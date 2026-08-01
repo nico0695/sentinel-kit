@@ -120,6 +120,7 @@ artifacts:
   design: ./sdd-lite/openspec/changes/e0-f1-h2-guards/design.md
   plan: ./sdd-lite/openspec/changes/e0-f1-h2-guards/plan.md
   execution_log: ./sdd-lite/openspec/changes/e0-f1-h2-guards/execution-log.md
+  review_ledger: ./sdd-lite/openspec/changes/e0-f1-h2-guards/review-ledger.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -303,17 +304,41 @@ open_risks:
       applied." — the explicit files.includes entry makes biome scan
       the dotfile; the design-formatted content passed with zero
       diagnostics, no fallback needed.
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 3
+  summary: >-
+    Standard-tier 4R review of the frozen story diff (4b43813..9e124e2,
+    109 hand-written lines): one reliability-lens sweep, zero severe
+    findings. Three WARNING rows recorded as info (R3-001..R3-003):
+    boundary-shape gaps in the rule regexes that only activate on file
+    layouts the PRD does not sanction (direction-level adapter files,
+    direct src/core/ files, prefix-sharing sibling dirs) — all proven
+    with live probes on a replica, all non-blocking per the severity
+    floor, candidates for a small follow-up hardening story. The lens
+    additionally generalized the S2 red-proof evidence with 12 probes
+    (bare fs, uninstalled npm, zod subpaths, $1 substitution, nested
+    depths, import type, dynamic import). No refuter (standard tier),
+    no fix rounds used.
+  reported_at: "2026-08-01T20:20:00Z"
+  ledger_path: ./sdd-lite/openspec/changes/e0-f1-h2-guards/review-ledger.md
 next_action:
   kind: advance-stage
   target: sddl-qa-review
   summary: >-
     Execution complete (S1 + S2, all 13 ACs covered, final check/dev
-    green, story diff = exactly the 4 intended files). Run
-    sddl-qa-review in final mode over the implemented change (includes
-    dev-001 typescript re-pin per dec-011 and dev-002 AC-06 full-chain
-    fixture adjustment), then orchestrator-owned closing mechanics per
-    ckp-001: single commit (suggested "feat: add dependency-cruiser
-    architecture guards to check gate"), PR "[E0.F1.H2] ..." with
-    Closes #3 (never merge), history S03 entry committed.
+    green, story diff = exactly the 4 intended files) and 4R review
+    finished pass_with_warnings (0 severe, 3 info). Run sddl-qa-review
+    in final mode over the implemented change (includes dev-001
+    typescript re-pin per dec-011 and dev-002 AC-06 full-chain fixture
+    adjustment), consuming the review ledger as evidence, then
+    orchestrator-owned closing mechanics per ckp-001: PR "[E0.F1.H2]
+    ..." with Closes #3 (never merge), history S03 entry committed.
 created_at: "2026-08-01T17:02:29Z"
-updated_at: "2026-08-01T19:40:00Z"
+updated_at: "2026-08-01T20:20:00Z"

@@ -11,7 +11,7 @@
 ```
 E0 Foundations ──┬── E1 Engine spike ─────────┐
                  ├── E2 Repos & git ──┐        ▼
-                 └── E3 Harnesses ────┴──► E4 Run & engines ──► E5 Valid. & history ──► E6 Interface ──► E7 Closure
+                 └── E3 Harnesses ────┴──► E4 Run & engines ──► E5 Valid. & history ──► E6 Interface ──► E7 Wrap-up
 ```
 
 E2 and E3 run in parallel with E1 (development against `FakeEngine`). E1 only blocks E4.
@@ -25,7 +25,7 @@ E2 and E3 run in parallel with E1 (development against `FakeEngine`). E1 only bl
 | E4 Run & engines | 5 | 0 |
 | E5 Validations & history | 4 | 1 |
 | E6 Interface | 4 | 1 |
-| E7 Closure | 5 | 0 |
+| E7 Wrap-up | 5 | 0 |
 | **Total** | **39** | **5** |
 
 ---
@@ -341,7 +341,7 @@ Acceptance: [ ] session opens in the correct worktree · [ ] engine respects the
 
 ---
 
-## E7 — Closure
+## E7 — Wrap-up
 
 **Objective**: MVP validated with real use and published.
 **DoD**: success criteria from PRD §7 verified + first release on npm.

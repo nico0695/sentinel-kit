@@ -40,7 +40,7 @@ E2 and E3 run in parallel with E1 (development against `FakeEngine`). E1 only bl
 #### E0.F1.H1 — Create repo and scaffold the hexagonal structure
 🔴 required · Depends on: —
 Goal: project existence with the structure from PRD §4.2.
-Description: create `sentinel` repo, reserve `@<scope>/sentinel` on npm, scaffold `src/{core,adapters,main}` with empty modules + `harnesses/`, `skills/`, `fixtures/`. Base configs: package.json (ESM, bin `sentinel`+`snt`, engines ≥22), strict tsconfig, biome.
+Description: create `sentinel` repo, reserve `@nico0695/sentinel` on npm, scaffold `src/{core,adapters,main}` with empty modules + `harnesses/`, `skills/`, `fixtures/`. Base configs: package.json (ESM, bin `sentinel`+`snt`, engines ≥22), strict tsconfig, biome.
 Acceptance: [ ] complete structure per PRD §4.2 · [ ] `npm run check` runs biome+tsc · [ ] npm package reserved.
 
 #### E0.F1.H2 — Executable architecture guards
@@ -376,6 +376,6 @@ Acceptance: [ ] decision recorded in the PRD · [ ] consistent LICENSE in repo a
 
 #### E7.F2.H3 — Release pipeline and first publication
 🔴 required · Depends on: E7.F1.H1, E7.F2.H2
-Goal: `npm i -g @<scope>/sentinel` working in the real world.
+Goal: `npm i -g @nico0695/sentinel` working in the real world.
 Description: changesets + `release.yml` (publish with `--provenance` via OIDC); publish v0.1.0; verify clean installation on a machine other than the development one.
 Acceptance: [ ] published with provenance · [ ] clean global install + `sentinel --version` OK · [ ] alias `snt` working.

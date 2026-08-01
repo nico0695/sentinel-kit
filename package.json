@@ -1,0 +1,28 @@
+{
+  "name": "@nico0695/sentinel",
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "sentinel": "./dist/cli.js",
+    "snt": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "harnesses",
+    "skills"
+  ],
+  "scripts": {
+    "dev": "node --experimental-strip-types src/main/cli.ts",
+    "build": "tsup",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "typescript": "7.0.2",
+    "@types/node": "22.20.1"
+  }
+}

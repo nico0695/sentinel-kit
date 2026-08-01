@@ -6,24 +6,24 @@
 - project_root: /home/user/sentinel-kit
 - runtime_root: ./sdd-lite
 - generated_at: 2026-08-01T13:14:29Z
-- last_refreshed_at: 2026-08-01T13:42:35Z
+- last_refreshed_at: 2026-08-01T14:39:32Z
 - generated_by: sddl-init
 
 ## Stack Summary
 
-> The repository is **pre-implementation**: no commits, no manifest, no source tree. Every stack value below is
-> *specified* in `docs/`, not yet *observed* in the working tree. Treat them as the approved target, and re-validate
-> once `[E0.F1.H1]` (scaffold) lands.
+> `[E0.F1.H1]` (scaffold, PR #47) landed: the stack below is now **observed** in the working tree, not just
+> specified in `docs/`. Package: `@nico0695/sentinel` (ESM, bin `sentinel` + `snt`).
 
 | Area | Value | Evidence |
 |---|---|---|
-| languages | typescript | `docs/setup-tecnico-sentinel.md` §1 (decided, with analysis) |
-| frameworks | none — CLI application (commander + @clack/prompts) | `docs/setup-tecnico-sentinel.md` §4 |
-| runtime | node >=22, runtime-agnostic code | `docs/setup-tecnico-sentinel.md` §2; `docs/prd-sentinel.md` |
-| package_manager | npm | `docs/setup-tecnico-sentinel.md` §5.1 (`npm run` scripts, npm publish with provenance) |
+| languages | typescript 7.0.2 | `package.json` devDependencies; `tsconfig.json` at root |
+| frameworks | none — CLI application (commander + @clack/prompts planned) | `docs/setup-tecnico-sentinel.md` §4; no runtime deps installed yet |
+| runtime | node >=22, runtime-agnostic code | `package.json` `engines.node: ">=22"`; `npm run dev` uses `--experimental-strip-types` |
+| package_manager | npm | `package-lock.json` (lockfileVersion 3) present |
 
-Planned runtime dependencies (7 total, deliberately minimal): commander, @clack/prompts, execa, zod, yaml,
-picocolors, ±marked. Dev toolchain: vitest, Biome, dependency-cruiser, tsup, changesets.
+Runtime dependencies: **none installed yet** — the planned minimal set (commander, @clack/prompts, execa, zod,
+yaml, picocolors, ±marked) arrives with its stories. Dev toolchain installed and green: @biomejs/biome 2.5.6,
+typescript 7.0.2, @types/node 22.20.1. Still pending: vitest, dependency-cruiser, tsup, changesets.
 
 ## Important Directories
 
@@ -32,7 +32,8 @@ picocolors, ±marked. Dev toolchain: vitest, Biome, dependency-cruiser, tsup, ch
 | `docs/` | Specification source of truth | PRD, technical setup, MVP backlog. The only authoritative content today. |
 | `sdd-lite/` | Vendored sdd-lite package + runtime root | Package files and generated runtime artifacts share this directory. |
 | `.claude/skills/` | Installed sdd-lite skills | Copy install, path-rewritten to project-relative. |
-| `src/` | **Does not exist yet** | Target layout is PRD §4.2: `core/`, `adapters/{driving,driven}/`, `main/`. |
+| `src/` | Source root per PRD §4.2 | 13 placeholder modules, zero imports: `core/{repos,workspace,review,run,history,shared}`, `adapters/driving/{cli,tui}`, `adapters/driven/{engines,git,exec,storage}`, `main/cli.ts`. |
+| `harnesses/`, `skills/`, `fixtures/` | Packaged/support roots (`.gitkeep` placeholders) | `harnesses` and `skills` ship in the npm package (`files` in package.json); `fixtures/` holds adapter contract fixtures later. |
 
 ## Key Docs
 
@@ -46,19 +47,20 @@ picocolors, ±marked. Dev toolchain: vitest, Biome, dependency-cruiser, tsup, ch
 
 ## Quality Commands
 
-> None of these are runnable yet — no `package.json` exists. They come from `docs/setup-tecnico-sentinel.md` §5.1
-> and become real with story `[E0.F1.H1]`.
+> Scripts exist in `package.json` (per setup §5.1). `check` and `dev` are runnable today (verified exit 0 on
+> 2026-08-01); `build` and `test` are defined but their tools land in later stories.
 
-| Command Type | Candidate Commands | Evidence |
+| Command Type | Command | Status |
 |---|---|---|
-| install | `npm install` | inferred from npm-based scripts |
-| test | `npm test` (`vitest run`) | setup §5.1; projects split core/adapters/e2e per §5.4 |
-| build | `npm run build` (`tsup`) | setup §5.1 |
-| lint | `npm run check` | setup §5.1 — combined command |
-| typecheck | `npm run check` | setup §5.1 — combined command |
+| install | `npm install` | Runnable — lockfile v3, dev toolchain installs clean. |
+| lint / typecheck / format | `npm run check` | **Runnable, verified exit 0.** Currently `biome check . && tsc --noEmit`; `depcruise src` is appended by `[E0.F1.H2]`. |
+| dev | `npm run dev` | Runnable, verified exit 0 (`node --experimental-strip-types src/main/cli.ts`). |
+| build | `npm run build` (`tsup`) | Script defined; tsup not installed yet — lands in its own story. |
+| test | `npm test` (`vitest run`) | Script defined; vitest not installed yet — lands with `[E0.F2.x]`; projects split core/adapters/e2e per §5.4. |
 
-`npm run check` = `biome check . && tsc --noEmit && depcruise src`. It is a single gate covering lint/format,
-typecheck, **and the five architecture guards**. There are no separate lint/typecheck/format commands by design.
+`npm run check` is the single quality gate by design (no separate lint/typecheck/format commands). It reaches its
+full form — `biome check . && tsc --noEmit && depcruise src`, covering the five architecture guards — once
+`[E0.F1.H2]` adds dependency-cruiser.
 
 ## Conventions
 
@@ -72,15 +74,15 @@ typecheck, **and the five architecture guards**. There are no separate lint/type
 
 ## Risks And Unknowns
 
-- **Pre-implementation repository.** Only docs are committed (repo `nico0695/sentinel-kit`, product `sentinel`);
-  no CI in place yet — the first stages produce the very toolchain that later stages validate against.
-- **Stack is declared, not verified.** Library choices are documented decisions that have never been installed or
-  exercised together.
+- ~~Pre-implementation repository~~ **Resolved 2026-08-01**: `[E0.F1.H1]` landed (PR #47) — `package.json`,
+  lockfile, `tsconfig.json`, `biome.json`, and the PRD §4.2 `src/` skeleton exist; `npm run check` is green.
+  CI is still pending (`[E0.F1.H2]`/`[E0.F1.H3]`).
+- ~~Stack declared, not verified~~ **Partially resolved 2026-08-01**: the installed dev toolchain (biome 2.5.6,
+  typescript 7.0.2, @types/node 22.20.1) is verified working together. Runtime deps and the remaining dev tools
+  (vitest, depcruise, tsup, changesets) are still declared-only until their stories land.
 - **Unresolved PRD decisions.** Notably decision 6, the license (MIT vs private), tracked as `[E7.F2.H2]` and
   blocking first publish.
 - **Two engine spikes are unresolved unknowns** (`[E1.F1.H1]`, `[E1.F1.H2]`): headless invocation, non-interactive
   mode, timeouts, and whether OpenCode emits structured output at all. Much of E4 depends on their outcome.
-- **npm scope decided 2026-08-01**: `@nico0695/sentinel` (bin `sentinel` + alias `snt`). Docs still carry the
-  `@<scope>` placeholder; update them when `[E0.F1.H1]` writes the real package.json.
-- GitHub Issues verified empty on 2026-08-01: `create-issues.sh` is pending — the user runs it locally with
-  authenticated `gh` (one-shot; a second run duplicates all 44 issues).
+- **npm scope `@nico0695/sentinel`** (bin `sentinel` + alias `snt`): now the real package name in `package.json`,
+  and docs placeholders were updated with it. The scope reservation on npmjs.com remains user-owned.

@@ -31,11 +31,11 @@
 **Main channel (MVP): npm.**
 
 ```bash
-npm i -g @<scope>/sentinel     # installation
-npx @<scope>/sentinel          # one-off usage
+npm i -g @nico0695/sentinel     # installation
+npx @nico0695/sentinel          # one-off usage
 ```
 
-**Naming on npm (verified against the registry)**: `sentinel` and `sentinel-cli` are **taken**; `sentinelcli` is free. Recommendation: **scoped package `@<your-scope>/sentinel`** (always available) with `bin: sentinel`.
+**Naming on npm (verified against the registry)**: `sentinel` and `sentinel-cli` are **taken**; `sentinelcli` is free. Recommendation: **scoped package `@nico0695/sentinel`** (always available) with `bin: sentinel`.
 
 ⚠️ **Known binary collision**: HashiCorp Sentinel (policy-as-code) installs a `sentinel` binary. Users with HashiCorp tooling would have a PATH conflict. Options: (a) keep `sentinel` and document it (uncommon collision in your target audience), (b) short alternative binary like `snt` in addition to `sentinel`. Recommendation: (a) + alias `snt` as a second binary — costs one line in package.json.
 
@@ -73,7 +73,7 @@ Total runtime dependencies: **7** (commander, clack, execa, zod, yaml, picocolor
 
 ```jsonc
 {
-  "name": "@<scope>/sentinel",
+  "name": "@nico0695/sentinel",
   "type": "module",
   "engines": { "node": ">=22" },
   "bin": { "sentinel": "./dist/cli.js", "snt": "./dist/cli.js" },
@@ -150,7 +150,7 @@ changesets/action:
 
 ## 7. Bootstrap checklist
 
-1. Create `sentinel` repo + npm scope; reserve `@<scope>/sentinel`.
+1. Create `sentinel` repo + npm scope; reserve `@nico0695/sentinel`.
 2. Scaffold: structure per PRD §4.2 + configs from §5 of this doc.
 3. CI with the 3 jobs and guards active (even if `core/` is nearly empty).
 4. `FakeEngine` + `ReviewEngine` port + first contract test — unblocks all core development in parallel.

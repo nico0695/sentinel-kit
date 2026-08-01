@@ -1,0 +1,228 @@
+version: "0.1"
+change_name: e0-f1-h3-ci-pipeline
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F1.H3] (issue #4): GitHub Actions ci.yml with jobs
+    check (biome, tsc, depcruise), test (vitest, Node matrix 22/24), and
+    build (tsup + smoke `sentinel --version`), running on PR and push to
+    main, per setup §6. Stacked on [E0.F1.H2] (PR #48, under review):
+    branch created from origin/claude/scaffold-hexagonal-structure-dfq16n
+    (b7f5e98), PR base will be that branch so the diff shows only H3.
+    Known tension routed to proposal/spec: the test and build scripts
+    exist but vitest and tsup are NOT installed yet (npm test exit 127
+    recorded at H2 QA), while the story AC requires all 3 jobs to run —
+    the story description itself names vitest, tsup, and the bin smoke,
+    so minimal tool enablement is likely in scope, but the boundary must
+    be pinned explicitly against E0.F2.x (which owns real test content).
+    Bounded blast radius: one workflow file plus minimal tooling
+    enablement. Normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-01T18:40:00Z"
+lifecycle_status: planning
+current_stage: sddl-spec
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocking routing — setup §6 pins the 3 jobs, the
+      repo state is audited (H2 state.yaml + skill catalog), and the
+      vitest/tsup gap is a known documented fact to be resolved as a scope
+      decision in proposal/spec, not an evidence gap.
+  sddl-proposal:
+    status: done
+    completed_at: "2026-08-01T18:55:00Z"
+    notes: >-
+      proposal.md written. Problem framed (no CI enforcement of quality
+      gate + guards; vitest/tsup not installed; cli.ts no-op vs bin smoke).
+      Scope sketch pins minimal-enablement boundary: ci.yml + vitest
+      install (green with zero tests) + tsup install/minimal config +
+      minimal --version in cli.ts IN; release.yml / pr-title / dependabot,
+      E0.F2.x test content, E6.F1.x wiring OUT. Feasibility high. Five
+      open questions routed to spec (zero-test strategy, tsup config
+      shape, --version implementation + smoke invocation, matrix breadth,
+      exact pins). Phase checkpoint implicitly approved per ckp-001
+      (auto mode, pre-approved kickoff).
+  sddl-spec:
+    status: done
+    completed_at: "2026-08-01T19:10:00Z"
+    notes: >-
+      spec.md written. Firm scope boundary + 10 acceptance criteria
+      (AC-01..AC-10). All five proposal questions pinned as A-level
+      decisions dec-002..dec-006: --passWithNoTests in the test script
+      (no vitest config file, E0.F2.x inherits a clean slate with a
+      recorded flag-removal duty); tsup.config.ts at root + biome
+      allowlist entry; --version prints package.json version from a
+      single source of truth, smoke pinned as `node dist/cli.js
+      --version`; matrix [22,24] on test only, check/build on Node 22
+      (engines floor); vitest/tsup as exact devDep pins with concrete
+      versions design-owned. Triggers pinned: pull_request unfiltered
+      (stacked PR must fire) + push to main. Guard red-proof pinned as
+      evidence chain (command-level equivalence + H2 red proofs + one
+      local uncommitted red demo), never a broken pushed commit. Phase
+      checkpoint ckp-002 implicitly approved per ckp-001 (auto mode).
+artifacts:
+  state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
+  proposal: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/proposal.md
+  spec: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/spec.md
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Execution mode and scope approval for the whole change, given in the
+      user session-kickoff message (2026-08-01): run [E0.F1.H3] as an
+      sdd-lite change through proposal → spec → design → plan → executor →
+      qa autonomously. Scope = issue #4 (3 CI jobs on PR and push to main;
+      broken guard = red pipeline) per setup §6. Stacking constraints from
+      the kickoff: branch FROM origin/claude/scaffold-hexagonal-structure-dfq16n
+      (never main), PR base = that branch, merge H2 review fixes if PR #48
+      moves while working. Closing requirements: npm run check green before
+      PR, PR "[E0.F1.H3] ..." with Closes #4 (never merge, never push
+      main), history entry committed before closing.
+    question: >-
+      Proceed with e0-f1-h3-ci-pipeline in auto mode with the
+      kickoff-defined scope?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved in advance by the user kickoff message (autonomous remote
+        session; user not available mid-task).
+      responded_at: "2026-08-01T18:40:00Z"
+    created_at: "2026-08-01T18:40:00Z"
+    resolved_at: "2026-08-01T18:40:00Z"
+  - id: ckp-002
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      Spec phase checkpoint: firm scope boundary, AC-01..AC-10, and the
+      five A-level pins dec-002..dec-006. Implicitly approved per
+      ckp-001 (auto mode, whole-change pre-approval covering phase
+      checkpoints).
+    question: >-
+      Approve spec.md scope contract and proceed to sddl-design?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; recorded
+        as such per handoff instruction.
+      responded_at: "2026-08-01T19:10:00Z"
+    created_at: "2026-08-01T19:10:00Z"
+    resolved_at: "2026-08-01T19:10:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: auto mode, kickoff-defined scope, stacked-branch workflow
+    rationale: >-
+      The kickoff message explicitly defines how to run the story, the
+      stacked-branch mechanics (base H2 branch, not main), and the closing
+      requirements; the session is autonomous. Stage approvals for
+      code-touching work are satisfied by this explicit pre-approval; any
+      deviation from the pinned scope still stops (protocol B/C).
+    recorded_at: "2026-08-01T18:40:00Z"
+  - id: dec-002
+    checkpoint_id: ckp-002
+    free_text: >-
+      Zero-test strategy: `vitest run --passWithNoTests` in the npm test
+      script; no vitest config file committed in this story.
+    rationale: >-
+      A-level (claude). Contract holds: npm test exits 0 today with zero
+      test files and turns non-zero the moment a real failing test
+      exists (the flag only tolerates absence of tests, never failures).
+      Leaves E0.F2.x a clean slate — no throwaway config to replace and
+      no biome allowlist churn. Explicit hand-off duty recorded: E0.F2.x
+      must remove the flag when the real projects config lands, so an
+      empty test glob can never pass silently afterwards.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-003
+    checkpoint_id: ckp-002
+    free_text: >-
+      tsup config lives in `tsup.config.ts` at repo root (not a
+      package.json field), added to biome files.includes.
+    rationale: >-
+      A-level (claude). Typed and discoverable; matches the repo
+      convention of explicit root config files (biome.json,
+      tsconfig.json, .dependency-cruiser.cjs — which needed the same
+      allowlist treatment in H2). Exact file contents are design-owned;
+      design must also verify tsc --noEmit treatment of the file so
+      npm run check stays green.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-004
+    checkpoint_id: ckp-002
+    free_text: >-
+      --version behavior: built bin prints the package.json version and
+      exits 0; smoke command pinned as `node dist/cli.js --version`;
+      every other invocation stays a no-op exiting 0.
+    rationale: >-
+      A-level (claude). The printed version must come from a single
+      source of truth (package.json version field — no duplicated
+      hardcoded literal), preventing drift without absorbing E6.F1.x
+      composition-root scope; mechanism (JSON import, createRequire, or
+      build-time define) is design-owned. `node dist/cli.js` avoids
+      npm-link/npm-exec indirection and is deterministic in CI. cli.ts
+      stays dependency-free (no core imports), passing all guards.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-005
+    checkpoint_id: ckp-002
+    free_text: >-
+      Matrix breadth: test job matrixes Node [22, 24]; check and build
+      jobs run on Node 22 only.
+    rationale: >-
+      A-level (claude). Matches setup §6 verbatim (matrix only on test).
+      Node 22 is the engines floor (>=22): lint/typecheck/guard results
+      are Node-version-independent tooling, and building + smoking on
+      the floor proves the bin works on the minimum supported runtime;
+      also saves CI minutes.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-006
+    checkpoint_id: ckp-002
+    free_text: >-
+      vitest and tsup installed as exact devDep pins (npm i -D -E);
+      concrete versions chosen in design.
+    rationale: >-
+      A-level (claude). Consistent with the existing exact-pin policy
+      (biome 2.5.6, dependency-cruiser 18.1.0, typescript 5.9.3).
+      Design must verify compatibility: a vitest version supporting
+      Node 22/24 and TS 5.9.3, and a tsup version compatible with
+      typescript 5.9.3 (tsup bundles via esbuild so the TS version is
+      mostly irrelevant — recorded for the audit).
+    recorded_at: "2026-08-01T19:10:00Z"
+open_risks:
+  - id: risk-001
+    severity: medium
+    summary: >-
+      vitest and tsup are not installed (scripts exist, tools missing —
+      npm test exit 127 at H2 QA), but the story AC requires all 3 jobs
+      to run and the pipeline must be green on this very PR. Resolution
+      owned by proposal/spec: pin the minimal-enablement boundary for
+      each tool without absorbing E0.F2.x scope (test content) or
+      inventing unpinned toolchain decisions.
+  - id: risk-002
+    severity: low
+    summary: >-
+      Stacked PR: base = claude/scaffold-hexagonal-structure-dfq16n while
+      PR #48 is under review. If H2 receives review fixes, this branch
+      must merge them before opening/updating the PR (kickoff rule). CI
+      on this PR runs against the stacked diff; GitHub retargets to main
+      when #48 merges.
+  - id: risk-003
+    severity: low
+    summary: >-
+      The bin smoke `sentinel --version` requires dist/cli.js to respond
+      to --version, but src/main/cli.ts is a deliberate no-op (wiring
+      lands E6.F1.x). The story description names the smoke explicitly,
+      so a minimal --version behavior is likely in scope — boundary to be
+      pinned in spec against the E6 composition-root scope.
+next_action:
+  kind: stage
+  target: sddl-spec
+  summary: >-
+    Formalize scope boundaries and acceptance criteria from proposal.md,
+    resolving the five open questions (zero-test strategy, tsup config
+    shape, --version implementation and smoke invocation, matrix breadth,
+    exact pins) with the minimal-enablement contract against E0.F2.x and
+    E6.F1.x.
+created_at: "2026-08-01T18:40:00Z"
+updated_at: "2026-08-01T18:55:00Z"

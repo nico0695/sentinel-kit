@@ -1,0 +1,432 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "sdd-lite Change State"
+type: object
+additionalProperties: false
+required:
+  - version
+  - change_name
+  - objective
+  - mode
+  - complexity_assessment
+  - lifecycle_status
+  - current_stage
+  - stages
+  - artifacts
+  - checkpoints
+  - decisions
+  - open_risks
+  - next_action
+  - created_at
+  - updated_at
+properties:
+  version:
+    type: string
+    minLength: 1
+  change_name:
+    type: string
+    pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+  objective:
+    type: string
+    enum:
+      - new-feature
+      - bug-fix
+      - planner
+      - refactor-rework
+  mode:
+    type: string
+    const: lite
+  complexity_assessment:
+    type: object
+    additionalProperties: false
+    required:
+      - route
+      - summary
+      - recorded_at
+    properties:
+      route:
+        type: string
+        enum:
+          - continue-lite
+          - macro-plan-first
+          - escalate-to-sdd-v2
+      summary:
+        type: string
+        minLength: 1
+      confidence:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+      recorded_at:
+        type: string
+        minLength: 1
+  lifecycle_status:
+    type: string
+    enum:
+      - draft
+      - planning
+      - planned
+      - implementing
+      - reviewing
+      - completed
+      - blocked
+  current_stage:
+    type: string
+    enum:
+      - none
+      - sddl-deep-explorer
+      - sddl-proposal
+      - sddl-spec
+      - sddl-design
+      - sddl-plan
+      - sddl-executor
+      - sddl-code-review
+      - sddl-judgment-day
+      - sddl-qa-review
+  stages:
+    type: object
+    additionalProperties: false
+    required:
+      - sddl-deep-explorer
+      - sddl-proposal
+      - sddl-spec
+      - sddl-design
+      - sddl-plan
+      - sddl-executor
+      - sddl-qa-review
+    properties:
+      sddl-deep-explorer:
+        $ref: "#/$defs/stageState"
+      sddl-proposal:
+        $ref: "#/$defs/stageState"
+      sddl-spec:
+        $ref: "#/$defs/stageState"
+      sddl-design:
+        $ref: "#/$defs/stageState"
+      sddl-plan:
+        $ref: "#/$defs/stageState"
+      sddl-executor:
+        $ref: "#/$defs/stageState"
+      sddl-code-review:
+        $ref: "#/$defs/stageState"
+      sddl-judgment-day:
+        $ref: "#/$defs/stageState"
+      sddl-qa-review:
+        $ref: "#/$defs/stageState"
+  artifacts:
+    type: object
+    additionalProperties: false
+    required:
+      - state
+      - proposal
+      - spec
+      - design
+      - plan
+      - execution_log
+      - qa_report
+    properties:
+      state:
+        type: string
+        minLength: 1
+      proposal:
+        type: string
+        minLength: 1
+      spec:
+        type: string
+        minLength: 1
+      design:
+        type: string
+        minLength: 1
+      plan:
+        type: string
+        minLength: 1
+      execution_log:
+        type: string
+        minLength: 1
+      qa_report:
+        type: string
+        minLength: 1
+      macro_plan:
+        type: string
+        minLength: 1
+      review_ledger:
+        type: string
+        minLength: 1
+  checkpoints:
+    type: array
+    items:
+      $ref: "#/$defs/checkpoint"
+  decisions:
+    type: array
+    items:
+      $ref: "#/$defs/decision"
+  open_risks:
+    type: array
+    items:
+      $ref: "#/$defs/risk"
+  qa_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - mode
+      - verdict
+      - summary
+      - reported_at
+      - report_path
+    properties:
+      mode:
+        type: string
+        enum:
+          - stage
+          - final
+      verdict:
+        type: string
+        enum:
+          - pass
+          - pass_with_warnings
+          - fail
+      summary:
+        type: string
+        minLength: 1
+      reported_at:
+        type: string
+        minLength: 1
+      report_path:
+        type: string
+        minLength: 1
+  review_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - mode
+      - verdict
+      - round
+      - summary
+      - reported_at
+      - ledger_path
+    properties:
+      mode:
+        type: string
+        enum:
+          - 4r
+          - judgment-day
+      verdict:
+        type: string
+        enum:
+          - pass
+          - pass_with_warnings
+          - fail
+          - not_reached
+      round:
+        type: integer
+        minimum: 0
+        maximum: 2
+      counts:
+        type: object
+        additionalProperties: false
+        properties:
+          confirmed:
+            type: integer
+            minimum: 0
+          suspect:
+            type: integer
+            minimum: 0
+          escalated:
+            type: integer
+            minimum: 0
+          info:
+            type: integer
+            minimum: 0
+      summary:
+        type: string
+        minLength: 1
+      reported_at:
+        type: string
+        minLength: 1
+      ledger_path:
+        type: string
+        minLength: 1
+  next_action:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - summary
+    properties:
+      kind:
+        type: string
+        enum:
+          - run_stage
+          - ask_user
+          - wait_for_approval
+          - review_output
+          - create_macro_plan
+          - escalate_to_sdd_v2
+          - complete
+          - halt
+      target:
+        type: string
+      summary:
+        type: string
+        minLength: 1
+  created_at:
+    type: string
+    minLength: 1
+  updated_at:
+    type: string
+    minLength: 1
+$defs:
+  stageState:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        enum:
+          - pending
+          - in_progress
+          - completed
+          - blocked
+          - skipped
+      started_at:
+        type: string
+      completed_at:
+        type: string
+      last_updated_at:
+        type: string
+      notes:
+        type: string
+  checkpoint:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - type
+      - stage
+      - summary
+      - question
+      - free_input_allowed
+      - created_at
+    properties:
+      id:
+        type: string
+        minLength: 1
+      type:
+        type: string
+        enum:
+          - language_selection
+          - missing_context
+          - scope_change
+          - risk_review
+          - phase_validation
+          - stage_approval
+          - macro_plan_review
+          - review_gate
+          - escalation_review
+          - final_review
+      stage:
+        type: string
+        enum:
+          - orchestrator
+          - sddl-deep-explorer
+          - sddl-proposal
+          - sddl-spec
+          - sddl-design
+          - sddl-plan
+          - sddl-executor
+          - sddl-code-review
+          - sddl-judgment-day
+          - sddl-qa-review
+      summary:
+        type: string
+        minLength: 1
+      question:
+        type: string
+        minLength: 1
+      options:
+        type: array
+        items:
+          $ref: "#/$defs/decisionOption"
+      free_input_allowed:
+        type: boolean
+      response:
+        type: object
+        additionalProperties: false
+        properties:
+          selected_option_id:
+            type: string
+          free_text:
+            type: string
+          responded_at:
+            type: string
+      created_at:
+        type: string
+        minLength: 1
+      resolved_at:
+        type: string
+  decision:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - checkpoint_id
+      - rationale
+      - recorded_at
+    properties:
+      id:
+        type: string
+        minLength: 1
+      checkpoint_id:
+        type: string
+        minLength: 1
+      selected_option_id:
+        type: string
+      free_text:
+        type: string
+      rationale:
+        type: string
+        minLength: 1
+      recorded_at:
+        type: string
+        minLength: 1
+  decisionOption:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - label
+      - description
+    properties:
+      id:
+        type: string
+        minLength: 1
+      label:
+        type: string
+        minLength: 1
+      description:
+        type: string
+        minLength: 1
+      recommended:
+        type: boolean
+  risk:
+    type: object
+    additionalProperties: false
+    required:
+      - summary
+      - severity
+    properties:
+      id:
+        type: string
+      summary:
+        type: string
+        minLength: 1
+      severity:
+        type: string
+        enum:
+          - low
+          - medium
+          - high
+          - critical

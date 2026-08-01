@@ -1,0 +1,104 @@
+version: "0.1"
+project:
+  name: example-project
+  slug: example-project
+  root: /absolute/path/to/project
+  package_root: sdd/sdd-lite
+  runtime_root: ./sdd-lite
+  stack:
+    languages:
+      - typescript
+    frameworks:
+      - nextjs
+    runtime: node
+    package_manager: pnpm
+
+paths:
+  runtime_root: ./sdd-lite
+  project_context_path: ./sdd-lite/project-context.md
+  skill_catalog_path: ./sdd-lite/skill-catalog.md
+  artifact_root: ./sdd-lite/openspec
+  config_path: ./sdd-lite/openspec/config.yaml
+  changes_root: ./sdd-lite/openspec/changes
+  reviews_root: ./sdd-lite/openspec/reviews
+
+quality_commands:
+  install:
+    - pnpm install
+  test:
+    - pnpm test
+  build:
+    - pnpm build
+  lint:
+    - pnpm lint
+  typecheck:
+    - pnpm typecheck
+  format:
+    - pnpm format
+
+bootstrap:
+  status: created
+  strategy: shallow-high-signal
+  generated_at: "2026-04-13T00:00:00Z"
+  generated_by: sddl-init
+  last_validated_at: "2026-04-13T00:00:00Z"
+  refresh_recommended: false
+  refresh_reason_codes: []
+  observed_files:
+    manifests:
+      - package.json
+    lockfiles:
+      - pnpm-lock.yaml
+    docs:
+      - README.md
+    tool_configs:
+      - tsconfig.json
+      - eslint.config.js
+  observed_paths:
+    source_roots:
+      - src
+    test_roots:
+      - tests
+    config_roots:
+      - .
+
+conventions:
+  persisted_language: en
+  persisted_artifacts_english_only: true
+  chat_language: es
+  chat_language_source: inferred
+  asks_only_when_material: true
+  skill_catalog_generation: internal_helper
+
+ai_setups:
+  detected: []
+  # Possible values: claude_code, codex
+  configured: []
+  # Skills installed per AI target
+  skills_installed: []
+  # Example entry:
+  # - target: .claude/skills
+  #   method: symlink        # symlink | copy
+  #   installed_at: "2026-04-15T00:00:00Z"
+  #   skills:
+  #     - sddl-init
+  #     - sddl-proposal
+  #     - sddl-spec
+  #     - sddl-design
+  #     - sddl-plan
+  #     - sddl-executor
+  #     - sddl-code-review
+  #     - sddl-judgment-day
+  #     - sddl-deep-explorer
+  #     - sddl-qa-review
+  wrappers_injected: []
+  # Example entry:
+  # - ai: claude_code
+  #   target_file: CLAUDE.md
+  #   injected_at: "2026-04-15T00:00:00Z"
+
+metadata:
+  bootstrap_version: stage-1
+  package_mode: lite
+  planner_terminal_skill: sddl-plan
+  final_closure_skill: sddl-qa-review

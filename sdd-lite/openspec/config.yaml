@@ -1,0 +1,104 @@
+version: "0.1"
+project:
+  name: sentinel
+  slug: sentinel
+  root: /Users/nicolasschmidt/Documents/develop/test-cr-cli
+  package_root: sdd-lite
+  runtime_root: ./sdd-lite
+  stack:
+    languages:
+      - typescript
+    frameworks: []
+    runtime: node
+    package_manager: npm
+
+paths:
+  runtime_root: ./sdd-lite
+  project_context_path: ./sdd-lite/project-context.md
+  skill_catalog_path: ./sdd-lite/skill-catalog.md
+  artifact_root: ./sdd-lite/openspec
+  config_path: ./sdd-lite/openspec/config.yaml
+  changes_root: ./sdd-lite/openspec/changes
+  reviews_root: ./sdd-lite/openspec/reviews
+
+# NOTE: the repository is pre-implementation — there is no package.json yet, so none of
+# these commands are runnable. They are the approved target from
+# docs/setup-tecnico-sentinel.md §5.1 and become real with story [E0.F1.H1].
+quality_commands:
+  install:
+    - npm install
+  test:
+    - npm test
+  build:
+    - npm run build
+  lint:
+    - npm run check
+  typecheck:
+    - npm run check
+  format:
+    - npm run check
+
+bootstrap:
+  status: created
+  strategy: shallow-high-signal
+  generated_at: "2026-08-01T13:14:29Z"
+  generated_by: sddl-init
+  last_validated_at: "2026-08-01T13:14:29Z"
+  refresh_recommended: true
+  refresh_reason_codes:
+    - pre_implementation_repo
+    - quality_commands_unverified
+    - source_roots_absent
+  observed_files:
+    manifests: []
+    lockfiles: []
+    docs:
+      - CLAUDE.md
+      - docs/prd-sentinel.md
+      - docs/setup-tecnico-sentinel.md
+      - docs/backlog-mvp-sentinel.md
+    tool_configs: []
+  observed_paths:
+    source_roots: []
+    test_roots: []
+    config_roots:
+      - .
+
+conventions:
+  persisted_language: en
+  persisted_artifacts_english_only: true
+  chat_language: es
+  chat_language_source: inferred
+  asks_only_when_material: true
+  skill_catalog_generation: internal_helper
+
+ai_setups:
+  detected:
+    - claude_code
+  configured:
+    - claude_code
+  skills_installed:
+    - target: .claude/skills
+      method: copy
+      installed_at: "2026-08-01T13:14:29Z"
+      skills:
+        - sddl-init
+        - sddl-proposal
+        - sddl-spec
+        - sddl-design
+        - sddl-plan
+        - sddl-executor
+        - sddl-code-review
+        - sddl-judgment-day
+        - sddl-deep-explorer
+        - sddl-qa-review
+  wrappers_injected:
+    - ai: claude_code
+      target_file: CLAUDE.md
+      injected_at: "2026-08-01T13:14:29Z"
+
+metadata:
+  bootstrap_version: stage-1
+  package_mode: lite
+  planner_terminal_skill: sddl-plan
+  final_closure_skill: sddl-qa-review

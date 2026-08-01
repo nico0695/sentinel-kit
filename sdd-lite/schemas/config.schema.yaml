@@ -1,0 +1,325 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "sdd-lite Project Config"
+type: object
+additionalProperties: false
+required:
+  - version
+  - project
+  - paths
+  - quality_commands
+  - bootstrap
+  - conventions
+  - metadata
+properties:
+  version:
+    type: string
+    minLength: 1
+  project:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - slug
+      - root
+      - package_root
+      - runtime_root
+      - stack
+    properties:
+      name:
+        type: string
+        minLength: 1
+      slug:
+        type: string
+        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      root:
+        type: string
+        minLength: 1
+      package_root:
+        type: string
+        minLength: 1
+      runtime_root:
+        type: string
+        const: "./sdd-lite"
+      stack:
+        type: object
+        additionalProperties: false
+        required:
+          - languages
+          - frameworks
+          - runtime
+          - package_manager
+        properties:
+          languages:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          frameworks:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          runtime:
+            type: string
+            minLength: 1
+          package_manager:
+            type: string
+            minLength: 1
+  paths:
+    type: object
+    additionalProperties: false
+    required:
+      - runtime_root
+      - project_context_path
+      - skill_catalog_path
+      - artifact_root
+      - config_path
+      - changes_root
+    properties:
+      runtime_root:
+        type: string
+        const: "./sdd-lite"
+      project_context_path:
+        type: string
+        const: "./sdd-lite/project-context.md"
+      skill_catalog_path:
+        type: string
+        const: "./sdd-lite/skill-catalog.md"
+      artifact_root:
+        type: string
+        const: "./sdd-lite/openspec"
+      config_path:
+        type: string
+        const: "./sdd-lite/openspec/config.yaml"
+      changes_root:
+        type: string
+        const: "./sdd-lite/openspec/changes"
+      reviews_root:
+        type: string
+        const: "./sdd-lite/openspec/reviews"
+  quality_commands:
+    type: object
+    additionalProperties: false
+    required:
+      - install
+      - test
+      - build
+      - lint
+      - typecheck
+    properties:
+      install:
+        $ref: "#/$defs/commandList"
+      test:
+        $ref: "#/$defs/commandList"
+      build:
+        $ref: "#/$defs/commandList"
+      lint:
+        $ref: "#/$defs/commandList"
+      typecheck:
+        $ref: "#/$defs/commandList"
+      format:
+        $ref: "#/$defs/commandList"
+      dev:
+        $ref: "#/$defs/commandList"
+  bootstrap:
+    type: object
+    additionalProperties: false
+    required:
+      - status
+      - strategy
+      - generated_at
+      - generated_by
+      - last_validated_at
+      - refresh_recommended
+      - refresh_reason_codes
+      - observed_files
+      - observed_paths
+    properties:
+      status:
+        type: string
+        enum:
+          - created
+          - refreshed
+          - already_usable
+      strategy:
+        type: string
+        const: shallow-high-signal
+      generated_at:
+        type: string
+        minLength: 1
+      generated_by:
+        type: string
+        const: sddl-init
+      last_validated_at:
+        type: string
+        minLength: 1
+      refresh_recommended:
+        type: boolean
+      refresh_reason_codes:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      observed_files:
+        type: object
+        additionalProperties: false
+        required:
+          - manifests
+          - lockfiles
+          - docs
+          - tool_configs
+        properties:
+          manifests:
+            $ref: "#/$defs/pathList"
+          lockfiles:
+            $ref: "#/$defs/pathList"
+          docs:
+            $ref: "#/$defs/pathList"
+          tool_configs:
+            $ref: "#/$defs/pathList"
+      observed_paths:
+        type: object
+        additionalProperties: false
+        required:
+          - source_roots
+          - test_roots
+          - config_roots
+        properties:
+          source_roots:
+            $ref: "#/$defs/pathList"
+          test_roots:
+            $ref: "#/$defs/pathList"
+          config_roots:
+            $ref: "#/$defs/pathList"
+  conventions:
+    type: object
+    additionalProperties: false
+    required:
+      - persisted_language
+      - persisted_artifacts_english_only
+      - chat_language
+      - chat_language_source
+      - asks_only_when_material
+      - skill_catalog_generation
+    properties:
+      persisted_language:
+        type: string
+        const: en
+      persisted_artifacts_english_only:
+        type: boolean
+        const: true
+      chat_language:
+        type: string
+        enum:
+          - es
+          - en
+      chat_language_source:
+        type: string
+        enum:
+          - inferred
+          - user_confirmed
+          - defaulted
+      asks_only_when_material:
+        type: boolean
+      skill_catalog_generation:
+        type: string
+        const: internal_helper
+  ai_setups:
+    type: object
+    additionalProperties: false
+    properties:
+      detected:
+        type: array
+        items:
+          type: string
+          enum:
+            - claude_code
+            - codex
+      configured:
+        type: array
+        items:
+          type: string
+          enum:
+            - claude_code
+            - codex
+      skills_installed:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - target
+            - method
+            - installed_at
+            - skills
+          properties:
+            target:
+              type: string
+              minLength: 1
+            method:
+              type: string
+              enum:
+                - symlink
+                - copy
+            installed_at:
+              type: string
+              minLength: 1
+            skills:
+              type: array
+              items:
+                type: string
+                minLength: 1
+      wrappers_injected:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - ai
+            - target_file
+            - injected_at
+          properties:
+            ai:
+              type: string
+              enum:
+                - claude_code
+                - codex
+            target_file:
+              type: string
+              minLength: 1
+            injected_at:
+              type: string
+              minLength: 1
+  metadata:
+    type: object
+    additionalProperties: false
+    required:
+      - bootstrap_version
+      - package_mode
+      - planner_terminal_skill
+      - final_closure_skill
+    properties:
+      bootstrap_version:
+        type: string
+        minLength: 1
+      package_mode:
+        type: string
+        const: lite
+      planner_terminal_skill:
+        type: string
+        const: sddl-plan
+      final_closure_skill:
+        type: string
+        const: sddl-qa-review
+$defs:
+  commandList:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  pathList:
+    type: array
+    items:
+      type: string
+      minLength: 1

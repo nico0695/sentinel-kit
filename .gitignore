@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output (tsup)
+dist/
+*.tsbuildinfo
+
+# Test output (vitest)
+coverage/
+
+# Secrets — engines are invoked via their own CLI auth, but keep this closed
+.env
+.env.*
+!.env.example
+
+# Local sentinel runtime: ephemeral worktrees and persisted runs.
+# Never commit these — runs contain the full diff and prompt of a review.
+worktrees/
+runs/
+
+# Claude Code — machine-local settings only; shared config stays tracked
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# macOS
+.DS_Store

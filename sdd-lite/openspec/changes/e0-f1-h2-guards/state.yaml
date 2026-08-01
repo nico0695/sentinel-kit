@@ -16,7 +16,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-01T17:02:29Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -48,7 +48,23 @@ stages:
       contract). Checkpoint skipped — pre-approved by ckp-001 (auto mode);
       no scope ambiguity remains.
   sddl-design:
-    status: pending
+    status: done
+    completed_at: "2026-08-01T18:05:00Z"
+    notes: >-
+      design.md written: dependency-cruiser pinned 18.1.0 (npm latest,
+      engines ^22||^24||>=26, flagless .dependency-cruiser.cjs discovery
+      since v13 per README). Verbatim config included with semantics
+      verified against the published v18.1.0 source (group matching $1,
+      builtins keep literal specifier + dependencyType core, npm resolved
+      as node_modules/<pkg>, intersection matching for dependencyTypes,
+      native .js->.ts NodeNext fallback). Options: tsConfig fileName,
+      tsPreCompilationDeps true, doNotFollow node_modules. Five one-line
+      violation fixtures defined with direct `npx depcruise src`
+      attribution. New A-level decisions dec-007..dec-010. risk-001
+      reduced (source-verified); new executor-verify risks: risk-005
+      (typescript 7.0.2 API compatibility with dc), risk-006 (biome
+      dotfile allowlist scanning). Checkpoint skipped — pre-approved by
+      ckp-001 (auto mode).
   sddl-plan:
     status: pending
   sddl-executor:
@@ -59,6 +75,7 @@ artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h2-guards/state.yaml
   proposal: ./sdd-lite/openspec/changes/e0-f1-h2-guards/proposal.md
   spec: ./sdd-lite/openspec/changes/e0-f1-h2-guards/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f1-h2-guards/design.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -125,16 +142,59 @@ decisions:
     free_text: exact version pin, flagless config auto-discovery, and working NodeNext resolution are spec-level contract (AC-02/AC-03); concrete version and resolver options are design-owned
     rationale: A-level (claude). Spec owns the observable contract; design owns mechanics.
     recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-007
+    free_text: pin dependency-cruiser 18.1.0 exact (no ^/~)
+    rationale: >-
+      A-level (claude). npm latest as of 2026-08-01; engines
+      ^22||^24||>=26 fits Node >=22 and the future CI 22/24 matrix;
+      v13+ auto-discovers .dependency-cruiser.cjs flaglessly (AC-03);
+      exact pin matches H1 devDeps convention. Install via
+      `npm install --save-dev --save-exact dependency-cruiser@18.1.0`.
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-008
+    free_text: options.tsPreCompilationDeps = true
+    rationale: >-
+      A-level (claude). Type-only imports across forbidden boundaries are
+      architectural coupling and must trip the guards even though they
+      vanish at compile time (verbatimModuleSyntax makes them explicit);
+      also speeds up cruising. See design.md.
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-009
+    free_text: >-
+      core-no-io-libs = dependencyTypes ban list (core + all npm flavors +
+      unknown/undetermined/deprecated) with zod pathNot in both bare
+      ("^zod(/|$)") and resolved ("^node_modules/zod(/|$)") forms
+    rationale: >-
+      A-level (claude). Maps 1:1 to spec behavior (any npm except zod, or
+      any builtin); builtins are reported with their literal specifier
+      (fs / node:fs) and type core; npm packages as node_modules/<pkg>;
+      uninstalled specifiers keep the bare name with type unknown —
+      verified against v18.1.0 source. Accepted side effect: a typo'd
+      relative import in core trips this rule as unknown (tsc fails on it
+      anyway).
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-010
+    free_text: >-
+      red-proof protocol: per rule, run `npx depcruise src` directly and
+      require output naming exactly the target rule (non-zero exit); one
+      proof (AC-06) additionally shows full `npm run check` red; fixtures
+      are one-line side-effect imports in existing placeholders (plus one
+      temp file for AC-07), each tripping exactly one rule, fully reverted
+    rationale: >-
+      A-level (claude). Implements spec risk-004 mitigation with
+      deterministic attribution; fixture matrix cross-checked against all
+      5 rules in design.md.
+    recorded_at: "2026-08-01T18:05:00Z"
 open_risks:
   - id: risk-001
-    severity: medium
+    severity: low
     summary: >-
-      Setup §5.3 config sketch is likely not verbatim-usable: cross-field
-      regex backreferences (\1, \1/\2) should be dependency-cruiser $1/$2
-      group substitution, and the npm whitelist matcher (pathNot "^(zod)$")
-      matches resolved node_modules paths, not bare module names. Wrong
-      regexes yield silently permissive guards — mitigated by the mandatory
-      per-rule red-proof in executor.
+      DOWNGRADED at design (was medium): §5.3 sketch confirmed not
+      verbatim-usable, and the design config replaces it with semantics
+      verified directly against the published dependency-cruiser 18.1.0
+      source ($1 group substitution, builtin/npm path reporting,
+      dependencyTypes intersection, native .js->.ts fallback). Residual
+      risk closes with the executor's five per-rule red proofs.
   - id: risk-002
     severity: low
     summary: >-
@@ -150,17 +210,36 @@ open_risks:
   - id: risk-004
     severity: low
     summary: >-
-      Red-proof attribution: biome or tsc could fail before depcruise sees a
-      temporary violation. Spec expected-behavior requires crafting violations
-      that pass biome+tsc, or capturing the depcruise step alone to show the
-      rule name plus the full-chain non-zero exit.
+      RESOLVED by dec-010 (design): red-proof attribution handled by
+      running `npx depcruise src` directly per rule (output names the
+      rule) plus one full-chain `npm run check` red on AC-06; fixtures
+      are crafted to pass biome and tsc.
+  - id: risk-005
+    severity: medium
+    summary: >-
+      dependency-cruiser 18.1.0 declares no typescript peer range; the
+      installed typescript is 7.0.2 (native-compiler line). If dc cannot
+      drive TS 7's compiler API, TS parsing/tsconfig loading may degrade
+      to the acorn fallback. Executor-verify at first `npx depcruise src`
+      + AC-05 red proof (fixtures are acorn-parseable, so failure is
+      observable, not silent). If TS 7 is genuinely unsupported: STOP,
+      protocol C (touching the typescript pin is H1 scope).
+  - id: risk-006
+    severity: low
+    summary: >-
+      biome scanning of the dotfile .dependency-cruiser.cjs via an
+      explicit files.includes entry (AC-13). Executor-verify with
+      `npx biome check .dependency-cruiser.cjs`; fallback is adjusting
+      the allowlist entry and/or `biome check --write` formatting —
+      content-neutral.
 next_action:
   kind: delegate
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Delegate design stage: choose the dependency-cruiser version pin, resolver
-    options (tsconfig/NodeNext), and exact rule regexes implementing the
-    behaviors pinned in spec.md; define the per-rule violation fixtures for the
-    executor's red proofs.
+    Delegate plan stage: turn design.md into the ordered executor plan —
+    install + config + script/biome edits, green baseline, the five
+    red-proof cycles (AC-05..AC-09 with the dec-010 attribution
+    protocol, including the AC-07 negative control), and closeout checks
+    (AC-11 clean tree, AC-12 test-gap note).
 created_at: "2026-08-01T17:02:29Z"
-updated_at: "2026-08-01T17:35:00Z"
+updated_at: "2026-08-01T18:05:00Z"

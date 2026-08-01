@@ -82,7 +82,18 @@ stages:
       Two A-level deviations recorded in execution-log.md: dev-001 existing
       .gitignore kept (already a superset of design's four patterns);
       dev-002 cli.ts comment references E6.F1.x (design's E0.F4.x does not
-      exist in the backlog). S2 and S3 pending.
+      exist in the backlog).
+      S2 completed (npm install + gates green): pins installed exactly
+      (@biomejs/biome 2.5.6, typescript 7.0.2, @types/node 22.20.1;
+      lockfileVersion 3), npm run check exit 0 with zero diagnostics,
+      npm run dev exit 0, devDeps-only tree confirmed (npm ls --omit=dev
+      empty). TS 7.0.2->5.9.3 fallback decision point did NOT fire — 7.0.2
+      passes the full §5.2 flag set; pin stands (dec-002). Two A-level
+      gate-revealed fixes to S1 files recorded in execution-log.md:
+      dev-003 package.json files array reformatted multiline (biome
+      formatter requirement); dev-004 biome.json rules.recommended migrated
+      to rules.preset via biome migrate (field deprecated in 2.5.6).
+      S3 pending.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -128,21 +139,31 @@ decisions:
       pre-approval; any deviation from the pinned scope still stops (protocol
       B/C).
     recorded_at: "2026-08-01T14:14:32Z"
-open_risks:
-  - id: risk-001
-    summary: >-
-      Toolchain versions were never installed together in this repo (stack is
-      declared, not verified); npm install may surface incompatibilities.
-    severity: low
+  - id: dec-002
+    checkpoint_id: ckp-001
+    free_text: keep typescript 7.0.2 — pre-authorized fallback not needed
+    rationale: >-
+      S2 decision point (design.md, A-level pre-authorized): fall back to
+      typescript 5.9.3 only if 7.0.2 failed install or misbehaved on the
+      setup §5.2 strict flag set with --noEmit. Evidence at execution:
+      7.0.2 installed cleanly (npx tsc --version = 7.0.2) and npm run check
+      (biome check . && tsc --noEmit) exited 0 with zero diagnostics over
+      all 13 placeholder files. Fallback condition never met; the 7.0.2 pin
+      stands. Recorded per plan.md Approval Notes (mandatory logging of the
+      decision point outcome). Authorship: claude (A-level).
+    recorded_at: "2026-08-01T15:10:00Z"
+open_risks: []
 next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S1 done. Execute plan stage S2 next: npm install (pinned devDeps,
-    lockfile committed), then npm run check and npm run dev must exit 0.
-    Pre-authorized typescript 7.0.2 -> 5.9.3 fallback decision point lives
-    in S2 (mandatory execution-log + state.yaml recording if it fires).
-    Then S3 (8 docs placeholder replacements + final gate re-run). All
-    pre-approved via ckp-001.
+    S1 and S2 done, gates green (check exit 0 zero diagnostics, dev exit 0,
+    devDeps-only tree, lockfile v3 present). risk-001 retired by evidence.
+    Execute plan stage S3 next: replace the 8 docs placeholder occurrences
+    with @nico0695/sentinel (backlog L43/L379, prd L279, setup
+    L34/L35/L38/L76/L153) and re-run npm run check as the closing gate.
+    Commit of S2 outputs (package.json, biome.json, package-lock.json) is
+    orchestrator-owned. sddl-qa-review recommended after S3/closeout
+    (stage-mode after S2 also acceptable). All pre-approved via ckp-001.
 created_at: "2026-08-01T14:14:32Z"
-updated_at: "2026-08-01T14:58:00Z"
+updated_at: "2026-08-01T15:10:00Z"

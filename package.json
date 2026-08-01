@@ -9,7 +9,11 @@
     "sentinel": "./dist/cli.js",
     "snt": "./dist/cli.js"
   },
-  "files": ["dist", "harnesses", "skills"],
+  "files": [
+    "dist",
+    "harnesses",
+    "skills"
+  ],
   "scripts": {
     "dev": "node --experimental-strip-types src/main/cli.ts",
     "build": "tsup",

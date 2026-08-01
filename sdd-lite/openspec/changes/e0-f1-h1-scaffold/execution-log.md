@@ -5,7 +5,7 @@
 | Stage Id | Goal | Touches Code | Approval | Status |
 |---|---|---|---|---|
 | S1 | Full file tree + root configs (13 placeholder `.ts`, 3 `.gitkeep`, package.json, tsconfig.json, biome.json, .gitignore) | yes | pre-approved (ckp-001) | completed |
-| S2 | `npm install` + gates green (`npm run check` exit 0, `npm run dev` exit 0; TS 7.0.2→5.9.3 fallback decision point) | yes | pre-approved (ckp-001) | pending |
+| S2 | `npm install` + gates green (`npm run check` exit 0, `npm run dev` exit 0; TS 7.0.2→5.9.3 fallback decision point) | yes | pre-approved (ckp-001) | completed |
 | S3 | Replace 8 docs placeholder occurrences with `@nico0695/sentinel` + final gate re-run | no | pre-approved (ckp-001) | pending |
 
 ## Stage Entries
@@ -50,3 +50,46 @@
 #### Next action
 
 - Invoke `sddl-executor` for stage S2: `npm install` (pinned devDeps, commit-ready lockfile), then `npm run check` and `npm run dev` must exit 0. Contains the pre-authorized typescript 7.0.2 → 5.9.3 fallback decision point (must be logged here + state.yaml if it fires).
+
+### S2 — npm install + quality gate green (completed)
+
+- executed_at: 2026-08-01
+- approval: ckp-001/dec-001 whole-change pre-approval (auto mode); no per-stage pause required.
+- planned scope: `npm install` with design-pinned devDeps; `npm run check` and `npm run dev` exit 0; edits limited to `package.json` (fallback only) + generated `package-lock.json` + ignored `node_modules/`. Gate-revealed defects in S1 files fixable minimally with recorded deviation.
+- precondition check: working tree was clean, S1 committed at `a44bf76`, devDeps already pinned in `package.json` (S1 did not leave them out) — assumptions held, no re-add needed.
+
+#### Command trail (commands, exit codes, versions)
+
+1. `npm install` → exit 0. "added 6 packages, and audited 7 packages"; 0 vulnerabilities. npm did NOT rewrite `package.json`. Installed exactly the design pins: `@biomejs/biome` 2.5.6, `typescript` 7.0.2, `@types/node` 22.20.1 (verified via `npx biome --version`, `npx tsc --version`, installed package.json). Node 22.22.2 / npm 10.9.7.
+2. `npm run check` (first run) → **exit 1**. Two diagnostics, both in S1-created files:
+   - error: biome formatter rejects `package.json` line 12 — `"files": ["dist", "harnesses", "skills"]` must be one-entry-per-line.
+   - info (non-blocking): `biome.json` `linter.rules.recommended` is DEPRECATED in biome 2.5.6 ("Use preset instead", suggests `biome migrate`).
+3. Fix dev-003 applied (see below) → `npm run check` → exit 0 (deprecation info still printed).
+4. Fix dev-004 applied via `npx biome migrate --write` (exit 0, one-line diff) → `npm run check` → **exit 0, zero diagnostics** ("Checked 16 files. No fixes applied."). AC-03 PASS.
+5. `npm run dev` (`node --experimental-strip-types src/main/cli.ts`) → **exit 0**, no output (deliberate no-op per design). AC-08 PASS.
+
+#### Deviations / decisions (A-level, recorded)
+
+- **TS fallback decision point: NOT fired.** typescript 7.0.2 installed cleanly and `tsc --noEmit` passed with the full §5.2 strict flag set on all 13 placeholder files. The pre-authorized 5.9.3 fallback was not needed; the 7.0.2 pin stands. Evidence: `npx tsc --version` → `Version 7.0.2`; `npm run check` exit 0.
+- **dev-003 — `package.json` `files` array reformatted multiline.** Gate-revealed formatting defect in an S1-created file: design wrote the array inline, biome 2.5.6's formatter requires one entry per line. Minimal fix (whitespace-only, same values), pre-authorized by the stage handoff. Authorship: claude (A-level).
+- **dev-004 — `biome.json` `linter.rules.recommended: true` → `linter.rules.preset: "recommended"`.** Design's verbatim config used a field deprecated in biome 2.5.6 (info-level, gate still exits 0, but every check run would carry the warning and the field dies in biome 3.x). Applied biome's own canonical migration (`npx biome migrate --write`); one-line, semantically equivalent diff, verified by a clean re-run. Authorship: claude (A-level).
+
+#### Quick checks
+
+- `npm run check` → exit 0, zero diagnostics. PASS (AC-03, the story gate).
+- `npm run dev` → exit 0. PASS (AC-08).
+- devDeps-only tree: `npm ls --omit=dev` → `(empty)`; lockfile root package has `devDependencies` only, no `dependencies` key. PASS (AC-07). (`npm ls --all` UNMET OPTIONAL entries are platform-specific biome/tsc binaries for other OS/arch — expected, not defects.)
+- Lockfile: `package-lock.json` present, lockfileVersion 3, exact pins recorded. PASS (D3; commit is orchestrator-owned).
+- `git status --short` → only `M biome.json`, `M package.json`, `?? package-lock.json` — exactly the allowed write scope; `node_modules/` ignored. PASS (scope).
+
+#### Blockers
+
+- None. risk-001 (unverified toolchain compatibility) is now retired by evidence: the three pins install and run together green.
+
+#### QA handoff
+
+- Recommended (not auto-run): S2 completed the meaningful checkpoint — toolchain live and gates green — which S1 deferred review to. Consider `sddl-qa-review` (stage mode) now, or after S3 at closeout per orchestrator routing; S3 is docs-only and low risk, so closeout-time final QA is also reasonable.
+
+#### Next action
+
+- Invoke `sddl-executor` for stage S3: replace the 8 docs placeholder occurrences with `@nico0695/sentinel` (backlog L43/L379, prd L279, setup L34/L35/L38/L76/L153), then re-run `npm run check` as the closing gate. Commit of S2 outputs (`package.json`, `biome.json`, `package-lock.json`) is orchestrator-owned.

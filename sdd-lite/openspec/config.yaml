@@ -21,16 +21,19 @@ paths:
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
 
-# NOTE: the repository is pre-implementation — there is no package.json yet, so none of
-# these commands are runnable. They are the approved target from
-# docs/setup-tecnico-sentinel.md §5.1 and become real with story [E0.F1.H1].
+# NOTE: [E0.F1.H1] landed (PR #47) — package.json exists and scripts follow
+# docs/setup-tecnico-sentinel.md §5.1. Runnable TODAY: `npm install`, `npm run check`
+# (currently `biome check . && tsc --noEmit`; depcruise is appended by [E0.F1.H2]) and
+# `npm run dev`. NOT runnable yet: `npm run build` (tsup lands in its own story) and
+# `npm test` (vitest lands with [E0.F2.x]) — the scripts exist but their tools are not
+# installed.
 quality_commands:
   install:
     - npm install
   test:
-    - npm test
+    - npm test # script defined; vitest not installed yet ([E0.F2.x])
   build:
-    - npm run build
+    - npm run build # script defined; tsup not installed yet
   lint:
     - npm run check
   typecheck:
@@ -41,26 +44,34 @@ quality_commands:
 bootstrap:
   status: refreshed
   strategy: shallow-high-signal
-  generated_at: "2026-08-01T13:14:29Z"
+  generated_at: "2026-08-01T14:39:32Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-01T13:42:35Z"
-  # Refreshed 2026-08-01: fixed stale absolute root (was a macOS path from another
-  # machine). The repo is still pre-implementation by design — that fact is accurately
-  # documented, not stale. A new refresh IS required right after [E0.F1.H1] lands
-  # (package.json + src/ appear and quality commands become runnable).
+  last_validated_at: "2026-08-01T14:39:32Z"
+  # Refreshed 2026-08-01 (post-[E0.F1.H1], PR #47): the repo is no longer
+  # pre-implementation. package.json (@nico0695/sentinel, ESM, node >=22, bin
+  # sentinel+snt), package-lock.json (v3), tsconfig.json, biome.json, and the PRD §4.2
+  # src/ skeleton (13 placeholder modules, zero imports) are observed in the working
+  # tree. `npm run check` and `npm run dev` verified exit 0 with the installed dev
+  # toolchain (biome 2.5.6, typescript 7.0.2, @types/node 22.20.1). Next refresh
+  # trigger: [E0.F1.H2] (depcruise joins `check`) or [E0.F2.x] (vitest lands).
   refresh_recommended: false
   refresh_reason_codes: []
   observed_files:
-    manifests: []
-    lockfiles: []
+    manifests:
+      - package.json
+    lockfiles:
+      - package-lock.json
     docs:
       - CLAUDE.md
       - docs/prd-sentinel.md
       - docs/setup-tecnico-sentinel.md
       - docs/backlog-mvp-sentinel.md
-    tool_configs: []
+    tool_configs:
+      - tsconfig.json
+      - biome.json
   observed_paths:
-    source_roots: []
+    source_roots:
+      - src
     test_roots: []
     config_roots:
       - .

@@ -18,8 +18,8 @@ module.exports = {
       // composition root.
       name: "core-no-adapters",
       severity: "error",
-      from: { path: "^src/core" },
-      to: { path: "^src/(adapters|main)" },
+      from: { path: "^src/core/" },
+      to: { path: "^src/(adapters|main)/" },
     },
     {
       // PRD §4.5 rule 2 (+ dec-002): the core imports no I/O or runtime
@@ -32,7 +32,7 @@ module.exports = {
       // ("node_modules/zod/...", how dc reports it once installed).
       name: "core-no-io-libs",
       severity: "error",
-      from: { path: "^src/core" },
+      from: { path: "^src/core/" },
       to: {
         dependencyTypes: [
           "core",
@@ -80,8 +80,8 @@ module.exports = {
       // the composition root imports from it.
       name: "wiring-only-in-main",
       severity: "error",
-      from: { pathNot: "^src/main" },
-      to: { path: "^src/main" },
+      from: { pathNot: "^src/main/" },
+      to: { path: "^src/main/" },
     },
   ],
   options: {

@@ -8,7 +8,7 @@
 - tier: standard
 - scope: change:e0-f1-h2-guards
 - round: 0
-- counts: confirmed=0 suspect=0 escalated=0 info=3
+- counts: confirmed=0 suspect=0 escalated=0 info=3 (R3-003 later fixed during PR #48 review — see post-review addendum)
 - open_severe_findings: 0
 - verdict: pass_with_warnings
 - next_action_digest: no severe findings — proceed to sddl-qa-review (final mode); the three info rows are future-layout boundary gaps, candidates for a follow-up story, never blocking
@@ -34,7 +34,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | R3-001 | reliability | .dependency-cruiser.cjs:76 | WARNING | info | deterministic | introduced | no | `adapters-isolated` silently exempts adapter files at direction level (`src/adapters/driving/*.ts`): the `from` regex requires depth >= 3, so a direction-level file can import any other adapter with a green check | live probe: `src/adapters/driving/shared.ts` importing `../driven/git/index.js` → exit 0, "no dependency violations found" (replica tree, dc 18.1.0, same config) |
 | R3-002 | reliability | .dependency-cruiser.cjs:60 | WARNING | info | deterministic | introduced | no | `core-modules-via-index` silently exempts files directly under `src/core/`: the `from` regex never matches `src/core/<file>.ts`, so such a file can deep-import module internals (rules 1-2 still apply to it; the via-index contract does not) | live probe: `src/core/util.ts` importing `./shared/internal.js` → exit 0. Likelihood lowered by the PRD layout (no direct core files) and the no-utils-in-core convention |
-| R3-003 | reliability | .dependency-cruiser.cjs:89-93 | WARNING | info | deterministic | introduced | no | Unanchored prefix regexes (`^src/main`, `^src/core`, `^src/(adapters\|main)`) misbehave on hypothetical sibling dirs sharing a name prefix: `src/mainframe` bypasses `wiring-only-in-main` silently; `src/maintenance` false-fires it | live probes: `src/mainframe/x.ts` importing `../main/cli.js` → exit 0 (silent bypass); adapter importing `src/maintenance/x.ts` → error `wiring-only-in-main` (false positive). Requires a top-level dir the PRD layout does not sanction; fix is `(/|$)` anchoring |
+| R3-003 | reliability | .dependency-cruiser.cjs:89-93 | WARNING | fixed | deterministic | introduced | no | Unanchored prefix regexes (`^src/main`, `^src/core`, `^src/(adapters\|main)`) misbehave on hypothetical sibling dirs sharing a name prefix: `src/mainframe` bypasses `wiring-only-in-main` silently; `src/maintenance` false-fires it | live probes: `src/mainframe/x.ts` importing `../main/cli.js` → exit 0 (silent bypass); adapter importing `src/maintenance/x.ts` → error `wiring-only-in-main` (false positive). Requires a top-level dir the PRD layout does not sanction; fix is `(/|$)` anchoring |
 
 Triage rationale (orchestrator): not `trivial` (the diff creates the executable guard config — the extraction guarantee itself); not `full-4r` (109 hand-written lines < 400; no auth/security/data surface; the hot-path concern concentrates in one config whose primary contracts already carry S2 red-proof evidence). `standard` tier → exactly one lens; dominant defect class is a silently permissive rule (correctness) → `reliability`.
 
@@ -65,3 +65,8 @@ None used (0 of 2). Severity floor: WARNING rows are recorded once as `info` and
 ## Budget Notes
 
 - Budgets used: 1 lens sweep of 1 allowed (standard); 0 refuter passes (not permitted in standard); 0 of 2 fix rounds.
+
+## Post-review addendum (PR #48)
+
+- R3-003 **resolved** during PR review: Copilot's review on PR #48 independently raised the same unanchored-prefix gap (`.dependency-cruiser.cjs` lines 22/35/83). Fixed by segment-anchoring the three prefix regexes with a trailing `/` (`^src/core/`, `^src/(adapters|main)/`, `^src/main/` in both `from.pathNot` and `to.path`) — equivalent to the suggested `(/|$)` for these rules since every matched entity is a file under the directory, and avoids introducing a capture group that would shift `$1` semantics. Re-verified: red probes for `core-no-adapters`, `core-no-io-libs`, `wiring-only-in-main` all still fire; negative control `src/coreutils/probe.ts` importing an adapter no longer false-fires (was the R3-003 bypass/false-positive pair); full `npm run check` green (13 modules cruised).
+- R3-001 and R3-002 (depth-1 file exemptions) remain open as `info` — not raised by the reviewer's active comment, still candidates for the follow-up hardening story.

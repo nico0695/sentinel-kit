@@ -1,0 +1,371 @@
+version: "0.1"
+change_name: e0-f1-h2-guards
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F1.H2] (issue #3): make the 5 PRD §4.5 architecture
+    guards executable with dependency-cruiser per setup §5.3 and append
+    `depcruise src` to `npm run check` (completing setup §5.1, closing the
+    S02-D2 deferral). Scope pinned by issue #3 AC (a forbidden import breaks
+    the check; core whitelist documented in the config) plus the user kickoff
+    (verify all 5 rules with temporary violations that are reverted). Small
+    blast radius: one new config file, one devDependency, one script edit;
+    scaffold from H1 is green and import-free. Normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-01T17:02:29Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown — the rules are written verbatim in setup §5.3, the
+      scaffold state is audited in S02 and the refreshed bootstrap, and the
+      kickoff pins the two decisions (final check chain; §5.3 rule set).
+  sddl-proposal:
+    status: done
+    completed_at: "2026-08-01T17:20:00Z"
+    notes: >-
+      proposal.md written. exploration_performed: true (targeted: setup
+      §5.1/§5.3, PRD §4.5, backlog E0.F1.H2, biome.json, package.json,
+      tsconfig.json). Checkpoint skipped — advancement pre-approved by
+      ckp-001. Six open questions routed to spec/design/executor; the only
+      scope-adjacent one is whether core-no-io-libs must also cover Node
+      builtins (PRD rule 2 names fs/child_process; §5.3 sketch only forbids
+      dependencyTypes npm).
+  sddl-spec:
+    status: done
+    completed_at: "2026-08-01T17:35:00Z"
+    notes: >-
+      spec.md written: 13 acceptance criteria (AC-01..AC-13), rule-behavior
+      table for the 5 guards, per-rule red-proof ACs. All proposal open
+      questions pinned as A-level decisions dec-002..dec-006 (Node builtins
+      fully banned in core; whitelist = comment + machine exception; behavior
+      pinned in spec, regex syntax to design; .dependency-cruiser.cjs added to
+      biome allowlist; version pin/discovery/resolution as behavioral
+      contract). Checkpoint skipped — pre-approved by ckp-001 (auto mode);
+      no scope ambiguity remains.
+  sddl-design:
+    status: done
+    completed_at: "2026-08-01T18:05:00Z"
+    notes: >-
+      design.md written: dependency-cruiser pinned 18.1.0 (npm latest,
+      engines ^22||^24||>=26, flagless .dependency-cruiser.cjs discovery
+      since v13 per README). Verbatim config included with semantics
+      verified against the published v18.1.0 source (group matching $1,
+      builtins keep literal specifier + dependencyType core, npm resolved
+      as node_modules/<pkg>, intersection matching for dependencyTypes,
+      native .js->.ts NodeNext fallback). Options: tsConfig fileName,
+      tsPreCompilationDeps true, doNotFollow node_modules. Five one-line
+      violation fixtures defined with direct `npx depcruise src`
+      attribution. New A-level decisions dec-007..dec-010. risk-001
+      reduced (source-verified); new executor-verify risks: risk-005
+      (typescript 7.0.2 API compatibility with dc), risk-006 (biome
+      dotfile allowlist scanning). Checkpoint skipped — pre-approved by
+      ckp-001 (auto mode).
+  sddl-plan:
+    status: done
+    completed_at: "2026-08-01T18:20:00Z"
+    notes: >-
+      plan.md written: 2 stages. S1 install dependency-cruiser@18.1.0
+      (exact) + .dependency-cruiser.cjs verbatim from design.md +
+      check-script edit + biome allowlist entry + green baseline; S1
+      contains both decision points with mandatory execution-log +
+      state.yaml recording: risk-005 (TS 7.0.2 compatibility, verify at
+      first `npx depcruise src`; no autonomous fallback — protocol C
+      STOP if unsupported) and risk-006 (biome dotfile scanning; bounded
+      content-neutral fallback: allowlist tweak / biome check --write).
+      S2 five red-proof cycles in AC order (dec-010: direct
+      `npx depcruise src` per proof naming exactly the target rule,
+      AC-06 full-chain `npm run check` red, AC-07 negative control +
+      temp file deletion), each cycle ends green; do-not-proceed rule on
+      any failed proof (fix config, record deviation, re-prove); closeout
+      AC-11 clean tree (only the 4 intended files) + AC-12 test-gap note.
+      S2 depends on S1. Commits/PR/history noted as orchestrator-owned
+      post-plan mechanics. execution_ready: true. Checkpoint skipped as
+      implicitly approved (ckp-001, auto mode).
+  sddl-executor:
+    status: done
+    completed_at: "2026-08-01T19:40:00Z"
+    notes: >-
+      S1 first attempt blocked (risk-005 fired, protocol C, dec-011 —
+      see execution-log.md S1 entry; partials committed by orchestrator
+      at 3f2b955). Second invocation after the dec-011 user resolution:
+      typescript re-pinned 5.9.3 exact (dev-001, claude→user), dec-011
+      note added to .dependency-cruiser.cjs header. Green baseline
+      real: tsc 5.9.3, `npx depcruise src` exit 0 with 13 modules
+      cruised (transpiler warning gone), `npm run check` exit 0,
+      `npm run dev` exit 0. S2 complete: all five red proofs passed in
+      AC order, each naming exactly the target rule with 1 violation
+      (AC-05 core-no-adapters, AC-06 core-no-io-libs via node:fs,
+      AC-07 core-modules-via-index + negative control green at 14
+      modules/1 dep, AC-08 adapters-isolated, AC-09
+      wiring-only-in-main); every cycle reverted to green; AC-06
+      full-chain `npm run check` red at the depcruise step (dev-002:
+      full-chain fixture replaced `export {};` instead of appending —
+      appended imports trip biome noUselessEmptyExport before depcruise
+      runs; direct depcruise proofs unaffected). Closeout: story diff
+      vs a06f221 = exactly the 4 intended files, no src/ residue, temp
+      file deleted (AC-11); AC-12 test-gap recorded (npm test exit 127,
+      vitest lands E0.F2.x); final check + dev green. All 13 ACs
+      covered.
+  sddl-qa-review:
+    status: done
+    completed_at: "2026-08-01T20:55:00Z"
+    notes: >-
+      Final-mode QA over the full change: verdict pass, completion allowed.
+      All 13 ACs re-verified with fresh evidence at ba3325e: check script
+      verbatim §5.1, dc 18.1.0 + typescript 5.9.3 exact-pinned (lockfile
+      matches), `npm run check` exit 0 with depcruise cruising 13 modules
+      (non-inert), `npm run dev` exit 0, config has the 5 rules at severity
+      error + zod whitelist comment/exception + dec-011 note, biome
+      allowlist entry effective (17 files checked). Red proofs AC-05..AC-09
+      accepted from execution-log verbatim output + 12 ledger probes; QA
+      independently re-executed the AC-05 cycle (red naming
+      core-no-adapters, exit 1; revert green, clean porcelain). Story diff
+      vs 4b43813 = exactly the 4 intended files, no src/ residue; AC-12
+      gap re-confirmed fresh (npm test exit 127). dev-001/dev-002 and
+      dec-002..dec-011 recorded with authorship. Ledger consumed:
+      pass_with_warnings, 0 severe, 3 info mirrored as low non-blocking
+      QA findings (follow-up hardening story optional). See qa-report.md.
+artifacts:
+  state: ./sdd-lite/openspec/changes/e0-f1-h2-guards/state.yaml
+  proposal: ./sdd-lite/openspec/changes/e0-f1-h2-guards/proposal.md
+  spec: ./sdd-lite/openspec/changes/e0-f1-h2-guards/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f1-h2-guards/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f1-h2-guards/plan.md
+  execution_log: ./sdd-lite/openspec/changes/e0-f1-h2-guards/execution-log.md
+  review_ledger: ./sdd-lite/openspec/changes/e0-f1-h2-guards/review-ledger.md
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Execution mode and scope approval for the whole change, given in the
+      user session-kickoff message (2026-08-01): run [E0.F1.H2] as sdd-lite
+      change e0-f1-h2-guards through proposal → spec → design → plan →
+      executor → qa in auto mode. Scope = issue #3 + setup §5.3 rule set
+      (core-no-adapters, core-no-io-libs with zod whitelist,
+      core-modules-via-index, adapters-isolated, wiring-only-in-main) +
+      `check` becomes `biome check . && tsc --noEmit && depcruise src` per
+      setup §5.1. All 5 rules must be proven with temporary violations that
+      are reverted. Closing requirements: check green before PR, PR
+      "[E0.F1.H2] ..." with Closes #3 (never merge), history S03 entry
+      committed.
+    question: >-
+      Proceed with e0-f1-h2-guards in auto mode with the kickoff-defined
+      scope?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved in advance by the user kickoff message (autonomous remote
+        session; user not available mid-task).
+      responded_at: "2026-08-01T17:02:29Z"
+    created_at: "2026-08-01T17:02:29Z"
+    resolved_at: "2026-08-01T17:02:29Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: auto mode, kickoff-defined scope
+    rationale: >-
+      The kickoff message explicitly defines how to run the story, its scope
+      (including the two pre-taken decisions: final check chain per setup
+      §5.1, and the 5 rules per setup §5.3), and the closing requirements;
+      the session is autonomous. Stage approvals for code-touching work are
+      satisfied by this explicit pre-approval; any deviation from the pinned
+      scope still stops (protocol B/C).
+    recorded_at: "2026-08-01T17:02:29Z"
+  - id: dec-002
+    free_text: core-no-io-libs forbids all Node builtins in core (bare and node:-prefixed), beyond the §5.3 npm-only sketch
+    rationale: >-
+      A-level (claude). PRD §4.5 rule 2 is mandatory and names builtins
+      (fs, child_process, http); setup §5.3 is a recommendation that
+      under-covers it. Blanket ban chosen over an I/O-only subset: strongest
+      extraction guarantee, zero cost today (core is import-free), future
+      exceptions are explicit reviewed whitelist edits. Not a scope conflict —
+      kickoff pinned the rule set, not the sketch matchers. See spec.md
+      dec-002.
+    recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-003
+    free_text: whitelist documented as explicit config comment (zod + builtins ban) plus machine-readable exception
+    rationale: A-level (claude). Issue #3 AC2; comment serves humans, exception serves the tool. Spec AC-10.
+    recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-004
+    free_text: spec pins rule BEHAVIOR + per-rule red proofs as ACs; exact regex syntax delegated to design
+    rationale: A-level (claude). Makes correctness observable regardless of §5.3 regex adaptation (risk-001). Spec AC-05..AC-09.
+    recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-005
+    free_text: add .dependency-cruiser.cjs to biome files.includes
+    rationale: A-level (claude). Consistent with H1's allowlist of maintained configs; the gate's own config should pass the gate. Spec AC-13.
+    recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-006
+    free_text: exact version pin, flagless config auto-discovery, and working NodeNext resolution are spec-level contract (AC-02/AC-03); concrete version and resolver options are design-owned
+    rationale: A-level (claude). Spec owns the observable contract; design owns mechanics.
+    recorded_at: "2026-08-01T17:35:00Z"
+  - id: dec-007
+    free_text: pin dependency-cruiser 18.1.0 exact (no ^/~)
+    rationale: >-
+      A-level (claude). npm latest as of 2026-08-01; engines
+      ^22||^24||>=26 fits Node >=22 and the future CI 22/24 matrix;
+      v13+ auto-discovers .dependency-cruiser.cjs flaglessly (AC-03);
+      exact pin matches H1 devDeps convention. Install via
+      `npm install --save-dev --save-exact dependency-cruiser@18.1.0`.
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-008
+    free_text: options.tsPreCompilationDeps = true
+    rationale: >-
+      A-level (claude). Type-only imports across forbidden boundaries are
+      architectural coupling and must trip the guards even though they
+      vanish at compile time (verbatimModuleSyntax makes them explicit);
+      also speeds up cruising. See design.md.
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-009
+    free_text: >-
+      core-no-io-libs = dependencyTypes ban list (core + all npm flavors +
+      unknown/undetermined/deprecated) with zod pathNot in both bare
+      ("^zod(/|$)") and resolved ("^node_modules/zod(/|$)") forms
+    rationale: >-
+      A-level (claude). Maps 1:1 to spec behavior (any npm except zod, or
+      any builtin); builtins are reported with their literal specifier
+      (fs / node:fs) and type core; npm packages as node_modules/<pkg>;
+      uninstalled specifiers keep the bare name with type unknown —
+      verified against v18.1.0 source. Accepted side effect: a typo'd
+      relative import in core trips this rule as unknown (tsc fails on it
+      anyway).
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-010
+    free_text: >-
+      red-proof protocol: per rule, run `npx depcruise src` directly and
+      require output naming exactly the target rule (non-zero exit); one
+      proof (AC-06) additionally shows full `npm run check` red; fixtures
+      are one-line side-effect imports in existing placeholders (plus one
+      temp file for AC-07), each tripping exactly one rule, fully reverted
+    rationale: >-
+      A-level (claude). Implements spec risk-004 mitigation with
+      deterministic attribution; fixture matrix cross-checked against all
+      5 rules in design.md.
+    recorded_at: "2026-08-01T18:05:00Z"
+  - id: dec-011
+    free_text: >-
+      risk-005 fired during S1: dependency-cruiser 18.1.0 is incompatible
+      with typescript 7.0.2 (declared support ">=2.0.0 <7.0.0") — depcruise
+      cruises 0 modules and exits 0, so the guard is silently inert. S1
+      stopped per protocol C; no autonomous fallback applied.
+    rationale: >-
+      C-level (claude→user, RESOLVED). Plan pinned this exact
+      trigger with "no autonomous fallback": re-pinning typescript revisits
+      H1's kept-7.0.2 decision (out of this story's scope), and adding an
+      alternative transpiler (@swc/core) expands blast radius beyond the
+      approved four files. Evidence in execution-log.md S1 entry (command
+      trail items 6-8). Options presented to the user: (1) re-pin typescript
+      to a dc-supported line (dc suggests ^6; H1 fallback was 5.9.3); (2) add
+      @swc/core as dc transpiler with a design amendment; (3) defer the
+      story until dc ships TS 7 support.
+    recorded_at: "2026-08-01T18:50:00Z"
+    resolution: >-
+      USER DECIDED (2026-08-01, in-session consultation): option 1 — re-pin
+      typescript to 5.9.3 exact, H1's pre-authorized fallback line. tsc
+      5.9.3 validating the setup §5.2 strict flag set was the explicit
+      condition of that H1 fallback, so the pin change is bounded; returning
+      to the 7.x line becomes a future story once dependency-cruiser ships
+      TS 7 support (note to be left in .dependency-cruiser.cjs). design.md
+      needs no amendment (it pins dc, not typescript); the executor records
+      the re-pin as a deviation referencing this decision. Authorship:
+      claude→user.
+open_risks:
+  - id: risk-001
+    severity: low
+    summary: >-
+      DOWNGRADED at design (was medium): §5.3 sketch confirmed not
+      verbatim-usable, and the design config replaces it with semantics
+      verified directly against the published dependency-cruiser 18.1.0
+      source ($1 group substitution, builtin/npm path reporting,
+      dependencyTypes intersection, native .js->.ts fallback). Residual
+      risk closes with the executor's five per-rule red proofs.
+  - id: risk-002
+    severity: low
+    summary: >-
+      RESOLVED by dec-002 (spec): core-no-io-libs covers all Node builtins
+      (bare and node:-prefixed) in addition to npm deps; the rule-2 red proof
+      uses node:fs, which simultaneously verifies builtin coverage (AC-06).
+  - id: risk-003
+    severity: low
+    summary: >-
+      Whitelist positive proof not runnable: zod is not installed, so "zod is
+      allowed in core" cannot be runtime-verified in this story. AC-10 requires
+      documentation only; the first real zod import in core (E1+) verifies it.
+  - id: risk-004
+    severity: low
+    summary: >-
+      RESOLVED by dec-010 (design): red-proof attribution handled by
+      running `npx depcruise src` directly per rule (output names the
+      rule) plus one full-chain `npm run check` red on AC-06; fixtures
+      are crafted to pass biome and tsc.
+  - id: risk-005
+    severity: low
+    summary: >-
+      CLOSED at S1 completion (had FIRED: dc 18.1.0 supports typescript
+      ">=2.0.0 <7.0.0" only, and 7.0.2 made depcruise silently cruise 0
+      modules). Resolved by dec-011 (user): typescript re-pinned 5.9.3
+      exact (dev-001). Verified closed: depcruise cruises all 13
+      modules, transpiler warning gone, red proofs trip. Residual:
+      returning to the TS 7.x line is a future story once dc ships
+      TS >=7 support (note in .dependency-cruiser.cjs header).
+  - id: risk-006
+    severity: low
+    summary: >-
+      CLOSED at S1 (did not fire): `npx biome check
+      .dependency-cruiser.cjs` → exit 0, "Checked 1 file. No fixes
+      applied." — the explicit files.includes entry makes biome scan
+      the dotfile; the design-formatted content passed with zero
+      diagnostics, no fallback needed.
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 3
+  summary: >-
+    Standard-tier 4R review of the frozen story diff (4b43813..9e124e2,
+    109 hand-written lines): one reliability-lens sweep, zero severe
+    findings. Three WARNING rows recorded as info (R3-001..R3-003):
+    boundary-shape gaps in the rule regexes that only activate on file
+    layouts the PRD does not sanction (direction-level adapter files,
+    direct src/core/ files, prefix-sharing sibling dirs) — all proven
+    with live probes on a replica, all non-blocking per the severity
+    floor, candidates for a small follow-up hardening story. The lens
+    additionally generalized the S2 red-proof evidence with 12 probes
+    (bare fs, uninstalled npm, zod subpaths, $1 substitution, nested
+    depths, import type, dynamic import). No refuter (standard tier),
+    no fix rounds used.
+  reported_at: "2026-08-01T20:20:00Z"
+  ledger_path: ./sdd-lite/openspec/changes/e0-f1-h2-guards/review-ledger.md
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    Final QA re-verified AC-01..AC-13 with fresh independent evidence
+    (check/dev/depcruise/tsc re-run, config files read, story diff vs
+    4b43813 scoped to the 4 intended files, AC-05 red-proof cycle
+    re-executed with full revert, npm test gap re-confirmed). Zero
+    blocking findings; 3 low non-blocking notes inherited from the 4R
+    ledger (unsanctioned-layout regex gaps, optional follow-up story).
+    Completion allowed.
+  reported_at: "2026-08-01T20:55:00Z"
+  report_path: ./sdd-lite/openspec/changes/e0-f1-h2-guards/qa-report.md
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Change completed (final QA pass). Orchestrator-owned closing
+    mechanics per ckp-001: commit QA artifacts, open PR "[E0.F1.H2]
+    ..." with Closes #3 (never merge), history S03 entry committed.
+    Optional follow-up (user's call): regex-hardening story seeded from
+    ledger R3-001..R3-003.
+created_at: "2026-08-01T17:02:29Z"
+updated_at: "2026-08-01T20:55:00Z"

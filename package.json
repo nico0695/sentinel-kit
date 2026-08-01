@@ -17,12 +17,13 @@
   "scripts": {
     "dev": "node --experimental-strip-types src/main/cli.ts",
     "build": "tsup",
-    "check": "biome check . && tsc --noEmit",
+    "check": "biome check . && tsc --noEmit && depcruise src",
     "test": "vitest run"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
-    "typescript": "7.0.2",
-    "@types/node": "22.20.1"
+    "@types/node": "22.20.1",
+    "dependency-cruiser": "18.1.0",
+    "typescript": "5.9.3"
   }
 }

@@ -92,7 +92,17 @@ stages:
       with dec-002 honored: Q2/Q3 were surfaced to the user with alternatives +
       recommendation; the user directed "continue", adopting the recommended
       options (dec-004, dec-005) with an explicit veto window before design
-      locks the API.
+      locks the API. design.md written by a fresh-context worker: locks the
+      ReviewEngine.review(ReviewRequest): Promise<ReviewResult> port signature,
+      the separate TerminalState union, WorktreeRef { path }, and a types-only
+      run/index re-export (dec-006..009, all A-level). No new [B] items.
+      Per-stage parallel validation (dec-003) IN PROGRESS: validator A
+      (acceptance/scope) returned no-drift (0 blocking / 0 should-fix / 8 info)
+      — confirms AC1-AC4, dec-004/dec-005, no H2/E4/E5 creep, and dec-007 async
+      correctly A-level. Validator B (PRD/architecture — guard-green, tsconfig
+      compile, .js specifier) still running; routing to sddl-plan is gated on
+      B's result and convergence. Committing the artifact now to protect it in
+      the ephemeral environment; will finalize status after B.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -231,6 +241,57 @@ decisions:
       a workspace-owned type (would create a core-to-core coupling, PRD §4.5
       guard 3). Reversible before sddl-design locks the API. Resolves risk-003.
     recorded_at: "2026-08-01T23:35:00Z"
+  - id: dec-006
+    checkpoint_id: ckp-002
+    free_text: >-
+      Design file layout — three concern-separated files under src/core/run/
+      plus a types-only index rewrite
+    author: claude
+    rationale: >-
+      A-level (reversible, PRD-aligned). run/ is the first core module to
+      materialize a ports/ folder: ports/review-engine.ts (port +
+      ReviewRequest/ReviewResult/ReviewUsage), terminal-state.ts (run-domain
+      union, not under ports/), worktree-ref.ts (boundary value), and index.ts
+      rewritten from `export {}` to a types-only public re-export. Rejected a
+      single combined types.ts (three unrelated concerns). Establishes the
+      port-per-file convention siblings will follow.
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-007
+    checkpoint_id: ckp-002
+    free_text: >-
+      Port method review(request): Promise<ReviewResult> — async by nature
+    author: claude
+    rationale: >-
+      A-level. Method named `review` (verb matching the domain role, avoids
+      colliding with the `run` module name). Async return is forced, not a
+      trade-off: an implementing adapter spawns an external CLI, so there is no
+      viable sync signature. Not a [B] item — it does not change the acceptance
+      contract's input/output shape (still worktree+prompt+timeout → raw +
+      optional usage).
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-002
+    free_text: >-
+      Type identifiers ReviewRequest/ReviewResult/ReviewUsage; timeoutMs
+      unit-in-name; all boundary members readonly
+    author: claude
+    rationale: >-
+      A-level (reversible identifiers; the shapes themselves are locked by
+      Q2/Q3/Q4). Immutable DTOs at the boundary; timeout carries its unit in
+      the name (timeoutMs).
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-002
+    free_text: >-
+      import type / export type throughout — mandatory under
+      verbatimModuleSyntax
+    author: claude
+    rationale: >-
+      A-level but load-bearing: under tsconfig verbatimModuleSyntax:true a
+      plain `export { ReviewEngine }` of a type is a tsc error, so the index
+      re-export and the intra-module WorktreeRef import must be type-only for a
+      green `tsc --noEmit`. Verified by the executor stage.
+    recorded_at: "2026-08-01T23:52:00Z"
 open_risks:
   - id: risk-001
     severity: medium

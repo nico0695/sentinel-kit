@@ -35,7 +35,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-01T22:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -86,7 +86,9 @@ stages:
       Claude <noreply@anthropic.com>) and force-pushed; commits remain
       unsigned (no signing key in this environment).
   sddl-design:
-    status: in_progress
+    status: completed
+    started_at: "2026-08-01T23:40:00Z"
+    completed_at: "2026-08-02T00:05:00Z"
     notes: >-
       Entered under dec-003 auto-continue (spec validators converged no-drift)
       with dec-002 honored: Q2/Q3 were surfaced to the user with alternatives +
@@ -96,13 +98,23 @@ stages:
       ReviewEngine.review(ReviewRequest): Promise<ReviewResult> port signature,
       the separate TerminalState union, WorktreeRef { path }, and a types-only
       run/index re-export (dec-006..009, all A-level). No new [B] items.
-      Per-stage parallel validation (dec-003) IN PROGRESS: validator A
-      (acceptance/scope) returned no-drift (0 blocking / 0 should-fix / 8 info)
-      — confirms AC1-AC4, dec-004/dec-005, no H2/E4/E5 creep, and dec-007 async
-      correctly A-level. Validator B (PRD/architecture — guard-green, tsconfig
-      compile, .js specifier) still running; routing to sddl-plan is gated on
-      B's result and convergence. Committing the artifact now to protect it in
-      the ephemeral environment; will finalize status after B.
+      Per-stage parallel validation (dec-003) CONVERGED no-drift: validator A
+      (acceptance/scope) 0/0/8-info — AC1-AC4, dec-004/dec-005, no H2/E4/E5
+      creep, dec-007 async correctly A-level; validator B (PRD/architecture)
+      0/0/2-info — VERIFIED against the real .dependency-cruiser.cjs (the local
+      `import type` edge is not in the forbidden dependencyTypes), tsconfig
+      compile clean (NodeNext + verbatimModuleSyntax + exactOptionalPropertyTypes,
+      `.js` specifier correct), and biome-clean; its 2 info notes are the
+      already-documented dec-004/dec-005 reconciliations, not drift. Both blind
+      and independent → auto-continue to sddl-plan authorized.
+  sddl-plan:
+    status: in_progress
+    notes: >-
+      Launched under dec-003 auto-continue after design validators converged.
+      Planner objective: ordered, verifiable stage plan for the types-only
+      contract. NOTE the hard gate ahead — sddl-executor is code-touching, so
+      per CLAUDE.md it requires EXPLICIT user approval before it runs, even in
+      auto mode; the orchestrator will STOP at the executor gate.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -321,16 +333,16 @@ open_risks:
       calls surfaced alongside.
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Spec complete and validated (both parallel validators no-drift); Q2/Q3
-    resolved as dec-004/dec-005 (thin port output; WorktreeRef { path }) under
-    dec-002-honored consultation. Run sddl-design to produce design.md that
-    locks: the ReviewEngine port signature (input WorktreeRef + prompt +
-    timeout; output raw string + optional loose usage), the run-domain terminal
-    -state union as a separate type, the run-local WorktreeRef value object,
-    and the run/index public re-export — all zero I/O, guard-green by
-    construction. Then run per-stage parallel validation on design before
-    routing to sddl-plan.
+    Design complete and validated (both parallel validators no-drift, verified
+    against real depcruise/tsconfig/biome config). Run sddl-plan to produce
+    plan.md: an ordered, verifiable stage plan to implement the four files
+    (worktree-ref.ts, terminal-state.ts, ports/review-engine.ts, index.ts
+    rewrite) with `npm run check` (biome + tsc --noEmit + depcruise src) as the
+    0-violation gate and AC4 (no test file, package.json untouched) as a
+    boundary check. After plan.md, run per-stage parallel validation, THEN STOP
+    at the sddl-executor approval gate — the executor is code-touching and
+    requires explicit user approval even under auto mode (CLAUDE.md).
 created_at: "2026-08-01T22:06:00Z"
-updated_at: "2026-08-01T23:35:00Z"
+updated_at: "2026-08-02T00:05:00Z"

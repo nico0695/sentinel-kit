@@ -131,16 +131,17 @@ stages:
       (with semicolon), not bare `export {}`. Both blind and independent →
       planning is fully validated end to end. STOP at the executor gate.
   sddl-executor:
-    status: pending
+    status: in_progress
     notes: >-
-      Awaiting explicit user approval (ckp-003). S1 is code-touching; CLAUDE.md
-      requires explicit approval before it runs even under auto mode, and
-      ckp-001 stated the kickoff was NOT a blanket pre-approval of later stages.
-      No code will be written until the user approves.
-  sddl-plan:
-    status: pending
-  sddl-executor:
-    status: pending
+      User approved at ckp-003 ("si comienza"). Fresh-context executor worker
+      launched to run P0 (`npm ci`) + S1 (transcribe the four files verbatim
+      from the frozen design.md, leaf->port->index) + the acceptance gate
+      (`npm run check` = 0 violations, `npm test` green, AC4 git-diff boundary).
+      Worker constrained: no redesign, no file outside the four targets, no
+      commit/push, no --passWithNoTests removal; STOP+blocked on any non-
+      mechanical gate failure. dec-003 validation role for this CODE stage is
+      the sddl-code-review 4R protocol, to run on the S1 diff after the gate
+      passes. Awaiting worker result.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -219,9 +220,15 @@ checkpoints:
       rewrite) exactly as frozen in design.md, then run `npm run check` +
       `npm test` as the acceptance gate?
     free_input_allowed: true
-    response: null
+    response:
+      free_text: >-
+        User approved explicitly: "si comienza" (yes, start) — a genuine user
+        turn, not a background event. Authorizes P0 (`npm ci`) + S1 (write the
+        four files verbatim from design.md) + the acceptance gate. Executor
+        launched as a fresh-context worker.
+      responded_at: "2026-08-02T00:35:00Z"
     created_at: "2026-08-02T00:30:00Z"
-    resolved_at: null
+    resolved_at: "2026-08-02T00:35:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -344,6 +351,19 @@ decisions:
       re-export and the intra-module WorktreeRef import must be type-only for a
       green `tsc --noEmit`. Verified by the executor stage.
     recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-010
+    checkpoint_id: ckp-003
+    free_text: >-
+      User approved the code-touching executor stage S1 ("si comienza")
+    author: user
+    rationale: >-
+      Explicit user approval at the mandatory executor gate after planning was
+      validated end to end (spec/design/plan, three dual-validator passes, all
+      no-drift). Authorizes P0 (`npm ci`) + S1 (write the four types-only files
+      verbatim from the frozen design.md) + the acceptance gate. Honors the
+      CLAUDE.md rule that code-touching stages require explicit approval even
+      under dec-003 auto mode, and ckp-001's "not a blanket pre-approval".
+    recorded_at: "2026-08-02T00:35:00Z"
 open_risks:
   - id: risk-001
     severity: medium
@@ -372,16 +392,16 @@ open_risks:
       to pin; usage shape and zod-vs-plain-types are lower-texture design
       calls surfaced alongside.
 next_action:
-  kind: await_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    HARD STOP at the executor approval gate (ckp-003). Planning is complete and
-    validated end to end (spec/design/plan each dual-validated no-drift). S1 is
-    code-touching, so per CLAUDE.md it needs explicit user approval before any
-    file is written — even under dec-003 auto mode. Awaiting the user's go/no-go
-    on writing the four files verbatim from design.md and running the
-    `npm run check` + `npm test` acceptance gate. On approval: run P0 (`npm ci`)
-    then S1, then the executor's 4R code review (sddl-code-review) fills the
-    dec-003 validation role for the code stage, then final QA.
+    User approved S1 (dec-010, "si comienza"). Fresh-context executor worker
+    running P0 (`npm ci`) + S1 (four types-only files verbatim from design.md)
+    + the acceptance gate. On a green gate: run the sddl-code-review 4R protocol
+    on the S1 diff (dec-003 validation role for the code stage), then final QA
+    (sddl-qa-review final mode), then commit the code + execution-log + state,
+    write the history entry, and prepare the PR ([E0.F2.H1] ... Closes #5) —
+    never merge, never push main. On a blocked gate: surface the exact failure
+    and STOP.
 created_at: "2026-08-01T22:06:00Z"
-updated_at: "2026-08-02T00:30:00Z"
+updated_at: "2026-08-02T00:35:00Z"

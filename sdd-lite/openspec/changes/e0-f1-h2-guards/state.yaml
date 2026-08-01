@@ -138,15 +138,29 @@ open_risks:
   - id: risk-002
     severity: low
     summary: >-
-      §5.3 core-no-io-libs only forbids dependencyTypes npm; PRD §4.5 rule 2
-      also names Node builtins (fs, child_process). Spec must decide whether
-      builtins are covered (protocol B if it reads as a §5.3/PRD conflict).
+      RESOLVED by dec-002 (spec): core-no-io-libs covers all Node builtins
+      (bare and node:-prefixed) in addition to npm deps; the rule-2 red proof
+      uses node:fs, which simultaneously verifies builtin coverage (AC-06).
+  - id: risk-003
+    severity: low
+    summary: >-
+      Whitelist positive proof not runnable: zod is not installed, so "zod is
+      allowed in core" cannot be runtime-verified in this story. AC-10 requires
+      documentation only; the first real zod import in core (E1+) verifies it.
+  - id: risk-004
+    severity: low
+    summary: >-
+      Red-proof attribution: biome or tsc could fail before depcruise sees a
+      temporary violation. Spec expected-behavior requires crafting violations
+      that pass biome+tsc, or capturing the depcruise step alone to show the
+      rule name plus the full-chain non-zero exit.
 next_action:
   kind: delegate
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Delegate spec stage: formalize scope boundaries and acceptance criteria
-    from proposal.md, resolving the Node-builtins question and pinning the
-    biome files.includes decision.
+    Delegate design stage: choose the dependency-cruiser version pin, resolver
+    options (tsconfig/NodeNext), and exact rule regexes implementing the
+    behaviors pinned in spec.md; define the per-rule violation fixtures for the
+    executor's red proofs.
 created_at: "2026-08-01T17:02:29Z"
-updated_at: "2026-08-01T17:20:00Z"
+updated_at: "2026-08-01T17:35:00Z"

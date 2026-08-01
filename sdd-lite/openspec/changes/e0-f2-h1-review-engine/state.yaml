@@ -111,10 +111,17 @@ stages:
     status: in_progress
     notes: >-
       Launched under dec-003 auto-continue after design validators converged.
-      Planner objective: ordered, verifiable stage plan for the types-only
-      contract. NOTE the hard gate ahead — sddl-executor is code-touching, so
-      per CLAUDE.md it requires EXPLICIT user approval before it runs, even in
-      auto mode; the orchestrator will STOP at the executor gate.
+      plan.md written by a fresh-context worker: precondition P0 (`npm ci` —
+      node_modules absent, lockfile present) [A]; single code-touching stage S1
+      writing all four files atomically in leaf->port->index order; acceptance
+      gate `npm run check` (biome check . && tsc --noEmit && depcruise src) = 0
+      violations, `npm test` (vitest run --passWithNoTests) green, AC4 boundary
+      via `git diff`; AC1..AC4 traced; rollback = delete 3 new files + restore
+      index.ts `export {}`. No new [B]. Per-stage parallel validation (dec-003)
+      IN PROGRESS: validator A (plan<->design fidelity + scope) and validator B
+      (gate-command/tooling reality vs real package.json + lockfile) running.
+      Routing STOPS at the sddl-executor approval gate regardless (S1 is
+      code-touching → explicit user approval required even under auto mode).
   sddl-plan:
     status: pending
   sddl-executor:

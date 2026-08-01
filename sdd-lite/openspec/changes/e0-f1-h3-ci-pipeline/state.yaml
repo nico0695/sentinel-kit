@@ -472,6 +472,27 @@ open_risks:
       syntax or schema error would only surface on the post-push run.
       Mitigation: design §1 YAML is complete and conventional; AC-07
       watch after PR opening catches any failure before story close.
+review_summary:
+  mode: 4r
+  verdict: pass
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 0
+  summary: >-
+    Standard-tier 4R review of the frozen story diff (5057e41..e3e87e5,
+    83 hand-written lines): one reliability-lens sweep, zero findings at
+    any severity. All story claims verified with live probes (full local
+    gate green; dist/cli.js shebang + inlined package.json; actions v7
+    tags exist; replica red-path → depcruise exit 2; npm ci dry-run
+    lockfile sync; ci.yml valid YAML; concurrency cancels PR runs only).
+    Residual: GitHub's own execution of ci.yml is locally unverifiable
+    (risk-008) — owned by the post-push AC-07 watch. No refuter
+    (standard tier), no fix rounds used.
+  reported_at: "2026-08-01T20:05:00Z"
+  ledger_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/review-ledger.md
 next_action:
   kind: stage
   target: sddl-qa-review

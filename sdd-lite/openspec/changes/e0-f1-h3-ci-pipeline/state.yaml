@@ -21,8 +21,8 @@ complexity_assessment:
     enablement. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T18:40:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -146,6 +146,30 @@ stages:
       (merged PR #48 review fixes), not plan's b7f5e98 — recorded in
       execution-log.md as a note, not a deviation (risk-002). No
       deviations. S2 pending in a separate executor invocation.
+  sddl-qa-review:
+    status: done
+    completed_at: "2026-08-01T21:45:00Z"
+    notes: >-
+      Final-mode QA over the full change: verdict pass, completion
+      allowed. RAN INLINE in the orchestrator (degradation recorded):
+      the delegated qa worker terminated on an API spend-limit error
+      mid-run (after confirming the diff bound, before the red demo);
+      per the CLAUDE.md fresh-context degradation policy the loss of
+      context isolation is recorded in qa-report.md and every AC was
+      re-verified with fresh independent command evidence, state
+      persisted immediately. AC-01..AC-06, AC-08..AC-10 all pass with
+      fresh evidence (check green 14 modules/0 violations, test exit 0
+      passWithNoTests, build 785 B + smoke 0.0.0 == package version,
+      cli.ts guard-clean, diff bound vs 5057e41 = exactly the 6 story
+      files). QA independently re-ran the red demo: dev-001 biome trip
+      reproduced first, then biome-clean variant made `npm run check`
+      fail AT depcruise naming core-no-io-libs (exit 1), revert → green,
+      porcelain clean. AC-07 (3 checks green on the real stacked PR) is
+      the only pending observable — explicitly owned by orchestrator
+      post-plan mechanics (risk-008/dec-011), the expected shape for a
+      CI story. dec-008/dec-009/dev-001/risk-004 recorded for PR
+      visibility. Ledger consumed (4R pass, 0 findings). See
+      qa-report.md.
 artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
   execution_log: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/execution-log.md
@@ -493,18 +517,33 @@ review_summary:
     (standard tier), no fix rounds used.
   reported_at: "2026-08-01T20:05:00Z"
   ledger_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/review-ledger.md
-next_action:
-  kind: stage
-  target: sddl-qa-review
+qa_summary:
+  mode: final
+  verdict: pass
+  completion_allowed: true
   summary: >-
-    Run sddl-qa-review in FINAL mode over the full change (S1 + S2;
-    validate against spec AC-01..AC-10 plus recorded amendments
-    dec-008/dec-009 and deviation dev-001), then orchestrator-owned
-    post-plan mechanics: commit ci.yml + sdd-lite artifacts, push,
-    stacked PR (base claude/scaffold-hexagonal-structure-dfq16n,
-    title "[E0.F1.H3] ...", Closes #4, description surfacing dec-008
+    Final QA (inline, degradation recorded) re-verified AC-01..AC-10
+    with fresh independent evidence: check/test/build/smoke/dev green,
+    diff bound vs 5057e41 = the 6 story files, cli.ts guard-clean, red
+    demo re-run reddening npm run check AT depcruise (core-no-io-libs,
+    exit 1) then reverting to green + clean porcelain. AC-07 (3 checks
+    green on the real stacked PR) pending post-push, explicitly owned by
+    orchestrator mechanics (risk-008). dec-008/dec-009/dev-001/risk-004
+    carried to the PR description. Zero blocking findings. Completion
+    allowed.
+  reported_at: "2026-08-01T21:45:00Z"
+  report_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/qa-report.md
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Change completed (final QA pass). Orchestrator-owned closing
+    mechanics per ckp-001: commit QA + review artifacts, open the
+    stacked PR (base claude/scaffold-hexagonal-structure-dfq16n, title
+    "[E0.F1.H3] CI pipeline", Closes #4, description surfacing dec-008
     concurrency amendment, dec-009 tsconfig amendment, and risk-004
-    --passWithNoTests removal duty for E0.F2.x), AC-07 watch (3
-    checks green), history entry via history-log before closing.
+    --passWithNoTests removal duty for E0.F2.x), never merge / never
+    push main, then watch AC-07 (3 checks green on the PR), history
+    entry via history-log committed before closing.
 created_at: "2026-08-01T18:40:00Z"
-updated_at: "2026-08-01T21:20:00Z"
+updated_at: "2026-08-01T21:45:00Z"

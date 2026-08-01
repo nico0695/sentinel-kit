@@ -13,8 +13,8 @@ complexity_assessment:
     break; bounded and well specified — normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T14:14:32Z"
-lifecycle_status: planning
-current_stage: sddl-design
+lifecycle_status: planned
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -58,7 +58,19 @@ stages:
       are full package form, so every replacement is @nico0695/sentinel.
       Checkpoint skipped as implicitly approved (ckp-001, auto mode).
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-01T14:44:00Z"
+    completed_at: "2026-08-01T14:50:00Z"
+    notes: >-
+      plan.md written: 3 stages — S1 tree+configs (all new files, contents
+      verbatim from design.md), S2 npm install + gates green (npm run check
+      exit 0, npm run dev exit 0; contains the pre-authorized typescript
+      7.0.2 -> 5.9.3 fallback as an explicit decision point with mandatory
+      execution-log + state.yaml recording), S3 docs placeholder replacement
+      (8 lines, 3 files) + final gate re-run. S2 depends on S1; S3
+      independent but ordered last. All stages pre-approved by ckp-001
+      (auto mode). Commits/PR noted as orchestrator-owned. execution_ready:
+      true. Checkpoint skipped as implicitly approved (ckp-001, auto mode).
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -114,10 +126,12 @@ open_risks:
     severity: low
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-executor
   summary: >-
-    Delegate sddl-design to define the technical approach (file layout,
-    placeholder contents, config file contents) against spec.md AC-01..AC-09.
-    No open questions gate design; decisions D1-D4 are pinned in spec.md.
+    Execute plan stage S1 (tree + configs: 13 placeholder .ts files, 3
+    .gitkeep dirs, 4 root configs — contents verbatim in design.md), then S2
+    (npm install + npm run check / npm run dev green, TS fallback decision
+    point), then S3 (8 docs placeholder replacements + final gate re-run).
+    One stage per executor invocation; all pre-approved via ckp-001.
 created_at: "2026-08-01T14:14:32Z"
-updated_at: "2026-08-01T14:32:00Z"
+updated_at: "2026-08-01T14:50:00Z"

@@ -15,7 +15,7 @@ complexity_assessment:
     scaffold from H1 is green and import-free. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T17:02:29Z"
-lifecycle_status: blocked
+lifecycle_status: in-progress
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -87,24 +87,30 @@ stages:
       post-plan mechanics. execution_ready: true. Checkpoint skipped as
       implicitly approved (ckp-001, auto mode).
   sddl-executor:
-    status: blocked
+    status: done
+    completed_at: "2026-08-01T19:40:00Z"
     notes: >-
-      S1 attempted 2026-08-01: install OK (dc 18.1.0 exact, lockfile
-      updated), .dependency-cruiser.cjs created byte-for-byte from
-      design.md, check script set to the §5.1 chain, biome allowlist
-      entry added. risk-006 did NOT fire (biome checks the dotfile
-      clean, no fallback needed). risk-005 FIRED — protocol C STOP:
-      dc 18.1.0 supports typescript ">=2.0.0 <7.0.0" only
-      (node_modules/dependency-cruiser/src/meta.cjs:14; runtime
-      warning "Support for typescript@>=7 will follow"). With the H1
-      pin typescript 7.0.2, `npx depcruise src` cruises 0 modules and
-      exits 0 — the guard step is silently blind, `npm run check` goes
-      green while enforcing nothing. AC-03/AC-04 unmeetable; S2 red
-      proofs would not trip. No autonomous fallback authorized
-      (typescript re-pin is H1 scope; adding @swc/core expands blast
-      radius). Repo left with the four intended S1 files modified/new
-      (recorded in execution-log.md), no src/ edits, no git side
-      effects. S2 not started.
+      S1 first attempt blocked (risk-005 fired, protocol C, dec-011 —
+      see execution-log.md S1 entry; partials committed by orchestrator
+      at 3f2b955). Second invocation after the dec-011 user resolution:
+      typescript re-pinned 5.9.3 exact (dev-001, claude→user), dec-011
+      note added to .dependency-cruiser.cjs header. Green baseline
+      real: tsc 5.9.3, `npx depcruise src` exit 0 with 13 modules
+      cruised (transpiler warning gone), `npm run check` exit 0,
+      `npm run dev` exit 0. S2 complete: all five red proofs passed in
+      AC order, each naming exactly the target rule with 1 violation
+      (AC-05 core-no-adapters, AC-06 core-no-io-libs via node:fs,
+      AC-07 core-modules-via-index + negative control green at 14
+      modules/1 dep, AC-08 adapters-isolated, AC-09
+      wiring-only-in-main); every cycle reverted to green; AC-06
+      full-chain `npm run check` red at the depcruise step (dev-002:
+      full-chain fixture replaced `export {};` instead of appending —
+      appended imports trip biome noUselessEmptyExport before depcruise
+      runs; direct depcruise proofs unaffected). Closeout: story diff
+      vs a06f221 = exactly the 4 intended files, no src/ residue, temp
+      file deleted (AC-11); AC-12 test-gap recorded (npm test exit 127,
+      vitest lands E0.F2.x); final check + dev green. All 13 ACs
+      covered.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -230,16 +236,26 @@ decisions:
       cruises 0 modules and exits 0, so the guard is silently inert. S1
       stopped per protocol C; no autonomous fallback applied.
     rationale: >-
-      C-level (claude→user, PENDING user outcome). Plan pinned this exact
+      C-level (claude→user, RESOLVED). Plan pinned this exact
       trigger with "no autonomous fallback": re-pinning typescript revisits
       H1's kept-7.0.2 decision (out of this story's scope), and adding an
       alternative transpiler (@swc/core) expands blast radius beyond the
       approved four files. Evidence in execution-log.md S1 entry (command
-      trail items 6-8). Options for the user: (1) re-pin typescript to a
-      dc-supported line (dc suggests ^6; H1 fallback was 5.9.3); (2) add
+      trail items 6-8). Options presented to the user: (1) re-pin typescript
+      to a dc-supported line (dc suggests ^6; H1 fallback was 5.9.3); (2) add
       @swc/core as dc transpiler with a design amendment; (3) defer the
       story until dc ships TS 7 support.
     recorded_at: "2026-08-01T18:50:00Z"
+    resolution: >-
+      USER DECIDED (2026-08-01, in-session consultation): option 1 — re-pin
+      typescript to 5.9.3 exact, H1's pre-authorized fallback line. tsc
+      5.9.3 validating the setup §5.2 strict flag set was the explicit
+      condition of that H1 fallback, so the pin change is bounded; returning
+      to the 7.x line becomes a future story once dependency-cruiser ships
+      TS 7 support (note to be left in .dependency-cruiser.cjs). design.md
+      needs no amendment (it pins dc, not typescript); the executor records
+      the re-pin as a deviation referencing this decision. Authorship:
+      claude→user.
 open_risks:
   - id: risk-001
     severity: low
@@ -270,14 +286,15 @@ open_risks:
       rule) plus one full-chain `npm run check` red on AC-06; fixtures
       are crafted to pass biome and tsc.
   - id: risk-005
-    severity: high
+    severity: low
     summary: >-
-      FIRED at S1 (was medium, executor-verify): dc 18.1.0 supports
-      typescript ">=2.0.0 <7.0.0" only; with the installed 7.0.2 it
-      skips all TS sources (0 modules cruised) and exits 0 — the guard
-      step is silently inert and `npm run check` is falsely green.
-      Protocol C stop taken (dec-011); blocked on user decision
-      (re-pin typescript / add @swc/core transpiler / defer story).
+      CLOSED at S1 completion (had FIRED: dc 18.1.0 supports typescript
+      ">=2.0.0 <7.0.0" only, and 7.0.2 made depcruise silently cruise 0
+      modules). Resolved by dec-011 (user): typescript re-pinned 5.9.3
+      exact (dev-001). Verified closed: depcruise cruises all 13
+      modules, transpiler warning gone, red proofs trip. Residual:
+      returning to the TS 7.x line is a future story once dc ships
+      TS >=7 support (note in .dependency-cruiser.cjs header).
   - id: risk-006
     severity: low
     summary: >-
@@ -287,18 +304,16 @@ open_risks:
       the dotfile; the design-formatted content passed with zero
       diagnostics, no fallback needed.
 next_action:
-  kind: consult-user
-  target: orchestrator
+  kind: advance-stage
+  target: sddl-qa-review
   summary: >-
-    Protocol C consultation (dec-011): risk-005 fired — dc 18.1.0 is
-    incompatible with typescript 7.0.2 and the guard runs silently
-    blind (0 modules cruised, falsely green check). Present the three
-    options (re-pin typescript to a dc-supported line; add @swc/core
-    as dc transpiler via design amendment; defer the story until dc
-    supports TS 7), record the user's decision, amend design/plan as
-    needed, then re-invoke sddl-executor to complete S1. S2 must not
-    start until S1 has a real green baseline (non-zero modules
-    cruised). S1's four file changes are in the working tree
-    (disposition orchestrator-owned).
+    Execution complete (S1 + S2, all 13 ACs covered, final check/dev
+    green, story diff = exactly the 4 intended files). Run
+    sddl-qa-review in final mode over the implemented change (includes
+    dev-001 typescript re-pin per dec-011 and dev-002 AC-06 full-chain
+    fixture adjustment), then orchestrator-owned closing mechanics per
+    ckp-001: single commit (suggested "feat: add dependency-cruiser
+    architecture guards to check gate"), PR "[E0.F1.H2] ..." with
+    Closes #3 (never merge), history S03 entry committed.
 created_at: "2026-08-01T17:02:29Z"
-updated_at: "2026-08-01T18:50:00Z"
+updated_at: "2026-08-01T19:40:00Z"

@@ -5,6 +5,11 @@
  *
  * While these rules hold, `src/core` stays extractable as a standalone
  * package (PRD §4.5 extraction guarantee).
+ *
+ * NOTE (dec-011): typescript is pinned to 5.9.3 because dependency-cruiser
+ * declares support for typescript >=2.0.0 <7.0.0 only. Returning to the
+ * typescript 7.x line is a future story once dependency-cruiser supports
+ * TS >=7.
  */
 module.exports = {
   forbidden: [

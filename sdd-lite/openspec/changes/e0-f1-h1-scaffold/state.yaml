@@ -13,8 +13,8 @@ complexity_assessment:
     break; bounded and well specified — normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T14:14:32Z"
-lifecycle_status: planned
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -72,7 +72,17 @@ stages:
       (auto mode). Commits/PR noted as orchestrator-owned. execution_ready:
       true. Checkpoint skipped as implicitly approved (ckp-001, auto mode).
   sddl-executor:
-    status: pending
+    status: in-progress
+    started_at: "2026-08-01T14:55:00Z"
+    notes: >-
+      S1 completed (tree + root configs): 13 placeholder .ts files (D2
+      pattern, zero imports), 3 .gitkeep dirs, package.json/tsconfig.json/
+      biome.json verbatim from design.md. Structural quick checks all pass
+      (git status exact, 13-file tree, import scan clean, export {} shape).
+      Two A-level deviations recorded in execution-log.md: dev-001 existing
+      .gitignore kept (already a superset of design's four patterns);
+      dev-002 cli.ts comment references E6.F1.x (design's E0.F4.x does not
+      exist in the backlog). S2 and S3 pending.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -128,10 +138,11 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    Execute plan stage S1 (tree + configs: 13 placeholder .ts files, 3
-    .gitkeep dirs, 4 root configs — contents verbatim in design.md), then S2
-    (npm install + npm run check / npm run dev green, TS fallback decision
-    point), then S3 (8 docs placeholder replacements + final gate re-run).
-    One stage per executor invocation; all pre-approved via ckp-001.
+    S1 done. Execute plan stage S2 next: npm install (pinned devDeps,
+    lockfile committed), then npm run check and npm run dev must exit 0.
+    Pre-authorized typescript 7.0.2 -> 5.9.3 fallback decision point lives
+    in S2 (mandatory execution-log + state.yaml recording if it fires).
+    Then S3 (8 docs placeholder replacements + final gate re-run). All
+    pre-approved via ckp-001.
 created_at: "2026-08-01T14:14:32Z"
-updated_at: "2026-08-01T14:50:00Z"
+updated_at: "2026-08-01T14:58:00Z"

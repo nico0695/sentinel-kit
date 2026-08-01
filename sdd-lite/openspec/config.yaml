@@ -2,7 +2,7 @@ version: "0.1"
 project:
   name: sentinel
   slug: sentinel
-  root: /Users/nicolasschmidt/Documents/develop/test-cr-cli
+  root: /home/user/sentinel-kit
   package_root: sdd-lite
   runtime_root: ./sdd-lite
   stack:
@@ -39,16 +39,17 @@ quality_commands:
     - npm run check
 
 bootstrap:
-  status: created
+  status: refreshed
   strategy: shallow-high-signal
   generated_at: "2026-08-01T13:14:29Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-01T13:14:29Z"
-  refresh_recommended: true
-  refresh_reason_codes:
-    - pre_implementation_repo
-    - quality_commands_unverified
-    - source_roots_absent
+  last_validated_at: "2026-08-01T13:42:35Z"
+  # Refreshed 2026-08-01: fixed stale absolute root (was a macOS path from another
+  # machine). The repo is still pre-implementation by design — that fact is accurately
+  # documented, not stale. A new refresh IS required right after [E0.F1.H1] lands
+  # (package.json + src/ appear and quality commands become runnable).
+  refresh_recommended: false
+  refresh_reason_codes: []
   observed_files:
     manifests: []
     lockfiles: []

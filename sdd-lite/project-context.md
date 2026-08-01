@@ -3,9 +3,10 @@
 ## Metadata
 
 - project_name: sentinel
-- project_root: /Users/nicolasschmidt/Documents/develop/test-cr-cli
+- project_root: /home/user/sentinel-kit
 - runtime_root: ./sdd-lite
 - generated_at: 2026-08-01T13:14:29Z
+- last_refreshed_at: 2026-08-01T13:42:35Z
 - generated_by: sddl-init
 
 ## Stack Summary
@@ -31,7 +32,6 @@ picocolors, ±marked. Dev toolchain: vitest, Biome, dependency-cruiser, tsup, ch
 | `docs/` | Specification source of truth | PRD, technical setup, MVP backlog. The only authoritative content today. |
 | `sdd-lite/` | Vendored sdd-lite package + runtime root | Package files and generated runtime artifacts share this directory. |
 | `.claude/skills/` | Installed sdd-lite skills | Copy install, path-rewritten to project-relative. |
-| `scripts/` | Empty placeholder | Exists but unused. |
 | `src/` | **Does not exist yet** | Target layout is PRD §4.2: `core/`, `adapters/{driving,driven}/`, `main/`. |
 
 ## Key Docs
@@ -72,16 +72,15 @@ typecheck, **and the five architecture guards**. There are no separate lint/type
 
 ## Risks And Unknowns
 
-- **Zero-commit repository.** There is no baseline to diff against and no CI in place; the first stages produce
-  the very toolchain that later stages validate against.
-- **Directory name vs. product name.** The working directory is `test-cr-cli`, the product is `sentinel`. Confirm
-  which the repo/package will actually carry before `[E0.F1.H1]`.
+- **Pre-implementation repository.** Only docs are committed (repo `nico0695/sentinel-kit`, product `sentinel`);
+  no CI in place yet — the first stages produce the very toolchain that later stages validate against.
 - **Stack is declared, not verified.** Library choices are documented decisions that have never been installed or
   exercised together.
 - **Unresolved PRD decisions.** Notably decision 6, the license (MIT vs private), tracked as `[E7.F2.H2]` and
   blocking first publish.
 - **Two engine spikes are unresolved unknowns** (`[E1.F1.H1]`, `[E1.F1.H2]`): headless invocation, non-interactive
   mode, timeouts, and whether OpenCode emits structured output at all. Much of E4 depends on their outcome.
-- **npm scope undecided** — the package is referenced as `@<scope>/sentinel` throughout.
-- The workflow contract assumes GitHub Issues exist; `create-issues.sh` has not necessarily been run against a
-  real remote yet.
+- **npm scope decided 2026-08-01**: `@nico0695/sentinel` (bin `sentinel` + alias `snt`). Docs still carry the
+  `@<scope>` placeholder; update them when `[E0.F1.H1]` writes the real package.json.
+- GitHub Issues verified empty on 2026-08-01: `create-issues.sh` is pending — the user runs it locally with
+  authenticated `gh` (one-shot; a second run duplicates all 44 issues).

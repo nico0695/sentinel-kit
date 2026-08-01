@@ -82,7 +82,37 @@ These guards are also the extraction guarantee: while they hold, `core/` can be 
 - Runtime-agnostic code: standard Node APIs only, no `Bun.*` / `Deno.*`.
 
 ## Session kickoff
-At the start of each session: read the current milestone's open issues (`gh issue list --milestone "<epic>"`), state the plan (which stories, in which PRs), then execute.
+At the start of each session: read the current milestone's open issues (`gh issue list --milestone "<epic>"`, or the GitHub MCP tools in remote sessions), state the plan (which stories, in which PRs), then execute.
+
+## sdd-lite activation policy (project rule — overrides the generic wrapper guidance below)
+
+Activation is deterministic, not suggested:
+
+1. **Mandatory**: every backlog story (`[E*.F*.H*]`) runs as an sdd-lite change. Change name = story id + slug (e.g. `e0-f1-h1-scaffold`), persisted under `sdd-lite/openspec/changes/<change-name>/`.
+2. **Mandatory**: any multi-file feature, refactor, or bug fix without a clear one-line cause — even outside the backlog.
+3. **Exempt** (proceed directly, no ceremony): doc typos/wording, clear one-line fixes, questions/explanations, session operations (commits, pushes, issue seeding, history entries).
+4. When in doubt between 2 and 3, activate sdd-lite.
+5. At every stage (proposal → spec → design → plan → executor → qa), validate the work against PRD §4, the architecture guards, and the story's acceptance criteria. Any deviation or contradiction is classified with the decision protocol below and recorded in the audit history.
+
+## Decision protocol (A/B/C)
+
+Every non-trivial decision falls in exactly one level:
+
+- **A — Autonomous**: technical, reversible, aligned with PRD/setup (file naming, test ordering, internal structure). Decide without asking; record it in the audit history with its rationale.
+- **B — Consult**: two or more viable alternatives with real trade-offs, or anything affecting public API, UX, config formats, or repo structure. Present options **with a recommendation**; the user decides. Record who decided.
+- **C — STOP**: the task contradicts the PRD/backlog, expands scope, or reality refutes a documented assumption. Stop and ask — never improvise scope (workflow contract rule 8).
+
+If a decision sits between two levels, escalate to the higher one (A→B, B→C).
+
+## Audit history (mandatory)
+
+`history/` is the audit trail of the development process (rules in `history/README.md`):
+
+- Every work session produces or updates exactly one entry in `history/entries/`, following `history/TEMPLATE.md`, via the `history-log` skill.
+- The entry is written **before closing**: end of session, end of story, or any STOP — whichever comes first. Closing a story without its history entry is as invalid as opening a PR without `npm run check`.
+- Every A-level decision, every B/C consultation and its outcome, and every deviation must appear there with explicit authorship (`user` / `claude` / `claude→user`).
+- History entries are committed to git (remote environments are ephemeral — uncommitted history is lost).
+- sdd-lite changes are not duplicated: entries link to `sdd-lite/openspec/changes/<change>/` artifacts instead of copying them.
 
 ---
 
@@ -91,25 +121,7 @@ You are a development assistant with access to `sdd-lite`, a structured change w
 
 ## When to use sdd-lite
 
-Use the `sdd-lite` orchestrator (canonical contract at `sdd-lite/orchestrator/SDDL-ORCHESTRATOR.md`) when one of these is true:
-
-- The user explicitly mentions sdd-lite: "use sdd", "con sdd-lite", "con sdd", "sddl", "hacerlo con sdd", or similar
-- The user is starting a feature, refactor, or fix and seems uncertain about scope or approach
-- The task spans multiple files, has unclear acceptance criteria, or carries non-trivial risk
-
-Do NOT activate sdd-lite automatically for:
-
-- Simple questions or explanations
-- Quick one-line fixes the user clearly understands
-- Conversational or exploratory requests
-
-## When to suggest sdd-lite (without forcing it)
-
-If a task looks substantial (new feature, broad refactor, bug with unknown root cause, multi-step change) and the user has not asked for structure, you may briefly offer:
-
-> "This looks like a task where sdd-lite could help with structured planning. Want to use it, or should I proceed directly?"
-
-If the user declines or ignores the suggestion, proceed without sdd-lite.
+This project replaces the generic "suggest sdd-lite" guidance with the deterministic **"sdd-lite activation policy"** section defined above, outside this generated block. In short: backlog stories and multi-file changes ALWAYS run through the `sdd-lite` orchestrator (canonical contract at `sdd-lite/orchestrator/SDDL-ORCHESTRATOR.md`); trivial fixes and session operations do not. If `sddl-init` ever regenerates this block, the project policy above still governs.
 
 ## When sdd-lite is active
 

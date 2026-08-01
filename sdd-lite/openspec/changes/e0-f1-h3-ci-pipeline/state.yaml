@@ -1,0 +1,565 @@
+version: "0.1"
+change_name: e0-f1-h3-ci-pipeline
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F1.H3] (issue #4): GitHub Actions ci.yml with jobs
+    check (biome, tsc, depcruise), test (vitest, Node matrix 22/24), and
+    build (tsup + smoke `sentinel --version`), running on PR and push to
+    main, per setup §6. Stacked on [E0.F1.H2] (PR #48, under review):
+    branch created from origin/claude/scaffold-hexagonal-structure-dfq16n
+    (b7f5e98), PR base will be that branch so the diff shows only H3.
+    Known tension routed to proposal/spec: the test and build scripts
+    exist but vitest and tsup are NOT installed yet (npm test exit 127
+    recorded at H2 QA), while the story AC requires all 3 jobs to run —
+    the story description itself names vitest, tsup, and the bin smoke,
+    so minimal tool enablement is likely in scope, but the boundary must
+    be pinned explicitly against E0.F2.x (which owns real test content).
+    Bounded blast radius: one workflow file plus minimal tooling
+    enablement. Normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-01T18:40:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocking routing — setup §6 pins the 3 jobs, the
+      repo state is audited (H2 state.yaml + skill catalog), and the
+      vitest/tsup gap is a known documented fact to be resolved as a scope
+      decision in proposal/spec, not an evidence gap.
+  sddl-proposal:
+    status: done
+    completed_at: "2026-08-01T18:55:00Z"
+    notes: >-
+      proposal.md written. Problem framed (no CI enforcement of quality
+      gate + guards; vitest/tsup not installed; cli.ts no-op vs bin smoke).
+      Scope sketch pins minimal-enablement boundary: ci.yml + vitest
+      install (green with zero tests) + tsup install/minimal config +
+      minimal --version in cli.ts IN; release.yml / pr-title / dependabot,
+      E0.F2.x test content, E6.F1.x wiring OUT. Feasibility high. Five
+      open questions routed to spec (zero-test strategy, tsup config
+      shape, --version implementation + smoke invocation, matrix breadth,
+      exact pins). Phase checkpoint implicitly approved per ckp-001
+      (auto mode, pre-approved kickoff).
+  sddl-spec:
+    status: done
+    completed_at: "2026-08-01T19:10:00Z"
+    notes: >-
+      spec.md written. Firm scope boundary + 10 acceptance criteria
+      (AC-01..AC-10). All five proposal questions pinned as A-level
+      decisions dec-002..dec-006: --passWithNoTests in the test script
+      (no vitest config file, E0.F2.x inherits a clean slate with a
+      recorded flag-removal duty); tsup.config.ts at root + biome
+      allowlist entry; --version prints package.json version from a
+      single source of truth, smoke pinned as `node dist/cli.js
+      --version`; matrix [22,24] on test only, check/build on Node 22
+      (engines floor); vitest/tsup as exact devDep pins with concrete
+      versions design-owned. Triggers pinned: pull_request unfiltered
+      (stacked PR must fire) + push to main. Guard red-proof pinned as
+      evidence chain (command-level equivalence + H2 red proofs + one
+      local uncommitted red demo), never a broken pushed commit. Phase
+      checkpoint ckp-002 implicitly approved per ckp-001 (auto mode).
+  sddl-design:
+    status: done
+    completed_at: "2026-08-01T19:45:00Z"
+    notes: >-
+      design.md written with all spec-owned mechanics pinned and
+      registry-verified: vitest 4.1.10 + tsup 8.5.1 exact pins (engines/
+      peers checked against Node 22/24 and TS 5.9.3, dec-007); exact
+      ci.yml YAML (actions checkout@v7 + setup-node@v7 major tags, npm ci
+      per job with setup-node npm cache, permissions contents:read,
+      timeout-minutes 10, concurrency cancelling superseded PR runs only,
+      dec-008); exact tsup.config.ts (esm, node22, entry {cli}, clean,
+      dts:false, native shebang in source, dec-010); --version via static
+      JSON import with `with { type: "json" }` — esbuild inlines it so the
+      dist-vs-src path depth difference disappears; requires
+      resolveJsonModule:true in tsconfig.json (recorded AC-09 amendment,
+      dec-009). biome allowlist += tsup.config.ts only (biome has no YAML
+      support — ci.yml sits outside the includes allowlist by design).
+      .gitignore verified: dist/ already ignored (H1), no change. Two
+      QA-visible amendments flagged: concurrency vs spec non-goal
+      (handoff-instructed) and tsconfig in the AC-09 diff bound. Phase
+      checkpoint ckp-003 implicitly approved per ckp-001 (auto mode).
+  sddl-plan:
+    status: done
+    completed_at: "2026-08-01T20:05:00Z"
+    notes: >-
+      plan.md written. Two sequential executor stages: S1 local tool
+      enablement (npm i -D -E vitest@4.1.10 tsup@8.5.1; test script →
+      `vitest run --passWithNoTests`; tsup.config.ts, biome allowlist,
+      tsconfig resolveJsonModule, cli.ts --version — all byte-exact from
+      design §§2-6) ending with check/test/build/smoke/shebang/dev-mode
+      green and dist/ untracked; S2 ci.yml byte-exact from design §1 +
+      structural YAML checklist (dec-011: no local linter — post-push
+      run is the authoritative proof, risk-008) + AC-06c red demo
+      (uncommitted forbidden import → check red at depcruise → revert →
+      green, never committed) + AC-09 diff bound vs b7f5e98 (7 files
+      incl. tsconfig per dec-009 amendment). AC coverage table maps
+      AC-01..AC-10 to stages or post-plan mechanics (AC-07 =
+      orchestrator watches the 3 checks post-push). Commit/PR/H2-fixes
+      merge/history entry pinned as orchestrator-owned post-plan
+      mechanics, not stages. npm run check green mandatory at end of
+      every stage. execution_ready: true. Phase checkpoint ckp-004
+      implicitly approved per ckp-001 (auto mode).
+  sddl-executor:
+    status: done
+    completed_at: "2026-08-01T21:20:00Z"
+    notes: >-
+      S2 (ci.yml + red-proof + diff bound) DONE 2026-08-01:
+      .github/workflows/ci.yml created byte-exact from design §1
+      (mechanical diff against the design yaml fence = identical);
+      dec-011 structural checklist 8/8 pass (3 jobs, verbatim npm
+      scripts + version smoke, unfiltered pull_request + push main,
+      node 22 / matrix [22,24], contents:read, PR-only cancel
+      concurrency, timeout 10, checkout@v7/setup-node@v7 + npm ci).
+      AC-06c red demo: plan's literal append tripped biome first
+      (short-circuit before depcruise) — dev-001 recorded; biome-clean
+      re-injection made `npm run check` fail AT depcruise naming
+      `core-no-io-libs` (exit 1), then revert → check green, porcelain
+      clean except ?? .github/. Never staged/committed. Final gate all
+      green (check, test, build 785 B, smoke 0.0.0, dev exit 0). AC-09
+      diff bound vs effective baseline 5057e41: tracked diff = exactly
+      the 6 committed story files + 6 sdd-lite change artifacts;
+      untracked = only .github/workflows/ci.yml (porcelain evidence —
+      untracked files don't appear in diff --stat; no git add -N to
+      avoid git side effects). Nothing under src/core/ or
+      src/adapters/. ci.yml left uncommitted per handoff. Both plan
+      stages done — implementation endpoint reached.
+
+      S1 (local tool enablement) DONE 2026-08-01: exact pins vitest
+      4.1.10 + tsup 8.5.1 installed (no drift); test script →
+      `vitest run --passWithNoTests`; tsup.config.ts created; biome
+      allowlist += tsup.config.ts; tsconfig += resolveJsonModule;
+      cli.ts replaced (shebang + JSON import attribute + --version) —
+      all byte-exact from design §§2-6. Full S1 validation battery
+      green: check (biome 18 files, tsc, depcruise 14 modules /
+      1 dependency, 0 violations), test (passWithNoTests, exit 0),
+      build (dist/cli.js 785 B, executable), smoke prints 0.0.0 ==
+      package version exit 0, shebang preserved natively (risk-006
+      fallback not needed), dev mode intact, dist/ untracked. Changes
+      left uncommitted per handoff (orchestrator owns git). Baseline
+      note: effective H2 tip / AC-09 diff-bound baseline is 5057e41
+      (merged PR #48 review fixes), not plan's b7f5e98 — recorded in
+      execution-log.md as a note, not a deviation (risk-002). No
+      deviations. S2 pending in a separate executor invocation.
+  sddl-qa-review:
+    status: done
+    completed_at: "2026-08-01T21:45:00Z"
+    notes: >-
+      Final-mode QA over the full change: verdict pass, completion
+      allowed. RAN INLINE in the orchestrator (degradation recorded):
+      the delegated qa worker terminated on an API spend-limit error
+      mid-run (after confirming the diff bound, before the red demo);
+      per the CLAUDE.md fresh-context degradation policy the loss of
+      context isolation is recorded in qa-report.md and every AC was
+      re-verified with fresh independent command evidence, state
+      persisted immediately. AC-01..AC-06, AC-08..AC-10 all pass with
+      fresh evidence (check green 14 modules/0 violations, test exit 0
+      passWithNoTests, build 785 B + smoke 0.0.0 == package version,
+      cli.ts guard-clean, diff bound vs 5057e41 = exactly the 6 story
+      files). QA independently re-ran the red demo: dev-001 biome trip
+      reproduced first, then biome-clean variant made `npm run check`
+      fail AT depcruise naming core-no-io-libs (exit 1), revert → green,
+      porcelain clean. AC-07 (3 checks green on the real stacked PR) is
+      the only pending observable — explicitly owned by orchestrator
+      post-plan mechanics (risk-008/dec-011), the expected shape for a
+      CI story. dec-008/dec-009/dev-001/risk-004 recorded for PR
+      visibility. Ledger consumed (4R pass, 0 findings). See
+      qa-report.md.
+artifacts:
+  state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
+  execution_log: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/execution-log.md
+  proposal: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/proposal.md
+  spec: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/plan.md
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Execution mode and scope approval for the whole change, given in the
+      user session-kickoff message (2026-08-01): run [E0.F1.H3] as an
+      sdd-lite change through proposal → spec → design → plan → executor →
+      qa autonomously. Scope = issue #4 (3 CI jobs on PR and push to main;
+      broken guard = red pipeline) per setup §6. Stacking constraints from
+      the kickoff: branch FROM origin/claude/scaffold-hexagonal-structure-dfq16n
+      (never main), PR base = that branch, merge H2 review fixes if PR #48
+      moves while working. Closing requirements: npm run check green before
+      PR, PR "[E0.F1.H3] ..." with Closes #4 (never merge, never push
+      main), history entry committed before closing.
+    question: >-
+      Proceed with e0-f1-h3-ci-pipeline in auto mode with the
+      kickoff-defined scope?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved in advance by the user kickoff message (autonomous remote
+        session; user not available mid-task).
+      responded_at: "2026-08-01T18:40:00Z"
+    created_at: "2026-08-01T18:40:00Z"
+    resolved_at: "2026-08-01T18:40:00Z"
+  - id: ckp-002
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      Spec phase checkpoint: firm scope boundary, AC-01..AC-10, and the
+      five A-level pins dec-002..dec-006. Implicitly approved per
+      ckp-001 (auto mode, whole-change pre-approval covering phase
+      checkpoints).
+    question: >-
+      Approve spec.md scope contract and proceed to sddl-design?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; recorded
+        as such per handoff instruction.
+      responded_at: "2026-08-01T19:10:00Z"
+    created_at: "2026-08-01T19:10:00Z"
+    resolved_at: "2026-08-01T19:10:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      Design phase checkpoint: exact ci.yml, exact pins vitest 4.1.10 /
+      tsup 8.5.1 (verified), tsup.config.ts + cli.ts exact contents,
+      JSON-import-attribute --version mechanism, plus two recorded
+      amendments (concurrency block vs spec non-goal per orchestrator
+      handoff; tsconfig resolveJsonModule extending the AC-09 diff
+      bound). Implicitly approved per ckp-001 (auto mode).
+    question: >-
+      Approve design.md (including the two recorded amendments) and
+      proceed to sddl-plan?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; the two
+        amendments stay flagged for QA and the PR description.
+      responded_at: "2026-08-01T19:45:00Z"
+    created_at: "2026-08-01T19:45:00Z"
+    resolved_at: "2026-08-01T19:45:00Z"
+  - id: ckp-004
+    type: stage_approval
+    stage: sddl-plan
+    summary: >-
+      Plan phase checkpoint: two-stage executor plan (S1 local tool
+      enablement, S2 ci.yml + red-proof + diff bound), AC coverage
+      table, post-plan mechanics pinned as orchestrator-owned, dec-011
+      evidence policy for ci.yml validation. Implicitly approved per
+      ckp-001 (auto mode). S1/S2 stage approvals likewise satisfied by
+      ckp-001's whole-change pre-approval; the executor records each as
+      implicitly approved at stage start.
+    question: >-
+      Approve plan.md and proceed to sddl-executor stage S1?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; recorded
+        as such per handoff instruction.
+      responded_at: "2026-08-01T20:05:00Z"
+    created_at: "2026-08-01T20:05:00Z"
+    resolved_at: "2026-08-01T20:05:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: auto mode, kickoff-defined scope, stacked-branch workflow
+    rationale: >-
+      The kickoff message explicitly defines how to run the story, the
+      stacked-branch mechanics (base H2 branch, not main), and the closing
+      requirements; the session is autonomous. Stage approvals for
+      code-touching work are satisfied by this explicit pre-approval; any
+      deviation from the pinned scope still stops (protocol B/C).
+    recorded_at: "2026-08-01T18:40:00Z"
+  - id: dec-002
+    checkpoint_id: ckp-002
+    free_text: >-
+      Zero-test strategy: `vitest run --passWithNoTests` in the npm test
+      script; no vitest config file committed in this story.
+    rationale: >-
+      A-level (claude). Contract holds: npm test exits 0 today with zero
+      test files and turns non-zero the moment a real failing test
+      exists (the flag only tolerates absence of tests, never failures).
+      Leaves E0.F2.x a clean slate — no throwaway config to replace and
+      no biome allowlist churn. Explicit hand-off duty recorded: E0.F2.x
+      must remove the flag when the real projects config lands, so an
+      empty test glob can never pass silently afterwards.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-003
+    checkpoint_id: ckp-002
+    free_text: >-
+      tsup config lives in `tsup.config.ts` at repo root (not a
+      package.json field), added to biome files.includes.
+    rationale: >-
+      A-level (claude). Typed and discoverable; matches the repo
+      convention of explicit root config files (biome.json,
+      tsconfig.json, .dependency-cruiser.cjs — which needed the same
+      allowlist treatment in H2). Exact file contents are design-owned;
+      design must also verify tsc --noEmit treatment of the file so
+      npm run check stays green.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-004
+    checkpoint_id: ckp-002
+    free_text: >-
+      --version behavior: built bin prints the package.json version and
+      exits 0; smoke command pinned as `node dist/cli.js --version`;
+      every other invocation stays a no-op exiting 0.
+    rationale: >-
+      A-level (claude). The printed version must come from a single
+      source of truth (package.json version field — no duplicated
+      hardcoded literal), preventing drift without absorbing E6.F1.x
+      composition-root scope; mechanism (JSON import, createRequire, or
+      build-time define) is design-owned. `node dist/cli.js` avoids
+      npm-link/npm-exec indirection and is deterministic in CI. cli.ts
+      stays dependency-free (no core imports), passing all guards.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-005
+    checkpoint_id: ckp-002
+    free_text: >-
+      Matrix breadth: test job matrixes Node [22, 24]; check and build
+      jobs run on Node 22 only.
+    rationale: >-
+      A-level (claude). Matches setup §6 verbatim (matrix only on test).
+      Node 22 is the engines floor (>=22): lint/typecheck/guard results
+      are Node-version-independent tooling, and building + smoking on
+      the floor proves the bin works on the minimum supported runtime;
+      also saves CI minutes.
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-006
+    checkpoint_id: ckp-002
+    free_text: >-
+      vitest and tsup installed as exact devDep pins (npm i -D -E);
+      concrete versions chosen in design.
+    rationale: >-
+      A-level (claude). Consistent with the existing exact-pin policy
+      (biome 2.5.6, dependency-cruiser 18.1.0, typescript 5.9.3).
+      Design must verify compatibility: a vitest version supporting
+      Node 22/24 and TS 5.9.3, and a tsup version compatible with
+      typescript 5.9.3 (tsup bundles via esbuild so the TS version is
+      mostly irrelevant — recorded for the audit).
+    recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-007
+    checkpoint_id: ckp-003
+    free_text: >-
+      Exact pins: vitest 4.1.10 and tsup 8.5.1 (npm i -D -E).
+    rationale: >-
+      A-level (claude). Registry-verified 2026-08-01: vitest 4.1.10 is
+      latest (published 2026-07-06), engines ^20||^22||>=24 covers the
+      22/24 matrix, peer @types/node ^22 satisfied by 22.20.1, vite is a
+      direct dependency (resolves to 8.2.0, engines ^20.19||>=22.12 — ok
+      on CI's latest 22.x/24.x), --passWithNoTests exists in v4. tsup
+      8.5.1 is latest (published 2025-11-12), engines node >=18, peer
+      typescript >=4.5.0 optional — 5.9.3 satisfies; bundles via esbuild
+      ^0.27 (import attributes + hashbang preservation supported).
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-003
+    free_text: >-
+      ci.yml mechanics: actions/checkout@v7 + actions/setup-node@v7
+      (major tags; latest v7.0.1 / v7.0.0 verified), npm ci per job with
+      setup-node npm cache, permissions contents:read, timeout-minutes
+      10 per job, concurrency group ${{ github.workflow }}-${{
+      github.ref }} with cancel-in-progress only for pull_request
+      events.
+    rationale: >-
+      A-level (claude). Major tags over SHA pins: first-party actions,
+      moving major receives security patches, SHA pins go stale with
+      Dependabot out of scope this story. npm ci per job: isolated
+      runners, lock-keyed cache makes it cheap; jobs run npm scripts
+      verbatim (AC-06 command-level equivalence). AMENDMENT: the
+      concurrency block amends the spec non-goal "no concurrency
+      groups", pinned per explicit orchestrator handoff instruction
+      (decide and justify); PR-only cancellation keeps a full audit run
+      for every main commit. Flagged for QA and the PR description.
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-003
+    free_text: >-
+      --version mechanism: static `import pkg from "../../package.json"
+      with { type: "json" }` in src/main/cli.ts; requires adding
+      "resolveJsonModule": true to tsconfig.json — recorded amendment
+      extending the AC-09 diff bound by tsconfig.json.
+    rationale: >-
+      A-level (claude). Only mechanism immune to the dev-vs-bundle path
+      depth trap: esbuild inlines the JSON at build time (dist/cli.js
+      has no runtime path dependence) while node strip-types resolves
+      ../../package.json correctly from src/main. createRequire was
+      rejected (esbuild leaves require paths untouched — broken from
+      dist/); fs walk-up and build-time define are uglier dual-path
+      hacks. Node 22.12+ has stable JSON modules (local v22.22.2, CI
+      uses latest 22.x/24.x); default import only (Node JSON modules
+      expose no named exports); guard-clean (no depcruise rule matches
+      src/main -> package.json). The tsconfig flag is additive and
+      changes nothing existing. Flagged for QA.
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-010
+    checkpoint_id: ckp-003
+    free_text: >-
+      tsup.config.ts: entry {cli: src/main/cli.ts}, format esm, platform
+      node, target node22, outDir dist, clean, dts:false; shebang lives
+      natively in src/main/cli.ts (no banner). tsconfig include stays
+      ["src"] so tsup.config.ts is outside tsc scope; biome lints it via
+      the dec-003 allowlist entry; no biome entry for .github (biome
+      2.5.6 has no YAML support and includes is an allowlist).
+    rationale: >-
+      A-level (claude). dts:false — a bin is executed, never imported.
+      Native shebang: one source of truth, direct-execution friendly;
+      esbuild preserves the entry hashbang and tsup chmods the output;
+      executor validates head -1 dist/cli.js with the tsup banner option
+      as bounded fallback (risk-006). Keeping tsconfig include at
+      ["src"] avoids a second tsconfig change; npm run build itself
+      exercises the config via bundle-require.
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-011
+    checkpoint_id: ckp-004
+    free_text: >-
+      Plan decomposition: two sequential executor stages (S1 local tool
+      enablement, S2 ci.yml + red-proof + diff bound), commit/PR/AC-07
+      watch/history as orchestrator post-plan mechanics; ci.yml local
+      evidence policy = byte-exact copy from design §1 + structural
+      checklist (jobs/triggers/node versions/verbatim npm scripts),
+      with the post-push real run as the authoritative proof.
+    rationale: >-
+      A-level (claude). The suggested decomposition from the handoff
+      maps cleanly onto the design's Validation Matrix with disjoint
+      write scopes and independently green endpoints; a finer split
+      would create filler stages. No local YAML linter exists in the
+      environment (actionlint not installed, no js-yaml), so pinning
+      the acceptable evidence prevents the executor from improvising
+      weaker or heavier checks; AC-07 remains the ultimate criterion
+      and is watched by the orchestrator after the PR opens.
+    recorded_at: "2026-08-01T20:05:00Z"
+open_risks:
+  - id: risk-001
+    severity: low
+    summary: >-
+      RESOLVED by design dec-007/dec-010: vitest 4.1.10 and tsup 8.5.1
+      verified against the live registry (engines, peers, Node 22/24,
+      TS 5.9.3); tsup.config.ts deliberately outside tsc scope
+      (tsconfig include stays ["src"]), biome lints it, build exercises
+      it. Residual: none beyond normal executor validation.
+  - id: risk-002
+    severity: low
+    summary: >-
+      Stacked PR: base = claude/scaffold-hexagonal-structure-dfq16n while
+      PR #48 is under review. If H2 receives review fixes, this branch
+      must merge them before opening/updating the PR (kickoff rule). CI
+      on this PR runs against the stacked diff; GitHub retargets to main
+      when #48 merges.
+  - id: risk-003
+    severity: low
+    summary: >-
+      RESOLVED: spec dec-004 pinned the behavior; design dec-009 pinned
+      the mechanism (static JSON import with attribute, esbuild-inlined,
+      guard-clean, dependency-free). Residual: none.
+  - id: risk-004
+    severity: medium
+    summary: >-
+      Future-facing hand-off duty from dec-002: `--passWithNoTests`
+      left in the test script beyond E0.F2.x could silently mask an
+      empty test glob. E0.F2.x must remove the flag when the real
+      vitest projects config lands; duty recorded in spec.md non-goals
+      and to be echoed in the PR description.
+  - id: risk-005
+    severity: low
+    summary: >-
+      Design amends the spec non-goal "no concurrency groups" (dec-008,
+      per explicit orchestrator handoff instruction) and extends the
+      AC-09 diff bound with tsconfig.json resolveJsonModule (dec-009).
+      Both additive and reversible, but QA must validate against spec +
+      these recorded amendments, and the PR description must surface
+      them so the human reviewer sees the deviation trail.
+  - id: risk-006
+    severity: low
+    summary: >-
+      Shebang preservation in dist/cli.js is asserted from documented
+      esbuild/tsup behavior, not locally reproduced (design stage runs
+      no installs). Executor validates `head -1 dist/cli.js` ==
+      `#!/usr/bin/env node`; bounded fallback: tsup banner
+      { js: "#!/usr/bin/env node" } and drop the source shebang line.
+  - id: risk-007
+    severity: low
+    summary: >-
+      actions/checkout@v7 and setup-node@v7 pinned as moving major tags
+      (dec-008): supply-chain exposure is accepted for first-party
+      GitHub actions; revisit SHA pinning when a Dependabot story lands
+      (out of scope here per spec).
+  - id: risk-008
+    severity: low
+    summary: >-
+      ci.yml has no authoritative local validation (actionlint not
+      installed, no local YAML parser): S2 evidence is a byte-exact
+      copy from design §1 plus a structural checklist (dec-011); a
+      syntax or schema error would only surface on the post-push run.
+      Mitigation: design §1 YAML is complete and conventional; AC-07
+      watch after PR opening catches any failure before story close.
+review_summary:
+  mode: 4r
+  verdict: pass
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 0
+  summary: >-
+    Standard-tier 4R review of the frozen story diff (5057e41..e3e87e5,
+    83 hand-written lines): one reliability-lens sweep, zero findings at
+    any severity. All story claims verified with live probes (full local
+    gate green; dist/cli.js shebang + inlined package.json; actions v7
+    tags exist; replica red-path → depcruise exit 2; npm ci dry-run
+    lockfile sync; ci.yml valid YAML; concurrency cancels PR runs only).
+    Residual: GitHub's own execution of ci.yml is locally unverifiable
+    (risk-008) — owned by the post-push AC-07 watch. No refuter
+    (standard tier), no fix rounds used.
+  reported_at: "2026-08-01T20:05:00Z"
+  ledger_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/review-ledger.md
+qa_summary:
+  mode: final
+  verdict: pass
+  completion_allowed: true
+  summary: >-
+    Final QA (inline, degradation recorded) re-verified AC-01..AC-10
+    with fresh independent evidence: check/test/build/smoke/dev green,
+    diff bound vs 5057e41 = the 6 story files, cli.ts guard-clean, red
+    demo re-run reddening npm run check AT depcruise (core-no-io-libs,
+    exit 1) then reverting to green + clean porcelain. AC-07 (3 checks
+    green on the real stacked PR) pending post-push, explicitly owned by
+    orchestrator mechanics (risk-008). dec-008/dec-009/dev-001/risk-004
+    carried to the PR description. Zero blocking findings. Completion
+    allowed.
+  reported_at: "2026-08-01T21:45:00Z"
+  report_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/qa-report.md
+pr:
+  number: 49
+  url: https://github.com/nico0695/sentinel-kit/pull/49
+  base: main
+  head: claude/e0-f1-h3-ci-pipeline-2gliny
+  note: >-
+    PR #48 (H2) merged to main via merge commit (4871aba) while this change
+    was in QA — the H2 tip 5057e41 is an ancestor of main, so the diff vs
+    main is exactly the 6 H3 story files. Opened directly against main
+    (the destination the kickoff anticipated on H2 merge) instead of the
+    now-merged H2 branch. Closes #4. dec-008/dec-009/risk-004 surfaced in
+    the description.
+ac_07_result:
+  status: pass
+  verified_at: "2026-08-01T21:54:30Z"
+  evidence: >-
+    All 4 CI check runs on PR #49 completed with conclusion=success:
+    check, test (22), test (24), build (GitHub Actions run 30720103831).
+    AC-07 (3 jobs green on the real PR) confirmed — the last pending
+    observable is now closed.
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Change completed (final QA pass) and PR #49 open against main with all
+    CI checks green (AC-07 closed). Remaining: history entry via
+    history-log committed before closing. Never merge / never push main —
+    the human reviews and merges.
+created_at: "2026-08-01T18:40:00Z"
+updated_at: "2026-08-01T21:45:00Z"

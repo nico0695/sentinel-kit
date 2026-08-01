@@ -6,7 +6,8 @@
       "package.json",
       "tsconfig.json",
       "biome.json",
-      ".dependency-cruiser.cjs"
+      ".dependency-cruiser.cjs",
+      "tsup.config.ts"
     ]
   },
   "formatter": {

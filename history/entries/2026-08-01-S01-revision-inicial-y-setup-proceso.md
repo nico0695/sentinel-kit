@@ -49,10 +49,19 @@ sistema de auditoría.
 - CLAUDE.md: política de activación sdd-lite + protocolo A/B/C + regla de auditoría obligatoria.
 - Creación de `history/` (README, TEMPLATE, INDEX, esta entrada) y skill `.claude/skills/history-log/`.
 
+## Cierre de sesión (actualización)
+
+- ✅ Usuario corrió `create-issues.sh`: 8 milestones + 44 issues creados (#2–#45); verificado vía API.
+  `[E0.F1.H1]` = issue #2.
+- ✅ Usuario mergeó el PR #1 (rename E7). El commit de auditoría/política quedó fuera del merge;
+  se rebasó la rama sobre `main` (protocolo post-merge, `ad7a9e0` → `120073e`) — irá en un PR nuevo.
+- Recomendación registrada: arrancar `[E0.F1.H1]` en **sesión nueva** (kickoff limpio con el
+  CLAUDE.md actualizado; el estado quedó 100% persistido en git + issues + este history).
+
 ## Pendientes y próximos pasos
 
-- **Usuario**: correr `./create-issues.sh nico0695/sentinel-kit` localmente (con `gh` autenticado, una sola vez).
-- **Próxima sesión**: arrancar `[E0.F1.H1]` como change sdd-lite (`e0-f1-h1-scaffold`), con scope
+- **Usuario**: revisar/mergear el PR nuevo con el commit de proceso (`120073e`) cuando se abra.
+- **Próxima sesión**: arrancar `[E0.F1.H1]` (issue #2) como change sdd-lite (`e0-f1-h1-scaffold`), con scope
   npm `@nico0695/sentinel`; actualizar el placeholder `@<scope>` en docs en esa misma historia.
 - Tras E0.F1.H1: re-refresh del bootstrap sdd-lite (quality commands pasan a ser ejecutables).
 - Abiertas del PRD: licencia (E7.F2.H2) y `sentinel open` (decisión 5) — no bloquean.

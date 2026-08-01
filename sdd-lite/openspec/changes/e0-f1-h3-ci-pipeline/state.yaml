@@ -533,17 +533,33 @@ qa_summary:
     allowed.
   reported_at: "2026-08-01T21:45:00Z"
   report_path: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/qa-report.md
+pr:
+  number: 49
+  url: https://github.com/nico0695/sentinel-kit/pull/49
+  base: main
+  head: claude/e0-f1-h3-ci-pipeline-2gliny
+  note: >-
+    PR #48 (H2) merged to main via merge commit (4871aba) while this change
+    was in QA — the H2 tip 5057e41 is an ancestor of main, so the diff vs
+    main is exactly the 6 H3 story files. Opened directly against main
+    (the destination the kickoff anticipated on H2 merge) instead of the
+    now-merged H2 branch. Closes #4. dec-008/dec-009/risk-004 surfaced in
+    the description.
+ac_07_result:
+  status: pass
+  verified_at: "2026-08-01T21:54:30Z"
+  evidence: >-
+    All 4 CI check runs on PR #49 completed with conclusion=success:
+    check, test (22), test (24), build (GitHub Actions run 30720103831).
+    AC-07 (3 jobs green on the real PR) confirmed — the last pending
+    observable is now closed.
 next_action:
   kind: complete
   target: orchestrator
   summary: >-
-    Change completed (final QA pass). Orchestrator-owned closing
-    mechanics per ckp-001: commit QA + review artifacts, open the
-    stacked PR (base claude/scaffold-hexagonal-structure-dfq16n, title
-    "[E0.F1.H3] CI pipeline", Closes #4, description surfacing dec-008
-    concurrency amendment, dec-009 tsconfig amendment, and risk-004
-    --passWithNoTests removal duty for E0.F2.x), never merge / never
-    push main, then watch AC-07 (3 checks green on the PR), history
-    entry via history-log committed before closing.
+    Change completed (final QA pass) and PR #49 open against main with all
+    CI checks green (AC-07 closed). Remaining: history entry via
+    history-log committed before closing. Never merge / never push main —
+    the human reviews and merges.
 created_at: "2026-08-01T18:40:00Z"
 updated_at: "2026-08-01T21:45:00Z"

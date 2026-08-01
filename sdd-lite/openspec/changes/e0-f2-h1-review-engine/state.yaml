@@ -2,7 +2,19 @@ version: "0.1"
 change_name: e0-f2-h1-review-engine
 objective: new-feature
 mode: lite
-execution_mode: interactive
+execution_mode: auto
+validation_protocol:
+  per_stage_parallel_validation: true
+  description: >-
+    User directive (dec-003): after each stage produces its artifact, run two
+    blind read-only validators in parallel to detect drift from the plan
+    before routing on. Validator A checks acceptance criteria (issue #5) + the
+    backlog H1/H2 boundary (no scope creep into H2/E4). Validator B checks PRD
+    §4 hexagonal rules + architecture guards (zero I/O, core whitelist zod,
+    port named by role, index re-export) + coherence with upstream artifacts.
+    Converge "no drift" -> auto-continue; any drift or divergence -> STOP and
+    consult (protocol B/C). For the executor (code) stage this role is filled
+    by the sddl-code-review 4R parallel-lens protocol.
 complexity_assessment:
   route: continue-lite
   summary: >-
@@ -125,6 +137,23 @@ decisions:
       suggestion, or direction change as a protocol-B consultation (options +
       recommendation) and let the user decide. Applies through the design gate.
     recorded_at: "2026-08-01T22:12:00Z"
+  - id: dec-003
+    checkpoint_id: ckp-001
+    free_text: >-
+      Switch to auto mode after proposal; stop only on discrepancy or required
+      interaction; add per-stage parallel drift validation
+    author: user
+    rationale: >-
+      User directive after the proposal stage: "si continua, y cambia a modo
+      automatico sdd; solo frena y consulta si hay alguna discrepancia o algo
+      que tenga que interactuar; por cada stage realizar validaciones
+      paralelas para asegurarnos que no nos estamos desviando del plan."
+      Operationalized: execution_mode=auto (no routine confirmation pauses);
+      hard stops preserved for drift, contradictions, and B-level decisions
+      (notably public-API shape of the ReviewEngine contract) per protocol
+      B/C; dec-002 design gate still honored. Each stage gets two blind
+      parallel read-only validators (see validation_protocol) before routing.
+    recorded_at: "2026-08-01T22:18:00Z"
 open_risks:
   - id: risk-001
     severity: medium

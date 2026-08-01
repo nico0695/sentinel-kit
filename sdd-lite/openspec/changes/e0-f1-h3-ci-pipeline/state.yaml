@@ -22,7 +22,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-01T18:40:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -63,10 +63,32 @@ stages:
       evidence chain (command-level equivalence + H2 red proofs + one
       local uncommitted red demo), never a broken pushed commit. Phase
       checkpoint ckp-002 implicitly approved per ckp-001 (auto mode).
+  sddl-design:
+    status: done
+    completed_at: "2026-08-01T19:45:00Z"
+    notes: >-
+      design.md written with all spec-owned mechanics pinned and
+      registry-verified: vitest 4.1.10 + tsup 8.5.1 exact pins (engines/
+      peers checked against Node 22/24 and TS 5.9.3, dec-007); exact
+      ci.yml YAML (actions checkout@v7 + setup-node@v7 major tags, npm ci
+      per job with setup-node npm cache, permissions contents:read,
+      timeout-minutes 10, concurrency cancelling superseded PR runs only,
+      dec-008); exact tsup.config.ts (esm, node22, entry {cli}, clean,
+      dts:false, native shebang in source, dec-010); --version via static
+      JSON import with `with { type: "json" }` — esbuild inlines it so the
+      dist-vs-src path depth difference disappears; requires
+      resolveJsonModule:true in tsconfig.json (recorded AC-09 amendment,
+      dec-009). biome allowlist += tsup.config.ts only (biome has no YAML
+      support — ci.yml sits outside the includes allowlist by design).
+      .gitignore verified: dist/ already ignored (H1), no change. Two
+      QA-visible amendments flagged: concurrency vs spec non-goal
+      (handoff-instructed) and tsconfig in the AC-09 diff bound. Phase
+      checkpoint ckp-003 implicitly approved per ckp-001 (auto mode).
 artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
   proposal: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/proposal.md
   spec: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/design.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -111,6 +133,27 @@ checkpoints:
       responded_at: "2026-08-01T19:10:00Z"
     created_at: "2026-08-01T19:10:00Z"
     resolved_at: "2026-08-01T19:10:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      Design phase checkpoint: exact ci.yml, exact pins vitest 4.1.10 /
+      tsup 8.5.1 (verified), tsup.config.ts + cli.ts exact contents,
+      JSON-import-attribute --version mechanism, plus two recorded
+      amendments (concurrency block vs spec non-goal per orchestrator
+      handoff; tsconfig resolveJsonModule extending the AC-09 diff
+      bound). Implicitly approved per ckp-001 (auto mode).
+    question: >-
+      Approve design.md (including the two recorded amendments) and
+      proceed to sddl-plan?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; the two
+        amendments stay flagged for QA and the PR description.
+      responded_at: "2026-08-01T19:45:00Z"
+    created_at: "2026-08-01T19:45:00Z"
+    resolved_at: "2026-08-01T19:45:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -189,15 +232,87 @@ decisions:
       typescript 5.9.3 (tsup bundles via esbuild so the TS version is
       mostly irrelevant — recorded for the audit).
     recorded_at: "2026-08-01T19:10:00Z"
+  - id: dec-007
+    checkpoint_id: ckp-003
+    free_text: >-
+      Exact pins: vitest 4.1.10 and tsup 8.5.1 (npm i -D -E).
+    rationale: >-
+      A-level (claude). Registry-verified 2026-08-01: vitest 4.1.10 is
+      latest (published 2026-07-06), engines ^20||^22||>=24 covers the
+      22/24 matrix, peer @types/node ^22 satisfied by 22.20.1, vite is a
+      direct dependency (resolves to 8.2.0, engines ^20.19||>=22.12 — ok
+      on CI's latest 22.x/24.x), --passWithNoTests exists in v4. tsup
+      8.5.1 is latest (published 2025-11-12), engines node >=18, peer
+      typescript >=4.5.0 optional — 5.9.3 satisfies; bundles via esbuild
+      ^0.27 (import attributes + hashbang preservation supported).
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-003
+    free_text: >-
+      ci.yml mechanics: actions/checkout@v7 + actions/setup-node@v7
+      (major tags; latest v7.0.1 / v7.0.0 verified), npm ci per job with
+      setup-node npm cache, permissions contents:read, timeout-minutes
+      10 per job, concurrency group ${{ github.workflow }}-${{
+      github.ref }} with cancel-in-progress only for pull_request
+      events.
+    rationale: >-
+      A-level (claude). Major tags over SHA pins: first-party actions,
+      moving major receives security patches, SHA pins go stale with
+      Dependabot out of scope this story. npm ci per job: isolated
+      runners, lock-keyed cache makes it cheap; jobs run npm scripts
+      verbatim (AC-06 command-level equivalence). AMENDMENT: the
+      concurrency block amends the spec non-goal "no concurrency
+      groups", pinned per explicit orchestrator handoff instruction
+      (decide and justify); PR-only cancellation keeps a full audit run
+      for every main commit. Flagged for QA and the PR description.
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-003
+    free_text: >-
+      --version mechanism: static `import pkg from "../../package.json"
+      with { type: "json" }` in src/main/cli.ts; requires adding
+      "resolveJsonModule": true to tsconfig.json — recorded amendment
+      extending the AC-09 diff bound by tsconfig.json.
+    rationale: >-
+      A-level (claude). Only mechanism immune to the dev-vs-bundle path
+      depth trap: esbuild inlines the JSON at build time (dist/cli.js
+      has no runtime path dependence) while node strip-types resolves
+      ../../package.json correctly from src/main. createRequire was
+      rejected (esbuild leaves require paths untouched — broken from
+      dist/); fs walk-up and build-time define are uglier dual-path
+      hacks. Node 22.12+ has stable JSON modules (local v22.22.2, CI
+      uses latest 22.x/24.x); default import only (Node JSON modules
+      expose no named exports); guard-clean (no depcruise rule matches
+      src/main -> package.json). The tsconfig flag is additive and
+      changes nothing existing. Flagged for QA.
+    recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-010
+    checkpoint_id: ckp-003
+    free_text: >-
+      tsup.config.ts: entry {cli: src/main/cli.ts}, format esm, platform
+      node, target node22, outDir dist, clean, dts:false; shebang lives
+      natively in src/main/cli.ts (no banner). tsconfig include stays
+      ["src"] so tsup.config.ts is outside tsc scope; biome lints it via
+      the dec-003 allowlist entry; no biome entry for .github (biome
+      2.5.6 has no YAML support and includes is an allowlist).
+    rationale: >-
+      A-level (claude). dts:false — a bin is executed, never imported.
+      Native shebang: one source of truth, direct-execution friendly;
+      esbuild preserves the entry hashbang and tsup chmods the output;
+      executor validates head -1 dist/cli.js with the tsup banner option
+      as bounded fallback (risk-006). Keeping tsconfig include at
+      ["src"] avoids a second tsconfig change; npm run build itself
+      exercises the config via bundle-require.
+    recorded_at: "2026-08-01T19:45:00Z"
 open_risks:
   - id: risk-001
     severity: low
     summary: >-
-      RESIDUAL (was medium; boundary now pinned by spec dec-002/dec-003/
-      dec-006): concrete vitest/tsup versions are still design-owned —
-      design must verify compatibility (vitest with Node 22/24 and TS
-      5.9.3; tsup with typescript 5.9.3) and confirm tsc --noEmit
-      treatment of tsup.config.ts so npm run check stays green.
+      RESOLVED by design dec-007/dec-010: vitest 4.1.10 and tsup 8.5.1
+      verified against the live registry (engines, peers, Node 22/24,
+      TS 5.9.3); tsup.config.ts deliberately outside tsc scope
+      (tsconfig include stays ["src"]), biome lints it, build exercises
+      it. Residual: none beyond normal executor validation.
   - id: risk-002
     severity: low
     summary: >-
@@ -209,11 +324,9 @@ open_risks:
   - id: risk-003
     severity: low
     summary: >-
-      RESOLVED as scope by spec dec-004 (minimal --version pinned:
-      package.json version, single source of truth, smoke = `node
-      dist/cli.js --version`). Residual: mechanism choice (JSON import /
-      createRequire / build-time define) is design-owned and must keep
-      cli.ts dependency-free and guard-clean.
+      RESOLVED: spec dec-004 pinned the behavior; design dec-009 pinned
+      the mechanism (static JSON import with attribute, esbuild-inlined,
+      guard-clean, dependency-free). Residual: none.
   - id: risk-004
     severity: medium
     summary: >-
@@ -222,15 +335,38 @@ open_risks:
       empty test glob. E0.F2.x must remove the flag when the real
       vitest projects config lands; duty recorded in spec.md non-goals
       and to be echoed in the PR description.
+  - id: risk-005
+    severity: low
+    summary: >-
+      Design amends the spec non-goal "no concurrency groups" (dec-008,
+      per explicit orchestrator handoff instruction) and extends the
+      AC-09 diff bound with tsconfig.json resolveJsonModule (dec-009).
+      Both additive and reversible, but QA must validate against spec +
+      these recorded amendments, and the PR description must surface
+      them so the human reviewer sees the deviation trail.
+  - id: risk-006
+    severity: low
+    summary: >-
+      Shebang preservation in dist/cli.js is asserted from documented
+      esbuild/tsup behavior, not locally reproduced (design stage runs
+      no installs). Executor validates `head -1 dist/cli.js` ==
+      `#!/usr/bin/env node`; bounded fallback: tsup banner
+      { js: "#!/usr/bin/env node" } and drop the source shebang line.
+  - id: risk-007
+    severity: low
+    summary: >-
+      actions/checkout@v7 and setup-node@v7 pinned as moving major tags
+      (dec-008): supply-chain exposure is accepted for first-party
+      GitHub actions; revisit SHA pinning when a Dependabot story lands
+      (out of scope here per spec).
 next_action:
   kind: stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Produce design.md within the spec contract: concrete vitest/tsup
-    exact versions (compatibility verified), exact ci.yml YAML
-    (actions/checkout + setup-node + npm cache, jobs per AC-01..AC-03),
-    tsup.config.ts contents, tsconfig treatment of the new config file,
-    biome allowlist edit, and the --version single-source mechanism in
-    src/main/cli.ts.
+    Produce plan.md from design.md: ordered executor stages (deps
+    install, config/file edits per exact contents, local validation
+    matrix incl. the uncommitted red demo, commit/PR mechanics per
+    kickoff stacking rules) with the AC-06 evidence chain and the two
+    recorded amendments carried into QA/PR visibility.
 created_at: "2026-08-01T18:40:00Z"
-updated_at: "2026-08-01T19:10:00Z"
+updated_at: "2026-08-01T19:45:00Z"

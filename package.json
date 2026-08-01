@@ -18,12 +18,14 @@
     "dev": "node --experimental-strip-types src/main/cli.ts",
     "build": "tsup",
     "check": "biome check . && tsc --noEmit && depcruise src",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@types/node": "22.20.1",
     "dependency-cruiser": "18.1.0",
-    "typescript": "5.9.3"
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
   }
 }

@@ -21,8 +21,8 @@ complexity_assessment:
     enablement. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T18:40:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -105,8 +105,28 @@ stages:
       mechanics, not stages. npm run check green mandatory at end of
       every stage. execution_ready: true. Phase checkpoint ckp-004
       implicitly approved per ckp-001 (auto mode).
+  sddl-executor:
+    status: in-progress
+    notes: >-
+      S1 (local tool enablement) DONE 2026-08-01: exact pins vitest
+      4.1.10 + tsup 8.5.1 installed (no drift); test script →
+      `vitest run --passWithNoTests`; tsup.config.ts created; biome
+      allowlist += tsup.config.ts; tsconfig += resolveJsonModule;
+      cli.ts replaced (shebang + JSON import attribute + --version) —
+      all byte-exact from design §§2-6. Full S1 validation battery
+      green: check (biome 18 files, tsc, depcruise 14 modules /
+      1 dependency, 0 violations), test (passWithNoTests, exit 0),
+      build (dist/cli.js 785 B, executable), smoke prints 0.0.0 ==
+      package version exit 0, shebang preserved natively (risk-006
+      fallback not needed), dev mode intact, dist/ untracked. Changes
+      left uncommitted per handoff (orchestrator owns git). Baseline
+      note: effective H2 tip / AC-09 diff-bound baseline is 5057e41
+      (merged PR #48 review fixes), not plan's b7f5e98 — recorded in
+      execution-log.md as a note, not a deviation (risk-002). No
+      deviations. S2 pending in a separate executor invocation.
 artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
+  execution_log: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/execution-log.md
   proposal: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/proposal.md
   spec: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/spec.md
   design: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/design.md
@@ -434,12 +454,13 @@ next_action:
   kind: stage
   target: sddl-executor
   summary: >-
-    Execute stage S1 (local tool enablement) per plan.md: exact-pin
-    install vitest 4.1.10 + tsup 8.5.1, test script flag,
-    tsup.config.ts, biome allowlist, tsconfig resolveJsonModule,
-    cli.ts --version — all byte-exact from design §§2-6 — then run the
-    S1 validation table (check/test/build/smoke/shebang/dev-mode green,
-    dist/ untracked). Stage approval implicitly satisfied by ckp-001
-    (auto mode); record it in execution-log.md at stage start.
+    Execute stage S2 per plan.md in a separate executor invocation:
+    .github/workflows/ci.yml byte-exact from design §1, structural
+    YAML checklist (dec-011), AC-06c red demo (uncommitted forbidden
+    import → check red at depcruise → revert → green), final gate
+    (check/test/build + smoke), and AC-09 diff bound against the
+    effective baseline 5057e41 (merged H2 tip; supersedes plan's
+    b7f5e98 — see execution-log.md S1 baseline note). Stage approval
+    implicitly satisfied by ckp-001 (auto mode).
 created_at: "2026-08-01T18:40:00Z"
-updated_at: "2026-08-01T20:05:00Z"
+updated_at: "2026-08-01T20:40:00Z"

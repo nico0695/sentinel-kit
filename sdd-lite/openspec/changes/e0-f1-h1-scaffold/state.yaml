@@ -13,8 +13,8 @@ complexity_assessment:
     break; bounded and well specified — normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T14:14:32Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -102,7 +102,21 @@ stages:
       diagnostics) and npm run dev exit 0. No deviations. All plan stages
       S1-S3 completed.
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-01T15:45:00Z"
+    completed_at: "2026-08-01T15:55:00Z"
+    notes: >-
+      Final-mode QA over the full change. All commands re-run fresh: npm run
+      check exit 0 (zero diagnostics, "Checked 16 files"), npm run dev exit 0.
+      AC-01..AC-08 all verified pass with independent evidence (tracked §4.2
+      tree, exact package.json fields, §5.2 tsconfig flags, docs grep zero
+      placeholders with diff limited to the 8 lines, honest zero-import
+      placeholders, devDeps-only tree). AC-09 (PR) is orchestrator-owned and
+      sequenced after this verdict; npm reservation recorded as user-owned/
+      external (spec out-of-scope), not a failure. Review ledger consumed as
+      evidence (4R pass, 0 findings). Deviations dev-001..dev-004 and dec-002
+      verified as recorded with authorship. Verdict: clean pass — change
+      completed. Zero findings, no final_review checkpoint needed.
 artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/state.yaml
   proposal: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/proposal.md
@@ -111,6 +125,7 @@ artifacts:
   plan: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/plan.md
   execution_log: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/execution-log.md
   qa_report: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/qa-report.md
+  review_ledger: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/review-ledger.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -160,16 +175,45 @@ decisions:
       decision point outcome). Authorship: claude (A-level).
     recorded_at: "2026-08-01T15:10:00Z"
 open_risks: []
-next_action:
-  kind: run_stage
-  target: sddl-qa-review
+review_summary:
+  mode: 4r
+  verdict: pass
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 0
   summary: >-
-    All plan stages S1-S3 completed; executor stage done. Gates green at
-    closeout: npm run check exit 0 (zero diagnostics), npm run dev exit 0,
-    docs placeholder grep zero matches (8/8 replaced with @nico0695/
-    sentinel). Orchestrator-owned next steps: commit S3 docs edits
-    (suggested "docs: replace npm scope placeholders" per plan.md), then
-    sddl-qa-review in final mode (only final mode may mark the change
-    completed), then PR "[E0.F1.H1] ..." with Closes #2 (AC-09).
+    Standard-tier 4R review of the frozen story diff (7fddc9f..de3b5de,
+    152 hand-written lines): one risk-lens sweep, zero findings at any
+    severity. Guards hold by construction (zero imports in src/**), no
+    secrets or lifecycle scripts, dependency surface = 3 pinned devDeps
+    only, gate independently re-verified green on the frozen tree. No
+    refuter (standard tier), no fix rounds used.
+  reported_at: "2026-08-01T15:40:00Z"
+  ledger_path: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/review-ledger.md
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    Full-change final QA: AC-01..AC-08 verified pass with fresh evidence
+    (npm run check exit 0 zero diagnostics, npm run dev exit 0, tree/
+    package.json/tsconfig exact, docs placeholders 8/8 replaced with diff
+    limited to those lines, honest zero-import placeholders, devDeps-only).
+    AC-09 (PR) orchestrator-owned post-verdict; npm reservation user-owned/
+    external as recorded. Review ledger (4R, pass, 0 findings) consumed as
+    evidence. Zero QA findings. Change completed.
+  reported_at: "2026-08-01T15:55:00Z"
+  report_path: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/qa-report.md
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Change e0-f1-h1-scaffold completed on a clean final-mode QA pass.
+    Orchestrator-owned closeout: commit QA artifacts (qa-report.md,
+    review-ledger.md, state.yaml), open PR "[E0.F1.H1] Scaffold hexagonal
+    structure and base configs" with Closes #2 (AC-09), then bootstrap
+    refresh and history S02 entry. Never merge (workflow contract rule 5).
 created_at: "2026-08-01T14:14:32Z"
-updated_at: "2026-08-01T15:25:00Z"
+updated_at: "2026-08-01T15:55:00Z"

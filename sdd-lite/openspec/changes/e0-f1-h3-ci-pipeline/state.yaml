@@ -22,7 +22,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-01T18:40:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -84,11 +84,33 @@ stages:
       QA-visible amendments flagged: concurrency vs spec non-goal
       (handoff-instructed) and tsconfig in the AC-09 diff bound. Phase
       checkpoint ckp-003 implicitly approved per ckp-001 (auto mode).
+  sddl-plan:
+    status: done
+    completed_at: "2026-08-01T20:05:00Z"
+    notes: >-
+      plan.md written. Two sequential executor stages: S1 local tool
+      enablement (npm i -D -E vitest@4.1.10 tsup@8.5.1; test script →
+      `vitest run --passWithNoTests`; tsup.config.ts, biome allowlist,
+      tsconfig resolveJsonModule, cli.ts --version — all byte-exact from
+      design §§2-6) ending with check/test/build/smoke/shebang/dev-mode
+      green and dist/ untracked; S2 ci.yml byte-exact from design §1 +
+      structural YAML checklist (dec-011: no local linter — post-push
+      run is the authoritative proof, risk-008) + AC-06c red demo
+      (uncommitted forbidden import → check red at depcruise → revert →
+      green, never committed) + AC-09 diff bound vs b7f5e98 (7 files
+      incl. tsconfig per dec-009 amendment). AC coverage table maps
+      AC-01..AC-10 to stages or post-plan mechanics (AC-07 =
+      orchestrator watches the 3 checks post-push). Commit/PR/H2-fixes
+      merge/history entry pinned as orchestrator-owned post-plan
+      mechanics, not stages. npm run check green mandatory at end of
+      every stage. execution_ready: true. Phase checkpoint ckp-004
+      implicitly approved per ckp-001 (auto mode).
 artifacts:
   state: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/state.yaml
   proposal: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/proposal.md
   spec: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/spec.md
   design: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f1-h3-ci-pipeline/plan.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -154,6 +176,27 @@ checkpoints:
       responded_at: "2026-08-01T19:45:00Z"
     created_at: "2026-08-01T19:45:00Z"
     resolved_at: "2026-08-01T19:45:00Z"
+  - id: ckp-004
+    type: stage_approval
+    stage: sddl-plan
+    summary: >-
+      Plan phase checkpoint: two-stage executor plan (S1 local tool
+      enablement, S2 ci.yml + red-proof + diff bound), AC coverage
+      table, post-plan mechanics pinned as orchestrator-owned, dec-011
+      evidence policy for ci.yml validation. Implicitly approved per
+      ckp-001 (auto mode). S1/S2 stage approvals likewise satisfied by
+      ckp-001's whole-change pre-approval; the executor records each as
+      implicitly approved at stage start.
+    question: >-
+      Approve plan.md and proceed to sddl-executor stage S1?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Implicitly approved per ckp-001 auto-mode pre-approval; recorded
+        as such per handoff instruction.
+      responded_at: "2026-08-01T20:05:00Z"
+    created_at: "2026-08-01T20:05:00Z"
+    resolved_at: "2026-08-01T20:05:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -304,6 +347,25 @@ decisions:
       ["src"] avoids a second tsconfig change; npm run build itself
       exercises the config via bundle-require.
     recorded_at: "2026-08-01T19:45:00Z"
+  - id: dec-011
+    checkpoint_id: ckp-004
+    free_text: >-
+      Plan decomposition: two sequential executor stages (S1 local tool
+      enablement, S2 ci.yml + red-proof + diff bound), commit/PR/AC-07
+      watch/history as orchestrator post-plan mechanics; ci.yml local
+      evidence policy = byte-exact copy from design §1 + structural
+      checklist (jobs/triggers/node versions/verbatim npm scripts),
+      with the post-push real run as the authoritative proof.
+    rationale: >-
+      A-level (claude). The suggested decomposition from the handoff
+      maps cleanly onto the design's Validation Matrix with disjoint
+      write scopes and independently green endpoints; a finer split
+      would create filler stages. No local YAML linter exists in the
+      environment (actionlint not installed, no js-yaml), so pinning
+      the acceptable evidence prevents the executor from improvising
+      weaker or heavier checks; AC-07 remains the ultimate criterion
+      and is watched by the orchestrator after the PR opens.
+    recorded_at: "2026-08-01T20:05:00Z"
 open_risks:
   - id: risk-001
     severity: low
@@ -359,14 +421,25 @@ open_risks:
       (dec-008): supply-chain exposure is accepted for first-party
       GitHub actions; revisit SHA pinning when a Dependabot story lands
       (out of scope here per spec).
+  - id: risk-008
+    severity: low
+    summary: >-
+      ci.yml has no authoritative local validation (actionlint not
+      installed, no local YAML parser): S2 evidence is a byte-exact
+      copy from design §1 plus a structural checklist (dec-011); a
+      syntax or schema error would only surface on the post-push run.
+      Mitigation: design §1 YAML is complete and conventional; AC-07
+      watch after PR opening catches any failure before story close.
 next_action:
   kind: stage
-  target: sddl-plan
+  target: sddl-executor
   summary: >-
-    Produce plan.md from design.md: ordered executor stages (deps
-    install, config/file edits per exact contents, local validation
-    matrix incl. the uncommitted red demo, commit/PR mechanics per
-    kickoff stacking rules) with the AC-06 evidence chain and the two
-    recorded amendments carried into QA/PR visibility.
+    Execute stage S1 (local tool enablement) per plan.md: exact-pin
+    install vitest 4.1.10 + tsup 8.5.1, test script flag,
+    tsup.config.ts, biome allowlist, tsconfig resolveJsonModule,
+    cli.ts --version — all byte-exact from design §§2-6 — then run the
+    S1 validation table (check/test/build/smoke/shebang/dev-mode green,
+    dist/ untracked). Stage approval implicitly satisfied by ckp-001
+    (auto mode); record it in execution-log.md at stage start.
 created_at: "2026-08-01T18:40:00Z"
-updated_at: "2026-08-01T19:45:00Z"
+updated_at: "2026-08-01T20:05:00Z"

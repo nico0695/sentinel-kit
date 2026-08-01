@@ -15,8 +15,8 @@ complexity_assessment:
     scaffold from H1 is green and import-free. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T17:02:29Z"
-lifecycle_status: planning
-current_stage: sddl-design
+lifecycle_status: planned
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -66,7 +66,26 @@ stages:
       dotfile allowlist scanning). Checkpoint skipped — pre-approved by
       ckp-001 (auto mode).
   sddl-plan:
-    status: pending
+    status: done
+    completed_at: "2026-08-01T18:20:00Z"
+    notes: >-
+      plan.md written: 2 stages. S1 install dependency-cruiser@18.1.0
+      (exact) + .dependency-cruiser.cjs verbatim from design.md +
+      check-script edit + biome allowlist entry + green baseline; S1
+      contains both decision points with mandatory execution-log +
+      state.yaml recording: risk-005 (TS 7.0.2 compatibility, verify at
+      first `npx depcruise src`; no autonomous fallback — protocol C
+      STOP if unsupported) and risk-006 (biome dotfile scanning; bounded
+      content-neutral fallback: allowlist tweak / biome check --write).
+      S2 five red-proof cycles in AC order (dec-010: direct
+      `npx depcruise src` per proof naming exactly the target rule,
+      AC-06 full-chain `npm run check` red, AC-07 negative control +
+      temp file deletion), each cycle ends green; do-not-proceed rule on
+      any failed proof (fix config, record deviation, re-prove); closeout
+      AC-11 clean tree (only the 4 intended files) + AC-12 test-gap note.
+      S2 depends on S1. Commits/PR/history noted as orchestrator-owned
+      post-plan mechanics. execution_ready: true. Checkpoint skipped as
+      implicitly approved (ckp-001, auto mode).
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -76,6 +95,7 @@ artifacts:
   proposal: ./sdd-lite/openspec/changes/e0-f1-h2-guards/proposal.md
   spec: ./sdd-lite/openspec/changes/e0-f1-h2-guards/spec.md
   design: ./sdd-lite/openspec/changes/e0-f1-h2-guards/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f1-h2-guards/plan.md
 checkpoints:
   - id: ckp-001
     type: stage_approval
@@ -234,12 +254,14 @@ open_risks:
       content-neutral.
 next_action:
   kind: delegate
-  target: sddl-plan
+  target: sddl-executor
   summary: >-
-    Delegate plan stage: turn design.md into the ordered executor plan —
-    install + config + script/biome edits, green baseline, the five
-    red-proof cycles (AC-05..AC-09 with the dec-010 attribution
-    protocol, including the AC-07 negative control), and closeout checks
-    (AC-11 clean tree, AC-12 test-gap note).
+    Delegate execution stage S1 (install + configs + green baseline;
+    pre-approved by ckp-001): install dependency-cruiser@18.1.0 exact,
+    create .dependency-cruiser.cjs verbatim from design.md, set the
+    §5.1 check chain, add the config to biome files.includes, run the
+    risk-006 and risk-005 verifications (risk-005 failure = protocol C
+    STOP), finish with `npm run check` exit 0. One stage per executor
+    invocation; S2 (red proofs + closeout) follows after S1.
 created_at: "2026-08-01T17:02:29Z"
-updated_at: "2026-08-01T18:05:00Z"
+updated_at: "2026-08-01T18:20:00Z"

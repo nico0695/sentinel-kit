@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | S1 | Full file tree + root configs (13 placeholder `.ts`, 3 `.gitkeep`, package.json, tsconfig.json, biome.json, .gitignore) | yes | pre-approved (ckp-001) | completed |
 | S2 | `npm install` + gates green (`npm run check` exit 0, `npm run dev` exit 0; TS 7.0.2→5.9.3 fallback decision point) | yes | pre-approved (ckp-001) | completed |
-| S3 | Replace 8 docs placeholder occurrences with `@nico0695/sentinel` + final gate re-run | no | pre-approved (ckp-001) | pending |
+| S3 | Replace 8 docs placeholder occurrences with `@nico0695/sentinel` + final gate re-run | no | pre-approved (ckp-001) | completed |
 
 ## Stage Entries
 
@@ -93,3 +93,41 @@
 #### Next action
 
 - Invoke `sddl-executor` for stage S3: replace the 8 docs placeholder occurrences with `@nico0695/sentinel` (backlog L43/L379, prd L279, setup L34/L35/L38/L76/L153), then re-run `npm run check` as the closing gate. Commit of S2 outputs (`package.json`, `biome.json`, `package-lock.json`) is orchestrator-owned.
+
+### S3 — docs placeholder replacement + closing gate (completed)
+
+- executed_at: 2026-08-01
+- approval: ckp-001/dec-001 whole-change pre-approval (auto mode); no per-stage pause required.
+- planned scope: edits only to the 8 placeholder lines in `docs/{backlog,prd,setup}*.md` (D4); no code, no configs, no installs, no git operations.
+- precondition check: working tree clean at `3187ffe` (S2 committed); pre-grep found exactly the 8 design-predicted occurrences at the exact predicted lines — assumptions held.
+
+#### Changed files (all modified, docs only)
+
+- `docs/setup-tecnico-sentinel.md` — 5 lines (L34, L35, L76, L153: `@<scope>/sentinel`; L38: `@<your-scope>/sentinel`) → `@nico0695/sentinel`
+- `docs/prd-sentinel.md` — 1 line (L279: `@<scope>/sentinel`) → `@nico0695/sentinel`
+- `docs/backlog-mvp-sentinel.md` — 2 lines (L43, L379: `@<scope>/sentinel`) → `@nico0695/sentinel`
+
+#### Deviations / decisions
+
+- None. All 8 occurrences were the full package form exactly as design.md evidence stated; no bare `@<your-scope>` line existed, so the bare-scope contingency (design L38 note) never applied. No other wording touched.
+
+#### Quick checks
+
+- Pre-grep `@<scope>|@<your-scope>` in `docs/`: 8 matches at backlog L43/L379, prd L279, setup L34/L35/L38/L76/L153 — matches design evidence exactly. PASS.
+- Post-grep `@<scope>|@<your-scope>` in `docs/`: **zero matches** (grep exit 1). PASS (AC-05).
+- Post-grep `@nico0695/sentinel` in `docs/`: 8 matching lines (setup 5, backlog 2, prd 1). PASS.
+- `git diff --stat docs/`: 3 files, 8 lines changed (+8/−8), nothing else in `git status`. PASS (scope, AC-05).
+- Closing gate `npm run check` → **exit 0**, "Checked 16 files. No fixes applied." — docs edits did not perturb the gate (biome allowlist never scans `docs/`). PASS (final gate).
+- `npm run dev` → **exit 0**, no output (deliberate no-op). PASS (AC-08 re-confirmed).
+
+#### Blockers
+
+- None.
+
+#### QA handoff
+
+- Recommended (not auto-run): all three plan stages are complete and the change is at closeout. Run `sddl-qa-review` (final mode) per orchestrator routing; only final mode may mark the change completed.
+
+#### Next action
+
+- All plan stages (S1, S2, S3) completed. Orchestrator-owned next steps: commit S3 docs edits (suggested `docs: replace npm scope placeholders`), then `sddl-qa-review` final mode, then PR per workflow contract (AC-09).

@@ -276,7 +276,7 @@ Two ways to deliver the diff and instructions to the engine:
 **Taken in this version**
 1. **Single product**: no separate "VPS tool" — server deployment is stage 3 of the same CLI (daemon as driving adapter). Single repo, single core.
 2. **Git tooling: own wrapper** over the `git` binary (execa + porcelain/machine-readable formats: `worktree list --porcelain`, `for-each-ref --format`, `merge-base`, `diff --numstat`). `simple-git` discarded: no first-class API for worktrees — the central operation of the flow — and small, well-known git surface that doesn't justify the dependency.
-3. **Naming: `sentinel`**. On npm: scoped package `@<scope>/sentinel` (`sentinel` and `sentinel-cli` are taken) with `bin: sentinel` + alias `snt` (mitigates collision with HashiCorp Sentinel binary).
+3. **Naming: `sentinel`**. On npm: scoped package `@nico0695/sentinel` (`sentinel` and `sentinel-cli` are taken) with `bin: sentinel` + alias `snt` (mitigates collision with HashiCorp Sentinel binary).
 4. **Language/runtime/stack**: TypeScript on Node ≥22 (target 24 LTS), runtime-agnostic code (Bun reserved as a compilation channel to single binary), npm distribution. Library stack, configs, executable guards, and pipelines defined in `setup-tecnico-sentinel.md` — **validated as recommendations, re-evaluated when implementing each piece**.
 
 **Open**

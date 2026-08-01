@@ -72,8 +72,9 @@ stages:
       (auto mode). Commits/PR noted as orchestrator-owned. execution_ready:
       true. Checkpoint skipped as implicitly approved (ckp-001, auto mode).
   sddl-executor:
-    status: in-progress
+    status: completed
     started_at: "2026-08-01T14:55:00Z"
+    completed_at: "2026-08-01T15:25:00Z"
     notes: >-
       S1 completed (tree + root configs): 13 placeholder .ts files (D2
       pattern, zero imports), 3 .gitkeep dirs, package.json/tsconfig.json/
@@ -93,7 +94,13 @@ stages:
       dev-003 package.json files array reformatted multiline (biome
       formatter requirement); dev-004 biome.json rules.recommended migrated
       to rules.preset via biome migrate (field deprecated in 2.5.6).
-      S3 pending.
+      S3 completed (docs placeholder replacement + closing gate): all 8
+      occurrences replaced with @nico0695/sentinel (setup L34/L35/L38/L76/
+      L153, prd L279, backlog L43/L379 — all full package form, no bare
+      scope existed). Post-grep zero placeholder matches; git diff exactly
+      3 docs files / 8 lines; closing gate npm run check exit 0 (zero
+      diagnostics) and npm run dev exit 0. No deviations. All plan stages
+      S1-S3 completed.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -155,15 +162,14 @@ decisions:
 open_risks: []
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    S1 and S2 done, gates green (check exit 0 zero diagnostics, dev exit 0,
-    devDeps-only tree, lockfile v3 present). risk-001 retired by evidence.
-    Execute plan stage S3 next: replace the 8 docs placeholder occurrences
-    with @nico0695/sentinel (backlog L43/L379, prd L279, setup
-    L34/L35/L38/L76/L153) and re-run npm run check as the closing gate.
-    Commit of S2 outputs (package.json, biome.json, package-lock.json) is
-    orchestrator-owned. sddl-qa-review recommended after S3/closeout
-    (stage-mode after S2 also acceptable). All pre-approved via ckp-001.
+    All plan stages S1-S3 completed; executor stage done. Gates green at
+    closeout: npm run check exit 0 (zero diagnostics), npm run dev exit 0,
+    docs placeholder grep zero matches (8/8 replaced with @nico0695/
+    sentinel). Orchestrator-owned next steps: commit S3 docs edits
+    (suggested "docs: replace npm scope placeholders" per plan.md), then
+    sddl-qa-review in final mode (only final mode may mark the change
+    completed), then PR "[E0.F1.H1] ..." with Closes #2 (AC-09).
 created_at: "2026-08-01T14:14:32Z"
-updated_at: "2026-08-01T15:10:00Z"
+updated_at: "2026-08-01T15:25:00Z"

@@ -191,14 +191,13 @@ decisions:
     recorded_at: "2026-08-01T19:10:00Z"
 open_risks:
   - id: risk-001
-    severity: medium
+    severity: low
     summary: >-
-      vitest and tsup are not installed (scripts exist, tools missing —
-      npm test exit 127 at H2 QA), but the story AC requires all 3 jobs
-      to run and the pipeline must be green on this very PR. Resolution
-      owned by proposal/spec: pin the minimal-enablement boundary for
-      each tool without absorbing E0.F2.x scope (test content) or
-      inventing unpinned toolchain decisions.
+      RESIDUAL (was medium; boundary now pinned by spec dec-002/dec-003/
+      dec-006): concrete vitest/tsup versions are still design-owned —
+      design must verify compatibility (vitest with Node 22/24 and TS
+      5.9.3; tsup with typescript 5.9.3) and confirm tsc --noEmit
+      treatment of tsup.config.ts so npm run check stays green.
   - id: risk-002
     severity: low
     summary: >-
@@ -210,19 +209,28 @@ open_risks:
   - id: risk-003
     severity: low
     summary: >-
-      The bin smoke `sentinel --version` requires dist/cli.js to respond
-      to --version, but src/main/cli.ts is a deliberate no-op (wiring
-      lands E6.F1.x). The story description names the smoke explicitly,
-      so a minimal --version behavior is likely in scope — boundary to be
-      pinned in spec against the E6 composition-root scope.
+      RESOLVED as scope by spec dec-004 (minimal --version pinned:
+      package.json version, single source of truth, smoke = `node
+      dist/cli.js --version`). Residual: mechanism choice (JSON import /
+      createRequire / build-time define) is design-owned and must keep
+      cli.ts dependency-free and guard-clean.
+  - id: risk-004
+    severity: medium
+    summary: >-
+      Future-facing hand-off duty from dec-002: `--passWithNoTests`
+      left in the test script beyond E0.F2.x could silently mask an
+      empty test glob. E0.F2.x must remove the flag when the real
+      vitest projects config lands; duty recorded in spec.md non-goals
+      and to be echoed in the PR description.
 next_action:
   kind: stage
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Formalize scope boundaries and acceptance criteria from proposal.md,
-    resolving the five open questions (zero-test strategy, tsup config
-    shape, --version implementation and smoke invocation, matrix breadth,
-    exact pins) with the minimal-enablement contract against E0.F2.x and
-    E6.F1.x.
+    Produce design.md within the spec contract: concrete vitest/tsup
+    exact versions (compatibility verified), exact ci.yml YAML
+    (actions/checkout + setup-node + npm cache, jobs per AC-01..AC-03),
+    tsup.config.ts contents, tsconfig treatment of the new config file,
+    biome allowlist edit, and the --version single-source mechanism in
+    src/main/cli.ts.
 created_at: "2026-08-01T18:40:00Z"
-updated_at: "2026-08-01T18:55:00Z"
+updated_at: "2026-08-01T19:10:00Z"

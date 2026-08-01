@@ -1,0 +1,123 @@
+version: "0.1"
+change_name: e0-f1-h1-scaffold
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F1.H1] (issue #2): scaffold the hexagonal structure, base
+    configs (package.json ESM, strict tsconfig, biome), and make `npm run check`
+    (biome + tsc) pass. Scope is fully pinned by issue #2 + PRD §4.2 + setup §5
+    plus the user kickoff (npm scope @nico0695/sentinel decided in S01-D1;
+    docs placeholder replacement included). Greenfield, no existing code to
+    break; bounded and well specified — normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-01T14:14:32Z"
+lifecycle_status: planning
+current_stage: sddl-design
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: No material unknown — scope pinned by docs and session S01 evidence.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-01T14:14:32Z"
+    completed_at: "2026-08-01T14:22:00Z"
+    notes: >-
+      proposal.md written; exploration_performed=true (targeted: setup §5 read,
+      @<scope> grep — 7 occurrences in 3 docs files). Checkpoint skipped as
+      implicitly approved (ckp-001 pre-approval, auto mode). Four spec-level
+      open questions recorded (check script text, empty-module placeholder
+      strategy, scripts referencing uninstalled tools, docs replacement form)
+      — none require a user decision.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-01T14:24:00Z"
+    completed_at: "2026-08-01T14:32:00Z"
+    notes: >-
+      spec.md written; the four proposal open questions pinned as A-level
+      decisions D1-D4 (check = biome+tsc for H1; honest index.ts placeholders;
+      declare §5.1 scripts but install only H1 devDeps; replace both @<scope>
+      and @<your-scope> forms). Factual correction recorded: 8 placeholder
+      occurrences across 3 docs files (proposal counted 7; live grep found
+      @<your-scope> at setup L38). AC-01..AC-09 defined; gate = npm run check
+      exits 0. Checkpoint skipped as implicitly approved (ckp-001, auto mode).
+  sddl-design:
+    status: completed
+    started_at: "2026-08-01T14:34:00Z"
+    completed_at: "2026-08-01T14:42:00Z"
+    notes: >-
+      design.md written with exact file tree (13 placeholder .ts files, 3
+      .gitkeep dirs, 4 root configs) and verbatim config contents. A-level
+      choices: devDeps pinned exactly (@biomejs/biome 2.5.6, typescript 7.0.2
+      with pre-authorized fallback to 5.9.3, @types/node 22.20.1 matching the
+      engines floor); biome scoped by allowlist files.includes; formatter set
+      to spaces to match npm-written package.json; .gitkeep over README stubs
+      (spec non-goal forbids prose docs); tsconfig include=["src"] plus
+      noEmit/skipLibCheck extras. Docs evidence: all 8 placeholder occurrences
+      are full package form, so every replacement is @nico0695/sentinel.
+      Checkpoint skipped as implicitly approved (ckp-001, auto mode).
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/state.yaml
+  proposal: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/proposal.md
+  spec: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/plan.md
+  execution_log: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/execution-log.md
+  qa_report: ./sdd-lite/openspec/changes/e0-f1-h1-scaffold/qa-report.md
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Execution mode and scope approval for the whole change, given in the user
+      session-kickoff message (2026-08-01): run [E0.F1.H1] as sdd-lite change
+      e0-f1-h1-scaffold through proposal → spec → design → plan → executor → qa,
+      scope = issue #2 + PRD §4.2 + setup §5 + docs placeholder replacement,
+      npm scope @nico0695/sentinel (S01-D1). npm package reservation is done by
+      the user separately. Chained (auto) execution; deviations still go
+      through the A/B/C protocol.
+    question: >-
+      Proceed with e0-f1-h1-scaffold in auto mode with the kickoff-defined
+      scope?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved in advance by the user kickoff message (autonomous remote
+        session; user not available mid-task).
+      responded_at: "2026-08-01T14:14:32Z"
+    created_at: "2026-08-01T14:14:32Z"
+    resolved_at: "2026-08-01T14:14:32Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: auto mode, kickoff-defined scope
+    rationale: >-
+      The kickoff message explicitly defines how to run the story, its scope,
+      and the closing requirements; the session is autonomous (user away), so
+      per-stage interactive pauses would block work the user already directed.
+      Stage approvals for code-touching work are satisfied by this explicit
+      pre-approval; any deviation from the pinned scope still stops (protocol
+      B/C).
+    recorded_at: "2026-08-01T14:14:32Z"
+open_risks:
+  - id: risk-001
+    summary: >-
+      Toolchain versions were never installed together in this repo (stack is
+      declared, not verified); npm install may surface incompatibilities.
+    severity: low
+next_action:
+  kind: run_stage
+  target: sddl-design
+  summary: >-
+    Delegate sddl-design to define the technical approach (file layout,
+    placeholder contents, config file contents) against spec.md AC-01..AC-09.
+    No open questions gate design; decisions D1-D4 are pinned in spec.md.
+created_at: "2026-08-01T14:14:32Z"
+updated_at: "2026-08-01T14:32:00Z"

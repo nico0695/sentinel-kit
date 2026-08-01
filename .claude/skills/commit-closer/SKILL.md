@@ -7,14 +7,17 @@ description: |
   optionally include analysis of previous commits in the same PR.
   Triggers on: "cerrar commit", "close commit", "generar commit message", "analizar cambios", "preparar PR",
   "cerrar el commit", "generar descripcion del PR", "commit y PR", "wrap up commit", "analizar mis cambios".
-  All agent responses must be in Spanish. The skill instructions are written in English.
+  Chat replies to the user are in Spanish; all generated artifacts (commit messages, PR titles and
+  descriptions) are in English, per the project Language policy in CLAUDE.md. The skill instructions are written in English.
 ---
 
 # Commit Closer
 
 Workflow for generating commit messages, PR descriptions, and impact analysis from staged/unstaged git changes.
 
-All output text must be in Spanish. All tool calls and git commands are in English as usual.
+Language split (project Language policy, CLAUDE.md): chat interaction with the user is Spanish, but
+every generated artifact that lands in git or GitHub — commit messages, PR titles, PR descriptions,
+checklists inside them — is **English**.
 
 ## Workflow
 
@@ -113,21 +116,21 @@ Present all 6 clearly labeled. Ask the user which one to use (or if they want to
 
 #### PR description structure
 
-Produce a complete PR description in Spanish using this structure:
+Produce a complete PR description in English using this structure:
 
-**### Descripción del cambio**
+**### What changed**
 2–4 sentences. What was changed and why. Focus on behavior, not implementation details.
 
-**### Archivos modificados**
-Table with columns: `Archivo | Tipo de cambio | Detalle`. List every modified file — do not group or summarize.
+**### Modified files**
+Table with columns: `File | Change type | Detail`. List every modified file — do not group or summarize.
 
-**### Impacto en el proyecto**
-Bullet list of affected modules or areas. Be specific: "afecta el endpoint REST de reminders" is better than "impacta el módulo". Use "podría afectar" when not confirmed.
+**### Project impact**
+Bullet list of affected modules or areas. Be specific: "affects the reminders REST endpoint" is better than "impacts the module". Use "may affect" when not confirmed.
 
-**### Puntos a revisar y testear manualmente**
-Actionable checklist with `- [ ]`. Each item must specify what to verify and in what scenario — never "verificar que funcione".
+**### Manual review and testing checklist**
+Actionable checklist with `- [ ]`. Each item must specify what to verify and in what scenario — never "check that it works".
 
-**### Contexto adicional** *(opcional)*
+**### Additional context** *(optional)*
 Include only if relevant: migration steps, related PRs, known limitations, pending work.
 
 ---
@@ -161,7 +164,7 @@ Present the complete output grouped in this order:
 
 ## Rules
 
-- All output text in Spanish. Git commands and file paths in English.
+- Chat with the user in Spanish; commit messages, PR titles, and PR descriptions in English (CLAUDE.md Language policy).
 - Never skip Step 1 — user context is mandatory.
 - Never mark a testing item as "check that it works" — each item must specify what to verify and in what scenario.
 - If a modified file is under a module's `controller/` directory, identify which interface is affected: `<module>.controller.ts` handles Slack commands/events; `<module>Web.controller.ts` handles HTTP/REST endpoints. If both are modified, call it out explicitly in the impact section.

@@ -11,11 +11,13 @@ AI-powered code review orchestrator CLI. Hexagonal architecture, TypeScript, Nod
 The repo has **no commits and no source code yet** — no `package.json`, no `src/`, no toolchain installed. What exists is the specification (`docs/`), the issue-seeding script, and a vendored `sdd-lite/` package. The first story to land is `[E0.F1.H1]` (scaffold + `npm run check`). Until it does, the commands below do not exist yet; do not assume a working `npm` setup.
 
 ## Source of truth
-- `docs/prd-sentinel.md` — product definition (v0.3), in English. Architecture rules in §4 are MANDATORY.
-- `docs/setup-tecnico-sentinel.md` — stack decisions, in Spanish (recommendations, re-evaluate on implementation with justification).
-- `docs/backlog-mvp-sentinel.md` — full backlog, in Spanish. GitHub Issues mirror it 1:1 (one issue per story, milestone per epic).
+- `docs/prd-sentinel.md` — product definition (v0.3). Architecture rules in §4 are MANDATORY.
+- `docs/setup-tecnico-sentinel.md` — stack decisions (recommendations, re-evaluate on implementation with justification).
+- `docs/backlog-mvp-sentinel.md` — full backlog. GitHub Issues mirror it 1:1 (one issue per story, milestone per epic).
 
-Persisted artifacts and code stay in English regardless of the doc's language.
+## Language policy (strict)
+
+**Everything persisted in this repository is English**: code, comments, identifiers, docs, README files, history entries, sdd-lite artifacts, commit messages, PR and issue titles/bodies. Chat interaction with the user may be Spanish, but nothing Spanish lands in the repo. The only exemption is vendored third-party content (`sdd-lite/` package files such as `USER_GUIDE_ES.md`), which is not ours to edit.
 
 ## Commands
 

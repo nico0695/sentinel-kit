@@ -40,8 +40,8 @@ picocolors, ±marked. Dev toolchain: vitest, Biome, dependency-cruiser, tsup, ch
 |---|---|---|
 | `CLAUDE.md` | Operating contract for Claude Code | Workflow rules, architecture guards, sdd-lite wrapper block. |
 | `docs/prd-sentinel.md` | Product definition v0.3 (English) | §4 architecture rules are **mandatory**, not advisory. |
-| `docs/setup-tecnico-sentinel.md` | Stack decisions (Spanish) | Recommendations — re-evaluate at implementation time with justification. |
-| `docs/backlog-mvp-sentinel.md` | MVP backlog (Spanish) | 8 epics / 44 stories; mirrored 1:1 into GitHub Issues. |
+| `docs/setup-tecnico-sentinel.md` | Stack decisions | Recommendations — re-evaluate at implementation time with justification. |
+| `docs/backlog-mvp-sentinel.md` | MVP backlog | 8 epics / 44 stories; mirrored 1:1 into GitHub Issues. |
 | `create-issues.sh` | GitHub seeding script | One-shot: issues are **not** idempotent across runs. |
 
 ## Quality Commands

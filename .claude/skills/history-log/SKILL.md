@@ -5,7 +5,7 @@ description: |
   following history/TEMPLATE.md, and keep history/INDEX.md in sync. Collects real evidence (git log, PRs,
   sdd-lite change state) and reconstructs the session's decisions with explicit authorship (user / claude /
   claude→user), deviations, and pending items. Required before closing a session, closing a story, or at
-  any STOP (see CLAUDE.md "Audit history"). Entry content is written in Spanish.
+  any STOP (see CLAUDE.md "Audit history"). Entry content is written in English (CLAUDE.md Language policy).
   Triggers on: "history", "history-log", "cerrar sesion", "cerrar la sesion", "generar history",
   "auditar sesion", "log de sesion", "registrar la sesion", "actualizar history".
 ---
@@ -15,8 +15,8 @@ description: |
 Generates or updates the single audit entry for the current session under `history/`, per the rules in
 `history/README.md` and the "Audit history" section of `CLAUDE.md`.
 
-Entry text is **Spanish** (deliberate exception to the English-artifacts rule — see history/README.md).
-Skill instructions are English.
+Entry text is **English**, like everything persisted in this repository (CLAUDE.md "Language policy").
+Chat with the user may be Spanish; the audit trail is not.
 
 ## Workflow
 
@@ -59,7 +59,7 @@ not omitted. If tests/checks did not run, say so.
 
 ### Step 4 — Write
 
-1. Create or update `history/entries/YYYY-MM-DD-Snn-<slug>.md` (slug: short kebab-case Spanish).
+1. Create or update `history/entries/YYYY-MM-DD-Snn-<slug>.md` (slug: short kebab-case English).
 2. On update: merge new decisions/work into the existing sections, never renumber existing decision IDs.
 3. Add or update the entry's row in `history/INDEX.md` (newest first).
 4. Keep it ~1 screen; move fine detail into links (sdd-lite artifacts, PRs, docs).

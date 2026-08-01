@@ -1,38 +1,38 @@
-# history/ — Auditoría del proceso de desarrollo
+# history/ — Development process audit trail
 
-Registro estricto y liviano de **cómo** se desarrolla sentinel: decisiones, desviaciones,
-autoría y contexto de cada iteración. Es la memoria del proceso, separada del producto
-(`src/`), de la especificación (`docs/`) y del runtime de sdd-lite (`sdd-lite/`).
+Strict, lightweight record of **how** sentinel gets built: decisions, deviations, authorship,
+and context of every iteration. It is the memory of the process, kept separate from the product
+(`src/`), the specification (`docs/`), and the sdd-lite runtime (`sdd-lite/`).
 
-> Idioma: las entradas se escriben en **español** (son para lectura directa del equipo,
-> igual que `docs/backlog-mvp-sentinel.md`). El código y los artefactos de sdd-lite
-> siguen siendo en inglés — esta carpeta es la excepción deliberada, junto a los docs es.
+> Language: entries are written in **English**, like everything persisted in this repository
+> (see "Language policy" in `CLAUDE.md`). Chat with the user may happen in Spanish; the audit
+> trail does not.
 
-## Reglas
+## Rules
 
-1. **Una entrada por sesión de trabajo**, en `entries/`, nombrada
-   `YYYY-MM-DD-Snn-<slug>.md` (`Snn` = número de sesión incremental).
-   Si una sesión abarca varias tareas/historias, van como secciones dentro de la misma entrada.
-2. La entrada se genera/actualiza con la skill **`history-log`** antes de cerrar:
-   fin de sesión, fin de historia, o cualquier STOP — lo que ocurra primero.
-3. Toda decisión no trivial lleva **autoría explícita**:
-   - `user` — la decidió el usuario por iniciativa propia.
-   - `claude` — decisión autónoma (nivel A del protocolo), con su porqué.
-   - `claude→user` — Claude presentó alternativas con recomendación y el usuario decidió (nivel B).
-4. Las **desviaciones** (de plan, PRD, backlog o supuestos) se registran siempre, aunque
-   se hayan resuelto en el momento.
-5. Cada entrada nueva agrega su línea a `INDEX.md` (más reciente arriba).
-6. Las entradas se **commitean** — historia no commiteada no existe (los entornos remotos
-   son efímeros).
-7. No se duplica contenido de sdd-lite: se **linkea** a `sdd-lite/openspec/changes/<change>/`.
-8. Sin exagerar: apuntar a ~1 pantalla por entrada. Detalle fino → link al artefacto que lo tiene.
+1. **One entry per work session**, in `entries/`, named
+   `YYYY-MM-DD-Snn-<slug>.md` (`Snn` = incremental session number).
+   If a session spans several tasks/stories, they go as sections inside the same entry.
+2. The entry is generated/updated with the **`history-log`** skill before closing:
+   end of session, end of story, or any STOP — whichever comes first.
+3. Every non-trivial decision carries **explicit authorship**:
+   - `user` — decided by the user on their own initiative.
+   - `claude` — autonomous decision (level A of the protocol), with its rationale.
+   - `claude→user` — Claude presented alternatives with a recommendation; the user decided (level B).
+4. **Deviations** (from plan, PRD, backlog, or assumptions) are always recorded, even when
+   resolved on the spot.
+5. Every new entry adds its row to `INDEX.md` (newest first).
+6. Entries are **committed** — uncommitted history does not exist (remote environments are
+   ephemeral).
+7. sdd-lite content is never duplicated: **link** to `sdd-lite/openspec/changes/<change>/`.
+8. Keep it lean: aim for ~1 screen per entry. Fine detail → link to the artifact that has it.
 
-## Estructura
+## Structure
 
 ```
 history/
-├── README.md      # este archivo
-├── TEMPLATE.md    # plantilla de entrada
-├── INDEX.md       # índice cronológico (1 línea por entrada)
-└── entries/       # las entradas
+├── README.md      # this file
+├── TEMPLATE.md    # entry template
+├── INDEX.md       # chronological index (1 line per entry)
+└── entries/       # the entries
 ```

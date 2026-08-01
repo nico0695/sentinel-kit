@@ -1,34 +1,34 @@
-# Snn — <título corto de la sesión>
+# Snn — <short session title>
 
-- **Fecha**: YYYY-MM-DD
-- **Rama**: `<branch>`
-- **Alcance**: <historias `[E*.F*.H*]` / changes sdd-lite / tareas tocadas>
-- **Changes sdd-lite**: <links a `sdd-lite/openspec/changes/<change>/` o `—`>
+- **Date**: YYYY-MM-DD
+- **Branch**: `<branch>`
+- **Scope**: <stories `[E*.F*.H*]` / sdd-lite changes / tasks touched>
+- **sdd-lite changes**: <links to `sdd-lite/openspec/changes/<change>/` or `—`>
 
-## Objetivo
+## Objective
 
-<1-2 líneas: qué se buscaba en esta sesión.>
+<1-2 lines: what this session set out to do.>
 
-## Decisiones
+## Decisions
 
-| ID | Decisión | Alternativas consideradas | Por qué | Autoría |
-|----|----------|---------------------------|---------|---------|
-| Snn-D1 | <qué se decidió> | <qué se descartó> | <fundamento en 1 línea> | `user` / `claude` / `claude→user` |
+| ID | Decision | Alternatives considered | Why | Authorship |
+|----|----------|-------------------------|-----|------------|
+| Snn-D1 | <what was decided> | <what was discarded> | <one-line rationale> | `user` / `claude` / `claude→user` |
 
-<!-- Autoría: user = decidió el usuario · claude = autónoma (nivel A) · claude→user = propuesta con recomendación, decidió el usuario (nivel B). Los STOP (nivel C) van también en Desviaciones. -->
+<!-- Authorship: user = decided by the user · claude = autonomous (level A) · claude→user = proposed with recommendation, user decided (level B). Level-C STOPs also go under Deviations. -->
 
-## Desviaciones
+## Deviations
 
-<Qué se apartó del plan/PRD/backlog/supuestos, por qué, e impacto. `—` si no hubo.>
+<What departed from plan/PRD/backlog/assumptions, why, and impact. `—` if none.>
 
-## Trabajo realizado
+## Work done
 
-- <bullets: commits (hash + mensaje), PRs abiertos, artefactos creados, validaciones corridas>
+- <bullets: commits (hash + message), PRs opened, artifacts created, validations run>
 
-## Pendientes y próximos pasos
+## Pending and next steps
 
-- <qué quedó abierto y quién tiene la pelota>
+- <what remains open and who owns it>
 
-## Preguntas abiertas para el usuario
+## Open questions for the user
 
-<`—` si no hay.>
+<`—` if none.>

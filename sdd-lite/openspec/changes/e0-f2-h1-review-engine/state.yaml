@@ -35,7 +35,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-01T22:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-plan
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -108,7 +108,9 @@ stages:
       already-documented dec-004/dec-005 reconciliations, not drift. Both blind
       and independent → auto-continue to sddl-plan authorized.
   sddl-plan:
-    status: in_progress
+    status: completed
+    started_at: "2026-08-02T00:08:00Z"
+    completed_at: "2026-08-02T00:30:00Z"
     notes: >-
       Launched under dec-003 auto-continue after design validators converged.
       plan.md written by a fresh-context worker: precondition P0 (`npm ci` —
@@ -117,11 +119,24 @@ stages:
       gate `npm run check` (biome check . && tsc --noEmit && depcruise src) = 0
       violations, `npm test` (vitest run --passWithNoTests) green, AC4 boundary
       via `git diff`; AC1..AC4 traced; rollback = delete 3 new files + restore
-      index.ts `export {}`. No new [B]. Per-stage parallel validation (dec-003)
-      IN PROGRESS: validator A (plan<->design fidelity + scope) and validator B
-      (gate-command/tooling reality vs real package.json + lockfile) running.
-      Routing STOPS at the sddl-executor approval gate regardless (S1 is
-      code-touching → explicit user approval required even under auto mode).
+      index.ts `export {};`. No new [B]. Per-stage parallel validation (dec-003)
+      CONVERGED no-drift: validator A (plan<->design fidelity + scope) 0/0 —
+      exact 4-file/6-type coverage, sound ordering, single-stage justified, no
+      H2/E4/E5 bleed, no silent [B]; validator B (tooling/gate reality) 0/0 —
+      VERIFIED against the real filesystem: `check`/`test` byte-exact in
+      package.json, node_modules absent + lockfile present (npm ci correct), all
+      four gate tools declared as devDependencies, .dependency-cruiser.cjs +
+      tsconfig.json present and backing the cited invocations, index.ts tracked
+      so rollback works. One optional info nit: the placeholder is `export {};`
+      (with semicolon), not bare `export {}`. Both blind and independent →
+      planning is fully validated end to end. STOP at the executor gate.
+  sddl-executor:
+    status: pending
+    notes: >-
+      Awaiting explicit user approval (ckp-003). S1 is code-touching; CLAUDE.md
+      requires explicit approval before it runs even under auto mode, and
+      ckp-001 stated the kickoff was NOT a blanket pre-approval of later stages.
+      No code will be written until the user approves.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -189,6 +204,24 @@ checkpoints:
       responded_at: "2026-08-01T23:35:00Z"
     created_at: "2026-08-01T23:35:00Z"
     resolved_at: "2026-08-01T23:35:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      All planning stages complete and validated end to end (spec, design, plan
+      — three independent dual-validator passes, every one no-drift). The next
+      stage S1 WRITES CODE: four types-only files under src/core/run/. Per
+      CLAUDE.md this code-touching stage requires explicit user approval even
+      under auto mode; ckp-001 confirmed kickoff was not a blanket pre-approval.
+    question: >-
+      Approve running executor stage S1 — write the four files
+      (worktree-ref.ts, terminal-state.ts, ports/review-engine.ts, index.ts
+      rewrite) exactly as frozen in design.md, then run `npm run check` +
+      `npm test` as the acceptance gate?
+    free_input_allowed: true
+    response: null
+    created_at: "2026-08-02T00:30:00Z"
+    resolved_at: null
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -339,17 +372,16 @@ open_risks:
       to pin; usage shape and zod-vs-plain-types are lower-texture design
       calls surfaced alongside.
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: await_approval
+  target: sddl-executor
   summary: >-
-    Design complete and validated (both parallel validators no-drift, verified
-    against real depcruise/tsconfig/biome config). Run sddl-plan to produce
-    plan.md: an ordered, verifiable stage plan to implement the four files
-    (worktree-ref.ts, terminal-state.ts, ports/review-engine.ts, index.ts
-    rewrite) with `npm run check` (biome + tsc --noEmit + depcruise src) as the
-    0-violation gate and AC4 (no test file, package.json untouched) as a
-    boundary check. After plan.md, run per-stage parallel validation, THEN STOP
-    at the sddl-executor approval gate — the executor is code-touching and
-    requires explicit user approval even under auto mode (CLAUDE.md).
+    HARD STOP at the executor approval gate (ckp-003). Planning is complete and
+    validated end to end (spec/design/plan each dual-validated no-drift). S1 is
+    code-touching, so per CLAUDE.md it needs explicit user approval before any
+    file is written — even under dec-003 auto mode. Awaiting the user's go/no-go
+    on writing the four files verbatim from design.md and running the
+    `npm run check` + `npm test` acceptance gate. On approval: run P0 (`npm ci`)
+    then S1, then the executor's 4R code review (sddl-code-review) fills the
+    dec-003 validation role for the code stage, then final QA.
 created_at: "2026-08-01T22:06:00Z"
-updated_at: "2026-08-02T00:05:00Z"
+updated_at: "2026-08-02T00:30:00Z"

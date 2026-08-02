@@ -49,3 +49,14 @@ export {
   GitNoDefaultBranchError,
   GitWorktreeError,
 } from "./ports/git-port-errors.js";
+export {
+  type RegisterRepoDeps,
+  type RegisterRepoRequest,
+  type RegisterRepoResult,
+  registerRepo,
+} from "./register-repo.js";
+export {
+  InvalidRepoRequestError,
+  RepoRegistrationError,
+  type RepoRegistrationErrorOptions,
+} from "./register-repo-errors.js";

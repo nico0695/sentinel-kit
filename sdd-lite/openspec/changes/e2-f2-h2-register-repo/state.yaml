@@ -1,0 +1,84 @@
+version: "0.1"
+change_name: e2-f2-h2-register-repo
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    registerRepo use case in core/repos consuming existing ConfigStore + GitPort
+    ports. Pure domain logic with in-memory fake tests. No adapter changes, no
+    I/O. Bounded scope, clear ACs from backlog.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — ports exist, types defined, pattern established by prior stories."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4 stages executed: errors, use case, index, tests. 48/48 tests pass, npm run check clean."
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4R reliability lens: 0 BLOCKER, 0 CRITICAL, 3 WARNING (accepted), 2 SUGGESTION (info)."
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "FINAL QA: 7/7 ACs pass, 48/48 tests, quality gate clean, architecture guards satisfied. Verdict PASS."
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f2-h2-register-repo/state.yaml
+  spec: sdd-lite/openspec/changes/e2-f2-h2-register-repo/spec.md
+  design: sdd-lite/openspec/changes/e2-f2-h2-register-repo/design.md
+  plan: sdd-lite/openspec/changes/e2-f2-h2-register-repo/plan.md
+checkpoints:
+  - id: chk-proposal-01
+    type: phase_validation
+    stage: sddl-proposal
+    summary: "Proposal defines registerRepo use case with two paths, alias derivation, re-registration detection."
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-02T00:00:00Z"
+    created_at: "2026-08-02T00:00:00Z"
+    resolved_at: "2026-08-02T00:00:00Z"
+decisions:
+  - id: dec-b1-alias-owner-repo
+    checkpoint_id: chk-proposal-01
+    selected_option_id: option-a
+    rationale: "B1: owner/repo alias format from URL. Human-readable, collision-resistant, matches GitHub CLI. User approved recommended option."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-b2-clones-config-dir
+    checkpoint_id: chk-proposal-01
+    selected_option_id: option-a
+    rationale: "B2: managed clones in <configDir>/clones/. Keeps all sentinel data together. Core sees only a string. User approved recommended option."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a1-return-result
+    rationale: "A-level: use case returns RegisterRepoResult (alias, entry, alreadyRegistered) so callers can render feedback without re-reading registry."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a2-url-always-required
+    rationale: "A-level: url is always required in RegisterRepoRequest (aligns with RepoEntrySchema). localPath is the optional flag that skips cloning."
+    recorded_at: "2026-08-02T00:00:00Z"
+open_risks: []
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:01:00Z"

@@ -2,6 +2,7 @@
 
 | Session | Date | Title | Scope | Entry |
 |---------|------|-------|-------|-------|
+| S11 | 2026-08-02 | Story [E2.F2.H2]: registerRepo use case | [E2.F2.H2] (issue #14, PR pending) | [entry](entries/2026-08-02-S11-e2-f2-h2-register-repo.md) |
 | S08 | 2026-08-02 | Story [E2.F1.H1]: Base git wrapper (GitPort + git-cli adapter) | [E2.F1.H1] (issue #11, PR opened) | [entry](entries/2026-08-02-S08-e2-f1-h1-git-wrapper.md) |
 | S07 | 2026-08-02 | Project standards + contributor documentation | docs-standards (non-backlog, no PR yet) | [entry](entries/2026-08-02-S07-docs-standards.md) |
 | S06 | 2026-08-02 | Story [E0.F2.H2]: FakeEngine + shared ReviewEngine contract suite | [E0.F2.H2] (issue #6, PR #51 merged) | [entry](entries/2026-08-02-S06-e0-f2-h2-fake-engine.md) |

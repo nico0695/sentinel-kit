@@ -48,9 +48,13 @@ export function reviewEngineContract(
     });
 
     it("rejects with an Error", async () => {
-      const engine = harness.rejecting();
-      await expect(engine.review(req)).rejects.toThrow();
-      await expect(engine.review(req)).rejects.toBeInstanceOf(Error);
+      // Capture ONE rejection and assert both matchers against it, so the
+      // contract never requires a rejecting engine to reject on repeated
+      // calls — a future one-shot real-engine harness stays valid (a single
+      // `review()` invocation, not two).
+      const rejection = harness.rejecting().review(req);
+      await expect(rejection).rejects.toThrow();
+      await expect(rejection).rejects.toBeInstanceOf(Error);
     });
   });
 }

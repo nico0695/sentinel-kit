@@ -224,7 +224,7 @@ export function createGitCliAdapter(): GitPort {
       try {
         const result = await execa(
           "git",
-          ["-C", repoPath, "diff", from, to],
+          ["-C", repoPath, "diff", "--no-ext-diff", "--no-color", from, to],
           EXECA_BASE,
         );
         raw = result.stdout;
@@ -234,7 +234,7 @@ export function createGitCliAdapter(): GitPort {
       try {
         const result = await execa(
           "git",
-          ["-C", repoPath, "diff", "--numstat", from, to],
+          ["-C", repoPath, "diff", "--numstat", "--no-ext-diff", from, to],
           EXECA_BASE,
         );
         numstatOut = result.stdout;
@@ -322,7 +322,8 @@ function parseWorktreeList(stdout: string): readonly WorktreeInfo[] {
     let head = "";
     let branch: string | null = null;
 
-    for (const line of trimmed.split("\n")) {
+    for (const raw of trimmed.split("\n")) {
+      const line = raw.trim();
       if (line.startsWith("worktree ")) {
         path = line.slice("worktree ".length);
       } else if (line.startsWith("HEAD ")) {

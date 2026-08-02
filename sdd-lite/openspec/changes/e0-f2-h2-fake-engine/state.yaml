@@ -73,7 +73,17 @@ stages:
       src; three vitest projects with only adapters populated; no src/main wiring
       yet; factory-with-scripted-behavior config sketch).
   sddl-spec:
-    status: pending
+    status: completed
+    completed_at: "2026-08-02T02:50:00Z"
+    notes: >-
+      spec.md written. Firm scope boundary (in/out/non-goals) + 9 acceptance
+      criteria mapping 1:1 to issue #6's three boxes (AC-1 FakeEngine passes
+      contract suite, AC-2 suite reusable verbatim, AC-3 error scenarios reject)
+      plus the two carried duties (AC-5 --passWithNoTests removal proven
+      non-vacuous, AC-6 three vitest projects with only adapters populated) and
+      AC-7 precise __test__/ depcruise exclusion / guards green, AC-8 no scope
+      leak, AC-9 check+test green. dec-004..dec-007 baked as fixed constraints.
+      No new B item; Q5 (fake config API shape) left as an A-level design detail.
   sddl-design:
     status: pending
   sddl-plan:
@@ -277,14 +287,15 @@ open_risks:
       green while the core/e2e projects match zero files — proven at the gate.
 next_action:
   kind: delegate
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    B questions resolved (dec-004..dec-007, ckp-002); mode flipped to auto
-    (dec-003). Delegate sddl-spec (fresh worker) to formalize firm scope +
-    acceptance criteria (issue #6's three boxes + the vitest/passWithNoTests
-    duties) with dec-004..dec-007 baked in as fixed constraints, then run the
-    two blind parallel validators (A: acceptance/scope vs. issue #6 + H2
-    boundary; B: PRD §4 + five guards + H1-port coherence). Converge no-drift ->
-    auto-continue to design; any drift/new-B -> STOP.
+    spec.md complete with firm scope + 9 AC (issue #6 three boxes + two carried
+    duties) and dec-004..dec-007 baked in. Under auto (dec-003), first run the
+    two blind parallel validators against the spec (A: acceptance/scope vs.
+    issue #6 + H2 boundary; B: PRD §4 + five guards + H1-port coherence).
+    Converge no-drift -> auto-continue to sddl-design to settle the FakeEngine
+    config API shape (Q5, A-level), the parameterized contract-suite signature,
+    the precise `(^|/)__test__/` depcruise exclusion, and the three-project
+    vitest config. Any drift or new-B -> STOP.
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T02:35:00Z"
+updated_at: "2026-08-02T02:50:00Z"

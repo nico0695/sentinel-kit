@@ -16,6 +16,7 @@ import {
   type FetchRequest,
   GitCloneError,
   GitCommandError,
+  type GitErrorOptions,
   GitFetchError,
   GitNoDefaultBranchError,
   type GitPort,
@@ -24,6 +25,27 @@ import {
 const DEFAULT_REMOTE = "origin";
 const REFS_HEADS_PREFIX = "refs/heads/";
 const REFS_REMOTES_PREFIX = "refs/remotes/";
+
+/**
+ * Locale + prompt overrides applied to every git invocation (dec-009):
+ * - `LC_ALL=C` / `LANG=C` pin git's stderr wording to English so
+ *   `isHeadUnsetSignal` matches on any host locale (fr_FR, es_ES, …).
+ * - `GIT_TERMINAL_PROMPT=0` prevents an interactive credential prompt from
+ *   deadlocking a spawn in test / CI / headless contexts (a mistyped URL
+ *   fails instead of hanging).
+ *
+ * Bag is `as const` so execa's generic overload keeps `stdout: string`
+ * (default `encoding: "utf8"` — the widening happens when execa infers
+ * from a broadly-typed options bag).
+ */
+const EXECA_BASE = {
+  env: {
+    ...process.env,
+    LC_ALL: "C",
+    LANG: "C",
+    GIT_TERMINAL_PROMPT: "0",
+  },
+} as const;
 
 /** Factory: returns a fresh `GitPort` backed by the local `git` binary. */
 export function createGitCliAdapter(): GitPort {
@@ -35,7 +57,7 @@ export function createGitCliAdapter(): GitPort {
         );
       }
       try {
-        await execa("git", ["clone", "--quiet", url, targetPath]);
+        await execa("git", ["clone", "--quiet", url, targetPath], EXECA_BASE);
       } catch (raw) {
         throw wrapAs(GitCloneError, `git clone failed for ${url}`, raw);
       }
@@ -44,7 +66,11 @@ export function createGitCliAdapter(): GitPort {
     async fetch({ repoPath, options }: FetchRequest): Promise<void> {
       const remote = options?.remote ?? DEFAULT_REMOTE;
       try {
-        await execa("git", ["-C", repoPath, "fetch", "--quiet", remote]);
+        await execa(
+          "git",
+          ["-C", repoPath, "fetch", "--quiet", remote],
+          EXECA_BASE,
+        );
       } catch (raw) {
         throw wrapAs(GitFetchError, `git fetch ${remote} failed`, raw);
       }
@@ -53,14 +79,18 @@ export function createGitCliAdapter(): GitPort {
     async branches(repoPath: string): Promise<readonly BranchRef[]> {
       let stdout: string;
       try {
-        const result = await execa("git", [
-          "-C",
-          repoPath,
-          "for-each-ref",
-          "--format=%(refname)",
-          "refs/heads",
-          "refs/remotes",
-        ]);
+        const result = await execa(
+          "git",
+          [
+            "-C",
+            repoPath,
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/heads",
+            "refs/remotes",
+          ],
+          EXECA_BASE,
+        );
         stdout = result.stdout;
       } catch (raw) {
         throw wrapAs(GitCommandError, "git for-each-ref failed", raw);
@@ -76,13 +106,11 @@ export function createGitCliAdapter(): GitPort {
       const ref = `refs/remotes/${target}/HEAD`;
       let short: string;
       try {
-        const result = await execa("git", [
-          "-C",
-          repoPath,
-          "symbolic-ref",
-          "--short",
-          ref,
-        ]);
+        const result = await execa(
+          "git",
+          ["-C", repoPath, "symbolic-ref", "--short", ref],
+          EXECA_BASE,
+        );
         short = result.stdout.trim();
       } catch (raw) {
         if (isHeadUnsetSignal(raw)) {
@@ -136,24 +164,26 @@ function parseBranches(stdout: string): readonly BranchRef[] {
 
 /**
  * Build a `GitError` subclass instance, preserving the raw failure in
- * `cause` conditionally (exactOptionalPropertyTypes-safe).
+ * `cause`. Reuses the core-exported `GitErrorOptions` shape as the single
+ * source of truth for the constructor signature.
  */
 function wrapAs<
-  T extends new (
+  ErrorClass extends new (
     message: string,
-    options?: { readonly cause?: unknown },
+    options?: GitErrorOptions,
   ) => Error,
->(Ctor: T, message: string, cause: unknown): InstanceType<T> {
+>(ErrorClass: ErrorClass, message: string, cause: unknown) {
   const asError = cause instanceof Error ? cause : new Error(String(cause));
-  return new Ctor(`${message}: ${asError.message}`, {
-    cause: asError,
-  }) as InstanceType<T>;
+  return new ErrorClass(`${message}: ${asError.message}`, { cause: asError });
 }
 
 /**
  * `git symbolic-ref` returns exit 128 with `fatal: ref … is not a symbolic
- * ref` when the requested HEAD isn't set. Two-signal check (exit + stderr
- * regex) avoids misclassifying unrelated 128s as "HEAD unset".
+ * ref` when the requested HEAD isn't set. The `LC_ALL=C` / `LANG=C` pin in
+ * `EXECA_ENV` guarantees this English wording on any host locale, so the
+ * two-signal check (exit code + stderr regex) is stable — the exit code
+ * alone would misclassify unrelated 128s, and the wording alone would
+ * be fragile.
  */
 function isHeadUnsetSignal(raw: unknown): boolean {
   const err = raw as Partial<ExecaError> & { stderr?: unknown };

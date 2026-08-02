@@ -2,20 +2,28 @@
  * Core module: repos — `GitPort` error family (dec-006).
  *
  * Base class + one typed subclass per failure family so the future run flow
- * and use cases can discriminate by `instanceof` rather than a string code
- * (exhaustive under strict TS, verbatimModuleSyntax-friendly).
+ * and use cases can discriminate by `instanceof` rather than by a string
+ * code (exhaustive under strict TS, verbatimModuleSyntax-friendly).
  *
- * `cause` is typed `unknown` on purpose: the adapter preserves the raw
+ * `cause` is typed `unknown` on purpose: adapters preserve the raw
  * ExecaError-or-similar for observability, but the core signature must NOT
- * name any I/O type (guard 2 `core-no-io-libs`). Adapters build the shape
- * CONDITIONALLY under exactOptionalPropertyTypes — never assign
- * `cause: undefined`.
+ * name any I/O type (guard 2 `core-no-io-libs`). The base constructor
+ * stores `cause` conditionally via `if ("cause" in options)`, so adapters
+ * may pass `{ cause: err }` unconditionally without violating
+ * exactOptionalPropertyTypes.
  */
 
+/** Constructor options shared by every `GitError` subclass. */
 export interface GitErrorOptions {
   readonly cause?: unknown;
 }
 
+/**
+ * Base class for every port-level git failure. Catch this to react to any
+ * git error without discriminating; catch a subclass to react to one
+ * specific family. Never thrown directly — every path in the adapter
+ * chooses one of the four subclasses below.
+ */
 export class GitError extends Error {
   readonly cause?: unknown;
   constructor(message: string, options?: GitErrorOptions) {
@@ -27,6 +35,7 @@ export class GitError extends Error {
   }
 }
 
+/** Raised when `clone()` fails (bad URL, network, auth, relative path). */
 export class GitCloneError extends GitError {
   constructor(message: string, options?: GitErrorOptions) {
     super(message, options);
@@ -34,6 +43,7 @@ export class GitCloneError extends GitError {
   }
 }
 
+/** Raised when `fetch()` fails (unknown remote, network, auth). */
 export class GitFetchError extends GitError {
   constructor(message: string, options?: GitErrorOptions) {
     super(message, options);
@@ -41,6 +51,14 @@ export class GitFetchError extends GitError {
   }
 }
 
+/**
+ * Catch-all for other git-invocation failures the port surface produces
+ * (`branches()`, `defaultBranch()` when the root cause is a git error other
+ * than an unset HEAD — for example: not a git repo, missing binary). Kept
+ * separate from `GitError` so downstream code that only wants to react to
+ * "git command misbehaved" (as opposed to "clone/fetch failed") can catch
+ * this class specifically.
+ */
 export class GitCommandError extends GitError {
   constructor(message: string, options?: GitErrorOptions) {
     super(message, options);

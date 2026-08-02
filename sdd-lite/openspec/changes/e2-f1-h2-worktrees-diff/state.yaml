@@ -11,7 +11,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -25,7 +25,9 @@ stages:
     started_at: "2026-08-02T00:00:00Z"
     completed_at: "2026-08-02T00:00:00Z"
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-plan:
     status: pending
   sddl-executor:
@@ -81,7 +83,7 @@ decisions:
 open_risks: []
 next_action:
   kind: run_stage
-  target: sddl-design
-  summary: "Proceed to sddl-design to define method signatures, request/response types, error subclasses, adapter internals, and contract test scenarios."
+  target: sddl-plan
+  summary: "Proceed to sddl-plan to produce the step-by-step execution plan from the completed design."
 created_at: "2026-08-02T00:00:00Z"
 updated_at: "2026-08-02T00:00:00Z"

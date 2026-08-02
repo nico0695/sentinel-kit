@@ -1,0 +1,55 @@
+version: "0.1"
+change_name: e2-f2-h1-configstore
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    ConfigStore port + storage adapter following the established port/adapter
+    pattern. Zod schemas for two config files, yaml parsing, contract tests.
+    No architectural unknowns.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — port/adapter pattern established, libraries pre-decided."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f2-h1-configstore/state.yaml
+  proposal: sdd-lite/openspec/changes/e2-f2-h1-configstore/proposal.md
+  spec: sdd-lite/openspec/changes/e2-f2-h1-configstore/spec.md
+  design: sdd-lite/openspec/changes/e2-f2-h1-configstore/design.md
+  plan: sdd-lite/openspec/changes/e2-f2-h1-configstore/plan.md
+  execution_log: sdd-lite/openspec/changes/e2-f2-h1-configstore/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e2-f2-h1-configstore/qa-report.md
+checkpoints: []
+decisions: []
+open_risks: []
+next_action:
+  kind: user_checkpoint
+  target: sddl-spec
+  summary: >-
+    Proposal complete. Two B-level questions (B1: module ownership, B2: method
+    granularity) need user decision before spec can formalize scope and ACs.
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:00:00Z"

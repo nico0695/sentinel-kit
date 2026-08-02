@@ -1,0 +1,440 @@
+version: "0.1"
+change_name: e0-f2-h1-review-engine
+objective: new-feature
+mode: lite
+execution_mode: auto
+validation_protocol:
+  per_stage_parallel_validation: true
+  description: >-
+    User directive (dec-003): after each stage produces its artifact, run two
+    blind read-only validators in parallel to detect drift from the plan
+    before routing on. Validator A checks acceptance criteria (issue #5) + the
+    backlog H1/H2 boundary (no scope creep into H2/E4). Validator B checks PRD
+    §4 hexagonal rules + architecture guards (zero I/O, core whitelist zod,
+    port named by role, index re-export) + coherence with upstream artifacts.
+    Converge "no drift" -> auto-continue; any drift or divergence -> STOP and
+    consult (protocol B/C). For the executor (code) stage this role is filled
+    by the sddl-code-review 4R parallel-lens protocol.
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F2.H1] (issue #5): define THE central border contract —
+    the `ReviewEngine` driven port (input worktree + prompt + timeout; output
+    raw output + optional usage) in `src/core/run/ports`, plus the run-domain
+    terminal-state model `ok | ambiguous | engine-error | timeout |
+    validation-failed`, exported via run's public `index`. Zero I/O imports
+    (depcruise core-no-io-libs / no-adapters guards stay green; core whitelist
+    is `zod` only). Types-only, greenfield core module, no runtime behavior —
+    guards satisfied by construction. Boundary pinned to proposal/spec: the
+    `ReviewEngine.contract` shared suite + `FakeEngine` belong to the NEXT
+    story E0.F2.H2 (issue #6), so H1 is very likely types-only. Linked
+    deferred duty: removing `--passWithNoTests` (e0-f1-h3 risk-004 / dec-002)
+    fires when the first real test file lands — stays with H2 if H1 ships no
+    test. Bounded blast radius: one core module's types + one index re-export.
+    Normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-01T22:10:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocking routing — the story is fully pinned by
+      issue #5, PRD §4.3 (ReviewEngine declared by run), the backlog H1/H2
+      boundary, and the audited repo state (run/index.ts placeholder, sibling
+      port-comment convention). Open questions are type-shape decisions for
+      spec/design, not evidence gaps.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-01T22:06:00Z"
+    completed_at: "2026-08-01T22:12:00Z"
+    notes: >-
+      proposal.md written. Problem framed: ReviewEngine is the border contract
+      the whole product converges on (PRD §4.3), today only a placeholder
+      export {}; E0.F2.H2, E1 spikes, E4.F1.H1/H2, E4.F2.x all block on it.
+      Desired outcome: ReviewEngine port under core/run/ports (input
+      worktree+prompt+timeout, output raw output + optional usage) + terminal
+      states ok|ambiguous|engine-error|timeout|validation-failed, exported via
+      run/index, guard-green. Scope sketch pins the H1/H2 boundary: FakeEngine
+      + contract suite + --passWithNoTests removal are OUT (H2 #6); runReview
+      (E4.F1.H1), verdict parser (E4.F1.H2), ProcessRunner (E5.F1.x), real
+      adapters (E4.F2.x) OUT. Feasibility very high (types-only). Five open
+      questions routed to spec — primary: test-in-H1-or-defer (recommend
+      types-only, defer suite to H2); plus port-return-carries-state?, worktree
+      boundary representation, usage shape, zod-vs-plain-types. NOTE: the
+      proposal worker was not told the execution mode and wrongly recorded an
+      auto-mode implicit approval; corrected by the orchestrator — session is
+      interactive, each stage routing pauses for explicit user confirmation.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-01T22:20:00Z"
+    completed_at: "2026-08-01T23:30:00Z"
+    notes: >-
+      spec.md written: firm scope + AC1..AC4 mapped 1:1 to issue #5's three
+      boxes (AC1 port typed in core/run/ports; AC2 five terminal states as a
+      run-domain type NOT carried on the engine return; AC3 zero I/O
+      guard-green) plus AC4 (types-only, no test file, --passWithNoTests
+      removal deferred to H2). Q1/Q4/Q5 decided [A]; Q2/Q3 raised [B] for the
+      design gate. Per-stage parallel validation (dec-003): validator A
+      (acceptance/scope) and validator B (PRD/architecture) both returned
+      no-drift, blind and independent — convergence authorizes auto-continue.
+      Validator A: AC1-AC3 map 1:1, no scope creep either direction, [A]/[B]
+      calls defensible (0 blocking, 0 should-fix, 2 info). Validator B: the
+      PRD-vs-backlog "verdict" reconciliation judged sound, guards hold (2
+      info). Committer identity was corrected (reset-author to
+      Claude <noreply@anthropic.com>) and force-pushed; commits remain
+      unsigned (no signing key in this environment).
+  sddl-design:
+    status: completed
+    started_at: "2026-08-01T23:40:00Z"
+    completed_at: "2026-08-02T00:05:00Z"
+    notes: >-
+      Entered under dec-003 auto-continue (spec validators converged no-drift)
+      with dec-002 honored: Q2/Q3 were surfaced to the user with alternatives +
+      recommendation; the user directed "continue", adopting the recommended
+      options (dec-004, dec-005) with an explicit veto window before design
+      locks the API. design.md written by a fresh-context worker: locks the
+      ReviewEngine.review(ReviewRequest): Promise<ReviewResult> port signature,
+      the separate TerminalState union, WorktreeRef { path }, and a types-only
+      run/index re-export (dec-006..009, all A-level). No new [B] items.
+      Per-stage parallel validation (dec-003) CONVERGED no-drift: validator A
+      (acceptance/scope) 0/0/8-info — AC1-AC4, dec-004/dec-005, no H2/E4/E5
+      creep, dec-007 async correctly A-level; validator B (PRD/architecture)
+      0/0/2-info — VERIFIED against the real .dependency-cruiser.cjs (the local
+      `import type` edge is not in the forbidden dependencyTypes), tsconfig
+      compile clean (NodeNext + verbatimModuleSyntax + exactOptionalPropertyTypes,
+      `.js` specifier correct), and biome-clean; its 2 info notes are the
+      already-documented dec-004/dec-005 reconciliations, not drift. Both blind
+      and independent → auto-continue to sddl-plan authorized.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-02T00:08:00Z"
+    completed_at: "2026-08-02T00:30:00Z"
+    notes: >-
+      Launched under dec-003 auto-continue after design validators converged.
+      plan.md written by a fresh-context worker: precondition P0 (`npm ci` —
+      node_modules absent, lockfile present) [A]; single code-touching stage S1
+      writing all four files atomically in leaf->port->index order; acceptance
+      gate `npm run check` (biome check . && tsc --noEmit && depcruise src) = 0
+      violations, `npm test` (vitest run --passWithNoTests) green, AC4 boundary
+      via `git diff`; AC1..AC4 traced; rollback = delete 3 new files + restore
+      index.ts `export {};`. No new [B]. Per-stage parallel validation (dec-003)
+      CONVERGED no-drift: validator A (plan<->design fidelity + scope) 0/0 —
+      exact 4-file/6-type coverage, sound ordering, single-stage justified, no
+      H2/E4/E5 bleed, no silent [B]; validator B (tooling/gate reality) 0/0 —
+      VERIFIED against the real filesystem: `check`/`test` byte-exact in
+      package.json, node_modules absent + lockfile present (npm ci correct), all
+      four gate tools declared as devDependencies, .dependency-cruiser.cjs +
+      tsconfig.json present and backing the cited invocations, index.ts tracked
+      so rollback works. One optional info nit: the placeholder is `export {};`
+      (with semicolon), not bare `export {}`. Both blind and independent →
+      planning is fully validated end to end. STOP at the executor gate.
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-02T00:35:00Z"
+    completed_at: "2026-08-02T00:55:00Z"
+    notes: >-
+      User approved at ckp-003 (an explicit "yes, start"). Fresh-context executor worker
+      ran P0 (`npm ci`, 141 pkgs) + S1 (four types-only files transcribed
+      verbatim from the frozen design.md, leaf->port->index) + the acceptance
+      gate. GATE GREEN, independently re-run by the orchestrator: `npm run check`
+      exit 0 (biome clean · tsc --noEmit clean · depcruise 0 violations, 17
+      modules / 5 deps) · `npm test` exit 0 (`--passWithNoTests` preserved). AC4
+      confirmed: only the four target paths changed, 0 `*.test.ts`, package.json
+      byte-unchanged. No transcription fix needed. execution-log.md written.
+      dec-003 code-stage validation = sddl-code-review 4R: target frozen (HEAD
+      9264318 + diff sha256 d05f457a…, 121 lines), triaged STANDARD → 1 lens
+      (readability), which returned CLEAN (0 findings); refuter N/A (full-4r
+      only). review-ledger.md verdict = pass. Ready for final QA.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-02T00:56:00Z"
+    completed_at: "2026-08-02T01:10:00Z"
+    notes: >-
+      FINAL mode (the only lifecycle closer). Fresh-context worker, adversarial,
+      independently re-ran the gates: `npm run check` exit 0 (biome + tsc
+      --noEmit + depcruise 0 violations), `npm test` exit 0. All four AC PASS
+      with concrete evidence — AC1 port signature + re-export, AC2 five-member
+      TerminalState off the engine return (dec-004), AC3 depcruise 0 violations
+      (sole edge is the intra-module `import type`), AC4 no test file +
+      package.json byte-unchanged (--passWithNoTests retained). No scope creep
+      into H2/E4/E5; dec-004/dec-005 honored in the shipped code; artifacts
+      English-only. Zero gaps. qa-report.md written. Verdict: pass →
+      lifecycle_status=completed.
+review_summary:
+  target: S1 execution diff (ReviewEngine border contract, types-only)
+  immutable_reference: "HEAD 9264318 + S1 diff sha256 d05f457ae2bb610d56fd4b8e555310eb456f22301a3f88ccac3a3767de9f55da"
+  protocol: sddl-code-review (4R)
+  triage_tier: standard
+  lenses_run: [readability]
+  refuter: not-applicable
+  verdict: pass
+  counts:
+    blocker: 0
+    critical: 0
+    warning: 0
+    suggestion: 0
+  ledger: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/review-ledger.md
+  recorded_at: "2026-08-02T00:55:00Z"
+artifacts:
+  state: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/state.yaml
+  proposal: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/proposal.md
+  spec: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/spec.md
+  design: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/design.md
+  plan: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/plan.md
+  execution_log: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/execution-log.md
+  qa_report: ./sdd-lite/openspec/changes/e0-f2-h1-review-engine/qa-report.md
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Change kickoff for [E0.F2.H1]: the user asked to start the story
+      and explicitly selected execution_mode=interactive via the session
+      mode prompt. Scope = issue #5: ReviewEngine port typed in core/run/ports,
+      terminal states modeled, zero I/O imports (guard green), run through the
+      canonical lite stages (proposal → spec → design → plan → executor → 4R →
+      final QA). Closing requirements: npm run check + npm test green before PR,
+      PR "[E0.F2.H1] ..." with Closes #5 (never merge, never push main, max 5
+      open PRs), history entry committed before closing.
+    question: >-
+      Start e0-f2-h1-review-engine (continue-lite) with issue #5 scope, in
+      interactive mode?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved to START the change in interactive mode (an explicit start
+        instruction plus mode selection). This is NOT a blanket pre-approval of
+        later stages: in
+        interactive mode each stage routing pauses for explicit confirmation.
+        Standing user constraint (dec-002): any deviation, suggestion, or
+        change of direction must be brought back with alternatives + a
+        recommendation for the user to decide BEFORE the design is formalized.
+      responded_at: "2026-08-01T22:06:00Z"
+    created_at: "2026-08-01T22:06:00Z"
+    resolved_at: "2026-08-01T22:06:00Z"
+  - id: ckp-002
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      Spec stage produced spec.md and passed per-stage parallel validation
+      (dec-003): validators A (acceptance/scope) and B (PRD/architecture) both
+      returned no-drift, blind and independent. Q2 (port output shape) and Q3
+      (worktree boundary representation) — the two [B] public-contract items
+      the spec deferred to the design gate — were surfaced to the user with
+      alternatives + recommendations (dec-002 hard gate).
+    question: >-
+      Confirm Q2 (thin port: raw + usage only) and Q3 (WorktreeRef { path })
+      before sddl-design locks the ReviewEngine API, or override?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User directed "continue from where you left off" (declining the
+        interactive modal three times). Interpreted as: adopt the recommended
+        options for Q2 and Q3 and proceed to design. Recorded as dec-004 /
+        dec-005 with author claude->user and an explicit veto window — the user
+        may reverse either before design.md finalizes the API. Validator
+        convergence (no-drift) satisfies the dec-003 auto-continue condition.
+      responded_at: "2026-08-01T23:35:00Z"
+    created_at: "2026-08-01T23:35:00Z"
+    resolved_at: "2026-08-01T23:35:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      All planning stages complete and validated end to end (spec, design, plan
+      — three independent dual-validator passes, every one no-drift). The next
+      stage S1 WRITES CODE: four types-only files under src/core/run/. Per
+      CLAUDE.md this code-touching stage requires explicit user approval even
+      under auto mode; ckp-001 confirmed kickoff was not a blanket pre-approval.
+    question: >-
+      Approve running executor stage S1 — write the four files
+      (worktree-ref.ts, terminal-state.ts, ports/review-engine.ts, index.ts
+      rewrite) exactly as frozen in design.md, then run `npm run check` +
+      `npm test` as the acceptance gate?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User approved explicitly (an unambiguous "yes, start") — a genuine user
+        turn, not a background event. Authorizes P0 (`npm ci`) + S1 (write the
+        four files verbatim from design.md) + the acceptance gate. Executor
+        launched as a fresh-context worker.
+      responded_at: "2026-08-02T00:35:00Z"
+    created_at: "2026-08-02T00:30:00Z"
+    resolved_at: "2026-08-02T00:35:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: interactive / continue-lite mode, kickoff-defined scope (issue #5, likely types-only contract)
+    author: user
+    rationale: >-
+      User started the change (an explicit start instruction) and selected interactive mode. The
+      story is bounded and fully specified by issue #5 + PRD §4.3. Each later
+      stage still requires explicit confirmation before routing; any
+      contradiction with the PRD/backlog or scope expansion escalates
+      (protocol B/C).
+    recorded_at: "2026-08-01T22:06:00Z"
+  - id: dec-002
+    checkpoint_id: ckp-001
+    free_text: >-
+      Standing user constraint — validate any deviation before formalizing design
+    author: user
+    rationale: >-
+      Explicit user instruction at kickoff: every deviation, suggestion, or
+      change of direction must be validated by the user, with alternatives and
+      a recommendation, before the design is formalized. Operationalized as a
+      hard gate: before
+      sddl-design is formalized, the orchestrator must surface every deviation,
+      suggestion, or direction change as a protocol-B consultation (options +
+      recommendation) and let the user decide. Applies through the design gate.
+    recorded_at: "2026-08-01T22:12:00Z"
+  - id: dec-003
+    checkpoint_id: ckp-001
+    free_text: >-
+      Switch to auto mode after proposal; stop only on discrepancy or required
+      interaction; add per-stage parallel drift validation
+    author: user
+    rationale: >-
+      User directive after the proposal stage: if the change continues, switch
+      the sdd flow to automatic mode; stop and consult only on a discrepancy or
+      something that needs interaction; for each stage run parallel validations
+      to make sure we are not drifting from the plan.
+      Operationalized: execution_mode=auto (no routine confirmation pauses);
+      hard stops preserved for drift, contradictions, and B-level decisions
+      (notably public-API shape of the ReviewEngine contract) per protocol
+      B/C; dec-002 design gate still honored. Each stage gets two blind
+      parallel read-only validators (see validation_protocol) before routing.
+    recorded_at: "2026-08-01T22:18:00Z"
+  - id: dec-004
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q2 resolved — ReviewEngine port output = raw output + optional usage
+      ONLY; terminal state is a separate run-domain type populated downstream
+    author: claude->user
+    rationale: >-
+      Recommendation by claude (thin invocation contract, endorsed by both
+      spec validators as PRD-faithful and no scope creep) adopted under the
+      user's "continue" directive after Q2 was surfaced twice with alternatives
+      + recommendation (dec-002 honored). The terminal-state union
+      ok|ambiguous|engine-error|timeout|validation-failed stays a distinct run
+      type, assigned by the verdict parser (E4.F1.H2) / run flow (E4.F1.H1) —
+      never returned by the engine. Reversible: flagged for user veto before
+      sddl-design locks the API. Resolves risk-002.
+    recorded_at: "2026-08-01T23:35:00Z"
+  - id: dec-005
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q3 resolved — worktree represented at the port boundary as a run-local
+      plain type WorktreeRef { path: string }
+    author: claude->user
+    rationale: >-
+      Recommendation by claude adopted under the user's "continue" directive
+      (dec-002 honored). A named, extensible run-owned value object with zero
+      I/O — chosen over a bare string (stringly-typed, not extensible) and over
+      a workspace-owned type (would create a core-to-core coupling, PRD §4.5
+      guard 3). Reversible before sddl-design locks the API. Resolves risk-003.
+    recorded_at: "2026-08-01T23:35:00Z"
+  - id: dec-006
+    checkpoint_id: ckp-002
+    free_text: >-
+      Design file layout — three concern-separated files under src/core/run/
+      plus a types-only index rewrite
+    author: claude
+    rationale: >-
+      A-level (reversible, PRD-aligned). run/ is the first core module to
+      materialize a ports/ folder: ports/review-engine.ts (port +
+      ReviewRequest/ReviewResult/ReviewUsage), terminal-state.ts (run-domain
+      union, not under ports/), worktree-ref.ts (boundary value), and index.ts
+      rewritten from `export {}` to a types-only public re-export. Rejected a
+      single combined types.ts (three unrelated concerns). Establishes the
+      port-per-file convention siblings will follow.
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-007
+    checkpoint_id: ckp-002
+    free_text: >-
+      Port method review(request): Promise<ReviewResult> — async by nature
+    author: claude
+    rationale: >-
+      A-level. Method named `review` (verb matching the domain role, avoids
+      colliding with the `run` module name). Async return is forced, not a
+      trade-off: an implementing adapter spawns an external CLI, so there is no
+      viable sync signature. Not a [B] item — it does not change the acceptance
+      contract's input/output shape (still worktree+prompt+timeout → raw +
+      optional usage).
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-002
+    free_text: >-
+      Type identifiers ReviewRequest/ReviewResult/ReviewUsage; timeoutMs
+      unit-in-name; all boundary members readonly
+    author: claude
+    rationale: >-
+      A-level (reversible identifiers; the shapes themselves are locked by
+      Q2/Q3/Q4). Immutable DTOs at the boundary; timeout carries its unit in
+      the name (timeoutMs).
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-002
+    free_text: >-
+      import type / export type throughout — mandatory under
+      verbatimModuleSyntax
+    author: claude
+    rationale: >-
+      A-level but load-bearing: under tsconfig verbatimModuleSyntax:true a
+      plain `export { ReviewEngine }` of a type is a tsc error, so the index
+      re-export and the intra-module WorktreeRef import must be type-only for a
+      green `tsc --noEmit`. Verified by the executor stage.
+    recorded_at: "2026-08-01T23:52:00Z"
+  - id: dec-010
+    checkpoint_id: ckp-003
+    free_text: >-
+      User approved the code-touching executor stage S1 (an explicit "yes, start")
+    author: user
+    rationale: >-
+      Explicit user approval at the mandatory executor gate after planning was
+      validated end to end (spec/design/plan, three dual-validator passes, all
+      no-drift). Authorizes P0 (`npm ci`) + S1 (write the four types-only files
+      verbatim from the frozen design.md) + the acceptance gate. Honors the
+      CLAUDE.md rule that code-touching stages require explicit approval even
+      under dec-003 auto mode, and ckp-001's "not a blanket pre-approval".
+    recorded_at: "2026-08-02T00:35:00Z"
+open_risks:
+  - id: risk-001
+    severity: medium
+    status: resolved
+    summary: >-
+      RESOLVED: spec decided H1 is types-only (Q1 [A]); the ReviewEngine.contract
+      suite + FakeEngine are deferred to E0.F2.H2 (#6). H1 shipped no test file,
+      so the --passWithNoTests removal duty (e0-f1-h3 risk-004) correctly stays
+      deferred to H2. Confirmed by QA final (AC4 PASS) and the shipped code.
+  - id: risk-002
+    severity: low
+    status: resolved
+    summary: >-
+      RESOLVED by dec-004: ReviewResult carries only raw output + optional usage;
+      TerminalState is a separate run-domain type assigned downstream (E4.F1.H2).
+      No E4 scope leaked into H1. Confirmed by QA final (AC1/AC2 PASS).
+  - id: risk-003
+    severity: low
+    status: resolved
+    summary: >-
+      RESOLVED by dec-005: worktree at the boundary is the run-local plain value
+      object WorktreeRef { readonly path }, zero I/O, no workspace coupling.
+      core-no-io-libs / no-adapters guards stay green (depcruise 0 violations).
+      Confirmed by QA final (AC3 PASS).
+next_action:
+  kind: await_user
+  target: pull-request
+  summary: >-
+    Change COMPLETE end to end: proposal -> spec -> design -> plan -> executor ->
+    4R review -> final QA, every stage validated (three planning dual-validator
+    passes + 4R + adversarial final QA), all AC1..AC4 PASS, gates green,
+    lifecycle_status=completed. Code committed (1d4a710 feat + 476c20e artifacts)
+    and pushed. Remaining: (1) commit qa-report.md + this state; (2) write the
+    mandatory history entry via history-log before closing; (3) STOP — do NOT
+    open the PR automatically (task rule: no PR unless the user explicitly asks).
+    Offer the PR "[E0.F2.H1] ReviewEngine port and run domain" (Closes #5) and
+    wait for the user's go. Never merge, never push main; max 5 open PRs.
+created_at: "2026-08-01T22:06:00Z"
+updated_at: "2026-08-02T01:10:00Z"

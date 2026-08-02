@@ -1,0 +1,104 @@
+version: "0.1"
+change_name: docs-standards
+objective: new-feature
+mode: lite
+execution_mode: lightweight
+validation_protocol:
+  per_stage_parallel_validation: false
+  description: >-
+    User chose a LIGHTWEIGHT sdd-lite run for this docs/governance change
+    (proposal -> combined spec/design -> plan -> execute -> single final
+    validation), instead of the dual-per-stage protocol used for code stories.
+    Rationale: pure documentation + two reference edits, fully reversible, no
+    code/gate risk; context-rich prose is authored in-session rather than by
+    fresh-context workers; a single blind read-only validator checks the final
+    result against PRD §4 / guards / CLAUDE.md.
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Non-backlog governance/docs change. Distill the project's standards into a
+    small human-first English doc set (README, CONTRIBUTING, docs/architecture,
+    docs/coding-standards, docs/testing) and wire CLAUDE.md +
+    sdd-lite/skill-catalog.md to reference them as the single source of truth for
+    AI validations, keeping .dependency-cruiser.cjs as the enforcement. Bounded,
+    reversible, docs-only. Not a backlog story -> no E*.F*.H* id.
+  confidence: high
+  recorded_at: "2026-08-02T14:30:00Z"
+lifecycle_status: planned
+current_stage: sddl-plan
+stages:
+  sddl-proposal:
+    status: completed
+    notes: >-
+      proposal.md written. Scope = 5 docs + wiring; single-source-of-truth
+      principle (docs explain what/why, guard file enforces, sdd-lite validates
+      against the docs). Non-goals: LICENSE (deferred #44), ADRs (history/ +
+      sdd-lite already are the decision record), SECURITY/CoC (premature),
+      templates. No code/guard/PRD change.
+  sddl-design:
+    status: completed
+    notes: >-
+      Combined spec+design.md written: AC-1..AC-6, the file set + placement
+      (README/CONTRIBUTING at root; architecture/coding-standards/testing under
+      docs/ per the user), per-doc section outlines, the wiring design, and the
+      single-final-validation strategy.
+  sddl-plan:
+    status: completed
+    notes: >-
+      plan.md written. One cohesive doc stage S1 (7 steps: architecture ->
+      coding-standards -> testing -> CONTRIBUTING -> README -> skill-catalog
+      wiring -> CLAUDE.md pointer). Gate = npm run check + npm test green
+      (docs-only) + diff-scope check + single blind validator (AC-1..AC-6).
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+decisions:
+  - id: dec-001
+    free_text: >-
+      Doc set = README + CONTRIBUTING (root) + docs/architecture +
+      docs/coding-standards + docs/testing, plus wiring; run as lightweight
+      sdd-lite; architecture under docs/
+    author: user
+    rationale: >-
+      User picked the recommended 5-doc set + wiring and the lightweight process
+      via AskUserQuestion, and specified architecture.md lives under docs/.
+    recorded_at: "2026-08-02T14:30:00Z"
+  - id: dec-002
+    free_text: >-
+      Single source of truth — docs explain what/why, .dependency-cruiser.cjs
+      enforces, sdd-lite validates against the docs; each doc references, never
+      copies, its source
+    author: claude
+    rationale: >-
+      A-level anti-drift principle so the doc set scales without desync across
+      the guard file, CLAUDE.md, PRD §4, and the new docs. Endorsed by the user's
+      stated goal (keep order as it scales).
+    recorded_at: "2026-08-02T14:30:00Z"
+  - id: dec-003
+    free_text: >-
+      Non-goals excluded — LICENSE (deferred to E7/#44), ADRs (duplicate
+      history/ + sdd-lite), SECURITY/CoC (premature), PR/issue templates
+    author: claude->user
+    rationale: >-
+      Recommended to skip these to avoid clutter/duplication and pre-empting the
+      open license decision; user accepted the recommended set.
+    recorded_at: "2026-08-02T14:30:00Z"
+open_risks:
+  - id: risk-001
+    severity: low
+    status: open
+    summary: >-
+      Docs must not invent/relax any rule vs PRD §4 / the guard file / CLAUDE.md
+      (traceability). Mitigated by authoring from the read source sections and a
+      final blind traceability validator.
+next_action:
+  kind: execute
+  target: sddl-executor
+  summary: >-
+    Planning bundle complete (lightweight). Execute S1: write the 5 docs + the
+    2 wiring edits in order, then run the gate (npm run check + npm test) and a
+    single blind validator (AC-1..AC-6). Docs are low-risk and user-directed, so
+    no separate code-gate approval is required (no src/ change).
+created_at: "2026-08-02T14:30:00Z"
+updated_at: "2026-08-02T14:30:00Z"

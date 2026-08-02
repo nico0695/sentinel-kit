@@ -135,7 +135,7 @@ stages:
     started_at: "2026-08-02T00:35:00Z"
     completed_at: "2026-08-02T00:55:00Z"
     notes: >-
-      User approved at ckp-003 ("si comienza"). Fresh-context executor worker
+      User approved at ckp-003 (an explicit "yes, start"). Fresh-context executor worker
       ran P0 (`npm ci`, 141 pkgs) + S1 (four types-only files transcribed
       verbatim from the frozen design.md, leaf->port->index) + the acceptance
       gate. GATE GREEN, independently re-run by the orchestrator: `npm run check`
@@ -190,7 +190,7 @@ checkpoints:
     type: stage_approval
     stage: orchestrator
     summary: >-
-      Change kickoff for [E0.F2.H1]: the user said "comienza" (start the story)
+      Change kickoff for [E0.F2.H1]: the user asked to start the story
       and explicitly selected execution_mode=interactive via the session
       mode prompt. Scope = issue #5: ReviewEngine port typed in core/run/ports,
       terminal states modeled, zero I/O imports (guard green), run through the
@@ -204,8 +204,9 @@ checkpoints:
     free_input_allowed: true
     response:
       free_text: >-
-        Approved to START the change in interactive mode ("comienza" + mode
-        selection). This is NOT a blanket pre-approval of later stages: in
+        Approved to START the change in interactive mode (an explicit start
+        instruction plus mode selection). This is NOT a blanket pre-approval of
+        later stages: in
         interactive mode each stage routing pauses for explicit confirmation.
         Standing user constraint (dec-002): any deviation, suggestion, or
         change of direction must be brought back with alternatives + a
@@ -255,7 +256,7 @@ checkpoints:
     free_input_allowed: true
     response:
       free_text: >-
-        User approved explicitly: "si comienza" (yes, start) — a genuine user
+        User approved explicitly (an unambiguous "yes, start") — a genuine user
         turn, not a background event. Authorizes P0 (`npm ci`) + S1 (write the
         four files verbatim from design.md) + the acceptance gate. Executor
         launched as a fresh-context worker.
@@ -268,7 +269,7 @@ decisions:
     free_text: interactive / continue-lite mode, kickoff-defined scope (issue #5, likely types-only contract)
     author: user
     rationale: >-
-      User started the change ("comienza") and selected interactive mode. The
+      User started the change (an explicit start instruction) and selected interactive mode. The
       story is bounded and fully specified by issue #5 + PRD §4.3. Each later
       stage still requires explicit confirmation before routing; any
       contradiction with the PRD/backlog or scope expansion escalates
@@ -280,9 +281,10 @@ decisions:
       Standing user constraint — validate any deviation before formalizing design
     author: user
     rationale: >-
-      Explicit user instruction at kickoff: "cualquier desvío, sugerencia o
-      cambio de dirección quiero validarlo con alternativas y recomendaciones
-      antes de formalizar el design." Operationalized as a hard gate: before
+      Explicit user instruction at kickoff: every deviation, suggestion, or
+      change of direction must be validated by the user, with alternatives and
+      a recommendation, before the design is formalized. Operationalized as a
+      hard gate: before
       sddl-design is formalized, the orchestrator must surface every deviation,
       suggestion, or direction change as a protocol-B consultation (options +
       recommendation) and let the user decide. Applies through the design gate.
@@ -294,10 +296,10 @@ decisions:
       interaction; add per-stage parallel drift validation
     author: user
     rationale: >-
-      User directive after the proposal stage: "si continua, y cambia a modo
-      automatico sdd; solo frena y consulta si hay alguna discrepancia o algo
-      que tenga que interactuar; por cada stage realizar validaciones
-      paralelas para asegurarnos que no nos estamos desviando del plan."
+      User directive after the proposal stage: if the change continues, switch
+      the sdd flow to automatic mode; stop and consult only on a discrepancy or
+      something that needs interaction; for each stage run parallel validations
+      to make sure we are not drifting from the plan.
       Operationalized: execution_mode=auto (no routine confirmation pauses);
       hard stops preserved for drift, contradictions, and B-level decisions
       (notably public-API shape of the ReviewEngine contract) per protocol
@@ -387,7 +389,7 @@ decisions:
   - id: dec-010
     checkpoint_id: ckp-003
     free_text: >-
-      User approved the code-touching executor stage S1 ("si comienza")
+      User approved the code-touching executor stage S1 (an explicit "yes, start")
     author: user
     rationale: >-
       Explicit user approval at the mandatory executor gate after planning was

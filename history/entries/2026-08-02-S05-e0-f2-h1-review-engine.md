@@ -13,7 +13,7 @@ Define the `ReviewEngine` driven port (the border contract the whole review flow
 
 | ID | Decision | Alternatives considered | Why | Authorship |
 |----|----------|-------------------------|-----|------------|
-| S05-D1 | Start the change in `interactive` / `continue-lite` mode, scope = issue #5 | — | User began the story ("comienza") and picked the mode; story fully pinned by #5 + PRD §4.3 | `user` |
+| S05-D1 | Start the change in `interactive` / `continue-lite` mode, scope = issue #5 | — | User began the story (an explicit start instruction) and picked the mode; story fully pinned by #5 + PRD §4.3 | `user` |
 | S05-D2 | Standing gate: surface every deviation/suggestion with alternatives + a recommendation **before** formalizing design | Proceed silently on A-level calls | Explicit user constraint at kickoff | `user` |
 | S05-D3 | After proposal, switch to `auto` mode; stop only on discrepancy/required interaction; run **two blind parallel validators per stage** | Manual confirmation at each stage routing | User directive to keep momentum while guarding against drift | `user` |
 | S05-D4 | Q1: H1 is types-only — defer the `ReviewEngine.contract` suite + `FakeEngine` to E0.F2.H2 (#6); `--passWithNoTests` removal stays with H2 | Land a first test in H1 | Keeps H1 bounded to the type contract; matches the backlog H1/H2 split | `claude` |
@@ -21,7 +21,7 @@ Define the `ReviewEngine` driven port (the border contract the whole review flow
 | S05-D6 | Q3 (dec-005): worktree at the boundary = run-local `WorktreeRef { readonly path }`, zero I/O | Bare `string`; a `workspace`-owned type | Extensible, no stringly-typing, no core→core coupling (guard 3) | `claude→user` |
 | S05-D7 | Design shape (dec-006..009): three concern-separated files + types-only index; `review()` async; `readonly` DTOs; `import type`/`export type` throughout | Single combined `types.ts`; sync method; plain re-exports | Adapter spawns an external CLI (async forced); `verbatimModuleSyntax` makes type-only im/exports mandatory for green `tsc` | `claude` |
 | S05-D8 | Q4/Q5: raw output = plain `string`, `usage` all-optional/loose; plain TS types, no `zod` | zod runtime schema; strict usage shape | Pure type contract; lets E1 fixtures refine `usage` later without churn | `claude` |
-| S05-D9 | Approve the code-touching executor stage S1 ("si comienza") | Hold at the gate | Planning validated end to end (3 dual-validator passes); explicit gate per CLAUDE.md | `user` |
+| S05-D9 | Approve the code-touching executor stage S1 (an explicit "yes, start") | Hold at the gate | Planning validated end to end (3 dual-validator passes); explicit gate per CLAUDE.md | `user` |
 
 ## Deviations
 

@@ -44,7 +44,15 @@ export function createConfigStoreAdapter(basePath: string): ConfigStore {
         raw = await readFile(configPath, "utf-8");
       } catch (err: unknown) {
         if (isEnoent(err)) {
-          return GlobalConfigSchema.parse({});
+          const defaults = GlobalConfigSchema.safeParse({});
+          if (!defaults.success) {
+            throw new ConfigValidationError(
+              `Invalid ${CONFIG_FILE} defaults`,
+              zodToFields(defaults.error),
+              { cause: defaults.error },
+            );
+          }
+          return defaults.data;
         }
         throw new ConfigReadError(`Failed to read ${CONFIG_FILE}`, {
           cause: err,
@@ -65,6 +73,7 @@ export function createConfigStoreAdapter(basePath: string): ConfigStore {
         throw new ConfigValidationError(
           `Invalid ${CONFIG_FILE}`,
           zodToFields(result.error),
+          { cause: result.error },
         );
       }
       return result.data;
@@ -76,6 +85,7 @@ export function createConfigStoreAdapter(basePath: string): ConfigStore {
         throw new ConfigValidationError(
           `Invalid config data`,
           zodToFields(result.error),
+          { cause: result.error },
         );
       }
       try {
@@ -114,6 +124,7 @@ export function createConfigStoreAdapter(basePath: string): ConfigStore {
         throw new ConfigValidationError(
           `Invalid ${REPOS_FILE}`,
           zodToFields(result.error),
+          { cause: result.error },
         );
       }
       return result.data;
@@ -125,6 +136,7 @@ export function createConfigStoreAdapter(basePath: string): ConfigStore {
         throw new ConfigValidationError(
           `Invalid repos data`,
           zodToFields(result.error),
+          { cause: result.error },
         );
       }
       try {

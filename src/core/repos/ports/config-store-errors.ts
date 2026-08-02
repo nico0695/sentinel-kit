@@ -32,8 +32,9 @@ export class ConfigValidationError extends ConfigError {
       readonly path: string;
       readonly message: string;
     }>,
+    options?: ConfigErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "ConfigValidationError";
     this.fields = fields;
   }

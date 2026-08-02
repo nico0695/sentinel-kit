@@ -6,7 +6,7 @@
  * `afterEach`. The adapter is imported through the storage barrel
  * (`../index.js`), proving it is reachable via its public API.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createConfigStoreAdapter } from "../index.js";
@@ -26,6 +26,13 @@ const harness: ConfigStoreContractHarness = {
   },
   async teardownFixture(fixture: ConfigFixture): Promise<void> {
     rmSync(fixture.basePath, { recursive: true, force: true });
+  },
+  async corruptFixture(
+    fixture: ConfigFixture,
+    filename: string,
+    content: string,
+  ): Promise<void> {
+    writeFileSync(join(fixture.basePath, filename), content, "utf-8");
   },
 };
 

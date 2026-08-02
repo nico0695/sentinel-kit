@@ -24,6 +24,11 @@ export interface ConfigStoreContractHarness {
   readonly build: (basePath: string) => ConfigStore;
   readonly setupFixture: () => Promise<ConfigFixture>;
   readonly teardownFixture: (fixture: ConfigFixture) => Promise<void>;
+  readonly corruptFixture: (
+    fixture: ConfigFixture,
+    filename: string,
+    content: string,
+  ) => Promise<void>;
 }
 
 export function configStoreContract(
@@ -114,11 +119,12 @@ export function configStoreContract(
       }
     });
 
-    it("I/O read failure produces ConfigReadError with cause", async () => {
-      const { writeFileSync } = await import("node:fs");
-      const { join } = await import("node:path");
-      const blockingPath = join(fixture.basePath, "repos.yaml");
-      writeFileSync(blockingPath, "{{{{invalid yaml: [}}}}", "utf-8");
+    it("corrupt YAML produces ConfigReadError with cause", async () => {
+      await harness.corruptFixture(
+        fixture,
+        "repos.yaml",
+        "{{{{invalid yaml: [}}}}",
+      );
 
       await expect(store.readRepos()).rejects.toSatisfy((err: unknown) => {
         expect(err).toBeInstanceOf(ConfigReadError);

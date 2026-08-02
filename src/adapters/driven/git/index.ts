@@ -1,6 +1,7 @@
 /**
- * Driven adapter: git — git CLI wrapper implementing GitPort (PRD §4.2).
- * Base wrapper lands in E2.F1.x.
- * No public API yet.
+ * Driven adapter: git — `GitPort` implementation over the `git` binary
+ * (execa + machine-readable output, PRD §5.1 / setup-tecnico decision 2).
+ *
+ * Public API: the `createGitCliAdapter` factory. Internals stay private.
  */
-export {};
+export { createGitCliAdapter } from "./git-cli.js";

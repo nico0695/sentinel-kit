@@ -18,7 +18,7 @@
     "dev": "node --experimental-strip-types src/main/cli.ts",
     "build": "tsup",
     "check": "biome check . && tsc --noEmit && depcruise src",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",

@@ -13,13 +13,23 @@ import {
   type BranchRef,
   type CloneRequest,
   type DefaultBranchRequest,
+  type DiffRequest,
+  type DiffResult,
   type FetchRequest,
+  type FileStats,
   GitCloneError,
   GitCommandError,
+  GitDiffError,
   type GitErrorOptions,
   GitFetchError,
+  GitMergeBaseError,
   GitNoDefaultBranchError,
   type GitPort,
+  GitWorktreeError,
+  type MergeBaseRequest,
+  type WorktreeAddRequest,
+  type WorktreeInfo,
+  type WorktreeRemoveRequest,
 } from "../../../core/repos/index.js";
 
 const DEFAULT_REMOTE = "origin";
@@ -129,6 +139,110 @@ export function createGitCliAdapter(): GitPort {
       const prefix = `${target}/`;
       return short.startsWith(prefix) ? short.slice(prefix.length) : short;
     },
+
+    async worktreeAdd({
+      repoPath,
+      targetPath,
+      commitish,
+    }: WorktreeAddRequest): Promise<void> {
+      if (!isAbsolute(targetPath)) {
+        throw new GitWorktreeError(
+          `worktreeAdd: targetPath must be absolute (received: ${targetPath})`,
+        );
+      }
+      try {
+        await execa(
+          "git",
+          [
+            "-C",
+            repoPath,
+            "worktree",
+            "add",
+            "--detach",
+            targetPath,
+            commitish,
+          ],
+          EXECA_BASE,
+        );
+      } catch (raw) {
+        throw wrapAs(GitWorktreeError, "git worktree add failed", raw);
+      }
+    },
+
+    async worktreeRemove({
+      repoPath,
+      worktreePath,
+    }: WorktreeRemoveRequest): Promise<void> {
+      try {
+        await execa(
+          "git",
+          ["-C", repoPath, "worktree", "remove", "--force", worktreePath],
+          EXECA_BASE,
+        );
+      } catch (raw) {
+        throw wrapAs(GitWorktreeError, "git worktree remove failed", raw);
+      }
+    },
+
+    async worktreeList(repoPath: string): Promise<readonly WorktreeInfo[]> {
+      let stdout: string;
+      try {
+        const result = await execa(
+          "git",
+          ["-C", repoPath, "worktree", "list", "--porcelain"],
+          EXECA_BASE,
+        );
+        stdout = result.stdout;
+      } catch (raw) {
+        throw wrapAs(GitWorktreeError, "git worktree list failed", raw);
+      }
+      return parseWorktreeList(stdout);
+    },
+
+    async mergeBase({
+      repoPath,
+      commitA,
+      commitB,
+    }: MergeBaseRequest): Promise<string> {
+      let stdout: string;
+      try {
+        const result = await execa(
+          "git",
+          ["-C", repoPath, "merge-base", commitA, commitB],
+          EXECA_BASE,
+        );
+        stdout = result.stdout;
+      } catch (raw) {
+        throw wrapAs(GitMergeBaseError, "git merge-base failed", raw);
+      }
+      return stdout.trim();
+    },
+
+    async diff({ repoPath, from, to }: DiffRequest): Promise<DiffResult> {
+      let raw: string;
+      let numstatOut: string;
+      try {
+        const result = await execa(
+          "git",
+          ["-C", repoPath, "diff", from, to],
+          EXECA_BASE,
+        );
+        raw = result.stdout;
+      } catch (rawErr) {
+        throw wrapAs(GitDiffError, "git diff failed", rawErr);
+      }
+      try {
+        const result = await execa(
+          "git",
+          ["-C", repoPath, "diff", "--numstat", from, to],
+          EXECA_BASE,
+        );
+        numstatOut = result.stdout;
+      } catch (rawErr) {
+        throw wrapAs(GitDiffError, "git diff --numstat failed", rawErr);
+      }
+      return { raw, stats: parseDiffNumstat(numstatOut) };
+    },
   };
 }
 
@@ -190,4 +304,58 @@ function isHeadUnsetSignal(raw: unknown): boolean {
   if (err?.exitCode !== 128) return false;
   const stderr = typeof err.stderr === "string" ? err.stderr : "";
   return /is not a symbolic ref/i.test(stderr);
+}
+
+/**
+ * Parse `git worktree list --porcelain` output into `WorktreeInfo[]`.
+ * Blocks are separated by blank lines; each block has `worktree <path>`,
+ * `HEAD <sha>`, and either `branch refs/heads/<name>` or `detached`.
+ */
+function parseWorktreeList(stdout: string): readonly WorktreeInfo[] {
+  const entries: WorktreeInfo[] = [];
+  const blocks = stdout.split("\n\n");
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (trimmed === "") continue;
+
+    let path = "";
+    let head = "";
+    let branch: string | null = null;
+
+    for (const line of trimmed.split("\n")) {
+      if (line.startsWith("worktree ")) {
+        path = line.slice("worktree ".length);
+      } else if (line.startsWith("HEAD ")) {
+        head = line.slice("HEAD ".length);
+      } else if (line.startsWith("branch ")) {
+        const ref = line.slice("branch ".length);
+        branch = ref.startsWith("refs/heads/")
+          ? ref.slice("refs/heads/".length)
+          : ref;
+      }
+    }
+    if (path !== "" && head !== "") {
+      entries.push({ path, head, branch });
+    }
+  }
+  return entries;
+}
+
+/** Parse `git diff --numstat` output into `FileStats[]`. */
+function parseDiffNumstat(stdout: string): readonly FileStats[] {
+  const stats: FileStats[] = [];
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    const parts = trimmed.split("\t");
+    if (parts.length < 3) continue;
+    const [addStr, delStr, ...pathParts] = parts;
+    const filePath = pathParts.join("\t");
+    stats.push({
+      path: filePath,
+      additions: addStr === "-" ? 0 : Number(addStr),
+      deletions: delStr === "-" ? 0 : Number(delStr),
+    });
+  }
+  return stats;
 }

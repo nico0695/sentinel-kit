@@ -1,11 +1,11 @@
 /**
  * Core module: repos — driven port `GitPort` (PRD §4.3).
  *
- * Thin domain contract for source-control operations the review flow needs
- * (H1 scope: clone, fetch, branches, defaultBranch). Adapters live under
- * `src/adapters/driven/git/*`; the core never spawns a process. Worktrees,
- * merge-base and diff land in H2 — this port intentionally has NO methods
- * for them yet (spec §Non-goals).
+ * Thin domain contract for source-control operations the review flow needs.
+ * H1: clone, fetch, branches, defaultBranch.
+ * H2: worktreeAdd/Remove/List, mergeBase, diff.
+ * Adapters live under `src/adapters/driven/git/*`; the core never spawns
+ * a process.
  */
 
 /** clone(url, targetPath) — `targetPath` must be ABSOLUTE (dec-004). */
@@ -39,6 +39,53 @@ export interface BranchRef {
 export interface DefaultBranchRequest {
   readonly repoPath: string;
   readonly remote?: string;
+}
+
+/** worktreeAdd(request) — targetPath must be ABSOLUTE (dec-a1). */
+export interface WorktreeAddRequest {
+  readonly repoPath: string;
+  readonly targetPath: string;
+  readonly commitish: string;
+}
+
+/** worktreeRemove(request) — worktreePath must be ABSOLUTE. */
+export interface WorktreeRemoveRequest {
+  readonly repoPath: string;
+  readonly worktreePath: string;
+}
+
+/** mergeBase(request) — two commit-ish strings (dec-a2). */
+export interface MergeBaseRequest {
+  readonly repoPath: string;
+  readonly commitA: string;
+  readonly commitB: string;
+}
+
+/** diff(request) — two commit-ish, caller does merge-base separately (dec-a2). */
+export interface DiffRequest {
+  readonly repoPath: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** Single entry from git worktree list --porcelain. */
+export interface WorktreeInfo {
+  readonly path: string;
+  readonly head: string;
+  readonly branch: string | null;
+}
+
+/** Per-file change stats from diff --numstat. */
+export interface FileStats {
+  readonly path: string;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
+/** Combined diff output (dec-b3). */
+export interface DiffResult {
+  readonly raw: string;
+  readonly stats: readonly FileStats[];
 }
 
 export interface GitPort {
@@ -76,4 +123,41 @@ export interface GitPort {
    * `GitCommandError`.
    */
   defaultBranch(request: DefaultBranchRequest): Promise<string>;
+
+  /**
+   * Create a detached worktree at `request.targetPath` (absolute; dec-a1)
+   * checked out to `request.commitish`. Adapters reject a non-absolute
+   * `targetPath` with `GitWorktreeError` before spawning git.
+   */
+  worktreeAdd(request: WorktreeAddRequest): Promise<void>;
+
+  /**
+   * Remove the worktree at `request.worktreePath` from the repo at
+   * `request.repoPath`. Uses `--force` so dirty worktrees are removed
+   * without complaint (ephemeral review worktrees, PRD §5.1).
+   */
+  worktreeRemove(request: WorktreeRemoveRequest): Promise<void>;
+
+  /**
+   * List worktrees in the local repo at `repoPath` via
+   * `git worktree list --porcelain`. Always returns at least one entry
+   * (the main worktree). Rejects with `GitWorktreeError` on any git failure.
+   */
+  worktreeList(repoPath: string): Promise<readonly WorktreeInfo[]>;
+
+  /**
+   * Return the merge-base commit SHA (40-hex) of `request.commitA` and
+   * `request.commitB` in the local repo at `request.repoPath`.
+   * Rejects with `GitMergeBaseError` if either ref is unresolvable.
+   */
+  mergeBase(request: MergeBaseRequest): Promise<string>;
+
+  /**
+   * Produce a unified diff between `request.from` and `request.to` in the
+   * local repo at `request.repoPath`. Returns `{ raw, stats }` where `raw`
+   * is the full unified diff text and `stats` is per-file add/delete counts
+   * from `--numstat` (dec-b3). Empty diff returns empty `raw` and empty
+   * `stats`. Rejects with `GitDiffError` on any git failure.
+   */
+  diff(request: DiffRequest): Promise<DiffResult>;
 }

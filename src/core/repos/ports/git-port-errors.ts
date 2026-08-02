@@ -77,3 +77,27 @@ export class GitNoDefaultBranchError extends GitError {
     this.name = "GitNoDefaultBranchError";
   }
 }
+
+/** Raised by `worktreeAdd()`, `worktreeRemove()`, `worktreeList()` on failure. */
+export class GitWorktreeError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitWorktreeError";
+  }
+}
+
+/** Raised by `mergeBase()` when either ref is unresolvable. */
+export class GitMergeBaseError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitMergeBaseError";
+  }
+}
+
+/** Raised by `diff()` on any git failure. */
+export class GitDiffError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitDiffError";
+  }
+}

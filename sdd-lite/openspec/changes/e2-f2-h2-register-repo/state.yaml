@@ -10,8 +10,8 @@ complexity_assessment:
     I/O. Bounded scope, clear ACs from backlog.
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
-lifecycle_status: active
-current_stage: sddl-code-review
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -38,9 +38,15 @@ stages:
     completed_at: "2026-08-02T00:00:00Z"
     notes: "4 stages executed: errors, use case, index, tests. 48/48 tests pass, npm run check clean."
   sddl-code-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4R reliability lens: 0 BLOCKER, 0 CRITICAL, 3 WARNING (accepted), 2 SUGGESTION (info)."
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "FINAL QA: 7/7 ACs pass, 48/48 tests, quality gate clean, architecture guards satisfied. Verdict PASS."
 artifacts:
   state: sdd-lite/openspec/changes/e2-f2-h2-register-repo/state.yaml
   spec: sdd-lite/openspec/changes/e2-f2-h2-register-repo/spec.md

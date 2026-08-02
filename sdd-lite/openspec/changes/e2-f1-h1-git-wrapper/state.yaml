@@ -1,0 +1,114 @@
+version: "0.1"
+change_name: e2-f1-h1-git-wrapper
+objective: new-feature
+mode: lite
+execution_mode: interactive
+validation_protocol:
+  per_stage_parallel_validation: true
+  activate_after: sddl-proposal
+  description: >-
+    Kickoff directive: start in interactive; if the proposal validates cleanly,
+    switch to auto with two blind read-only validators in parallel per stage.
+    Validator A checks acceptance criteria (issue #11) + backlog boundary
+    (nothing from E2.F1.H2 worktree/merge-base/diff, E2.F2.H1 ConfigStore,
+    E2.F2.H2 registerRepo, E2.F2.H3 listRepos/listBranches). Validator B
+    checks PRD §4 hexagonal rules + the five architecture guards
+    (core-no-adapters, core-no-io-libs, core-modules-via-index,
+    adapters-isolated, wiring-only-in-main) + coherence with the frozen
+    ReviewEngine port style (thin, typed, no I/O in core) + coding standards
+    (NodeNext .js specifiers, verbatimModuleSyntax, exactOptionalPropertyTypes,
+    English-only). Converge "no drift" -> auto-continue; any drift/divergence
+    -> STOP and consult (protocol B/C). For the executor (code) stage this
+    role is filled by the sddl-code-review 4R parallel-lens protocol.
+    STANDING GATE: validate any deviation or B-item BEFORE the design is
+    formalized. The executor (code) stage ALWAYS requires explicit user OK,
+    even under auto mode.
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E2.F1.H1] (issue #11): declare a thin `GitPort` in
+    src/core/repos/ports/ (types-only, re-exported via the module's public
+    index) and implement one driven adapter under src/adapters/driven/git/
+    over execa + machine-readable git output (--porcelain,
+    for-each-ref --format, symbolic-ref refs/remotes/<remote>/HEAD). Four
+    operations only: clone, fetch, branches, default-branch. Adapter
+    translates every raw execa/git failure into a typed port error
+    (GitCloneError / GitFetchError / GitCommandError /
+    GitNoDefaultBranchError, all extending a base GitError). Shared
+    GitPort.contract test suite following the ReviewEngine.contract pattern
+    from E0.F2.H2, driven against a real local git repo (bare + working
+    repo in os.tmpdir(), no network). Blast radius: 1 port file, 1 error
+    file, 1 adapter file, 1 contract file, 1 test file, and public-index
+    re-exports for src/core/repos and src/adapters/driven/git. src/core/run
+    is NOT touched (frozen H1 ReviewEngine port). Guards enforce: no I/O
+    library reaches the core (execa lives only in the adapter), adapters
+    are isolated, only src/main/ may instantiate (this change does not
+    wire; no use case exists yet).
+  confidence: high
+  recorded_at: "2026-08-02T15:15:00Z"
+lifecycle_status: in_progress
+current_stage: sddl-proposal
+kickoff:
+  branch: claude/e2-f1-h1-git-wrapper
+  base_commit: f24f5e2
+  issue: 11
+  epic: E2 — Repos & git
+  in_scope: [clone, fetch, branches, default-branch]
+  out_of_scope:
+    - worktree add/remove/list (E2.F1.H2 / #12)
+    - merge-base + diff (E2.F1.H2 / #12)
+    - ConfigStore schemas + fs/yaml (E2.F2.H1 / #13)
+    - registerRepo use case + managed clones layout (E2.F2.H2 / #14)
+    - listRepos / listBranches use cases (E2.F2.H3 / #15)
+    - Real engine adapters, CLI wiring, runReview
+decisions:
+  - id: dec-001
+    stage: sddl-proposal
+    kind: A
+    author: claude
+    summary: >-
+      Own the port in `src/core/repos` (public-index re-export). PRD §4.3
+      lists both `repos` and `workspace` as owners; `repos` is the domain
+      that will consume it FIRST (E2.F2.H2 registerRepo), and `workspace`
+      (E2.F3.H1) can consume the same public type through the repos index
+      once needed — no need to duplicate the declaration.
+    rationale: >-
+      Keeps ownership single, matches "first consumer wins" for driven
+      ports, avoids a cross-module public re-export from workspace which
+      would create a phantom re-export before workspace has any use case.
+open_questions:
+  - id: Q1
+    kind: B
+    summary: "`branches` scope: local, remote, or both (tagged)?"
+    recommendation: >-
+      Both, returned as a tagged shape `{ name, kind, remote? }`, one call
+      to `for-each-ref refs/heads refs/remotes` — H2 needs local for
+      merge-base; H3 needs remote for listBranches.
+  - id: Q2
+    kind: B
+    summary: "default-branch detection: symbolic-ref (needs clone) vs ls-remote --symref (no clone)?"
+    recommendation: >-
+      `symbolic-ref refs/remotes/<remote>/HEAD` post-clone; H2's registerRepo
+      always clones first. Raise `GitNoDefaultBranchError` when HEAD is unset.
+  - id: Q3
+    kind: B
+    summary: "clone target directory: caller-owned absolute path vs adapter-picked layout?"
+    recommendation: >-
+      Caller owns the path; layout is a registerRepo concern (H2), not a
+      git-wrapper concern. Keeps the port thin.
+  - id: Q4
+    kind: B
+    summary: "fetch remote: fixed `origin` vs configurable with default?"
+    recommendation: >-
+      Configurable, default `origin` — one line, no follow-up needed for H3.
+  - id: Q5
+    kind: B
+    summary: "Error hierarchy: single GitError + code discriminator vs one class per family?"
+    recommendation: >-
+      Base `GitError extends Error` + typed subclasses per failure family
+      (Clone / Fetch / Command / NoDefaultBranch). Matches coding-standards
+      `Error` suffix rule and the ReviewEngine port style; downstream use
+      cases can discriminate cleanly later.
+proposal_summary:
+  path: ./sdd-lite/openspec/changes/e2-f1-h1-git-wrapper/proposal.md
+  reported_at: "2026-08-02T15:15:00Z"

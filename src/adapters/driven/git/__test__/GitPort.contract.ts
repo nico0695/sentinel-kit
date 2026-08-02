@@ -15,10 +15,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   GitCloneError,
   GitCommandError,
+  GitDiffError,
   GitError,
   GitFetchError,
+  GitMergeBaseError,
   GitNoDefaultBranchError,
   type GitPort,
+  GitWorktreeError,
 } from "../../../../core/repos/index.js";
 
 export interface GitFixture {
@@ -47,6 +50,12 @@ export interface GitFixture {
    * return the resulting commit SHA (used by the fetch test).
    */
   readonly addCommitToBare: () => Promise<string>;
+  /** Branch forked from main with file additions (for diff testing). */
+  readonly featureBranch: string;
+  /** SHA of the fork point (common ancestor of main and featureBranch). */
+  readonly forkPointSha: string;
+  /** Number of files changed on featureBranch since fork point. */
+  readonly featureBranchChangedFiles: number;
 }
 
 export interface GitPortContractHarness {
@@ -255,6 +264,228 @@ export function gitPortContract(
           const gitErr = err as GitCommandError;
           expect(gitErr.cause).toBeInstanceOf(Error);
         });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // worktreeAdd
+    // -------------------------------------------------------------------
+
+    describe("worktreeAdd", () => {
+      it("creates a worktree at absolute path; worktreeList includes it (AC-1)", async () => {
+        const wtPath = `${fixture.clonePath}-wt-ok`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: fixture.defaultBranch,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        const entry = list.find((w) => w.path === wtPath);
+        expect(entry).toBeDefined();
+        expect(entry?.head).toMatch(/^[0-9a-f]{40}$/);
+      });
+
+      it("rejects relative path with GitWorktreeError, no cause (AC-2)", async () => {
+        const rejection = git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: "relative/path",
+          commitish: fixture.defaultBranch,
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitWorktreeError;
+          expect(gitErr.cause).toBeUndefined();
+        });
+      });
+
+      it("wraps bad commitish as GitWorktreeError with cause", async () => {
+        const rejection = git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: `${fixture.clonePath}-wt-bad`,
+          commitish: "does-not-exist-ref",
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitWorktreeError;
+          expect(gitErr.cause).toBeInstanceOf(Error);
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // worktreeRemove
+    // -------------------------------------------------------------------
+
+    describe("worktreeRemove", () => {
+      it("removes a worktree; worktreeList no longer includes it (AC-3)", async () => {
+        const wtPath = `${fixture.clonePath}-wt-rm`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: fixture.defaultBranch,
+        });
+        await git.worktreeRemove({
+          repoPath: fixture.clonePath,
+          worktreePath: wtPath,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.find((w) => w.path === wtPath)).toBeUndefined();
+      });
+
+      it("wraps non-existent path as GitWorktreeError with cause", async () => {
+        const rejection = git.worktreeRemove({
+          repoPath: fixture.clonePath,
+          worktreePath: `${fixture.clonePath}-wt-nonexistent`,
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitWorktreeError;
+          expect(gitErr.cause).toBeInstanceOf(Error);
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // worktreeList
+    // -------------------------------------------------------------------
+
+    describe("worktreeList", () => {
+      it("returns WorktreeInfo[] with main worktree always present (AC-4)", async () => {
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.length).toBeGreaterThanOrEqual(1);
+        const main = list[0];
+        expect(main).toBeDefined();
+        expect(main?.path).toBe(fixture.clonePath);
+        expect(main?.head).toMatch(/^[0-9a-f]{40}$/);
+      });
+
+      it("wraps non-repo path as GitWorktreeError with cause", async () => {
+        const rejection = git.worktreeList(fixture.nonRepoPath);
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitWorktreeError;
+          expect(gitErr.cause).toBeInstanceOf(Error);
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // mergeBase
+    // -------------------------------------------------------------------
+
+    describe("mergeBase", () => {
+      it("returns 40-hex SHA for two valid refs (AC-5)", async () => {
+        const sha = await git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: `origin/${fixture.defaultBranch}`,
+          commitB: `origin/${fixture.featureBranch}`,
+        });
+        expect(sha).toMatch(/^[0-9a-f]{40}$/);
+        expect(sha).toBe(fixture.forkPointSha);
+      });
+
+      it("wraps unresolvable ref as GitMergeBaseError with cause", async () => {
+        const rejection = git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: fixture.defaultBranch,
+          commitB: "does-not-exist-ref",
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitMergeBaseError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitMergeBaseError;
+          expect(gitErr.cause).toBeInstanceOf(Error);
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // diff
+    // -------------------------------------------------------------------
+
+    describe("diff", () => {
+      it("returns DiffResult with raw and stats (AC-6)", async () => {
+        const base = fixture.forkPointSha;
+        const result = await git.diff({
+          repoPath: fixture.clonePath,
+          from: base,
+          to: `origin/${fixture.featureBranch}`,
+        });
+        expect(result.raw).toContain("diff --git");
+        expect(result.stats.length).toBe(fixture.featureBranchChangedFiles);
+        for (const s of result.stats) {
+          expect(s.path).toBeTruthy();
+          expect(typeof s.additions).toBe("number");
+          expect(typeof s.deletions).toBe("number");
+        }
+      });
+
+      it("identical refs return empty raw and empty stats (AC-7)", async () => {
+        const head = `origin/${fixture.defaultBranch}`;
+        const result = await git.diff({
+          repoPath: fixture.clonePath,
+          from: head,
+          to: head,
+        });
+        expect(result.raw).toBe("");
+        expect(result.stats).toEqual([]);
+      });
+
+      it("PR-semantics: diff(mergeBase(base, target), target) shows only target changes (AC-8)", async () => {
+        const base = await git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: `origin/${fixture.defaultBranch}`,
+          commitB: `origin/${fixture.featureBranch}`,
+        });
+        const result = await git.diff({
+          repoPath: fixture.clonePath,
+          from: base,
+          to: `origin/${fixture.featureBranch}`,
+        });
+        expect(result.stats.length).toBe(fixture.featureBranchChangedFiles);
+        const paths = result.stats.map((s) => s.path);
+        expect(paths).toContain("file-a.txt");
+        expect(paths).toContain("file-b.txt");
+        expect(paths).not.toContain("file-c.txt");
+      });
+
+      it("wraps unresolvable ref as GitDiffError with cause", async () => {
+        const rejection = git.diff({
+          repoPath: fixture.clonePath,
+          from: fixture.defaultBranch,
+          to: "does-not-exist-ref",
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitDiffError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await rejection.catch((err: unknown) => {
+          const gitErr = err as GitDiffError;
+          expect(gitErr.cause).toBeInstanceOf(Error);
+        });
+      });
+    });
+
+    // -------------------------------------------------------------------
+    // error hierarchy (AC-9)
+    // -------------------------------------------------------------------
+
+    describe("error hierarchy (AC-9)", () => {
+      it("all three new errors extend GitError", () => {
+        const wt = new GitWorktreeError("test");
+        const mb = new GitMergeBaseError("test");
+        const df = new GitDiffError("test");
+
+        expect(wt).toBeInstanceOf(GitError);
+        expect(wt).toBeInstanceOf(GitWorktreeError);
+
+        expect(mb).toBeInstanceOf(GitError);
+        expect(mb).toBeInstanceOf(GitMergeBaseError);
+
+        expect(df).toBeInstanceOf(GitError);
+        expect(df).toBeInstanceOf(GitDiffError);
       });
     });
   });

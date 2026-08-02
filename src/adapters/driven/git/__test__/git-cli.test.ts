@@ -16,7 +16,7 @@
  * locale is pinned to `C` so the runner's ambient config cannot hijack the
  * fixture.
  */
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execa } from "execa";
@@ -113,6 +113,44 @@ const harness: GitPortContractHarness = {
     await git(["-C", clonePath, "fetch", "--quiet", "upstream"]);
     await git(["-C", clonePath, "remote", "set-head", "upstream", "--auto"]);
 
+    // H2 divergent-branch setup for merge-base + diff contract tests.
+    // Record fork-point SHA before divergent commits.
+    const { stdout: forkSha } = await git([
+      "-C",
+      seedPath,
+      "rev-parse",
+      "HEAD",
+    ]);
+    const forkPointSha = forkSha.trim();
+
+    // feat-diverge: two file additions from the fork point.
+    await git(["-C", seedPath, "checkout", "-b", "feat-diverge"]);
+    writeFileSync(join(seedPath, "file-a.txt"), "feature-a\n");
+    await git(["-C", seedPath, "add", "file-a.txt"]);
+    await git(["-C", seedPath, ...GIT_IDENTITY, "commit", "-m", "add file-a"]);
+    writeFileSync(join(seedPath, "file-b.txt"), "feature-b\n");
+    await git(["-C", seedPath, "add", "file-b.txt"]);
+    await git(["-C", seedPath, ...GIT_IDENTITY, "commit", "-m", "add file-b"]);
+    await git(["-C", seedPath, "push", "-u", "origin", "feat-diverge"]);
+
+    // Back on main: one independent file addition (should NOT appear in
+    // the PR-semantics diff against feat-diverge).
+    await git(["-C", seedPath, "checkout", "main"]);
+    writeFileSync(join(seedPath, "file-c.txt"), "base-only\n");
+    await git(["-C", seedPath, "add", "file-c.txt"]);
+    await git([
+      "-C",
+      seedPath,
+      ...GIT_IDENTITY,
+      "commit",
+      "-m",
+      "add file-c (base only)",
+    ]);
+    await git(["-C", seedPath, "push", "origin", "main"]);
+
+    // Re-fetch in the working clone to pick up both divergent branches.
+    await git(["-C", clonePath, "fetch", "--quiet", "origin"]);
+
     // Empty repo: init only, no remote configured → no `refs/remotes/*/HEAD`.
     await git(["init", "-b", "main", emptyRepoPath]);
 
@@ -130,6 +168,9 @@ const harness: GitPortContractHarness = {
       defaultBranch: "main",
       localOnlyBranch: "feat-local",
       pushedBranch: "feat-shared",
+      featureBranch: "feat-diverge",
+      forkPointSha,
+      featureBranchChangedFiles: 2,
       addCommitToBare: async (): Promise<string> => {
         const throwaway = mkdtempSync(join(tmpdir(), "sentinel-git-push-"));
         try {

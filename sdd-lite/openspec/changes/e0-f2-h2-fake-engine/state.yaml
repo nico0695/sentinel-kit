@@ -46,8 +46,8 @@ complexity_assessment:
     types. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-02T02:10:00Z"
-lifecycle_status: planned
-current_stage: sddl-plan
+lifecycle_status: in-progress
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -254,6 +254,33 @@ checkpoints:
       responded_at: "2026-08-02T03:45:00Z"
     created_at: "2026-08-02T03:40:00Z"
     resolved_at: "2026-08-02T03:45:00Z"
+  - id: ckp-004
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      All planning stages complete and validated end to end (spec, design, plan
+      — three independent dual-validator passes, every one no-drift; plus the
+      ckp-003 biome ratification). The next stage S1 WRITES CODE: 8 files (4 new
+      FakeEngine adapter + shared contract suite + fake test + vitest.config.ts;
+      4 edits engines/index.ts + .dependency-cruiser.cjs + biome.json +
+      package.json). Per CLAUDE.md + dec-003 this code-touching stage requires
+      explicit user approval even under auto; ckp-001 confirmed kickoff was not a
+      blanket pre-approval.
+    question: >-
+      Approve running executor stage S1 — P0 (`npm ci`) + write the 8 files
+      verbatim from the frozen design/plan + run the three-part acceptance gate
+      (`npm run check` + `npm test` + AC-8 diff scope)?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User approved explicitly ("si, arranca con S1 y realiza todo el flujo de
+        ejecucion automatico, a menos que surja algun bloqueante") — a genuine
+        user turn. Authorizes P0 + S1 (write the 8 files verbatim) + the gate,
+        AND chaining the post-execution flow in auto (4R code review -> final QA)
+        stopping only on a blocker. Executor launched as a fresh-context worker.
+      responded_at: "2026-08-02T04:20:00Z"
+    created_at: "2026-08-02T04:18:00Z"
+    resolved_at: "2026-08-02T04:20:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -381,6 +408,21 @@ decisions:
       (A should-fix vs B info). The alternative (drop it, leaving the new config
       outside biome's allowlist) was declined for tooling consistency.
     recorded_at: "2026-08-02T03:45:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-004
+    free_text: >-
+      User approved the code-touching executor stage S1 + auto-chaining the
+      post-execution flow (4R review -> final QA), stopping only on a blocker
+    author: user
+    rationale: >-
+      Explicit user approval at the mandatory executor gate after planning was
+      validated end to end (spec/design/plan, three dual-validator passes, all
+      no-drift). Authorizes P0 (`npm ci`) + S1 (write the 8 files verbatim from
+      the frozen design/plan) + the acceptance gate, and directs auto-chaining
+      of the downstream review + QA stages unless a blocker arises. Honors the
+      CLAUDE.md rule that code-touching stages require explicit approval even
+      under dec-003 auto mode.
+    recorded_at: "2026-08-02T04:20:00Z"
 open_risks:
   - id: risk-001
     severity: medium

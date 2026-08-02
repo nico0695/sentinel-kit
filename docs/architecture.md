@@ -66,6 +66,11 @@ cohesive and makes it obvious which module depends on which external capability.
 | `RunStore` | `history` | persist and list full runs | `storage` |
 | `ProcessRunner` | `run` | run validations with timeout + output capture | `exec` |
 
+> Note: `ReviewEngine` is a **thin** port — it returns the engine's raw output
+> plus optional usage, and does **not** decide a verdict or terminal state (that
+> is run-domain work, done downstream). This is the shipped contract; it refines
+> PRD §4.3's older "raw output + verdict" wording, which predates the split.
+
 The **core's driving API is its use cases** — thin functions per module
 (`registerRepo`, `runReview`, `listRuns`, …). The use-case signature is the
 contract; TUI and CLI (and a future daemon) consume it equally. No logic lives

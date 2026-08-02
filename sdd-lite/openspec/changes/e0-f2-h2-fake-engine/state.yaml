@@ -47,7 +47,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T02:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -122,6 +122,19 @@ stages:
       depth `../../../../core/run/index.js` from both fake/ and __test__/. No new
       B item. ONE low-risk A-level assumption flagged (e2e include -> `e2e/` root
       dir, zero files, vetoable) per dec-002 standing gate — non-blocking.
+      Per-stage dual validation (dec-003): both validators returned verdict
+      no-drift. Validator B (guards/TS/port) 0 blocking / 0 should-fix —
+      VERIFIED against real files: import depth `../../../../core/run/index.js`
+      correct from both fake/ and __test__/, frozen port implemented exactly, TS
+      strict flags (import type/export type split, exactOptionalPropertyTypes
+      conditional build, noUncheckedIndexedAccess exhaustion) sound, all five
+      guards hold, options.exclude additive+precise, no orphan rule, vitest
+      empty-project aggregate behavior sound (risk-003 gated to executor).
+      Validator A (acceptance/scope) no-drift with ONE should-fix: the biome.json
+      files.includes edit (add vitest.config.ts) is outside AC-8's enumerated
+      diff list — ratify or drop. DIVERGENCE (A should-fix vs B info) surfaced to
+      the user (ckp-003): user chose MAINTAIN + ratify AC-8 (dec-008). All other
+      findings info. Converged -> auto-continue to sddl-plan.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -183,6 +196,28 @@ checkpoints:
       responded_at: "2026-08-02T02:35:00Z"
     created_at: "2026-08-02T02:30:00Z"
     resolved_at: "2026-08-02T02:35:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      Design complete + dual-validated (both verdicts no-drift). A single
+      divergence between the blind validators: validator A flagged the design's
+      `biome.json` files.includes edit (add vitest.config.ts) as a should-fix
+      because it is outside AC-8's enumerated allowed-diff list; validator B
+      judged the same edit correct, additive, and non-breaking (info). Neither
+      blocking. Surfaced to the user per the dec-002 standing gate before design
+      locks and before routing to plan.
+    question: >-
+      Keep the biome.json edit (ratify AC-8's diff to include vitest.config.ts)
+      or drop it?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User chose "Mantener + ratificar AC-8" (AskUserQuestion): keep the
+        biome.json files.includes edit for vitest.config.ts. Recorded as dec-008.
+      responded_at: "2026-08-02T03:45:00Z"
+    created_at: "2026-08-02T03:40:00Z"
+    resolved_at: "2026-08-02T03:45:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: ckp-001
@@ -292,6 +327,24 @@ decisions:
       stays green when core/e2e match zero files (the overall run has tests via
       adapters) — the executor gate proves this.
     recorded_at: "2026-08-02T02:35:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-003
+    free_text: >-
+      Keep the biome.json files.includes edit (add vitest.config.ts); AC-8's
+      enumerated diff is ratified to include this one-line tooling-consistency
+      change within H2's own footprint
+    author: claude->user
+    rationale: >-
+      Claude recommended keep, user ratified (ckp-003). Adding "vitest.config.ts"
+      to biome.json `files.includes` mirrors the existing `tsup.config.ts` entry
+      so H2's own new config file is linted/formatted by `biome check .`. It is
+      NOT a scope leak (touches no E1/E4/E5 or core-port territory) — AC-8's
+      illustrative allowed-diff list is amended to include it. A-level in
+      substance (trivial, reversible, within H2's footprint); routed through a
+      user ratification only because the two blind validators diverged on it
+      (A should-fix vs B info). The alternative (drop it, leaving the new config
+      outside biome's allowlist) was declined for tooling consistency.
+    recorded_at: "2026-08-02T03:45:00Z"
 open_risks:
   - id: risk-001
     severity: medium
@@ -309,9 +362,10 @@ open_risks:
       RESOLVED by dec-005. Tests co-located INSIDE src in per-module `__test__/`
       folders; a scoping exclusion for `(^|/)__test__/` is added to
       .dependency-cruiser.cjs so depcruise never cruises test code (vitest
-      imports) — production guards + extraction guarantee stay intact. NEW
-      residual: the exclusion must be precise (only `__test__/`); verified at
-      design + proven guard-green at the executor gate.
+      imports) — production guards + extraction guarantee stay intact. Residual
+      CLEARED at design: both validators verified `{ path: "(^|/)__test__/" }`
+      is additive (no exclude key today) and precise (matches only a __test__/
+      segment; no production path contains it); final proof at the executor gate.
   - id: risk-003
     severity: low
     status: open
@@ -325,14 +379,16 @@ next_action:
   kind: delegate
   target: sddl-plan
   summary: >-
-    design.md complete; all A-level details settled within dec-004..dec-007, no
-    new B item. Per dec-003, run the two blind read-only validators against
-    design.md (A: acceptance/scope vs issue #6 + H2 boundary; B: PRD §4 + five
-    guards + H1-port coherence). One low-risk A-level assumption is flagged for
-    transparency (e2e include -> `e2e/` root dir, zero files, vetoable) — surface
-    it under the dec-002 standing gate but it does not gate planning. On
-    converge-no-drift, delegate sddl-plan to produce the ordered stage plan.
-    dec-002/dec-003: any drift or new-B -> STOP and consult before design locks.
-current_stage_note: sddl-design completed (auto-continue to validators -> sddl-plan)
+    Design validated end to end (both blind validators no-drift; the sole
+    divergence — the biome.json edit — ratified by the user, dec-008). Delegate
+    sddl-plan (fresh worker) to produce the ordered execution plan: precondition
+    (npm ci if node_modules absent), a single code-touching stage writing all
+    files (fake-engine.ts, engines/index.ts, __test__/ReviewEngine.contract.ts,
+    __test__/fake-engine.test.ts, vitest.config.ts, .dependency-cruiser.cjs
+    exclude, biome.json includes, package.json test script), acceptance gate
+    (`npm run check` = 0 violations + `npm test` = vitest run green with real
+    non-vacuous tests, AC-8 diff-scope check), AC-1..AC-9 traceability, rollback.
+    Then run the two blind validators against plan.md. HALT at the executor gate
+    (code stage ALWAYS needs explicit user OK, even under auto).
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T03:30:00Z"
+updated_at: "2026-08-02T03:50:00Z"

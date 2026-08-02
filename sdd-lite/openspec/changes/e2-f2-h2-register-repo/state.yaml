@@ -11,7 +11,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
 lifecycle_status: active
-current_stage: sddl-spec
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -21,11 +21,17 @@ stages:
     started_at: "2026-08-02T00:00:00Z"
     completed_at: "2026-08-02T00:00:00Z"
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -34,6 +40,9 @@ stages:
     status: pending
 artifacts:
   state: sdd-lite/openspec/changes/e2-f2-h2-register-repo/state.yaml
+  spec: sdd-lite/openspec/changes/e2-f2-h2-register-repo/spec.md
+  design: sdd-lite/openspec/changes/e2-f2-h2-register-repo/design.md
+  plan: sdd-lite/openspec/changes/e2-f2-h2-register-repo/plan.md
 checkpoints:
   - id: chk-proposal-01
     type: phase_validation
@@ -63,4 +72,4 @@ decisions:
     recorded_at: "2026-08-02T00:00:00Z"
 open_risks: []
 created_at: "2026-08-02T00:00:00Z"
-updated_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:01:00Z"

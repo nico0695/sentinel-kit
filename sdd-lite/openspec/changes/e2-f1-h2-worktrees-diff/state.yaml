@@ -11,7 +11,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -29,7 +29,9 @@ stages:
     started_at: "2026-08-02T00:00:00Z"
     completed_at: "2026-08-02T00:00:00Z"
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -83,7 +85,7 @@ decisions:
 open_risks: []
 next_action:
   kind: run_stage
-  target: sddl-plan
-  summary: "Proceed to sddl-plan to produce the step-by-step execution plan from the completed design."
+  target: sddl-executor
+  summary: "Plan complete. Proceed to sddl-executor to implement the two code stages (S1 core types, S2 adapter + tests)."
 created_at: "2026-08-02T00:00:00Z"
 updated_at: "2026-08-02T00:00:00Z"

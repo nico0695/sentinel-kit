@@ -34,7 +34,7 @@ complexity_assessment:
     Normal lite flow.
   confidence: high
   recorded_at: "2026-08-01T22:10:00Z"
-lifecycle_status: implemented
+lifecycle_status: completed
 current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
@@ -148,7 +148,20 @@ stages:
       (readability), which returned CLEAN (0 findings); refuter N/A (full-4r
       only). review-ledger.md verdict = pass. Ready for final QA.
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:56:00Z"
+    completed_at: "2026-08-02T01:10:00Z"
+    notes: >-
+      FINAL mode (the only lifecycle closer). Fresh-context worker, adversarial,
+      independently re-ran the gates: `npm run check` exit 0 (biome + tsc
+      --noEmit + depcruise 0 violations), `npm test` exit 0. All four AC PASS
+      with concrete evidence — AC1 port signature + re-export, AC2 five-member
+      TerminalState off the engine return (dec-004), AC3 depcruise 0 violations
+      (sole edge is the intra-module `import type`), AC4 no test file +
+      package.json byte-unchanged (--passWithNoTests retained). No scope creep
+      into H2/E4/E5; dec-004/dec-005 honored in the shipped code; artifacts
+      English-only. Zero gaps. qa-report.md written. Verdict: pass →
+      lifecycle_status=completed.
 review_summary:
   target: S1 execution diff (ReviewEngine border contract, types-only)
   immutable_reference: "HEAD 9264318 + S1 diff sha256 d05f457ae2bb610d56fd4b8e555310eb456f22301a3f88ccac3a3767de9f55da"
@@ -387,41 +400,39 @@ decisions:
 open_risks:
   - id: risk-001
     severity: medium
+    status: resolved
     summary: >-
-      Primary open question for spec: does H1 land any test now, or is the
-      ReviewEngine.contract suite + FakeEngine strictly deferred to E0.F2.H2
-      (#6)? Proposal recommendation (not decided): types-only in H1, defer
-      suite to H2. Consequence to pin in spec: if H1 ships no test file, the
-      --passWithNoTests removal duty (e0-f1-h3 risk-004 / dec-002) also stays
-      deferred to H2. Spec must decide and record.
+      RESOLVED: spec decided H1 is types-only (Q1 [A]); the ReviewEngine.contract
+      suite + FakeEngine are deferred to E0.F2.H2 (#6). H1 shipped no test file,
+      so the --passWithNoTests removal duty (e0-f1-h3 risk-004) correctly stays
+      deferred to H2. Confirmed by QA final (AC4 PASS) and the shipped code.
   - id: risk-002
     severity: low
+    status: resolved
     summary: >-
-      Port-shape question: does the ReviewEngine return type carry a terminal
-      state, or only raw output + optional usage (terminal states assigned
-      later by parse/flow, E4.F1.H2)? Story lists them as two separate
-      deliverables; mis-coupling would leak E4 scope into H1. Spec/design to
-      pin the thin-invocation contract.
+      RESOLVED by dec-004: ReviewResult carries only raw output + optional usage;
+      TerminalState is a separate run-domain type assigned downstream (E4.F1.H2).
+      No E4 scope leaked into H1. Confirmed by QA final (AC1/AC2 PASS).
   - id: risk-003
     severity: low
+    status: resolved
     summary: >-
-      Cross-module representation of "worktree" at the port boundary (path
-      string vs run-local WorktreeRef vs a workspace-owned type). Must stay a
-      plain reference with zero I/O to keep core-no-io-libs and no-adapters
-      guards green and avoid an unwanted core-to-core coupling. Spec/design
-      to pin; usage shape and zod-vs-plain-types are lower-texture design
-      calls surfaced alongside.
+      RESOLVED by dec-005: worktree at the boundary is the run-local plain value
+      object WorktreeRef { readonly path }, zero I/O, no workspace coupling.
+      core-no-io-libs / no-adapters guards stay green (depcruise 0 violations).
+      Confirmed by QA final (AC3 PASS).
 next_action:
-  kind: run_stage
-  target: sddl-qa-review
+  kind: await_user
+  target: pull-request
   summary: >-
-    S1 executed, gate green, and 4R code review passed (0 findings). Run
-    sddl-qa-review in FINAL mode — the only lifecycle closer — to judge the
-    implemented change against spec.md (AC1..AC4) + plan.md and the story's
-    acceptance boxes (issue #5). On a pass it may set lifecycle_status=completed;
-    then commit the code (the four files) + execution-log.md + review-ledger.md +
-    state.yaml, write the mandatory history entry (history-log) before closing,
-    and prepare the PR "[E0.F2.H1] ... Closes #5" (never merge, never push main,
-    max 5 open PRs). No open severe findings to route.
+    Change COMPLETE end to end: proposal -> spec -> design -> plan -> executor ->
+    4R review -> final QA, every stage validated (three planning dual-validator
+    passes + 4R + adversarial final QA), all AC1..AC4 PASS, gates green,
+    lifecycle_status=completed. Code committed (1d4a710 feat + 476c20e artifacts)
+    and pushed. Remaining: (1) commit qa-report.md + this state; (2) write the
+    mandatory history entry via history-log before closing; (3) STOP — do NOT
+    open the PR automatically (task rule: no PR unless the user explicitly asks).
+    Offer the PR "[E0.F2.H1] ReviewEngine port and run domain" (Closes #5) and
+    wait for the user's go. Never merge, never push main; max 5 open PRs.
 created_at: "2026-08-01T22:06:00Z"
-updated_at: "2026-08-02T00:55:00Z"
+updated_at: "2026-08-02T01:10:00Z"

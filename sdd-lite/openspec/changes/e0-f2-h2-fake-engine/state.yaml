@@ -46,7 +46,7 @@ complexity_assessment:
     types. Normal lite flow.
   confidence: high
   recorded_at: "2026-08-02T02:10:00Z"
-lifecycle_status: planning
+lifecycle_status: planned
 current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
@@ -136,7 +136,29 @@ stages:
       the user (ckp-003): user chose MAINTAIN + ratify AC-8 (dec-008). All other
       findings info. Converged -> auto-continue to sddl-plan.
   sddl-plan:
-    status: pending
+    status: completed
+    completed_at: "2026-08-02T04:10:00Z"
+    notes: >-
+      plan.md written (terminal planner stage). One precondition P0 (`npm ci` —
+      node_modules ABSENT, package-lock PRESENT; installs vitest 4.1.10 / biome
+      2.5.6 / typescript 5.9.3 / dependency-cruiser 18.1.0 / @types/node) + one
+      atomic code-touching stage S1 writing the 8 files in fixed order
+      (fake-engine.ts -> engines/index.ts -> __test__/ReviewEngine.contract.ts ->
+      __test__/fake-engine.test.ts -> vitest.config.ts -> .dependency-cruiser.cjs
+      -> biome.json -> package.json). Single-stage justified: bounded, cohesive,
+      interdependent edits with no meaningful mid-tree gate. Acceptance gate has
+      three parts: (1) `npm run check` exit 0 (five guards green, depcruise skips
+      `(^|/)__test__/`, vitest.config.ts linted); (2) `npm test` = `vitest run`
+      exit 0 with adapters project executing >0 non-vacuous tests AND empty
+      core/e2e NOT failing the aggregate (risk-003 proof point); (3) AC-8 diff
+      scope = exactly the 8 paths (biome.json IN-scope per dec-008). AC-1..AC-9
+      each mapped to a step/gate assertion. Rollback = delete 3 new files/dirs +
+      revert 4 edits. Verified from real files: node_modules absent, lockfile
+      present, engines/index.ts = `export {};`, package.json test carries
+      `--passWithNoTests`, .dependency-cruiser.cjs has NO exclude key, no
+      vitest.config.ts yet. No new B item. One A-level planner recommendation:
+      include a minimal array-script multi-call test (reversible, in-scope).
+      HALT at the executor gate — code stage ALWAYS needs explicit user OK.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -376,19 +398,16 @@ open_risks:
       Related residual (dec-007): with the flag removed, `vitest run` must stay
       green while the core/e2e projects match zero files — proven at the gate.
 next_action:
-  kind: delegate
-  target: sddl-plan
+  kind: halt_for_approval
+  target: sddl-executor
   summary: >-
-    Design validated end to end (both blind validators no-drift; the sole
-    divergence — the biome.json edit — ratified by the user, dec-008). Delegate
-    sddl-plan (fresh worker) to produce the ordered execution plan: precondition
-    (npm ci if node_modules absent), a single code-touching stage writing all
-    files (fake-engine.ts, engines/index.ts, __test__/ReviewEngine.contract.ts,
-    __test__/fake-engine.test.ts, vitest.config.ts, .dependency-cruiser.cjs
-    exclude, biome.json includes, package.json test script), acceptance gate
-    (`npm run check` = 0 violations + `npm test` = vitest run green with real
-    non-vacuous tests, AC-8 diff-scope check), AC-1..AC-9 traceability, rollback.
-    Then run the two blind validators against plan.md. HALT at the executor gate
-    (code stage ALWAYS needs explicit user OK, even under auto).
+    plan.md complete (terminal planner stage); lifecycle_status = planned.
+    HALT at the executor gate for EXPLICIT user approval before any code is
+    written — the code-touching stage S1 always requires explicit OK even under
+    auto (dec-003). On approval, sddl-executor runs P0 (`npm ci`) then the single
+    stage S1 (8 files in fixed order), and proves the three-part acceptance gate
+    (`npm run check` exit 0 + `npm test` vitest run green non-vacuously + AC-8
+    diff scope = the 8 paths). Recommended options at the gate: approve and start
+    S1, stop as planned, or revise the plan.
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T03:50:00Z"
+updated_at: "2026-08-02T04:10:00Z"

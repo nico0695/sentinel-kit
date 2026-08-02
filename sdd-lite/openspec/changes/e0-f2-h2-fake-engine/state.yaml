@@ -97,7 +97,31 @@ stages:
       inherited, already-documented H1 divergence, not new drift). Both blind and
       independent -> auto-continue to sddl-design.
   sddl-design:
-    status: pending
+    status: completed
+    completed_at: "2026-08-02T03:30:00Z"
+    notes: >-
+      design.md written. Settled all A-level details within dec-004..dec-007:
+      (Q5) FakeEngine config API = `createFakeEngine(script)` factory where
+      script is a discriminated `FakeReviewOutcome` ({ok:true;result} |
+      {ok:false;error:Error}) or a readonly array consumed in order (exhaustion
+      rejects; noUncheckedIndexedAccess-safe); async review() returns result or
+      throws the plain Error (dec-004, no timeoutMs, no verdict/TerminalState).
+      (Q2) Shared `ReviewEngine.contract.ts` (named per setup §5.4) =
+      `reviewEngineContract(harness, label?)`, fake-agnostic, imports only
+      vitest + core TYPES; harness = { resolving(output, usage?), rejecting() }
+      scenario factories; rejection asserted as `instanceof Error` so E4 typed
+      EngineError still passes (AC-2/AC-3 reuse). File layout: fake/fake-engine.ts
+      + __test__/ReviewEngine.contract.ts + __test__/fake-engine.test.ts; fake
+      exported via engines/index.ts (dec-006 reachability). depcruise:
+      `options.exclude: { path: "(^|/)__test__/" }` (object form, matches only a
+      __test__/ segment, no production path). vitest.config.ts: three projects
+      (core/adapters/e2e, node env, non-overlapping globs), only adapters
+      populated; empty core/e2e rely on vitest-4 aggregate passWithNoTests
+      semantics (proven at executor gate, risk-003). biome: add vitest.config.ts
+      to files.includes. package.json test -> `vitest run`. Verified relative
+      depth `../../../../core/run/index.js` from both fake/ and __test__/. No new
+      B item. ONE low-risk A-level assumption flagged (e2e include -> `e2e/` root
+      dir, zero files, vetoable) per dec-002 standing gate — non-blocking.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -299,15 +323,16 @@ open_risks:
       green while the core/e2e projects match zero files — proven at the gate.
 next_action:
   kind: delegate
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Spec validated end to end (dual validators converged no-drift). Delegate
-    sddl-design (fresh worker) to settle the A-level design detail (Q5 FakeEngine
-    config API shape), the parameterized contract-suite signature, the precise
-    `(^|/)__test__/` depcruise exclusion form, and the three-project vitest
-    config — all within dec-004..dec-007. Then run the two blind validators
-    against design.md. dec-002 standing gate: any deviation/new-B must be
-    surfaced to the user BEFORE design locks. Any drift -> STOP.
-current_stage_note: sddl-design (spec validated, auto-continue)
+    design.md complete; all A-level details settled within dec-004..dec-007, no
+    new B item. Per dec-003, run the two blind read-only validators against
+    design.md (A: acceptance/scope vs issue #6 + H2 boundary; B: PRD §4 + five
+    guards + H1-port coherence). One low-risk A-level assumption is flagged for
+    transparency (e2e include -> `e2e/` root dir, zero files, vetoable) — surface
+    it under the dec-002 standing gate but it does not gate planning. On
+    converge-no-drift, delegate sddl-plan to produce the ordered stage plan.
+    dec-002/dec-003: any drift or new-B -> STOP and consult before design locks.
+current_stage_note: sddl-design completed (auto-continue to validators -> sddl-plan)
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T03:05:00Z"
+updated_at: "2026-08-02T03:30:00Z"

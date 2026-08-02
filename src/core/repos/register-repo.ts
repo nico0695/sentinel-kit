@@ -57,7 +57,9 @@ export async function registerRepo(
   request: RegisterRepoRequest,
   deps: RegisterRepoDeps,
 ): Promise<RegisterRepoResult> {
-  if (request.url.trim() === "") {
+  const url = request.url.trim();
+
+  if (url === "") {
     throw new InvalidRepoRequestError("url must not be empty");
   }
 
@@ -65,7 +67,7 @@ export async function registerRepo(
     throw new InvalidRepoRequestError("localPath must be an absolute path");
   }
 
-  const alias = deriveAlias(request.url);
+  const alias = deriveAlias(url);
 
   const repos = await deps.config.readRepos();
 
@@ -81,13 +83,12 @@ export async function registerRepo(
   } else {
     const targetPath = `${deps.clonesDir}/${alias}`;
     try {
-      await deps.git.clone({ url: request.url, targetPath });
+      await deps.git.clone({ url, targetPath });
     } catch (error) {
       if (error instanceof GitError) {
-        throw new RepoRegistrationError(
-          `Failed to clone repository "${request.url}"`,
-          { cause: error },
-        );
+        throw new RepoRegistrationError(`Failed to clone repository "${url}"`, {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -113,7 +114,7 @@ export async function registerRepo(
   }
 
   const entry: RepoEntry = {
-    url: request.url,
+    url,
     ...(request.localPath !== undefined
       ? { localPath: request.localPath }
       : {}),

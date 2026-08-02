@@ -1,0 +1,578 @@
+version: "0.1"
+change_name: e0-f2-h2-fake-engine
+objective: new-feature
+mode: lite
+execution_mode: auto
+validation_protocol:
+  per_stage_parallel_validation: true
+  activate_after: sddl-proposal
+  description: >-
+    User directive at kickoff (dec-002): start in interactive; once the change
+    starts well (after the proposal), switch to auto with two blind read-only
+    validators in parallel per stage. Validator A checks acceptance criteria
+    (issue #6) + the backlog H2 boundary (no scope creep into E1 real engines /
+    E4 run flow / E4.F1.H2 verdict parser). Validator B checks PRD §4 hexagonal
+    rules + the five architecture guards (adapters-isolated, wiring-only-in-main,
+    core-no-adapters, core-no-io-libs, core-modules-via-index) + coherence with
+    the H1 ReviewEngine contract (thin port: raw output + optional usage;
+    TerminalState separate; WorktreeRef { path }). Converge "no drift" ->
+    auto-continue; any drift/divergence -> STOP and consult (protocol B/C).
+    For the executor (code) stage this role is filled by the sddl-code-review
+    4R parallel-lens protocol. STANDING GATE (dec-002): validate any deviation
+    or suggestion with alternatives + a recommendation BEFORE the design is
+    formalized. The executor (code) stage ALWAYS requires explicit user OK,
+    even under auto mode.
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Backlog story [E0.F2.H2] (issue #6): implement (a) FakeEngine as a driven
+    adapter under src/adapters/driven/engines/, and (b) the shared
+    ReviewEngine.contract suite (reusable fixtures) that every ReviewEngine
+    implementation must pass, plus error-scenario coverage. This is the FIRST
+    real test landing in the repo, so it also (c) establishes the vitest
+    projects config (core / adapters / e2e per docs/setup-tecnico §5.4) and
+    (d) FIRES the deferred duty: remove `--passWithNoTests` from package.json
+    (e0-f1-h3 risk-004 / dec-002) now that a real test exists. FakeEngine is an
+    adapter, so per guard wiring-only-in-main any production instantiation lives
+    only in src/main; the contract suite instantiates it in tests. The H1 port
+    is THIN (dec-004: review() -> Promise<ReviewResult{output, usage?}>, no
+    verdict / no TerminalState), which creates a design tension with the
+    backlog phrasing "configurable responses: valid verdict, ambiguous,
+    timeout, error" -> the fake produces raw OUTPUT strings for the success
+    scenarios and surfaces failure via the async contract (rejection); how
+    exactly the port surfaces error/timeout is a [B] item for the design gate.
+    Bounded blast radius: one new adapter folder + test infrastructure +
+    vitest config + a one-token package.json edit. No change to the core port
+    types. Normal lite flow.
+  confidence: high
+  recorded_at: "2026-08-02T02:10:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    Final closeout of [E0.F2.H2]. All 9 acceptance criteria PASS on gates re-run
+    independently by QA: `npm run check` exit 0 (biome 25 files clean, tsc clean,
+    depcruise 0 violations / 18 modules, __test__/ excluded, five guards green)
+    and `npm test` (`vitest run`) exit 0 with 4 real non-vacuous adapters tests
+    (empty core/e2e non-failing). Diff = exactly the 8 authorized paths at
+    commit 1cfaac2; src/core/run untouched (frozen H1 port intact); post-commit
+    HEAD 8291717 adds sdd-lite artifacts only. Shared ReviewEngine.contract suite
+    verified fake-agnostic (imports only vitest + core types, zero FakeEngine
+    coupling — AC-2). dec-004..dec-009 all honored. English-only confirmed.
+    review-ledger 4R verdict pass (0 blocker/critical, 5 info suggestions, none
+    open/severe). No medium/high finding. Clean pass -> change completed.
+  reported_at: "2026-08-02T13:20:00Z"
+  report_path: ./sdd-lite/openspec/changes/e0-f2-h2-fake-engine/qa-report.md
+review_summary:
+  target: S1 execution diff (FakeEngine adapter + shared ReviewEngine contract suite)
+  immutable_reference: "commit 1cfaac2 (parent 82c3282) + diff sha256 09def7943f8fbf734f0215a9e8921bd391a655c9c5038f9993723be52da1eff9"
+  protocol: sddl-code-review (4R)
+  triage_tier: standard (elevated to 2 lenses)
+  lenses_run: [reliability, readability]
+  refuter: not-applicable
+  verdict: pass
+  counts:
+    blocker: 0
+    critical: 0
+    warning: 0
+    suggestion: 5
+  ledger: ./sdd-lite/openspec/changes/e0-f2-h2-fake-engine/review-ledger.md
+  recorded_at: "2026-08-02T13:25:00Z"
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing. The story is pinned by issue #6, the
+      backlog E0.F2.H2 entry, docs/setup-tecnico §5.4 (which names
+      ReviewEngine.contract.ts and the three vitest projects), the frozen H1
+      port contract (src/core/run), and the audited repo state (engines
+      placeholder `export {}`, fixtures/ dir present, no vitest config yet).
+      Open items are design decisions (error model, test-tree location), not
+      evidence gaps.
+  sddl-proposal:
+    status: completed
+    completed_at: "2026-08-02T02:20:00Z"
+    notes: >-
+      proposal.md written. Problem framed (FakeEngine + shared reusable
+      ReviewEngine.contract suite + error coverage + first vitest config +
+      --passWithNoTests removal). exploration_performed: true (5 high-signal
+      reads: frozen H1 port trio, engines index, package.json, backlog E0.F2.H2,
+      setup §5.4). Five B-level open questions surfaced with recommendations and
+      routed to spec/design (failure model = success-as-output / failure-as-
+      rejection with plain Error, fake does not enforce timeoutMs; tests OUTSIDE
+      src; three vitest projects with only adapters populated; no src/main wiring
+      yet; factory-with-scripted-behavior config sketch).
+  sddl-spec:
+    status: completed
+    completed_at: "2026-08-02T02:50:00Z"
+    notes: >-
+      spec.md written. Firm scope boundary (in/out/non-goals) + 9 acceptance
+      criteria mapping 1:1 to issue #6's three boxes (AC-1 FakeEngine passes
+      contract suite, AC-2 suite reusable verbatim, AC-3 error scenarios reject)
+      plus the two carried duties (AC-5 --passWithNoTests removal proven
+      non-vacuous, AC-6 three vitest projects with only adapters populated) and
+      AC-7 precise __test__/ depcruise exclusion / guards green, AC-8 no scope
+      leak, AC-9 check+test green. dec-004..dec-007 baked as fixed constraints.
+      No new B item; Q5 (fake config API shape) left as an A-level design detail.
+      Per-stage dual validation (dec-003) CONVERGED no-drift: validator A
+      (acceptance/scope) 0 blocking / 0 should-fix — 3 boxes + 2 carried duties
+      map cleanly, no creep either direction, dec-004..dec-007 faithful (1 info:
+      dec-005 co-located reverses the proposal's original outside-src preference,
+      but is the user-resolved decision, not drift). Validator B
+      (PRD/architecture) 0 blocking / 0 should-fix — frozen H1 port verbatim,
+      all five guards respected, VERIFIED .dependency-cruiser.cjs has NO exclude
+      key today (adding options.exclude is additive) and `(^|/)__test__/` is a
+      precise regex exempting no production path; 4 info (notably: PRD §4.3 table
+      still says "output + verdict" but the frozen port is thin per dec-004 — an
+      inherited, already-documented H1 divergence, not new drift). Both blind and
+      independent -> auto-continue to sddl-design.
+  sddl-design:
+    status: completed
+    completed_at: "2026-08-02T03:30:00Z"
+    notes: >-
+      design.md written. Settled all A-level details within dec-004..dec-007:
+      (Q5) FakeEngine config API = `createFakeEngine(script)` factory where
+      script is a discriminated `FakeReviewOutcome` ({ok:true;result} |
+      {ok:false;error:Error}) or a readonly array consumed in order (exhaustion
+      rejects; noUncheckedIndexedAccess-safe); async review() returns result or
+      throws the plain Error (dec-004, no timeoutMs, no verdict/TerminalState).
+      (Q2) Shared `ReviewEngine.contract.ts` (named per setup §5.4) =
+      `reviewEngineContract(harness, label?)`, fake-agnostic, imports only
+      vitest + core TYPES; harness = { resolving(output, usage?), rejecting() }
+      scenario factories; rejection asserted as `instanceof Error` so E4 typed
+      EngineError still passes (AC-2/AC-3 reuse). File layout: fake/fake-engine.ts
+      + __test__/ReviewEngine.contract.ts + __test__/fake-engine.test.ts; fake
+      exported via engines/index.ts (dec-006 reachability). depcruise:
+      `options.exclude: { path: "(^|/)__test__/" }` (object form, matches only a
+      __test__/ segment, no production path). vitest.config.ts: three projects
+      (core/adapters/e2e, node env, non-overlapping globs), only adapters
+      populated; empty core/e2e rely on vitest-4 aggregate passWithNoTests
+      semantics (proven at executor gate, risk-003). biome: add vitest.config.ts
+      to files.includes. package.json test -> `vitest run`. Verified relative
+      depth `../../../../core/run/index.js` from both fake/ and __test__/. No new
+      B item. ONE low-risk A-level assumption flagged (e2e include -> `e2e/` root
+      dir, zero files, vetoable) per dec-002 standing gate — non-blocking.
+      Per-stage dual validation (dec-003): both validators returned verdict
+      no-drift. Validator B (guards/TS/port) 0 blocking / 0 should-fix —
+      VERIFIED against real files: import depth `../../../../core/run/index.js`
+      correct from both fake/ and __test__/, frozen port implemented exactly, TS
+      strict flags (import type/export type split, exactOptionalPropertyTypes
+      conditional build, noUncheckedIndexedAccess exhaustion) sound, all five
+      guards hold, options.exclude additive+precise, no orphan rule, vitest
+      empty-project aggregate behavior sound (risk-003 gated to executor).
+      Validator A (acceptance/scope) no-drift with ONE should-fix: the biome.json
+      files.includes edit (add vitest.config.ts) is outside AC-8's enumerated
+      diff list — ratify or drop. DIVERGENCE (A should-fix vs B info) surfaced to
+      the user (ckp-003): user chose MAINTAIN + ratify AC-8 (dec-008). All other
+      findings info. Converged -> auto-continue to sddl-plan.
+  sddl-plan:
+    status: completed
+    completed_at: "2026-08-02T04:10:00Z"
+    notes: >-
+      plan.md written (terminal planner stage). One precondition P0 (`npm ci` —
+      node_modules ABSENT, package-lock PRESENT; installs vitest 4.1.10 / biome
+      2.5.6 / typescript 5.9.3 / dependency-cruiser 18.1.0 / @types/node) + one
+      atomic code-touching stage S1 writing the 8 files in fixed order
+      (fake-engine.ts -> engines/index.ts -> __test__/ReviewEngine.contract.ts ->
+      __test__/fake-engine.test.ts -> vitest.config.ts -> .dependency-cruiser.cjs
+      -> biome.json -> package.json). Single-stage justified: bounded, cohesive,
+      interdependent edits with no meaningful mid-tree gate. Acceptance gate has
+      three parts: (1) `npm run check` exit 0 (five guards green, depcruise skips
+      `(^|/)__test__/`, vitest.config.ts linted); (2) `npm test` = `vitest run`
+      exit 0 with adapters project executing >0 non-vacuous tests AND empty
+      core/e2e NOT failing the aggregate (risk-003 proof point); (3) AC-8 diff
+      scope = exactly the 8 paths (biome.json IN-scope per dec-008). AC-1..AC-9
+      each mapped to a step/gate assertion. Rollback = delete 3 new files/dirs +
+      revert 4 edits. Verified from real files: node_modules absent, lockfile
+      present, engines/index.ts = `export {};`, package.json test carries
+      `--passWithNoTests`, .dependency-cruiser.cjs has NO exclude key, no
+      vitest.config.ts yet. No new B item. One A-level planner recommendation:
+      include a minimal array-script multi-call test (reversible, in-scope).
+      HALT at the executor gate — code stage ALWAYS needs explicit user OK.
+      Per-stage dual validation (dec-003) CONVERGED no-drift: validator A
+      (plan<->design fidelity + scope) 0 blocking / 0 should-fix — 8/8 files
+      transcribed verbatim, scope confined to the 8 paths, AC-1..AC-9 mappings
+      all valid, dec-004..dec-008 honored (verified dec-008 is a real recorded
+      decision, not a fabricated citation); 1 info (suite builds ReviewRequest
+      inline importing only ReviewEngine+ReviewUsage — transcribed from design,
+      resolved by contextual typing, not infidelity). Validator B (tooling/gate
+      reality) 0 blocking with ONE should-fix — VERIFIED byte-exact: npm ci
+      correct+necessary, gate commands match package.json, all 8 current-state
+      facts true, exclude valid/additive/precise, no orphan rule, rollback
+      complete; should-fix = carry an EXPLICIT FALLBACK for risk-003 (vitest
+      empty-project behavior can only be proven at execution). Both blind and
+      independent -> planning validated end to end. FALLBACK PROTOCOL adopted
+      (see risk-003). STOP at the executor gate.
+  sddl-executor:
+    status: completed
+    completed_at: "2026-08-02T13:10:00Z"
+    notes: >-
+      execution-log.md written. P0 (`npm ci`) exit 0, toolchain restored,
+      node_modules/.bin/vitest present. S1 wrote all 8 files verbatim from the
+      frozen design/plan in fixed order (fake-engine.ts -> engines/index.ts ->
+      __test__/ReviewEngine.contract.ts -> __test__/fake-engine.test.ts ->
+      vitest.config.ts -> .dependency-cruiser.cjs -> biome.json -> package.json),
+      INCLUDING the plan-recommended optional array-script sequence test.
+      Three-part acceptance gate ALL GREEN: (1) `npm run check` exit 0 — biome
+      clean (one `biome check --write` autofix pass on the touched files only:
+      organizeImports reordered the two re-exports in index.ts + reflowed a
+      chained call in the contract suite; formatter-only), tsc --noEmit clean,
+      depcruise 0 violations (18 modules cruised, __test__/ excluded, all five
+      guards green); (2) `npm test` (`vitest run`) exit 0 — 1 test file / 4
+      tests passed, adapters project non-vacuous, empty core/e2e did NOT fail
+      the aggregate (risk-003 empirically RESOLVED, no fallback needed,
+      --passWithNoTests stays removed); (3) AC-8 diff scope = exactly the 8
+      target paths, no stray files. No git side effects. QA handoff RECOMMENDED
+      (code stage, non-trivial blast radius). No transcription deviation beyond
+      the formatter-only autofix noted above. ORCHESTRATOR INDEPENDENTLY RE-RAN
+      the gate: `npm run check` exit 0 (biome 25 files clean, tsc clean,
+      depcruise 0 violations / 18 modules / 8 deps) and `npm test` exit 0 (1
+      file / 4 tests). Feature committed as 1cfaac2 `feat(engines): FakeEngine
+      adapter + shared ReviewEngine contract suite` (Closes #6). dec-003
+      code-stage validation = sddl-code-review 4R: target frozen at 1cfaac2
+      (parent 82c3282), diff sha256 09def794…, 8 files / 226 insertions; triaged
+      standard, elevated to 2 blind lenses (Reliability + Readability) because
+      the shared contract governs all future engine adapters + a guard-config
+      edit; running.
+  sddl-code-review:
+    status: completed
+    completed_at: "2026-08-02T13:25:00Z"
+    notes: >-
+      4R protocol on frozen target 1cfaac2 (diff sha256 09def794…, 8 files / 226
+      insertions). Triaged standard, elevated to 2 blind parallel read-only
+      lenses (Reliability + Readability) — the shared contract governs all future
+      engine adapters + a guard-config edit. CONVERGED clean at the fix-loop
+      floor: 0 BLOCKER / 0 CRITICAL / 0 WARNING, 5 SUGGESTION (info). Reliability
+      empirically verified correctness (single/array/exhaustion/empty-array
+      paths, no cursor re-entrancy, suite validates the port non-vacuously with
+      zero FakeEngine coupling — reusable verbatim by E4). Readability: well-
+      documented + role-named; suggestions = lone PascalCase filename (spec-named
+      §5.4, kept), indirect single/sequence discriminator, one redundant `as`
+      cast. Per severity floor SUGGESTIONs are recorded as info, NOT auto-applied
+      (no scope change), no refuter (full-4r only). review-ledger.md written by
+      the orchestrator. Verdict = pass. No blocker -> auto-continue to final QA.
+  sddl-qa-review:
+    status: completed
+    completed_at: "2026-08-02T13:20:00Z"
+    notes: >-
+      qa-report.md written (final mode). Independent adversarial verification of
+      the whole change: re-ran both gates (`npm run check` exit 0; `npm test`
+      exit 0, 4 real tests), re-derived diff scope from git (exactly 8 paths at
+      1cfaac2, src/core/run untouched, post-commit changes = sdd-lite artifacts
+      only), re-read the frozen port + shared suite for coupling/scope leaks.
+      All 9 ACs PASS with concrete evidence. AC-2 confirmed: contract suite
+      imports only vitest + core types, no createFakeEngine import/call. AC-8
+      confirmed: no core-port/type change, no typed error, no src/main wiring,
+      no real engine, no verdict/TerminalState leak, no E1/E4/E5 creep. English
+      -only clean. Consumed review-ledger (4R pass, 0 blocker/critical, 5 info) —
+      no open/severe finding to carry. No medium/high QA finding. Verdict = pass
+      -> lifecycle_status completed. QA performed no code edit / commit / push.
+checkpoints:
+  - id: ckp-001
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Change kickoff for [E0.F2.H2] (issue #6): the user explicitly started the
+      story and selected the mode. Scope = issue #6: FakeEngine driven adapter +
+      shared ReviewEngine.contract suite (reusable) + error scenarios, plus the
+      first vitest config and the deferred `--passWithNoTests` removal. Run the
+      canonical lite flow (proposal -> spec -> design -> plan -> executor -> 4R
+      -> final QA). Closing requirements: npm run check + npm test green, PR
+      "[E0.F2.H2] ... Closes #6" (never merge, never push main, max 5 open PRs),
+      history entry committed before closing.
+    question: >-
+      Start e0-f2-h2-fake-engine (continue-lite) with issue #6 scope, in
+      interactive mode, switching to auto after the proposal with per-stage
+      dual validation?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Approved to START in interactive mode (explicit start instruction +
+        mode selection in the kickoff message). NOT a blanket pre-approval of
+        later stages. Standing constraints: (dec-002) validate any deviation /
+        suggestion with alternatives + a recommendation BEFORE formalizing
+        design; (dec-003) switch to auto after the proposal with two blind
+        parallel validators per stage, stopping only on discrepancy or a
+        B-level decision; the executor (code) gate ALWAYS needs explicit OK.
+      responded_at: "2026-08-02T02:10:00Z"
+    created_at: "2026-08-02T02:10:00Z"
+    resolved_at: "2026-08-02T02:10:00Z"
+  - id: ckp-002
+    type: stage_approval
+    stage: sddl-proposal
+    summary: >-
+      Proposal complete; interactive phase-validation pause. The five B-level
+      open questions the proposal surfaced were presented to the user with
+      alternatives + a recommendation each (dec-002 standing gate honored before
+      any formalization).
+    question: >-
+      Resolve the four material [B] questions (failure model, test location,
+      src/main wiring, vitest projects) before spec formalizes scope?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User decided via AskUserQuestion: (1) failure = plain-Error rejection,
+        fake does not enforce timeoutMs, port unchanged [dec-004]; (2) tests
+        co-located INSIDE src in per-module `__test__/` folders, excluded from
+        depcruise — an OVERRIDE of claude's outside-src recommendation [dec-005];
+        (3) defer src/main wiring [dec-006]; (4) define three vitest projects,
+        populate only adapters [dec-007]. Q5 (fake config API shape) stays an
+        A-level design detail. Authorizes flipping to auto (dec-003) and
+        delegating spec with these decisions baked in.
+      responded_at: "2026-08-02T02:35:00Z"
+    created_at: "2026-08-02T02:30:00Z"
+    resolved_at: "2026-08-02T02:35:00Z"
+  - id: ckp-003
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      Design complete + dual-validated (both verdicts no-drift). A single
+      divergence between the blind validators: validator A flagged the design's
+      `biome.json` files.includes edit (add vitest.config.ts) as a should-fix
+      because it is outside AC-8's enumerated allowed-diff list; validator B
+      judged the same edit correct, additive, and non-breaking (info). Neither
+      blocking. Surfaced to the user per the dec-002 standing gate before design
+      locks and before routing to plan.
+    question: >-
+      Keep the biome.json edit (ratify AC-8's diff to include vitest.config.ts)
+      or drop it?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User chose "Mantener + ratificar AC-8" (AskUserQuestion): keep the
+        biome.json files.includes edit for vitest.config.ts. Recorded as dec-008.
+      responded_at: "2026-08-02T03:45:00Z"
+    created_at: "2026-08-02T03:40:00Z"
+    resolved_at: "2026-08-02T03:45:00Z"
+  - id: ckp-004
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      All planning stages complete and validated end to end (spec, design, plan
+      — three independent dual-validator passes, every one no-drift; plus the
+      ckp-003 biome ratification). The next stage S1 WRITES CODE: 8 files (4 new
+      FakeEngine adapter + shared contract suite + fake test + vitest.config.ts;
+      4 edits engines/index.ts + .dependency-cruiser.cjs + biome.json +
+      package.json). Per CLAUDE.md + dec-003 this code-touching stage requires
+      explicit user approval even under auto; ckp-001 confirmed kickoff was not a
+      blanket pre-approval.
+    question: >-
+      Approve running executor stage S1 — P0 (`npm ci`) + write the 8 files
+      verbatim from the frozen design/plan + run the three-part acceptance gate
+      (`npm run check` + `npm test` + AC-8 diff scope)?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        User approved explicitly ("si, arranca con S1 y realiza todo el flujo de
+        ejecucion automatico, a menos que surja algun bloqueante") — a genuine
+        user turn. Authorizes P0 + S1 (write the 8 files verbatim) + the gate,
+        AND chaining the post-execution flow in auto (4R code review -> final QA)
+        stopping only on a blocker. Executor launched as a fresh-context worker.
+      responded_at: "2026-08-02T04:20:00Z"
+    created_at: "2026-08-02T04:18:00Z"
+    resolved_at: "2026-08-02T04:20:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: ckp-001
+    free_text: >-
+      interactive -> auto (after proposal) / continue-lite; kickoff scope =
+      issue #6 (FakeEngine + shared contract suite + error scenarios + first
+      vitest config + --passWithNoTests removal)
+    author: user
+    rationale: >-
+      User started the change and picked the mode in the kickoff message. Story
+      bounded and specified by issue #6 + backlog E0.F2.H2 + setup-tecnico §5.4
+      + the frozen H1 port. Each later stage still requires its gate; code stage
+      needs explicit approval.
+    recorded_at: "2026-08-02T02:10:00Z"
+  - id: dec-002
+    checkpoint_id: ckp-001
+    free_text: >-
+      Standing constraint — validate any deviation / suggestion with
+      alternatives + a recommendation BEFORE formalizing design
+    author: user
+    rationale: >-
+      Explicit kickoff instruction ("validá cualquier desvío ANTES de
+      formalizar el design"). Operationalized as a hard protocol-B gate through
+      the design stage.
+    recorded_at: "2026-08-02T02:10:00Z"
+  - id: dec-003
+    checkpoint_id: ckp-001
+    free_text: >-
+      Switch to auto after the proposal; stop only on discrepancy or B
+      decision; two blind parallel validators per stage; executor code gate
+      always explicit
+    author: user
+    rationale: >-
+      Explicit kickoff instruction. Operationalized in validation_protocol:
+      execution_mode flips to auto after sddl-proposal; per-stage dual blind
+      validators converge no-drift -> continue; hard stops for drift /
+      contradictions / B decisions; the code-touching executor stage always
+      requires explicit user OK even under auto.
+    recorded_at: "2026-08-02T02:10:00Z"
+  - id: dec-004
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q1 (failure model) resolved — the thin ReviewEngine port surfaces failure
+      by REJECTING the returned promise with a plain Error; the fake does NOT
+      enforce timeoutMs; the H1 core port stays UNCHANGED
+    author: claude->user
+    rationale: >-
+      Claude recommended, user chose (AskUserQuestion, option "Rechazo con Error
+      plano"). Success scenarios ("valid verdict", "ambiguous") are configurable
+      raw OUTPUT strings on ReviewResult.output; failure scenarios ("error",
+      "timeout") are modeled as a rejected Promise with a standard Error. The
+      fake does NOT own wall-clock enforcement of timeoutMs — real timeout
+      enforcement is the run flow's job (E4.F1.H1); the fake only models the
+      failed invocation. No typed port error is added to core/run in H2, keeping
+      the frozen H1 contract intact; a typed EngineError may arrive later (E4)
+      without breaking this contract. The contract suite asserts `rejects` for
+      the failure scenarios. Resolves risk-001.
+    recorded_at: "2026-08-02T02:35:00Z"
+  - id: dec-005
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q2 (test location) resolved — tests co-located INSIDE src in per-module
+      `__test__/` folders, excluded from dependency-cruiser via a scoping edit
+      to .dependency-cruiser.cjs
+    author: user
+    rationale: >-
+      User OVERRODE claude's recommendation (claude recommended a test tree
+      OUTSIDE src; user chose "co-ubicar en src + excluir" and specified the
+      grouping: per-module `__test__/` folders). Operationalized: the shared
+      `ReviewEngine.contract` suite + the FakeEngine test live under
+      src/adapters/driven/engines/__test__/ (co-located with the adapter they
+      exercise); a scoping exclusion for `(^|/)__test__/` paths is added to
+      .dependency-cruiser.cjs `options.exclude` so depcruise never cruises test
+      code (which imports vitest, an npm/I-O lib) — this exempts test infra from
+      the production guards WITHOUT relaxing any forbidden rule, so the five
+      guards and the core/ extraction guarantee remain intact for production
+      code. This is a sensitive edit to the guard config; it is explicitly
+      user-approved. Design must confirm the exclusion is precise (matches
+      only `__test__/`, no production path). Resolves risk-002.
+  - id: dec-006
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q3 (src/main wiring) resolved — DEFER FakeEngine composition; H2 wires
+      nothing into src/main
+    author: claude->user
+    rationale: >-
+      Claude recommended, user chose "Diferir". There is no consumer yet
+      (runReview lands in E4.F1.H1), so wiring FakeEngine into src/main now would
+      be dead code a later story rewrites (YAGNI). H2 only proves the
+      guard-compliant PLACEMENT of the adapter under
+      src/adapters/driven/engines/; guard-5 (wiring-only-in-main) stays satisfied
+      vacuously (no instantiation in production code outside future src/main).
+    recorded_at: "2026-08-02T02:35:00Z"
+  - id: dec-007
+    checkpoint_id: ckp-002
+    free_text: >-
+      Q4 (vitest projects) resolved — define all three projects
+      (core/adapters/e2e) per setup §5.4, populate only `adapters` in H2
+    author: claude->user
+    rationale: >-
+      Claude recommended, user chose "Definir los 3, poblar solo adapters". The
+      vitest config declares the three projects from docs/setup-tecnico §5.4
+      (core=unit/in-memory fakes, adapters=contract suite, e2e=smoke) so the
+      scaffolding is ready for later stories; only the `adapters` project has
+      test files now (the ReviewEngine.contract suite exercised by FakeEngine).
+      Design must verify that with `--passWithNoTests` REMOVED, `vitest run`
+      stays green when core/e2e match zero files (the overall run has tests via
+      adapters) — the executor gate proves this.
+    recorded_at: "2026-08-02T02:35:00Z"
+  - id: dec-008
+    checkpoint_id: ckp-003
+    free_text: >-
+      Keep the biome.json files.includes edit (add vitest.config.ts); AC-8's
+      enumerated diff is ratified to include this one-line tooling-consistency
+      change within H2's own footprint
+    author: claude->user
+    rationale: >-
+      Claude recommended keep, user ratified (ckp-003). Adding "vitest.config.ts"
+      to biome.json `files.includes` mirrors the existing `tsup.config.ts` entry
+      so H2's own new config file is linted/formatted by `biome check .`. It is
+      NOT a scope leak (touches no E1/E4/E5 or core-port territory) — AC-8's
+      illustrative allowed-diff list is amended to include it. A-level in
+      substance (trivial, reversible, within H2's footprint); routed through a
+      user ratification only because the two blind validators diverged on it
+      (A should-fix vs B info). The alternative (drop it, leaving the new config
+      outside biome's allowlist) was declined for tooling consistency.
+    recorded_at: "2026-08-02T03:45:00Z"
+  - id: dec-009
+    checkpoint_id: ckp-004
+    free_text: >-
+      User approved the code-touching executor stage S1 + auto-chaining the
+      post-execution flow (4R review -> final QA), stopping only on a blocker
+    author: user
+    rationale: >-
+      Explicit user approval at the mandatory executor gate after planning was
+      validated end to end (spec/design/plan, three dual-validator passes, all
+      no-drift). Authorizes P0 (`npm ci`) + S1 (write the 8 files verbatim from
+      the frozen design/plan) + the acceptance gate, and directs auto-chaining
+      of the downstream review + QA stages unless a blocker arises. Honors the
+      CLAUDE.md rule that code-touching stages require explicit approval even
+      under dec-003 auto mode.
+    recorded_at: "2026-08-02T04:20:00Z"
+open_risks:
+  - id: risk-001
+    severity: medium
+    status: resolved
+    summary: >-
+      RESOLVED by dec-004. Thin-port vs. backlog phrasing tension settled:
+      success = configurable raw OUTPUT strings; failure (error/timeout) =
+      rejected Promise with a plain Error; the fake does NOT enforce timeoutMs;
+      the H1 core port is UNCHANGED. No typed port error added in H2; no E4 run
+      flow / verdict-parser scope leaked.
+  - id: risk-002
+    severity: low
+    status: resolved
+    summary: >-
+      RESOLVED by dec-005. Tests co-located INSIDE src in per-module `__test__/`
+      folders; a scoping exclusion for `(^|/)__test__/` is added to
+      .dependency-cruiser.cjs so depcruise never cruises test code (vitest
+      imports) — production guards + extraction guarantee stay intact. Residual
+      CLEARED at design: both validators verified `{ path: "(^|/)__test__/" }`
+      is additive (no exclude key today) and precise (matches only a __test__/
+      segment; no production path contains it); final proof at the executor gate.
+  - id: risk-003
+    severity: low
+    status: resolved
+    summary: >-
+      RESOLVED at the executor gate. `npm test` (`vitest run`, flag removed)
+      exited 0 with 1 test file / 4 real non-vacuous adapters tests; the empty
+      core/e2e projects did NOT fail the aggregate (vitest-4 semantics held).
+      The fallback protocol was NOT triggered — `--passWithNoTests` stays
+      removed, dec-007 (three projects, only adapters populated) intact.
+      Original context follows.
+      First real test fires the `--passWithNoTests` removal (e0-f1-h3
+      risk-004 / dec-002). Must land in THIS change and the acceptance gate must
+      prove `npm test` (now `vitest run`) is green WITH real tests, not vacuous.
+      Related residual (dec-007): with the flag removed, `vitest run` must stay
+      green while the core/e2e projects match zero files — proven at the gate.
+      FALLBACK PROTOCOL (plan validator B should-fix): the executor runs
+      `npm test` as the FIRST S1 gate action to prove the behavior empirically.
+      If `vitest run` is GREEN (vitest-4 aggregate semantics, ≥1 test overall)
+      -> proceed, residual resolved. If it ERRORS because empty core/e2e
+      projects fail per-project strict -> the executor STOPS (returns blocked;
+      does NOT silently re-add `--passWithNoTests`, which would defeat the
+      duty). The orchestrator then consults the user on the fix: (a) scope
+      `passWithNoTests: true` inside the vitest config to the empty scaffold
+      projects only; (b) seed a trivial placeholder test in core/e2e; or (c)
+      declare only the `adapters` project now (revisiting dec-007). Recommended
+      order if it fires: (a) then (c).
+next_action:
+  kind: complete
+  target: null
+  summary: >-
+    Final QA passed clean — change [E0.F2.H2] is COMPLETED for lite. All 9 ACs
+    PASS on QA-re-run gates (`npm run check` + `npm test` both exit 0), diff
+    confined to the 8 authorized paths at 1cfaac2, frozen H1 port untouched,
+    shared contract suite fake-agnostic, dec-004..dec-009 honored. No blocker /
+    no residual risk. Remaining steps are session operations OUTSIDE QA: open PR
+    `[E0.F2.H2] … Closes #6` (human reviews + merges — never merge / never push
+    main; max 5 open PRs), write the mandatory history entry, commit sdd-lite
+    artifacts. QA performed no commit / branch / push.
+created_at: "2026-08-02T02:10:00Z"
+updated_at: "2026-08-02T13:20:00Z"

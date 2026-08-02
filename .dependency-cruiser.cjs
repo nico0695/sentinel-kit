@@ -85,6 +85,10 @@ module.exports = {
     },
   ],
   options: {
+    // Exempt co-located test infra from the guards: `depcruise src` must not
+    // cruise test code (which imports vitest). Matches ONLY a `__test__/`
+    // path segment — no production file path contains it (dec-005).
+    exclude: { path: "(^|/)__test__/" },
     // Resolve with the project's TS settings (NodeNext) so imports
     // between .ts files (".js" specifiers included) actually resolve.
     tsConfig: { fileName: "tsconfig.json" },

@@ -1,0 +1,104 @@
+version: "0.1"
+change_name: e2-f1-h2-worktrees-diff
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Well-scoped extension of existing GitPort (5 new methods, 3 error subclasses,
+    adapter implementation, contract suite extension). Pattern fully established by
+    E2.F1.H1. No architectural unknowns.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — port/adapter pattern established by H1."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "S1 core types + S2 adapter/tests — 31/31 tests pass, npm run check clean."
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: >-
+      4R parallel review (reliability + readability lenses). Both verdict: pass.
+      1 major fixed (stale subclass count docstring), 1 minor fixed (WorktreeRemoveRequest
+      docstring softened). 4 minor deferred (TOCTOU in diff — low practical risk, binary
+      FileStats — scope expansion, worktreeRemove relative-path — matches softened doc,
+      no relative-path test — consistent). 2 nits acknowledged.
+  sddl-judgment-day:
+    status: skipped
+    notes: "Combined with code-review — dual-lens parallel agents served as independent judges."
+  sddl-qa-review:
+    status: in_progress
+    started_at: "2026-08-02T00:00:00Z"
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/state.yaml
+  proposal: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/proposal.md
+  spec: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/spec.md
+  design: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/design.md
+  plan: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/plan.md
+  execution_log: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/qa-report.md
+checkpoints:
+  - id: chk-proposal-01
+    type: phase_validation
+    stage: sddl-proposal
+    summary: "Proposal consolidates worktree/diff extension of GitPort. All design decisions pre-approved."
+    question: "Approve proposal and proceed to sddl-spec?"
+    options:
+      - id: approve
+        label: Approve and continue
+        description: "Proceed to sddl-spec to formalize scope, acceptance criteria, and parameter shapes."
+        recommended: true
+      - id: revise
+        label: Revise proposal
+        description: "Revisit problem framing or scope sketch before proceeding."
+      - id: stop
+        label: Stop
+        description: "Halt the change."
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-02T00:00:00Z"
+    created_at: "2026-08-02T00:00:00Z"
+    resolved_at: "2026-08-02T00:00:00Z"
+decisions:
+  - id: dec-b1-single-gitport
+    checkpoint_id: chk-proposal-01
+    selected_option_id: approve
+    rationale: "User pre-approved B1: extend existing GitPort interface rather than creating a separate port (PRD SS4.3 defines one GitPort)."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-b3-diff-shape
+    checkpoint_id: chk-proposal-01
+    selected_option_id: approve
+    rationale: "User pre-approved B3: diff returns { raw: string, stats: FileStats[] } — raw unified for prompt, numstat for size policy."
+    recorded_at: "2026-08-02T00:00:00Z"
+open_risks: []
+next_action:
+  kind: run_stage
+  target: sddl-qa-review
+  summary: "Code review complete. Proceed to QA — verify all 11 ACs against shipped code."
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:00:00Z"

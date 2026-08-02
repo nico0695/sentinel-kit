@@ -22,7 +22,7 @@ export interface GitErrorOptions {
  * Base class for every port-level git failure. Catch this to react to any
  * git error without discriminating; catch a subclass to react to one
  * specific family. Never thrown directly — every path in the adapter
- * chooses one of the four subclasses below.
+ * chooses one of the subclasses below.
  */
 export class GitError extends Error {
   readonly cause?: unknown;
@@ -75,5 +75,29 @@ export class GitNoDefaultBranchError extends GitError {
   constructor(message: string) {
     super(message);
     this.name = "GitNoDefaultBranchError";
+  }
+}
+
+/** Raised by `worktreeAdd()`, `worktreeRemove()`, `worktreeList()` on failure. */
+export class GitWorktreeError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitWorktreeError";
+  }
+}
+
+/** Raised by `mergeBase()` when either ref is unresolvable. */
+export class GitMergeBaseError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitMergeBaseError";
+  }
+}
+
+/** Raised by `diff()` on any git failure. */
+export class GitDiffError extends GitError {
+  constructor(message: string, options?: GitErrorOptions) {
+    super(message, options);
+    this.name = "GitDiffError";
   }
 }

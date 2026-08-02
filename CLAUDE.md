@@ -14,6 +14,7 @@ The repo has **no commits and no source code yet** — no `package.json`, no `sr
 - `docs/prd-sentinel.md` — product definition (v0.3). Architecture rules in §4 are MANDATORY.
 - `docs/setup-tecnico-sentinel.md` — stack decisions (recommendations, re-evaluate on implementation with justification).
 - `docs/backlog-mvp-sentinel.md` — full backlog. GitHub Issues mirror it 1:1 (one issue per story, milestone per epic).
+- `docs/architecture.md` · `docs/coding-standards.md` · `docs/testing.md` — human-readable distillation of the standards (structure + the five guards, naming/errors/TS, testing). Validate work against these; they must stay consistent with PRD §4 and `.dependency-cruiser.cjs` (the enforcement). Contributor entry points: `README.md`, `CONTRIBUTING.md`.
 
 ## Language policy (strict)
 

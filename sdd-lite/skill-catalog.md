@@ -52,6 +52,13 @@ These references are reusable support patterns. They are optional helpers, not s
 
 Copy only the relevant bullets from this section into delegated prompts.
 
+**Canonical human-readable standards** (single source of truth for validations):
+`docs/architecture.md` (structure + the five guards, allowed/forbidden) and
+`docs/coding-standards.md` (naming, errors, terminal states, TypeScript). The
+bullets below are the compact digest to inject; they must stay consistent with
+those docs and with PRD §4. The **enforcement** is `.dependency-cruiser.cjs`.
+When validating a stage, check the work against these docs + the guard file.
+
 ### repo_conventions
 
 - Persisted artifacts stay in English even when chat is Spanish.

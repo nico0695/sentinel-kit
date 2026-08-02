@@ -32,15 +32,17 @@ Private, under `src/core/repos/ports/`:
 ```ts
 export interface GitPort {
   /**
-   * Clone `url` into `targetPath` (absolute, dec-004). The adapter must
-   * refuse a relative path with a validation-time GitCommandError before
-   * spawning git. Rejects with GitCloneError on any git/network failure.
+   * Clone `request.url` into `request.targetPath` (absolute, dec-004). The
+   * adapter refuses a relative path with a validation-time GitCloneError
+   * before spawning git. Rejects with GitCloneError on any git/network
+   * failure.
    */
   clone(request: CloneRequest): Promise<void>;
 
   /**
-   * Fetch from `options.remote` (default `origin`, dec-005) in the local
-   * repo at `repoPath`. Rejects with GitFetchError on any git failure.
+   * Fetch from `request.options.remote` (default `origin`, dec-005) in the
+   * local repo at `request.repoPath`. Rejects with GitFetchError on any
+   * git failure.
    */
   fetch(request: FetchRequest): Promise<void>;
 
@@ -52,11 +54,11 @@ export interface GitPort {
   branches(repoPath: string): Promise<readonly BranchRef[]>;
 
   /**
-   * Detect the remote HEAD's branch of `options.remote` (default `origin`)
-   * in the local repo at `repoPath`, via `git symbolic-ref`. Returns the
-   * short branch name (e.g. `main`), never a full refname. Rejects with
-   * GitNoDefaultBranchError when HEAD is not set for that remote, or with
-   * GitCommandError on any other git failure (dec-003).
+   * Detect the remote HEAD's branch of `request.remote` (default `origin`)
+   * in the local repo at `request.repoPath`, via `git symbolic-ref`.
+   * Returns the short branch name (e.g. `main`), never a full refname.
+   * Rejects with GitNoDefaultBranchError when HEAD is not set for that
+   * remote, or with GitCommandError on any other git failure (dec-003).
    */
   defaultBranch(request: DefaultBranchRequest): Promise<string>;
 }

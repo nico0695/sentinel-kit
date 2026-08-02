@@ -69,11 +69,11 @@ export interface GitPort {
 
   /**
    * Return the short name of the remote HEAD's branch (e.g. `main`, not
-   * `origin/main`) for `request.options.remote` (default `origin`, dec-003)
-   * in the local repo at `request.repoPath`, via `git symbolic-ref`. When
-   * HEAD is not set for that remote, rejects with `GitNoDefaultBranchError`
-   * — an expected domain outcome, not a bug. Any other git failure rejects
-   * with `GitCommandError`.
+   * `origin/main`) for `request.remote` (default `origin`, dec-003) in the
+   * local repo at `request.repoPath`, via `git symbolic-ref`. When HEAD is
+   * not set for that remote, rejects with `GitNoDefaultBranchError` — an
+   * expected domain outcome, not a bug. Any other git failure rejects with
+   * `GitCommandError`.
    */
   defaultBranch(request: DefaultBranchRequest): Promise<string>;
 }

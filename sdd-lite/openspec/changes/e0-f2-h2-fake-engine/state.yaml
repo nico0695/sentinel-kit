@@ -159,6 +159,20 @@ stages:
       vitest.config.ts yet. No new B item. One A-level planner recommendation:
       include a minimal array-script multi-call test (reversible, in-scope).
       HALT at the executor gate — code stage ALWAYS needs explicit user OK.
+      Per-stage dual validation (dec-003) CONVERGED no-drift: validator A
+      (plan<->design fidelity + scope) 0 blocking / 0 should-fix — 8/8 files
+      transcribed verbatim, scope confined to the 8 paths, AC-1..AC-9 mappings
+      all valid, dec-004..dec-008 honored (verified dec-008 is a real recorded
+      decision, not a fabricated citation); 1 info (suite builds ReviewRequest
+      inline importing only ReviewEngine+ReviewUsage — transcribed from design,
+      resolved by contextual typing, not infidelity). Validator B (tooling/gate
+      reality) 0 blocking with ONE should-fix — VERIFIED byte-exact: npm ci
+      correct+necessary, gate commands match package.json, all 8 current-state
+      facts true, exclude valid/additive/precise, no orphan rule, rollback
+      complete; should-fix = carry an EXPLICIT FALLBACK for risk-003 (vitest
+      empty-project behavior can only be proven at execution). Both blind and
+      independent -> planning validated end to end. FALLBACK PROTOCOL adopted
+      (see risk-003). STOP at the executor gate.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -397,17 +411,34 @@ open_risks:
       prove `npm test` (now `vitest run`) is green WITH real tests, not vacuous.
       Related residual (dec-007): with the flag removed, `vitest run` must stay
       green while the core/e2e projects match zero files — proven at the gate.
+      FALLBACK PROTOCOL (plan validator B should-fix): the executor runs
+      `npm test` as the FIRST S1 gate action to prove the behavior empirically.
+      If `vitest run` is GREEN (vitest-4 aggregate semantics, ≥1 test overall)
+      -> proceed, residual resolved. If it ERRORS because empty core/e2e
+      projects fail per-project strict -> the executor STOPS (returns blocked;
+      does NOT silently re-add `--passWithNoTests`, which would defeat the
+      duty). The orchestrator then consults the user on the fix: (a) scope
+      `passWithNoTests: true` inside the vitest config to the empty scaffold
+      projects only; (b) seed a trivial placeholder test in core/e2e; or (c)
+      declare only the `adapters` project now (revisiting dec-007). Recommended
+      order if it fires: (a) then (c).
 next_action:
   kind: halt_for_approval
   target: sddl-executor
   summary: >-
-    plan.md complete (terminal planner stage); lifecycle_status = planned.
-    HALT at the executor gate for EXPLICIT user approval before any code is
-    written — the code-touching stage S1 always requires explicit OK even under
-    auto (dec-003). On approval, sddl-executor runs P0 (`npm ci`) then the single
-    stage S1 (8 files in fixed order), and proves the three-part acceptance gate
-    (`npm run check` exit 0 + `npm test` vitest run green non-vacuously + AC-8
-    diff scope = the 8 paths). Recommended options at the gate: approve and start
-    S1, stop as planned, or revise the plan.
+    Planning COMPLETE and validated end to end (proposal -> spec -> design ->
+    plan; three planning dual-validator passes, all no-drift; ckp-003 biome
+    ratification dec-008). lifecycle_status = planned. HALT at the executor gate
+    for EXPLICIT user approval before any code is written — the code-touching
+    stage S1 always requires explicit OK even under auto (dec-003). On approval,
+    sddl-executor (fresh worker) runs P0 (`npm ci`) then the single stage S1 (8
+    files in fixed order), proving the three-part acceptance gate (`npm run
+    check` exit 0 + `npm test` vitest run green non-vacuously + AC-8 diff scope =
+    the 8 paths), applying the risk-003 FALLBACK PROTOCOL (prove `vitest run`
+    empirically first; STOP+consult if empty projects fail per-project strict —
+    never silently re-add `--passWithNoTests`). Then triage the S1 diff ->
+    sddl-code-review 4R (dec-003 code-stage role) -> final QA. Recommended
+    options at the gate: approve + start S1, stop as planned, or revise.
+    No PR unless the user asks; never merge / never push main; max 5 open PRs.
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T04:10:00Z"
+updated_at: "2026-08-02T04:15:00Z"

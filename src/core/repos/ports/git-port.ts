@@ -48,7 +48,7 @@ export interface WorktreeAddRequest {
   readonly commitish: string;
 }
 
-/** worktreeRemove(request) — worktreePath must be ABSOLUTE. */
+/** worktreeRemove(request) — callers should supply an absolute worktreePath (dec-a1). */
 export interface WorktreeRemoveRequest {
   readonly repoPath: string;
   readonly worktreePath: string;

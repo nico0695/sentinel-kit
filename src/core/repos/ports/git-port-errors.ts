@@ -22,7 +22,7 @@ export interface GitErrorOptions {
  * Base class for every port-level git failure. Catch this to react to any
  * git error without discriminating; catch a subclass to react to one
  * specific family. Never thrown directly — every path in the adapter
- * chooses one of the four subclasses below.
+ * chooses one of the subclasses below.
  */
 export class GitError extends Error {
   readonly cause?: unknown;

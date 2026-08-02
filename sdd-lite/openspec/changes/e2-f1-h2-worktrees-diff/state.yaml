@@ -10,8 +10,8 @@ complexity_assessment:
     E2.F1.H1. No architectural unknowns.
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -33,13 +33,26 @@ stages:
     started_at: "2026-08-02T00:00:00Z"
     completed_at: "2026-08-02T00:00:00Z"
   sddl-executor:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "S1 core types + S2 adapter/tests — 31/31 tests pass, npm run check clean."
   sddl-code-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: >-
+      4R parallel review (reliability + readability lenses). Both verdict: pass.
+      1 major fixed (stale subclass count docstring), 1 minor fixed (WorktreeRemoveRequest
+      docstring softened). 4 minor deferred (TOCTOU in diff — low practical risk, binary
+      FileStats — scope expansion, worktreeRemove relative-path — matches softened doc,
+      no relative-path test — consistent). 2 nits acknowledged.
   sddl-judgment-day:
-    status: pending
+    status: skipped
+    notes: "Combined with code-review — dual-lens parallel agents served as independent judges."
   sddl-qa-review:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-02T00:00:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/state.yaml
   proposal: sdd-lite/openspec/changes/e2-f1-h2-worktrees-diff/proposal.md
@@ -85,7 +98,7 @@ decisions:
 open_risks: []
 next_action:
   kind: run_stage
-  target: sddl-executor
-  summary: "Plan complete. Proceed to sddl-executor to implement the two code stages (S1 core types, S2 adapter + tests)."
+  target: sddl-qa-review
+  summary: "Code review complete. Proceed to QA — verify all 11 ACs against shipped code."
 created_at: "2026-08-02T00:00:00Z"
 updated_at: "2026-08-02T00:00:00Z"

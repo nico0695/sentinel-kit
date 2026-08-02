@@ -1,0 +1,101 @@
+version: "0.1"
+change_name: e2-f2-h1-configstore
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    ConfigStore port + storage adapter following the established port/adapter
+    pattern. Zod schemas for two config files, yaml parsing, contract tests.
+    No architectural unknowns.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — port/adapter pattern established, libraries pre-decided."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4R review: reliability + readability lenses. 4 findings fixed, 6 triaged."
+  sddl-judgment-day:
+    status: skipped
+    notes: "Covered by 4R review lenses."
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "All 9 ACs verified green."
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f2-h1-configstore/state.yaml
+  proposal: sdd-lite/openspec/changes/e2-f2-h1-configstore/proposal.md
+  spec: sdd-lite/openspec/changes/e2-f2-h1-configstore/spec.md
+  design: sdd-lite/openspec/changes/e2-f2-h1-configstore/design.md
+  plan: sdd-lite/openspec/changes/e2-f2-h1-configstore/plan.md
+  execution_log: sdd-lite/openspec/changes/e2-f2-h1-configstore/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e2-f2-h1-configstore/qa-report.md
+checkpoints:
+  - id: chk-proposal-01
+    type: phase_validation
+    stage: sddl-proposal
+    summary: "Proposal consolidates ConfigStore port + storage adapter. Two B-level decisions resolved."
+    question: "Approve proposal and proceed to sddl-spec?"
+    options:
+      - id: approve
+        label: Approve and continue
+        description: "Proceed to sddl-spec."
+        recommended: true
+      - id: revise
+        label: Revise proposal
+      - id: stop
+        label: Stop
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-02T00:00:00Z"
+    created_at: "2026-08-02T00:00:00Z"
+    resolved_at: "2026-08-02T00:00:00Z"
+decisions:
+  - id: dec-b1-repos-owns-configstore
+    checkpoint_id: chk-proposal-01
+    selected_option_id: approve
+    rationale: "User approved B1: repos module owns ConfigStore port. review imports via repos/index.ts."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-b2-separate-typed-methods
+    checkpoint_id: chk-proposal-01
+    selected_option_id: approve
+    rationale: "User approved B2: separate typed methods (readConfig/writeConfig/readRepos/writeRepos) for maximum type inference."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a-repos-yaml-map
+    rationale: "A-level: repos.yaml root shape is a map keyed by alias (Record<string, RepoEntry>). Duplicate keys structurally impossible, O(1) lookup."
+    recorded_at: "2026-08-02T00:00:00Z"
+open_risks: []
+next_action:
+  kind: close
+  target: none
+  summary: "All stages complete. Open PR with Closes #13."
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:00:00Z"

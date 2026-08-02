@@ -1,10 +1,28 @@
 /**
  * Core module: repos — repo registration and configuration (PRD §4.2).
  *
- * Public API: the `GitPort` driven port + its invocation/domain types, and
- * its typed error family. Use cases (registerRepo, listRepos, listBranches)
- * land in E2.F2.x.
+ * Public API: the `GitPort` and `ConfigStore` driven ports + their
+ * invocation/domain types and typed error families. Use cases
+ * (registerRepo, listRepos, listBranches) land in E2.F2.x.
  */
+
+export {
+  DiffLimitsSchema,
+  type GlobalConfig,
+  GlobalConfigSchema,
+  type RepoEntry,
+  RepoEntrySchema,
+  type RepoRegistry,
+  RepoRegistrySchema,
+} from "./ports/config-schemas.js";
+export type { ConfigStore } from "./ports/config-store.js";
+export {
+  ConfigError,
+  type ConfigErrorOptions,
+  ConfigReadError,
+  ConfigValidationError,
+  ConfigWriteError,
+} from "./ports/config-store-errors.js";
 export type {
   BranchRef,
   CloneRequest,

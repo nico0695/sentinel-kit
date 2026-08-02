@@ -24,7 +24,7 @@ export const RepoEntrySchema = z.object({
   localPath: z.string().optional(),
   baseBranch: z.string().optional(),
   defaultHarness: z.string().optional(),
-  defaultEngine: z.string().optional(),
+  defaultEngine: z.enum(["claude-code", "opencode"]).optional(),
   extraSkills: z.array(z.string()).optional(),
   validations: z.array(z.string()).optional(),
 });

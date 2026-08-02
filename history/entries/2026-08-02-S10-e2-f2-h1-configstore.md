@@ -13,8 +13,8 @@ Implement the ConfigStore driven port with zod schemas for config.yaml and repos
 
 | ID | Decision | Alternatives considered | Why | Authorship |
 |----|----------|-------------------------|-----|------------|
-| S10-D1 | repos module owns ConfigStore (B1) | review owns it, shared ownership | repos is the primary consumer; review imports via repos/index.ts | `claude->user` |
-| S10-D2 | Separate typed methods per file (B2) | Single read/write with discriminated union | Stronger type safety, clearer intent, no runtime discrimination needed | `claude->user` |
+| S10-D1 | repos module owns ConfigStore (B1) | review owns it, shared ownership | repos is the primary consumer; review imports via repos/index.ts | `claude→user` |
+| S10-D2 | Separate typed methods per file (B2) | Single read/write with discriminated union | Stronger type safety, clearer intent, no runtime discrimination needed | `claude→user` |
 | S10-D3 | repos.yaml root shape: map keyed by alias | Array with name field | Duplicate keys structurally impossible, O(1) lookup, natural for registry | `claude` |
 | S10-D4 | ENOENT returns defaults instead of throwing | Throw ConfigReadError on missing file | Better first-run UX, tool works without manual config creation | `claude` |
 | S10-D5 | ConfigValidationError accepts optional cause | No cause on validation errors | Preserves full ZodError diagnostic chain (4R review finding) | `claude` |

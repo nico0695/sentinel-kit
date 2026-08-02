@@ -11,13 +11,15 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T00:00:00Z"
 lifecycle_status: active
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
     notes: "No blocking unknowns — ports exist, types defined, pattern established by prior stories."
   sddl-proposal:
-    status: pending
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
   sddl-spec:
     status: pending
   sddl-design:
@@ -32,8 +34,33 @@ stages:
     status: pending
 artifacts:
   state: sdd-lite/openspec/changes/e2-f2-h2-register-repo/state.yaml
-checkpoints: []
-decisions: []
+checkpoints:
+  - id: chk-proposal-01
+    type: phase_validation
+    stage: sddl-proposal
+    summary: "Proposal defines registerRepo use case with two paths, alias derivation, re-registration detection."
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-02T00:00:00Z"
+    created_at: "2026-08-02T00:00:00Z"
+    resolved_at: "2026-08-02T00:00:00Z"
+decisions:
+  - id: dec-b1-alias-owner-repo
+    checkpoint_id: chk-proposal-01
+    selected_option_id: option-a
+    rationale: "B1: owner/repo alias format from URL. Human-readable, collision-resistant, matches GitHub CLI. User approved recommended option."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-b2-clones-config-dir
+    checkpoint_id: chk-proposal-01
+    selected_option_id: option-a
+    rationale: "B2: managed clones in <configDir>/clones/. Keeps all sentinel data together. Core sees only a string. User approved recommended option."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a1-return-result
+    rationale: "A-level: use case returns RegisterRepoResult (alias, entry, alreadyRegistered) so callers can render feedback without re-reading registry."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a2-url-always-required
+    rationale: "A-level: url is always required in RegisterRepoRequest (aligns with RepoEntrySchema). localPath is the optional flag that skips cloning."
+    recorded_at: "2026-08-02T00:00:00Z"
 open_risks: []
 created_at: "2026-08-02T00:00:00Z"
 updated_at: "2026-08-02T00:00:00Z"

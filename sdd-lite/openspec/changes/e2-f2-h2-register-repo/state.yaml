@@ -1,0 +1,39 @@
+version: "0.1"
+change_name: e2-f2-h2-register-repo
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    registerRepo use case in core/repos consuming existing ConfigStore + GitPort
+    ports. Pure domain logic with in-memory fake tests. No adapter changes, no
+    I/O. Bounded scope, clear ACs from backlog.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: active
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — ports exist, types defined, pattern established by prior stories."
+  sddl-proposal:
+    status: pending
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f2-h2-register-repo/state.yaml
+checkpoints: []
+decisions: []
+open_risks: []
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:00:00Z"

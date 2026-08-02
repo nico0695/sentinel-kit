@@ -180,7 +180,7 @@ function wrapAs<
 /**
  * `git symbolic-ref` returns exit 128 with `fatal: ref … is not a symbolic
  * ref` when the requested HEAD isn't set. The `LC_ALL=C` / `LANG=C` pin in
- * `EXECA_ENV` guarantees this English wording on any host locale, so the
+ * `EXECA_BASE` guarantees this English wording on any host locale, so the
  * two-signal check (exit code + stderr regex) is stable — the exit code
  * alone would misclassify unrelated 128s, and the wording alone would
  * be fragile.

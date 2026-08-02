@@ -47,7 +47,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-02T02:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -84,6 +84,18 @@ stages:
       AC-7 precise __test__/ depcruise exclusion / guards green, AC-8 no scope
       leak, AC-9 check+test green. dec-004..dec-007 baked as fixed constraints.
       No new B item; Q5 (fake config API shape) left as an A-level design detail.
+      Per-stage dual validation (dec-003) CONVERGED no-drift: validator A
+      (acceptance/scope) 0 blocking / 0 should-fix — 3 boxes + 2 carried duties
+      map cleanly, no creep either direction, dec-004..dec-007 faithful (1 info:
+      dec-005 co-located reverses the proposal's original outside-src preference,
+      but is the user-resolved decision, not drift). Validator B
+      (PRD/architecture) 0 blocking / 0 should-fix — frozen H1 port verbatim,
+      all five guards respected, VERIFIED .dependency-cruiser.cjs has NO exclude
+      key today (adding options.exclude is additive) and `(^|/)__test__/` is a
+      precise regex exempting no production path; 4 info (notably: PRD §4.3 table
+      still says "output + verdict" but the frozen port is thin per dec-004 — an
+      inherited, already-documented H1 divergence, not new drift). Both blind and
+      independent -> auto-continue to sddl-design.
   sddl-design:
     status: pending
   sddl-plan:
@@ -289,13 +301,13 @@ next_action:
   kind: delegate
   target: sddl-design
   summary: >-
-    spec.md complete with firm scope + 9 AC (issue #6 three boxes + two carried
-    duties) and dec-004..dec-007 baked in. Under auto (dec-003), first run the
-    two blind parallel validators against the spec (A: acceptance/scope vs.
-    issue #6 + H2 boundary; B: PRD §4 + five guards + H1-port coherence).
-    Converge no-drift -> auto-continue to sddl-design to settle the FakeEngine
-    config API shape (Q5, A-level), the parameterized contract-suite signature,
-    the precise `(^|/)__test__/` depcruise exclusion, and the three-project
-    vitest config. Any drift or new-B -> STOP.
+    Spec validated end to end (dual validators converged no-drift). Delegate
+    sddl-design (fresh worker) to settle the A-level design detail (Q5 FakeEngine
+    config API shape), the parameterized contract-suite signature, the precise
+    `(^|/)__test__/` depcruise exclusion form, and the three-project vitest
+    config — all within dec-004..dec-007. Then run the two blind validators
+    against design.md. dec-002 standing gate: any deviation/new-B must be
+    surfaced to the user BEFORE design locks. Any drift -> STOP.
+current_stage_note: sddl-design (spec validated, auto-continue)
 created_at: "2026-08-02T02:10:00Z"
-updated_at: "2026-08-02T02:50:00Z"
+updated_at: "2026-08-02T03:05:00Z"

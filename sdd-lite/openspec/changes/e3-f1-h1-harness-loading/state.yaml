@@ -12,8 +12,8 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-03"
 
-lifecycle_status: planning
-current_stage: sddl-proposal
+lifecycle_status: planned
+current_stage: sddl-plan
 
 stages:
   sddl-deep-explorer:
@@ -24,11 +24,17 @@ stages:
     started_at: "2026-08-03"
     completed_at: "2026-08-03"
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -132,9 +138,9 @@ decisions:
 open_risks: []
 
 next_action:
-  kind: run_stage
-  target: sddl-spec
-  summary: "Formalize acceptance criteria, domain types, port interface, and skills.yaml schema in spec.md"
+  kind: wait_for_approval
+  target: sddl-executor
+  summary: "Plan approved. Awaiting stage_approval to begin S1 (core domain: ports, types, errors, use case, unit tests)"
 
 created_at: "2026-08-03"
 updated_at: "2026-08-03"

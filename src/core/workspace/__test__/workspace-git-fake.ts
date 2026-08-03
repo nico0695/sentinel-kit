@@ -7,7 +7,10 @@
  */
 
 import type {
+  DiffRequest,
+  DiffResult,
   GitPort,
+  MergeBaseRequest,
   WorktreeAddRequest,
   WorktreeInfo,
   WorktreeRemoveRequest,
@@ -17,6 +20,8 @@ export interface FakeWorktreeState {
   readonly addCalls: WorktreeAddRequest[];
   readonly removeCalls: WorktreeRemoveRequest[];
   readonly listCalls: string[];
+  readonly mergeBaseCalls: MergeBaseRequest[];
+  readonly diffCalls: DiffRequest[];
   readonly worktrees: Map<string, { head: string; branch: string | null }>;
 }
 
@@ -24,6 +29,10 @@ export interface FakeGitPortConfig {
   readonly addError?: Error;
   readonly removeError?: Error;
   readonly listError?: Error;
+  readonly mergeBaseResult?: string;
+  readonly mergeBaseError?: Error;
+  readonly diffResult?: DiffResult;
+  readonly diffError?: Error;
   readonly initialWorktrees?: ReadonlyMap<
     string,
     { head: string; branch: string | null }
@@ -36,6 +45,8 @@ export function createFakeGitPort(
   const addCalls: WorktreeAddRequest[] = [];
   const removeCalls: WorktreeRemoveRequest[] = [];
   const listCalls: string[] = [];
+  const mergeBaseCalls: MergeBaseRequest[] = [];
+  const diffCalls: DiffRequest[] = [];
   const worktrees = new Map<string, { head: string; branch: string | null }>();
 
   if (config?.initialWorktrees !== undefined) {
@@ -52,6 +63,8 @@ export function createFakeGitPort(
     addCalls,
     removeCalls,
     listCalls,
+    mergeBaseCalls,
+    diffCalls,
     worktrees,
 
     async worktreeAdd(req: WorktreeAddRequest) {
@@ -85,7 +98,17 @@ export function createFakeGitPort(
     fetch: notImplemented as GitPort["fetch"],
     branches: notImplemented as GitPort["branches"],
     defaultBranch: notImplemented as GitPort["defaultBranch"],
-    mergeBase: notImplemented as GitPort["mergeBase"],
-    diff: notImplemented as GitPort["diff"],
+
+    async mergeBase(req: MergeBaseRequest): Promise<string> {
+      mergeBaseCalls.push(req);
+      if (config?.mergeBaseError) throw config.mergeBaseError;
+      return config?.mergeBaseResult ?? "abc123def456";
+    },
+
+    async diff(req: DiffRequest): Promise<DiffResult> {
+      diffCalls.push(req);
+      if (config?.diffError) throw config.diffError;
+      return config?.diffResult ?? { raw: "", stats: [] };
+    },
   };
 }

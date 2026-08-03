@@ -7,6 +7,22 @@
  */
 
 export {
+  type ListBranchesDeps,
+  type ListBranchesRequest,
+  type ListBranchesResult,
+  listBranches,
+} from "./list-branches.js";
+export {
+  BranchListError,
+  type BranchListErrorOptions,
+  RepoNotFoundError,
+} from "./list-branches-errors.js";
+export {
+  type ListReposDeps,
+  type ListReposResult,
+  listRepos,
+} from "./list-repos.js";
+export {
   DiffLimitsSchema,
   type GlobalConfig,
   GlobalConfigSchema,

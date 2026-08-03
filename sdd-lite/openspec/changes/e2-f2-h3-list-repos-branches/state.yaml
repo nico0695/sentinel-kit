@@ -1,0 +1,74 @@
+version: "0.1"
+change_name: e2-f2-h3-list-repos-branches
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    listRepos and listBranches use cases in core/repos consuming existing
+    ConfigStore + GitPort ports. Pure domain logic with in-memory fake tests.
+    No adapter changes, no I/O. Bounded scope, clear ACs from backlog.
+  confidence: high
+  recorded_at: "2026-08-02T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No blocking unknowns — ports exist, types defined, pattern established by registerRepo."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4 stages executed: errors, use cases, barrel, tests. 56/56 tests pass, npm run check clean."
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:00:00Z"
+    notes: "4R review: 0 BLOCKER, 0 CRITICAL, 0 WARNING, 1 SUGGESTION (accepted-deferred). Verdict PASS."
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-02T00:00:00Z"
+    completed_at: "2026-08-02T00:01:00Z"
+    notes: "FINAL QA: 2/2 ACs pass, 56/56 tests, quality gate clean, architecture guards satisfied. Verdict PASS."
+artifacts:
+  state: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/state.yaml
+  proposal: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/proposal.md
+  spec: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/spec.md
+  design: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/design.md
+  plan: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/plan.md
+  review-ledger: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/review-ledger.md
+  qa-report: sdd-lite/openspec/changes/e2-f2-h3-list-repos-branches/qa-report.md
+checkpoints: []
+decisions:
+  - id: dec-a1-return-all-branches
+    rationale: "A-level: listBranches returns all BranchRef (local + remote) since the type already tags kind. Caller filters as needed."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a2-listRepos-returns-registry
+    rationale: "A-level: listRepos returns RepoRegistry directly (alias->RepoEntry map). No transformation needed — the registry is already the domain model."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a3-repo-not-found-in-list-branches-errors
+    rationale: "A-level: RepoNotFoundError and BranchListError colocated in list-branches-errors.ts. RepoNotFoundError can be extracted later if shared (YAGNI now)."
+    recorded_at: "2026-08-02T00:00:00Z"
+  - id: dec-a4-test-fake-isolation
+    rationale: "A-level: new createFakeGitPort in list-branches.test.ts with fetch/branches stubs and callOrder tracking. Isolated from register-repo fakes for test independence."
+    recorded_at: "2026-08-02T00:00:00Z"
+open_risks: []
+created_at: "2026-08-02T00:00:00Z"
+updated_at: "2026-08-02T00:01:00Z"

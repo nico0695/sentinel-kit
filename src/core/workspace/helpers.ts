@@ -47,5 +47,8 @@ export function deriveWorktreePath(
   branchLabel: string,
   timestamp: number,
 ): string {
-  return `${worktreesDir}/${repoBasename(repoPath)}/${sanitizeBranchLabel(branchLabel)}-${timestamp}`;
+  const normalizedDir = worktreesDir.endsWith("/")
+    ? worktreesDir.slice(0, -1)
+    : worktreesDir;
+  return `${normalizedDir}/${repoBasename(repoPath)}/${sanitizeBranchLabel(branchLabel)}-${timestamp}`;
 }

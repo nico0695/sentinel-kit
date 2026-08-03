@@ -92,7 +92,8 @@ function parseRawDiff(raw: string): ParsedFileChunk[] {
     const end = nextIdx !== undefined ? nextIdx : raw.length;
     const content = raw.slice(start, end);
 
-    const firstLine = content.slice(0, content.indexOf("\n"));
+    const nlIndex = content.indexOf("\n");
+    const firstLine = nlIndex >= 0 ? content.slice(0, nlIndex) : content;
     const bIndex = firstLine.indexOf(" b/");
     const path = bIndex >= 0 ? firstLine.slice(bIndex + 3) : firstLine;
 

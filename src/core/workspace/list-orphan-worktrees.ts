@@ -37,12 +37,12 @@ export async function listOrphanWorktrees(
   const worktrees = await deps.git.worktreeList(request.repoPath);
 
   const orphans: OrphanWorktreeInfo[] = [];
+  const prefix = deps.worktreesDir.endsWith("/")
+    ? deps.worktreesDir
+    : `${deps.worktreesDir}/`;
 
   for (const wt of worktrees) {
-    if (
-      wt.path.startsWith(`${deps.worktreesDir}/`) &&
-      !deps.activeWorktreePaths.has(wt.path)
-    ) {
+    if (wt.path.startsWith(prefix) && !deps.activeWorktreePaths.has(wt.path)) {
       orphans.push({
         path: wt.path,
         head: wt.head === "" ? null : wt.head,

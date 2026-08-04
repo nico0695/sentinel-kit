@@ -3,6 +3,7 @@ import type {
   DiffWarning,
   ReviewDiff,
 } from "../workspace/index.js";
+import { ContextModeNotSupportedError } from "./ports/harness-errors.js";
 import type { ResolvedHarness, Skill } from "./ports/harness-schemas.js";
 
 export interface AssemblePromptInput {
@@ -12,6 +13,10 @@ export interface AssemblePromptInput {
 }
 
 export function assemblePrompt(input: AssemblePromptInput): string {
+  if (input.resolvedHarness.harness.contextMode === "agent") {
+    throw new ContextModeNotSupportedError("agent");
+  }
+
   const sections = [
     renderInstructions(input.resolvedHarness.harness.instructions),
     renderSkills(input.resolvedHarness.skills),

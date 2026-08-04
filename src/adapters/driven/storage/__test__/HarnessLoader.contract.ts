@@ -102,6 +102,7 @@ export function harnessLoaderContract(
       expect(h.instructions).toBe("# Security Instructions");
       expect(h.outputContract).toBe("# Output Contract");
       expect(h.skills).toEqual(["analyze", "report"]);
+      expect(h.contextMode).toBe("inline");
     });
 
     it("loads minimal harness (harness.md only)", async () => {
@@ -116,6 +117,41 @@ export function harnessLoaderContract(
       expect(h.instructions).toBe("# Minimal");
       expect(h.outputContract).toBeUndefined();
       expect(h.skills).toEqual([]);
+      expect(h.contextMode).toBe("inline");
+    });
+
+    it("loads harness with contextMode from skills.yaml", async () => {
+      await harness.writeHarnessFile(
+        fixture,
+        "agent-mode",
+        "harness.md",
+        "# Agent Mode",
+      );
+      await harness.writeHarnessFile(
+        fixture,
+        "agent-mode",
+        "skills.yaml",
+        "skills: []\ncontextMode: agent",
+      );
+      const h = await loader.loadHarness("agent-mode");
+      expect(h.contextMode).toBe("agent");
+    });
+
+    it("defaults contextMode to inline when skills.yaml omits it", async () => {
+      await harness.writeHarnessFile(
+        fixture,
+        "no-mode",
+        "harness.md",
+        "# No Mode",
+      );
+      await harness.writeHarnessFile(
+        fixture,
+        "no-mode",
+        "skills.yaml",
+        "skills: []",
+      );
+      const h = await loader.loadHarness("no-mode");
+      expect(h.contextMode).toBe("inline");
     });
 
     it("missing harness.md throws HarnessValidationError", async () => {

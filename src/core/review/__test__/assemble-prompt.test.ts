@@ -4,7 +4,15 @@ import {
   type AssemblePromptInput,
   assemblePrompt,
 } from "../assemble-prompt.js";
-import type { ResolvedHarness, Skill } from "../ports/harness-schemas.js";
+import {
+  ContextModeNotSupportedError,
+  HarnessError,
+} from "../ports/harness-errors.js";
+import type {
+  ContextMode,
+  ResolvedHarness,
+  Skill,
+} from "../ports/harness-schemas.js";
 
 function buildInput(
   overrides?: Partial<{
@@ -13,6 +21,7 @@ function buildInput(
     outputContract: string | undefined;
     diff: ReviewDiff;
     validationOutput: readonly string[] | undefined;
+    contextMode: ContextMode;
   }>,
 ): AssemblePromptInput {
   const defaultDiff: ReviewDiff = {
@@ -42,6 +51,7 @@ function buildInput(
     type: "security",
     instructions: overrides?.instructions ?? "Review this code carefully.",
     skills: ["skill-a"] as readonly string[],
+    contextMode: overrides?.contextMode ?? ("inline" as const),
     ...(contractValue !== undefined ? { outputContract: contractValue } : {}),
   };
 
@@ -361,5 +371,18 @@ describe("assemblePrompt", () => {
     expect(fileIdx).toBeGreaterThan(-1);
     expect(warningIdx).toBeLessThan(fileIdx);
     expect(result).toContain('truncated="true"');
+  });
+
+  it("throws ContextModeNotSupportedError when contextMode is agent", () => {
+    const input = buildInput({ contextMode: "agent" });
+    expect(() => assemblePrompt(input)).toThrow(ContextModeNotSupportedError);
+  });
+
+  it("ContextModeNotSupportedError extends HarnessError", () => {
+    const err = new ContextModeNotSupportedError("agent");
+    expect(err).toBeInstanceOf(HarnessError);
+    expect(err.mode).toBe("agent");
+    expect(err.message).toBe('Context mode "agent" is not yet supported');
+    expect(err.name).toBe("ContextModeNotSupportedError");
   });
 });

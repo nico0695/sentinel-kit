@@ -12,6 +12,7 @@ function harness(type: string, skills: string[] = []): Harness {
     type,
     instructions: `${type} instructions`,
     skills,
+    contextMode: "inline" as const,
   };
 }
 
@@ -57,11 +58,13 @@ describe("loadHarnesses", () => {
       type: "security",
       instructions: "factory version",
       skills: [],
+      contextMode: "inline" as const,
     });
     deps.user.addHarness({
       type: "security",
       instructions: "user version",
       skills: [],
+      contextMode: "inline" as const,
     });
     const result = await loadHarnesses(deps);
     expect(result.size).toBe(1);

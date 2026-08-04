@@ -8,10 +8,11 @@ import {
   ContextModeNotSupportedError,
   HarnessError,
 } from "../ports/harness-errors.js";
-import type {
-  ContextMode,
-  ResolvedHarness,
-  Skill,
+import {
+  type ContextMode,
+  HarnessSkillsSchema,
+  type ResolvedHarness,
+  type Skill,
 } from "../ports/harness-schemas.js";
 
 function buildInput(
@@ -376,6 +377,14 @@ describe("assemblePrompt", () => {
   it("throws ContextModeNotSupportedError when contextMode is agent", () => {
     const input = buildInput({ contextMode: "agent" });
     expect(() => assemblePrompt(input)).toThrow(ContextModeNotSupportedError);
+  });
+
+  it("HarnessSkillsSchema rejects invalid contextMode", () => {
+    const result = HarnessSkillsSchema.safeParse({
+      skills: [],
+      contextMode: "foo",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("ContextModeNotSupportedError extends HarnessError", () => {

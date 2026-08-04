@@ -1,0 +1,174 @@
+version: "0.1"
+change_name: e3-f1-h1-harness-loading
+objective: new-feature
+mode: lite
+
+complexity_assessment:
+  route: continue-lite
+  summary: >
+    Well-bounded new-feature story following established ConfigStore pattern.
+    New port + adapter + domain types + tests in a single module (review).
+    All dependencies met, clear PRD spec, no unknowns.
+  confidence: high
+  recorded_at: "2026-08-03"
+
+lifecycle_status: completed
+current_stage: sddl-qa-review
+
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "No unknowns — PRD §5.2 fully specifies the harness layout and the ConfigStore pattern is proven"
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-03"
+    completed_at: "2026-08-03"
+    notes: "All 3 stages (S1, S2, S3) executed. QA review found 4 issues: 3 fixed (AC-1 harness.md error type, missing loadSkill contract test, unused HarnessNotFoundError import removed), 1 accepted (only first missing skill reported — actionable as-is)."
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-04"
+    completed_at: "2026-08-04"
+    notes: "Full 4R review (4 lenses). Verdict: pass_with_warnings. 0 BLOCKER, 0 CRITICAL, 5 WARNING (info), 3 SUGGESTION (info). No fix rounds needed."
+  sddl-judgment-day:
+    status: skipped
+    notes: "4R code-review covers this target; judgment-day and code-review are mutually exclusive per protocol."
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-04"
+    completed_at: "2026-08-04"
+    notes: "Final mode. All 9 ACs pass. Quality gate clean (147 tests, biome+tsc+depcruise). 4R review consumed (pass_with_warnings, 0 blocking). Verdict: pass."
+
+artifacts:
+  state: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/state.yaml
+  proposal: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/proposal.md
+  spec: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/spec.md
+  design: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/design.md
+  plan: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/plan.md
+  execution_log: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/qa-report.md
+
+checkpoints:
+  - id: chk-b1-port-design
+    type: scope_change
+    stage: sddl-proposal
+    summary: "Port design for harness/skill loading"
+    question: "New dedicated HarnessLoader port in review/ports vs extending ConfigStore?"
+    options:
+      - id: opt-new-port
+        label: "New HarnessLoader port"
+        description: "Dedicated port in review/ports — cleaner separation, each module owns its ports"
+        recommended: true
+      - id: opt-extend-configstore
+        label: "Extend ConfigStore"
+        description: "Add harness methods to existing ConfigStore — single abstraction but mixes patterns"
+    free_input_allowed: true
+    response:
+      selected_option_id: opt-new-port
+      responded_at: "2026-08-03"
+    created_at: "2026-08-03"
+    resolved_at: "2026-08-03"
+  - id: chk-b2-override-rule
+    type: scope_change
+    stage: sddl-proposal
+    summary: "Factory vs user harness name conflict resolution"
+    question: "When factory and user harnesses share the same name, which takes precedence?"
+    options:
+      - id: opt-user-wins
+        label: "User overrides factory"
+        description: "Standard CLI convention — user customization wins"
+        recommended: true
+      - id: opt-error
+        label: "Error on conflict"
+        description: "Reject ambiguity with a clear error"
+      - id: opt-factory-wins
+        label: "Factory wins"
+        description: "Factory harnesses are immutable, user must use unique names"
+    free_input_allowed: true
+    response:
+      selected_option_id: opt-user-wins
+      responded_at: "2026-08-03"
+    created_at: "2026-08-03"
+    resolved_at: "2026-08-03"
+  - id: chk-b3-validation-rules
+    type: scope_change
+    stage: sddl-proposal
+    summary: "Mandatory files in a harness directory"
+    question: "Which files are required in harnesses/<type>/?"
+    options:
+      - id: opt-harness-only
+        label: "harness.md required, rest optional"
+        description: "Minimal harnesses allowed — output.md and skills.yaml are optional"
+        recommended: true
+      - id: opt-harness-output
+        label: "harness.md + output.md required"
+        description: "Both instructions and output contract mandatory"
+      - id: opt-all-required
+        label: "All three required"
+        description: "Strictest validation — harness.md, output.md, and skills.yaml all mandatory"
+    free_input_allowed: true
+    response:
+      selected_option_id: opt-harness-only
+      responded_at: "2026-08-03"
+    created_at: "2026-08-03"
+    resolved_at: "2026-08-03"
+
+decisions:
+  - id: dec-b1
+    checkpoint_id: chk-b1-port-design
+    selected_option_id: opt-new-port
+    rationale: "Different read pattern (directory trees vs single YAML file). Each module owns its ports per architecture principle."
+    recorded_at: "2026-08-03"
+  - id: dec-b2
+    checkpoint_id: chk-b2-override-rule
+    selected_option_id: opt-user-wins
+    rationale: "Standard CLI convention (like git config). Enables customization of built-in harnesses."
+    recorded_at: "2026-08-03"
+  - id: dec-b3
+    checkpoint_id: chk-b3-validation-rules
+    selected_option_id: opt-harness-only
+    rationale: "Allows minimal harnesses for quick review types. Missing output.md means no verdict parsing; missing skills.yaml means no extra skills."
+    recorded_at: "2026-08-03"
+
+open_risks: []
+
+review_summary:
+  mode: 4r
+  tier: full-4r
+  target: "52d896d"
+  verdict: pass_with_warnings
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 8
+  open_severe: 0
+
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: "All 9 ACs verified, quality gate clean, 4R review consumed (0 blocking). Change complete."
+  reported_at: "2026-08-04"
+  report_path: sdd-lite/openspec/changes/e3-f1-h1-harness-loading/qa-report.md
+
+next_action:
+  kind: complete
+  summary: "Final QA passed. Change ready for PR and merge."
+
+created_at: "2026-08-03"
+updated_at: "2026-08-04"

@@ -1,0 +1,144 @@
+version: "0.1"
+change_name: e3-f1-h2-prompt-assembler
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Pure function in core/review — single file, no ports, no adapters.
+    All input types already exist from E3.F1.H1 and workspace module.
+    Straightforward string assembly with snapshot tests.
+  confidence: high
+  recorded_at: "2026-08-04T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "All needed types and structure already known from E3.F1.H1 context"
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-04T00:01:00Z"
+    completed_at: "2026-08-04T00:02:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-04T02:08:00Z"
+    completed_at: "2026-08-04T02:11:00Z"
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-04T02:12:00Z"
+    completed_at: "2026-08-04T02:14:00Z"
+  sddl-judgment-day:
+    status: skipped
+    notes: "Not required for continue-lite route"
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-04T02:16:00Z"
+    completed_at: "2026-08-04T02:17:00Z"
+artifacts:
+  state: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/state.yaml
+  proposal: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/proposal.md
+  spec: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/spec.md
+  design: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/design.md
+  plan: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/plan.md
+  execution_log: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/qa-report.md
+checkpoints: []
+decisions:
+  - id: dec-spec-001
+    stage: sddl-spec
+    level: A
+    summary: "XML-style tags for section delimiters"
+    rationale: >-
+      Standard LLM prompt practice, unambiguous boundaries that do not conflict
+      with markdown content in skills or instructions. Reversible if a different
+      format proves better with specific engines.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-002
+    stage: sddl-spec
+    level: A
+    summary: "Validation output typed as readonly string[]"
+    rationale: >-
+      Minimal sufficient type for string messages from validation scripts.
+      Widening to a richer interface later is non-breaking since the assembler
+      only reads the array.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-003
+    stage: sddl-spec
+    level: A
+    summary: "Omit optional sections entirely when input absent"
+    rationale: >-
+      Simpler output, no misleading empty tags. Absent outputContract or absent/empty
+      validationOutput results in the section being omitted from the prompt.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-004
+    stage: sddl-spec
+    level: A
+    summary: "Diff serialized as XML <file> sub-tags with metadata attributes"
+    rationale: >-
+      Structured, machine-readable, preserves all metadata (path, additions,
+      deletions, truncation). Warnings rendered as <warning> sub-tags before
+      file entries for audit visibility.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-001
+    stage: sddl-design
+    level: A
+    summary: "Inline private renderers in single file, no separate modules"
+    rationale: >-
+      Five small functions (~5-10 lines each) do not justify separate files.
+      The total file stays under 120 lines. Keeps the implementation self-contained
+      and easy to navigate.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-002
+    stage: sddl-design
+    level: A
+    summary: "Double newline separator between XML sections"
+    rationale: >-
+      Visual separation improves LLM prompt readability. Single newline within
+      sections for sub-elements. No trailing newline after last section for
+      determinism.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-003
+    stage: sddl-design
+    level: A
+    summary: "Inline Vitest snapshots over external .snap files"
+    rationale: >-
+      Output is a single string per test case. Inline snapshots keep expected
+      values visible in the test file, reducing snapshot file management overhead.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    All 12 acceptance criteria verified against implementation, tests, and quality
+    gate output. No blocking or warning-level findings. npm run check and npm test
+    pass cleanly (158/158 tests, 0 dependency violations).
+  reported_at: "2026-08-04"
+  report_path: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/qa-report.md
+open_risks: []
+next_action:
+  kind: complete
+  summary: >-
+    Change fully implemented, tested, and verified. All 12 ACs pass.
+    Quality gate green. Ready for PR creation and human review.
+created_at: "2026-08-04T00:00:00Z"
+updated_at: "2026-08-04T02:17:00Z"

@@ -4,6 +4,7 @@
  * via `../repos/index.js` when this module needs config access.
  */
 
+export { type AssemblePromptInput, assemblePrompt } from "./assemble-prompt.js";
 export { type LoadHarnessesDeps, loadHarnesses } from "./load-harnesses.js";
 export {
   HarnessError,

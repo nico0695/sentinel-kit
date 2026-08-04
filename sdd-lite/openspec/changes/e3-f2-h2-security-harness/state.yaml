@@ -1,0 +1,64 @@
+version: "0.1"
+change_name: e3-f2-h2-security-harness
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: "Pure content authoring mirroring pr-review harness pattern. 4 new Markdown/YAML files, no code changes."
+  confidence: high
+  recorded_at: "2026-08-04T23:55:00Z"
+lifecycle_status: planning
+current_stage: sddl-plan
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "Pattern fully established by E3.F2.H1; no unknowns to investigate."
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-04T23:50:00Z"
+    completed_at: "2026-08-04T23:52:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-04T23:52:00Z"
+    completed_at: "2026-08-04T23:54:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-04T23:54:00Z"
+    completed_at: "2026-08-04T23:56:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-04T23:56:00Z"
+    completed_at: "2026-08-04T23:58:00Z"
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e3-f2-h2-security-harness/state.yaml
+  proposal: sdd-lite/openspec/changes/e3-f2-h2-security-harness/proposal.md
+  spec: sdd-lite/openspec/changes/e3-f2-h2-security-harness/spec.md
+  design: sdd-lite/openspec/changes/e3-f2-h2-security-harness/design.md
+  plan: sdd-lite/openspec/changes/e3-f2-h2-security-harness/plan.md
+  execution_log: sdd-lite/openspec/changes/e3-f2-h2-security-harness/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e3-f2-h2-security-harness/qa-report.md
+checkpoints: []
+decisions:
+  - id: D-1
+    checkpoint_id: implicit-advancement
+    rationale: "Duplicate output.md per harness rather than symlink. Each harness is self-contained, avoids cross-platform symlink issues, consistent with pr-review pattern."
+    recorded_at: "2026-08-04T23:56:00Z"
+  - id: D-2
+    checkpoint_id: implicit-advancement
+    rationale: "Security harness references only the security skill (not code-quality). Keeps the harness specialized; users compose both skills via repos.yaml when needed."
+    recorded_at: "2026-08-04T23:56:00Z"
+open_risks: []
+next_action:
+  kind: run_stage
+  target: sddl-executor
+  summary: "Plan complete. Single-stage execution: create 4 content files (harness.md, output.md, skills.yaml, skills/security.md). Stage approval required before execution."
+created_at: "2026-08-04T23:50:00Z"
+updated_at: "2026-08-04T23:58:00Z"

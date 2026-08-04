@@ -1,0 +1,83 @@
+version: "1.0"
+change_name: e3-f2-h3-quick-harness
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: Content-only change creating 3 files under harnesses/quick/ following established harness pattern.
+  confidence: high
+  recorded_at: "2026-08-04T00:00:00Z"
+lifecycle_status: implementing
+current_stage: sddl-executor
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: No exploration needed -- patterns fully established by pr-review and security harnesses.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+    notes: S1 completed -- all 3 files created, all validations passed.
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/state.yaml
+  proposal: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/proposal.md
+  spec: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/spec.md
+  design: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/design.md
+  plan: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/plan.md
+  execution_log: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e3-f2-h3-quick-harness/qa-report.md
+checkpoints:
+  - id: cp-s1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: "Stage S1: Create harnesses/quick/ files (harness.md, output.md, skills.yaml)"
+    question: "Approve execution of S1 (content-only, no code changes)?"
+    free_input_allowed: false
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-04T00:00:00Z"
+    created_at: "2026-08-04T00:00:00Z"
+    resolved_at: "2026-08-04T00:00:00Z"
+decisions:
+  - id: d-s1-approval
+    checkpoint_id: cp-s1-approval
+    selected_option_id: approve
+    rationale: Implicitly approved via orchestrator handoff with full execution authority.
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: d-reject-only
+    checkpoint_id: cp-s1-approval
+    rationale: "A-level decision: included only REJECT rules, excluded REQUIRE and PREFER to maximize brevity and ensure only blocker/major findings are produced."
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: d-critical-design-subset
+    checkpoint_id: cp-s1-approval
+    rationale: "A-level decision: labeled the Design domain subset as Critical Design, including only the 4 most impactful REJECT rules from the full Design domain."
+    recorded_at: "2026-08-04T00:00:00Z"
+open_risks: []
+next_action:
+  kind: run_stage
+  target: sddl-qa-review
+  summary: All execution stages completed. Recommend sddl-qa-review for structured validation of the deliverables.
+created_at: "2026-08-04T00:00:00Z"
+updated_at: "2026-08-04T00:00:00Z"

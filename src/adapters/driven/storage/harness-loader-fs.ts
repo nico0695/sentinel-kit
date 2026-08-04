@@ -8,6 +8,7 @@ import {
 } from "../../../core/review/ports/harness-errors.js";
 import type { HarnessLoader } from "../../../core/review/ports/harness-loader.js";
 import {
+  type ContextMode,
   type Harness,
   HarnessSkillsSchema,
   type Skill,
@@ -72,6 +73,7 @@ export function createHarnessLoaderAdapter(basePath: string): HarnessLoader {
       }
 
       let skills: readonly string[] = [];
+      let contextMode: ContextMode = "inline";
       try {
         const raw = await readFile(join(dir, SKILLS_FILE), "utf-8");
         let parsed: unknown;
@@ -93,6 +95,7 @@ export function createHarnessLoaderAdapter(basePath: string): HarnessLoader {
           );
         }
         skills = result.data.skills;
+        contextMode = result.data.contextMode;
       } catch (err: unknown) {
         if (err instanceof HarnessValidationError) {
           throw err;
@@ -102,7 +105,7 @@ export function createHarnessLoaderAdapter(basePath: string): HarnessLoader {
         }
       }
 
-      const harness: Harness = { type, instructions, skills };
+      const harness: Harness = { type, instructions, skills, contextMode };
       if (outputContract !== undefined) {
         return { ...harness, outputContract };
       }

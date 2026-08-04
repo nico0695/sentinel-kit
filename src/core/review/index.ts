@@ -7,6 +7,7 @@
 export { type AssemblePromptInput, assemblePrompt } from "./assemble-prompt.js";
 export { type LoadHarnessesDeps, loadHarnesses } from "./load-harnesses.js";
 export {
+  ContextModeNotSupportedError,
   HarnessError,
   type HarnessErrorOptions,
   HarnessNotFoundError,
@@ -15,6 +16,7 @@ export {
 } from "./ports/harness-errors.js";
 export type { HarnessLoader } from "./ports/harness-loader.js";
 export {
+  type ContextMode,
   type Harness,
   type HarnessSkillsConfig,
   HarnessSkillsSchema,

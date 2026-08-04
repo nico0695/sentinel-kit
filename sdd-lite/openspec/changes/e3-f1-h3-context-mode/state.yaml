@@ -1,0 +1,56 @@
+change_name: e3-f1-h3-context-mode
+mode: lite
+objective: "Add contextMode option (inline|agent) to harness schema; inline default, agent errors explicitly"
+story: "[E3.F1.H3] contextMode option in harness"
+issue: "#21"
+depends_on:
+  - e3-f1-h2-prompt-assembler
+
+complexity_assessment: low
+lifecycle: completed
+
+current_stage: sddl-qa-review
+execution_mode: auto
+
+stages:
+  sddl-proposal:
+    status: success
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-spec:
+    status: success
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-design:
+    status: success
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-plan:
+    status: success
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-executor:
+    status: success
+  sddl-qa-review:
+    status: success
+
+artifacts:
+  proposal: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/proposal.md
+  spec: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/spec.md
+  design: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/design.md
+  plan: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/plan.md
+  execution_log: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/execution-log.md
+  qa_report: ./sdd-lite/openspec/changes/e3-f1-h3-context-mode/qa-report.md
+
+checkpoints: []
+
+decisions:
+  - id: A1
+    level: A
+    description: "contextMode stored in skills.yaml alongside skills array — simplest path, matches existing config structure"
+    decided_by: claude
+    rationale: "skills.yaml is the only structured config file per harness; adding one field there avoids introducing frontmatter parsing"
+
+open_risks: []
+
+next_action: done

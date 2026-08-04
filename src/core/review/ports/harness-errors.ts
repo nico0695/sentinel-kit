@@ -58,3 +58,12 @@ export class SkillNotFoundError extends HarnessError {
     this.referencedBy = referencedBy;
   }
 }
+
+export class ContextModeNotSupportedError extends HarnessError {
+  readonly mode: string;
+  constructor(mode: string, options?: HarnessErrorOptions) {
+    super(`Context mode "${mode}" is not yet supported`, options);
+    this.name = "ContextModeNotSupportedError";
+    this.mode = mode;
+  }
+}

@@ -11,7 +11,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-04T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -25,7 +25,9 @@ stages:
     started_at: "2026-08-04T00:00:00Z"
     completed_at: "2026-08-04T00:00:00Z"
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
   sddl-plan:
     status: pending
   sddl-executor:
@@ -85,13 +87,41 @@ decisions:
       file entries for audit visibility.
     decided_by: claude
     recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-001
+    stage: sddl-design
+    level: A
+    summary: "Inline private renderers in single file, no separate modules"
+    rationale: >-
+      Five small functions (~5-10 lines each) do not justify separate files.
+      The total file stays under 120 lines. Keeps the implementation self-contained
+      and easy to navigate.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-002
+    stage: sddl-design
+    level: A
+    summary: "Double newline separator between XML sections"
+    rationale: >-
+      Visual separation improves LLM prompt readability. Single newline within
+      sections for sub-elements. No trailing newline after last section for
+      determinism.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-design-003
+    stage: sddl-design
+    level: A
+    summary: "Inline Vitest snapshots over external .snap files"
+    rationale: >-
+      Output is a single string per test case. Inline snapshots keep expected
+      values visible in the test file, reducing snapshot file management overhead.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
 open_risks: []
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Advance to sddl-design to produce the implementation design:
-    function signature, internal structure, diff rendering helpers,
-    and test fixture strategy.
+    Advance to sddl-plan to produce the step-by-step implementation plan:
+    file creation order, export wiring, test implementation, and check pass.
 created_at: "2026-08-04T00:00:00Z"
-updated_at: "2026-08-04T00:00:00Z"
+updated_at: "2026-08-04T00:01:00Z"

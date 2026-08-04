@@ -1,0 +1,97 @@
+version: "0.1"
+change_name: e3-f1-h2-prompt-assembler
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Pure function in core/review — single file, no ports, no adapters.
+    All input types already exist from E3.F1.H1 and workspace module.
+    Straightforward string assembly with snapshot tests.
+  confidence: high
+  recorded_at: "2026-08-04T00:00:00Z"
+lifecycle_status: planning
+current_stage: sddl-spec
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: "All needed types and structure already known from E3.F1.H1 context"
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-04T00:00:00Z"
+    completed_at: "2026-08-04T00:00:00Z"
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/state.yaml
+  proposal: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/proposal.md
+  spec: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/spec.md
+  design: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/design.md
+  plan: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/plan.md
+  execution_log: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e3-f1-h2-prompt-assembler/qa-report.md
+checkpoints: []
+decisions:
+  - id: dec-spec-001
+    stage: sddl-spec
+    level: A
+    summary: "XML-style tags for section delimiters"
+    rationale: >-
+      Standard LLM prompt practice, unambiguous boundaries that do not conflict
+      with markdown content in skills or instructions. Reversible if a different
+      format proves better with specific engines.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-002
+    stage: sddl-spec
+    level: A
+    summary: "Validation output typed as readonly string[]"
+    rationale: >-
+      Minimal sufficient type for string messages from validation scripts.
+      Widening to a richer interface later is non-breaking since the assembler
+      only reads the array.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-003
+    stage: sddl-spec
+    level: A
+    summary: "Omit optional sections entirely when input absent"
+    rationale: >-
+      Simpler output, no misleading empty tags. Absent outputContract or absent/empty
+      validationOutput results in the section being omitted from the prompt.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+  - id: dec-spec-004
+    stage: sddl-spec
+    level: A
+    summary: "Diff serialized as XML <file> sub-tags with metadata attributes"
+    rationale: >-
+      Structured, machine-readable, preserves all metadata (path, additions,
+      deletions, truncation). Warnings rendered as <warning> sub-tags before
+      file entries for audit visibility.
+    decided_by: claude
+    recorded_at: "2026-08-04T00:00:00Z"
+open_risks: []
+next_action:
+  kind: run_stage
+  target: sddl-design
+  summary: >-
+    Advance to sddl-design to produce the implementation design:
+    function signature, internal structure, diff rendering helpers,
+    and test fixture strategy.
+created_at: "2026-08-04T00:00:00Z"
+updated_at: "2026-08-04T00:00:00Z"

@@ -13,8 +13,9 @@ export interface AssemblePromptInput {
 }
 
 export function assemblePrompt(input: AssemblePromptInput): string {
-  if (input.resolvedHarness.harness.contextMode === "agent") {
-    throw new ContextModeNotSupportedError("agent");
+  const { contextMode } = input.resolvedHarness.harness;
+  if (contextMode !== "inline") {
+    throw new ContextModeNotSupportedError(contextMode);
   }
 
   const sections = [

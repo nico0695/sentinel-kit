@@ -59,14 +59,7 @@
 
 ## Findings
 
-### F1: Missing explicit unit test for invalid contextMode rejection (minor)
-
-**Severity**: Minor
-**AC**: AC3
-**Detail**: The spec's verification column for AC3 states: _"Unit test: parse `{ skills: [], contextMode: 'foo' }` fails"_. No such test exists. The Zod `z.enum(["inline", "agent"])` inherently rejects invalid values, and the adapter contract test for invalid schema values provides integration-level coverage. However, a direct schema-level unit test (e.g., `HarnessSkillsSchema.safeParse({ skills: [], contextMode: 'foo' })` returning `success: false`) would satisfy the spec literally and guard against accidental schema loosening (e.g., if someone changed the enum to a string).
-
-**Impact**: Low. The behavior is correct and enforced by Zod. This is a coverage gap, not a bug.
-**Recommendation**: Add a schema unit test in a future PR or as a follow-up. Does not block merge.
+No blocking findings. The original F1 (missing explicit schema rejection test) was resolved in a subsequent commit — `assemble-prompt.test.ts` now includes `"HarnessSkillsSchema rejects invalid contextMode"` which calls `HarnessSkillsSchema.safeParse({ skills: [], contextMode: "foo" })` and asserts `success: false`.
 
 ## Edge Case Analysis
 
@@ -74,7 +67,7 @@
 |---|---|---|
 | `contextMode` omitted from `skills.yaml` | Zod `.default("inline")` fills it | Covered by contract test |
 | `skills.yaml` missing entirely (ENOENT) | Variable initialized to `"inline"` before try block | Covered by contract test (minimal harness) |
-| Invalid `contextMode` value in `skills.yaml` | Zod schema rejects, adapter throws `HarnessValidationError` | Implicit coverage (see F1) |
+| Invalid `contextMode` value in `skills.yaml` | Zod schema rejects, adapter throws `HarnessValidationError` | Covered by schema unit test |
 | `contextMode: "agent"` at prompt assembly | `ContextModeNotSupportedError` thrown before rendering | Covered by unit test |
 | Backward compatibility (existing harnesses without `contextMode`) | Default fills `"inline"` transparently | Covered by contract tests + all existing tests passing |
 

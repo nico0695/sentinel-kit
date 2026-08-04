@@ -76,8 +76,9 @@ Add `contextMode: ContextMode` (required) to the `Harness` interface. Not option
 At the top of `assemblePrompt`, before any rendering:
 
 ```
-if (input.resolvedHarness.harness.contextMode === 'agent') {
-  throw new ContextModeNotSupportedError('agent');
+const { contextMode } = input.resolvedHarness.harness;
+if (contextMode !== 'inline') {
+  throw new ContextModeNotSupportedError(contextMode);
 }
 ```
 

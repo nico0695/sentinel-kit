@@ -1,4 +1,7 @@
-import { HarnessNotFoundError } from "../ports/harness-errors.js";
+import {
+  HarnessNotFoundError,
+  SkillNotFoundError,
+} from "../ports/harness-errors.js";
 import type { HarnessLoader } from "../ports/harness-loader.js";
 import type { Harness, Skill } from "../ports/harness-schemas.js";
 
@@ -33,7 +36,7 @@ export class FakeHarnessLoader implements HarnessLoader {
   async loadSkill(name: string): Promise<Skill> {
     const skill = this.skills.get(name);
     if (skill === undefined) {
-      throw new HarnessNotFoundError(name);
+      throw new SkillNotFoundError(name, "unknown");
     }
     return skill;
   }

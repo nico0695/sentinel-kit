@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import type { ZodError } from "zod";
 import {
-  HarnessNotFoundError,
   HarnessValidationError,
+  SkillNotFoundError,
 } from "../../../core/review/ports/harness-errors.js";
 import type { HarnessLoader } from "../../../core/review/ports/harness-loader.js";
 import {
@@ -111,10 +111,10 @@ export function createHarnessLoaderAdapter(basePath: string): HarnessLoader {
 
     async listSkills(): Promise<string[]> {
       try {
-        const entries = await readdir(skillsPath);
+        const entries = await readdir(skillsPath, { withFileTypes: true });
         return entries
-          .filter((e) => e.endsWith(".md"))
-          .map((e) => e.replace(/\.md$/, ""));
+          .filter((e) => e.isFile() && e.name.endsWith(".md"))
+          .map((e) => e.name.replace(/\.md$/, ""));
       } catch (err: unknown) {
         if (isEnoent(err)) {
           return [];
@@ -130,7 +130,7 @@ export function createHarnessLoaderAdapter(basePath: string): HarnessLoader {
         return { name, content };
       } catch (err: unknown) {
         if (isEnoent(err)) {
-          throw new HarnessNotFoundError(name);
+          throw new SkillNotFoundError(name, "unknown");
         }
         throw err;
       }

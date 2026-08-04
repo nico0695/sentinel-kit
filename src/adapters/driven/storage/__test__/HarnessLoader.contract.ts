@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   HarnessError,
-  HarnessNotFoundError,
   HarnessValidationError,
+  SkillNotFoundError,
 } from "../../../../core/review/ports/harness-errors.js";
 import type { HarnessLoader } from "../../../../core/review/ports/harness-loader.js";
 
@@ -192,10 +192,10 @@ export function harnessLoaderContract(
       expect(skill.content).toBe("# Analyze Skill");
     });
 
-    it("loading nonexistent skill throws HarnessNotFoundError", async () => {
+    it("loading nonexistent skill throws SkillNotFoundError", async () => {
       await expect(loader.loadSkill("nonexistent")).rejects.toSatisfy(
         (err: unknown) => {
-          expect(err).toBeInstanceOf(HarnessNotFoundError);
+          expect(err).toBeInstanceOf(SkillNotFoundError);
           expect(err).toBeInstanceOf(HarnessError);
           return true;
         },

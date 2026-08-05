@@ -4,9 +4,9 @@
 - **Branch**: `claude/epic-e3-factory-harnesses-myl1ra`
 - **Scope**: [E3.F2.H1] (issue #22), [E3.F2.H2] (issue #23), [E3.F2.H3] (issue #24) — PR #62
 - **sdd-lite changes**:
-  - [`e3-f2-h1-pr-review-harness`](../sdd-lite/openspec/changes/e3-f2-h1-pr-review-harness/)
-  - [`e3-f2-h2-security-harness`](../sdd-lite/openspec/changes/e3-f2-h2-security-harness/)
-  - [`e3-f2-h3-quick-harness`](../sdd-lite/openspec/changes/e3-f2-h3-quick-harness/)
+  - [`e3-f2-h1-pr-review-harness`](../../sdd-lite/openspec/changes/e3-f2-h1-pr-review-harness/)
+  - [`e3-f2-h2-security-harness`](../../sdd-lite/openspec/changes/e3-f2-h2-security-harness/)
+  - [`e3-f2-h3-quick-harness`](../../sdd-lite/openspec/changes/e3-f2-h3-quick-harness/)
 
 ## Objective
 

@@ -2,6 +2,7 @@
 
 | Session | Date | Title | Scope | Entry |
 |---------|------|-------|-------|-------|
+| S14 | 2026-08-04 | E3.F2 factory harnesses: pr-review, security, quick | [E3.F2.H1-H3] (issues #22-24, PR #62) | [entry](entries/2026-08-04-S14-e3-f2-factory-harnesses.md) |
 | S12 | 2026-08-02 | Story [E2.F2.H3]: listRepos and listBranches use cases | [E2.F2.H3] (issue #15, PR pending) | [entry](entries/2026-08-02-S12-e2-f2-h3-list-repos-branches.md) |
 | S11 | 2026-08-02 | Story [E2.F2.H2]: registerRepo use case | [E2.F2.H2] (issue #14, PR pending) | [entry](entries/2026-08-02-S11-e2-f2-h2-register-repo.md) |
 | S08 | 2026-08-02 | Story [E2.F1.H1]: Base git wrapper (GitPort + git-cli adapter) | [E2.F1.H1] (issue #11, PR opened) | [entry](entries/2026-08-02-S08-e2-f1-h1-git-wrapper.md) |

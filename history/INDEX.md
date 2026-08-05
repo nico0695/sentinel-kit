@@ -2,6 +2,7 @@
 
 | Session | Date | Title | Scope | Entry |
 |---------|------|-------|-------|-------|
+| S16 | 2026-08-05 | E1 spike working guide (docs/todo/E1) | E1 prep (issues #7-10, guide docs) | [entry](entries/2026-08-05-S16-e1-spike-guide-docs.md) |
 | S15 | 2026-08-05 | 4R code review of E3.F2 factory harnesses | [E3.F2.H1-H3] 4R review (PR #62) | [entry](entries/2026-08-05-S15-e3-f2-4r-review.md) |
 | S14 | 2026-08-04 | E3.F2 factory harnesses: pr-review, security, quick | [E3.F2.H1-H3] (issues #22-24, PR #62) | [entry](entries/2026-08-04-S14-e3-f2-factory-harnesses.md) |
 | S12 | 2026-08-02 | Story [E2.F2.H3]: listRepos and listBranches use cases | [E2.F2.H3] (issue #15, PR pending) | [entry](entries/2026-08-02-S12-e2-f2-h3-list-repos-branches.md) |

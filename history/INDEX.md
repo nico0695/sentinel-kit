@@ -2,6 +2,7 @@
 
 | Session | Date | Title | Scope | Entry |
 |---------|------|-------|-------|-------|
+| S17 | 2026-08-08 | E1.F1.H1: Claude Code headless spike executed | [E1.F1.H1] (issue #7, PR deferred) | [entry](entries/2026-08-08-S17-e1-f1-h1-claude-code-spike.md) |
 | S16 | 2026-08-05 | E1 spike working guide (docs/todo/E1) | E1 prep (issues #7-10, guide docs) | [entry](entries/2026-08-05-S16-e1-spike-guide-docs.md) |
 | S15 | 2026-08-05 | 4R code review of E3.F2 factory harnesses | [E3.F2.H1-H3] 4R review (PR #62) | [entry](entries/2026-08-05-S15-e3-f2-4r-review.md) |
 | S14 | 2026-08-04 | E3.F2 factory harnesses: pr-review, security, quick | [E3.F2.H1-H3] (issues #22-24, PR #62) | [entry](entries/2026-08-04-S14-e3-f2-factory-harnesses.md) |

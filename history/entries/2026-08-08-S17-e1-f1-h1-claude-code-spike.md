@@ -1,14 +1,15 @@
-# S17 — E1.F1.H1: Claude Code headless spike executed
+# S17 — E1.F1.H1 + E1.F1.H2: engine spikes executed (Claude Code, OpenCode)
 
 - **Date**: 2026-08-08
 - **Branch**: `claude/project-status-backlog-ocdf7f`
-- **Scope**: `[E1.F1.H1]` (issue #7) — spike executed, deliverable written
+- **Scope**: `[E1.F1.H1]` (issue #7), `[E1.F1.H2]` (issue #8) — both spikes executed, deliverables written
 - **sdd-lite changes**: — (see Deviations)
 
 ## Objective
 
-Execute the Claude Code headless spike per `docs/todo/E1/01-spike-claude-code.md`: answer the
-four PRD §6.2 questions with real evidence and write `docs/engines/claude-code.md`.
+Execute the engine spikes per `docs/todo/E1/01-spike-claude-code.md` and `02-spike-opencode.md`:
+answer the four PRD §6.2 questions per engine with real evidence and write
+`docs/engines/claude-code.md` and `docs/engines/opencode.md`.
 
 ## Decisions
 
@@ -20,6 +21,10 @@ four PRD §6.2 questions with real evidence and write `docs/engines/claude-code.
 | S17-D4 | No permission flags: default `-p` behavior is the canonical config | `--allowedTools` read-only allowlist; `--permission-mode`; `--dangerously-skip-permissions` | Evidence: default auto-approves cwd reads and denies writes (recorded in `permission_denials`) — already the least-permissive profile that completes a review | `claude` |
 | S17-D5 | Argv size limit measured at exec level (`claude --version <big-arg>`), not with real API calls | Growing real prompts until failure | Same `execve` limit applies; zero token cost | `claude` |
 | S17-D6 | Commit deliverable + history now; defer the `[E1.F1.H1]` PR until the OpenCode spike (H2) is done | Open the PR immediately | User prefers one E1 PR flow after both engine spikes | `user` |
+| S17-D7 | OpenCode spike model: `openai/gpt-5.4-mini` (OAuth credential) | Free-tier model first; `opencode-go` credit models | User picked among available credentials; no Anthropic provider configured in OpenCode | `claude→user` |
+| S17-D8 | Read-only posture for OpenCode via `OPENCODE_CONFIG` env pointing to a `permission: deny` config | Project-local `opencode.json` in the worktree (pollutes reviewed tree); `--dangerously-skip-permissions` (opposite direction) | Default `run` mode is write-enabled (verified); env-injected config blocks writes without touching the worktree | `claude` |
+| S17-D9 | Single PR for H1+H2 (`Closes #7, #8`) | One PR per story | Same feature (E1.F1), doc-only deliverables; workflow contract allows it when declared | `claude→user` |
+| S17-D10 | No Co-Authored-By trailer in commits from this session onward | Default trailer | User request | `user` |
 
 ## Deviations
 
@@ -48,11 +53,27 @@ four PRD §6.2 questions with real evidence and write `docs/engines/claude-code.
 - Deliverable: `docs/engines/claude-code.md` (template from doc 01, fully filled).
 - Raw outputs preserved in `~/spikes/run*.{txt,json,out,err}` as candidate H3 fixtures.
 
+### OpenCode spike (H2)
+
+- Prerequisites: OpenCode `1.17.9`, credentials OpenAI (oauth) + OpenCode Go (api); no Anthropic.
+- 11 evidence runs: baseline stdin, NDJSON `--format json`, argv + exec-limit probe (~1 MiB, same
+  OS cap), default-permission read test, **write test proving default mode creates files without
+  asking**, write-denial via `OPENCODE_CONFIG` deny config (blocked, incl. subagent workaround),
+  unknown-model and invalid-flag signatures, SIGTERM/SIGKILL kills (truncated stream, no flush),
+  final clean end-to-end.
+- Acceptance met: `VERDICT: request-changes` first line on every full run; parsing strategy
+  (concatenate `text` events, usage from `step_finish.tokens`) verified working.
+- Key findings: default posture is write-enabled (biggest delta vs. Claude Code); stdout not
+  clean on failures (log dumps) → defensive parsing confirmed necessary; `cost` reads 0 on
+  OAuth provider → usage must rely on token counts.
+- Deliverable: `docs/engines/opencode.md`.
+- Raw outputs preserved in `~/spikes/oc-run*.{txt,json,out,err}` as candidate H3 fixtures.
+
 ## Pending and next steps
 
-- `[E1.F1.H2]` OpenCode spike — next session (user + claude, same collaborative mode).
-- `[E1.F1.H3]` fixtures — recycle this session's raw outputs; anonymize before committing.
-- Open the E1 PR (`Closes #7`, likely with H2) — user decides when.
+- `[E1.F1.H3]` fixtures — recycle this session's raw outputs (`~/spikes/`); anonymize before committing.
+- `[E1.F1.H4]` context modes — optional, skipped unless requested.
+- E1 PR for H1+H2 (`Closes #7, #8`) — being opened at session close.
 
 ## Open questions for the user
 

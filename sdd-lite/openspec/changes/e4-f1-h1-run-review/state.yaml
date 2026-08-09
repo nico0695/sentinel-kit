@@ -16,7 +16,7 @@ complexity_assessment:
     E5 validations seam is left open without implementing it.
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
-lifecycle_status: draft
+lifecycle_status: planning
 current_stage: sddl-proposal
 stages:
   sddl-deep-explorer:
@@ -26,7 +26,15 @@ stages:
       E2.F3.H2 diff size policy, E3.F1.H2 prompt assembler, E0.F2.H2 FakeEngine + contract
       suite) are merged on main and their public index modules are readable at spec time.
   sddl-proposal:
-    status: pending
+    status: completed
+    started_at: "2026-08-09T03:25:00Z"
+    completed_at: "2026-08-09T03:29:00Z"
+    notes: >-
+      proposal.md written. Exploration performed. Sharpened the three seeded risks into six open
+      questions for spec and surfaced a seventh the seed did not carry (how runReview reaches a
+      terminal state without the H2 parser). Recommended a user checkpoint on terminal-state
+      coverage; the orchestrator's post-processing narrowed that escalation (see d-dec004-scope
+      and r-validation-failed-semantics).
   sddl-spec:
     status: pending
   sddl-design:
@@ -94,7 +102,12 @@ checkpoints:
       Approve launching sddl-proposal for [E4.F1.H1] runReview, scoped to the core/run use case
       against FakeEngine only?
     free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "comienza".
+      responded_at: "2026-08-09T03:25:00Z"
     created_at: "2026-08-09T03:15:00Z"
+    resolved_at: "2026-08-09T03:25:00Z"
 decisions:
   - id: d-change-scope
     checkpoint_id: cp-change-seed
@@ -104,6 +117,19 @@ decisions:
       the flow against FakeEngine while H2 owns defensive parsing against the real E1 fixtures.
       Bundling them would put two distinct risk profiles behind one approval gate.
     recorded_at: "2026-08-09T03:15:00Z"
+  - id: d-dec004-scope
+    checkpoint_id: cp-proposal-approval
+    rationale: >-
+      A-level: the proposal flagged "timeout vs engine-error may require touching the frozen
+      ReviewEngine port (dec-004)" as a B/C escalation. Checked the source. dec-004 is recorded
+      in the E0.F2.H2 spec and it froze the port against *that* story, explicitly deferring both
+      concerns to this one: "No typed port error added to src/core/run in H2 (dec-004) — a typed
+      error may arrive later (E4) without breaking this contract" and "The fake does NOT enforce
+      timeoutMs (dec-004) — real timeout enforcement is the run flow's job (E4.F1.H1)". So
+      wall-clock enforcement in runReview and a typed run-domain error are pre-sanctioned work
+      here, not scope expansion. Escalation withdrawn; r-terminal-state-coverage downgraded to
+      low. Spec still owns the mapping design.
+    recorded_at: "2026-08-09T03:30:00Z"
   - id: d-bootstrap-surgical-refresh
     checkpoint_id: cp-change-seed
     selected_option_id: surgical
@@ -118,30 +144,61 @@ decisions:
     recorded_at: "2026-08-09T03:10:00Z"
 open_risks:
   - id: r-terminal-state-coverage
+    severity: low
+    summary: >-
+      DOWNGRADED from medium by orchestrator post-processing. The proposal read `timeout` and
+      `engine-error` as blocked behind a frozen port. Evidence says otherwise: the E0.F2.H2 spec
+      (dec-004) explicitly deferred both to this story — "real timeout enforcement is the run
+      flow's job (E4.F1.H1)" and "a typed error may arrive later (E4) without breaking this
+      contract". So wall-clock enforcement and a typed run-domain error are sanctioned A-level
+      work here, not a port change requiring escalation. What remains for spec is the mapping
+      itself, not permission to build it.
+  - id: r-validation-failed-semantics
     severity: medium
     summary: >-
-      The acceptance criterion "each terminal state reachable by test" spans states this story
-      cannot produce natively: `validation-failed` belongs to E5 (declared validations) and
-      `engine-error` / `timeout` are adapter concerns surfaced through the ReviewEngine port.
-      Spec must decide whether FakeEngine drives them through the port or the criterion is
-      partially deferred, and say so explicitly rather than silently narrowing the story.
+      NEW, replaces the `validation-failed` half of r-terminal-state-coverage. The proposal
+      assumed `validation-failed` belongs to E5 and has no producer here, but E5.F1.H2 states
+      the opposite: declared-validation failures do NOT abort the review ("failed validation =
+      review continues with the evidence"). So E5 never produces this terminal state, and it
+      most plausibly means pre-flight/input validation failure — invalid request, unknown
+      harness, invalid diff-limit config (the only thing DiffSizePolicyError actually raises on)
+      — which IS producible in this story. This is an interpretation of a PRD term that shapes
+      the public contract: B-level, user decides.
+  - id: r-parse-seam
+    severity: medium
+    summary: >-
+      NEW, surfaced by the proposal. The backlog flow reads "engine -> parsing -> terminal state"
+      but the verdict parser is issue #27. Spec must decide whether H1 does a deliberately
+      minimal internal extraction that H2 replaces, or takes an injected parse function with a
+      trivial default. Determines whether `ok` vs `ambiguous` is even distinguishable here, and
+      whether H1 pre-empts H2's scope.
   - id: r-cleanup-on-error
     severity: medium
     summary: >-
       "Correct cleanup even on error" means the worktree must be removed on every path,
-      including engine failure and timeout, without swallowing the original error. Design must
-      pin the cleanup guarantee and its interaction with the existing E2.F3 cleanup policy.
+      including engine failure and timeout, without swallowing the original error. Sharpened by
+      the proposal with an edge the seed did not name: cleanupWorktree can itself throw
+      WorktreeCleanupError after the review already resolved, so spec must say whether a cleanup
+      fault overrides, annotates, or leaves intact the original outcome.
+  - id: r-dependency-surface
+    severity: low
+    summary: >-
+      NEW, surfaced by the proposal. runReview needs GitPort, engine, resolved harness (or
+      HarnessLoader), worktreesDir, diff limits, cleanup policy and timeout. Whether the harness
+      is resolved internally or passed in is a public-API shape decision (B-level) for spec.
   - id: r-e5-validation-seam
     severity: low
     summary: >-
-      The backlog describes the flow as "diff -> (validations when E5 exists) -> prompt". The
-      seam must be left open without implementing ProcessRunner or importing anything from E5,
-      or the guards and the story boundary both break.
+      Cheaper than the seed assumed: assemblePrompt already accepts an optional readonly
+      validationOutput, so the E5 seam is a pass-through parameter — no new machinery, no E5
+      import, no guard risk.
 next_action:
   kind: wait_for_approval
-  target: sddl-proposal
+  target: sddl-spec
   summary: >-
-    Change seeded and bootstrap refreshed. Awaiting user approval to launch the sddl-proposal
-    worker for [E4.F1.H1] runReview (issue #26).
+    proposal.md complete. Two medium risks must be surfaced before routing (interactive mode),
+    and r-validation-failed-semantics is a B-level interpretation the user should settle so spec
+    can convert "each terminal state reachable by test" into a defensible mapping rather than a
+    silent deferral.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T03:15:00Z"
+updated_at: "2026-08-09T03:30:00Z"

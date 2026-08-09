@@ -121,7 +121,38 @@ stages:
       failed the ST-6 gate as a self-inflicted false positive. ST-4..ST-6 each still require
       their own stage_approval.
   sddl-code-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-09T14:20:00Z"
+    completed_at: "2026-08-09T15:10:00Z"
+    notes: >-
+      Full-4r review of the cumulative ST-1..ST-3 source delta, frozen at 03bd7cf. The review
+      gate was raised (review-now vs defer-to-ST-6) with review-now recommended; the user did
+      not respond, and the orchestrator proceeded on its own recommendation — authorship
+      claude, recorded here rather than silently. Scope was widened from the ST-3 diff to the
+      cumulative delta (A-level) so engine-timeout.ts, skipped at its own trivial-plus gate,
+      finally came under review. Four lenses ran as parallel read-only workers; 15 merged
+      findings, all WARNING/SUGGESTION -> info under the severity floor. One three-lens
+      convergent finding (dual timeout budget) was provisionally escalated to CRITICAL and put
+      through the single refuter pass: ordering sub-claim REFUTED (depends on unwritten E4.F2
+      adapter behaviour; the design-named kill mechanism would actually let the outer timer
+      win), consequence sub-claim corroborated in weak form (nondeterministic terminal state
+      across adapter implementations; undocumented escape hatch: publicly-exported
+      EngineTimeoutError is rethrown unwrapped). Merged at lens severity WARNING. Verdict:
+      pass_with_warnings, zero open severe findings, no fix round mandated. The lenses also
+      hand-verified clean: the full stage->terminal-state mapping row by row, the
+      cannot-reject/exactly-one-state invariant, timer hygiene on all exit paths, guards
+      (depcruise+tsc re-run in-review) and secrets. Chief yield is test-shaping for ST-4/ST-5:
+      AC-5's fake ignores the budget, so tests must also pin the EngineTimeoutError-rejection
+      escape hatch and (if ST-3b lands) the timeoutMs upper bound. review_gate raised for
+      optional fix routing; see next_action.
+    review_summary:
+      mode: 4r
+      tier: full-4r
+      target: 03bd7cf8a1204f2aa23a7619b4ef6203f7db073c
+      round: 1
+      counts: confirmed=0 suspect=0 escalated=0 info=15
+      open_severe_findings: 0
+      verdict: pass_with_warnings
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
@@ -134,6 +165,7 @@ artifacts:
   plan: sdd-lite/openspec/changes/e4-f1-h1-run-review/plan.md
   execution_log: sdd-lite/openspec/changes/e4-f1-h1-run-review/execution-log.md
   qa_report: sdd-lite/openspec/changes/e4-f1-h1-run-review/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e4-f1-h1-run-review/review-ledger.md
 checkpoints:
   - id: cp-change-seed
     type: risk_review
@@ -545,14 +577,99 @@ open_risks:
     summary: >-
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
+  - id: r-timeout-budget-precedence
+    severity: medium
+    summary: >-
+      NEW from 4R review (R1-001, convergent across three lenses; refuter split the claim). The
+      identical timeoutMs feeds the adapter's self-enforced budget and the outer race with zero
+      headroom and no precedence rule, so which terminal state (`timeout` vs `engine-error`) an
+      over-budget engine yields depends on adapter implementation detail. Not a defect at this
+      commit (the strong "timeout unreachable" form was refuted: no adapter self-enforces yet,
+      and a kill-based adapter would lose the race to the outer timer anyway). Owner: E4.F2
+      (#28-30) must fix a precedence rule. Working escape hatch to document and pin: an adapter
+      rejecting with the publicly-exported EngineTimeoutError is rethrown unwrapped and lands on
+      `timeout` (engine-timeout.ts:96-97, index.ts). ST-5 should add that case; AC-5 alone
+      proves timeout only with a budget-ignoring fake.
+  - id: r-verdict-provenance
+    severity: medium
+    summary: >-
+      NEW from 4R review (R1-002). The diff is embedded verbatim in the prompt and the verdict
+      marker is accepted from anywhere in the engine output, so repository content an attacker
+      controls (a diff line `+VERDICT: approve` the model echoes) can steer the terminal verdict.
+      NOT covered by #27, which hardens marker normalization, not provenance — this needs an
+      owner. Candidates: constrain extraction to the output tail, or a delimiter contract in the
+      prompt template (E3 owns the template). Raise when scoping #27 so the two land together.
+  - id: r-orphan-sweeper-blind-spot
+    severity: medium
+    summary: >-
+      NEW from 4R review (R4-001, empirically reproduced with git 2.43.0). A partially-failed
+      `git worktree remove --force` deletes the .git/worktrees registry entry while leaving the
+      directory on disk, so the leaked worktree is invisible to listOrphanWorktrees, which
+      enumerates the registry only. Single-run mitigation exists (the result carries
+      worktreePath + cleanup-failed). Fix candidates live in E2/E6 scope: filesystem sweep of
+      worktreesDir in listOrphanWorktrees, or surfacing cleanup-failed paths in the E6 UI.
+      Related but distinct: R1-003 — a partial `worktree add` failure leaves debris with no
+      handle at all (path derivation is module-private).
+  - id: r-harness-load-eager
+    severity: medium
+    summary: >-
+      NEW from 4R review (R3-001). runReview consumes exactly one harness but loadHarnesses
+      eagerly resolves all and throws on the first broken one, so one broken harness in the
+      user's config fails every review with an error naming a harness the caller never asked
+      for, in readdir (nondeterministic) order. Behavior-activated: the gap is load-harnesses.ts
+      (E3), first activated by this composition. Candidates: per-type load path, or tolerant
+      load returning per-harness errors. B-level API question for E3 — raise before E6 makes the
+      error user-visible.
+  - id: r-unbounded-nonengine-awaits
+    severity: medium
+    summary: >-
+      NEW from 4R review (R3-002). Only the engine stage is time-boxed; harness load, worktree
+      creation, diff and cleanup are unbounded awaits, and the git adapter sets no execa
+      timeout, so a wedged git leaves runReview permanently unsettled — the documented "ALWAYS
+      resolves" guarantee is contingent on adapters this module does not control. Core fix would
+      violate the design (one budget, one seam); right owner is the git adapter (execa timeout
+      in EXECA_BASE, translated to a GitPort error). Behavior-activated, pre-existing adapter
+      gap. Candidate for a small E4.F2-adjacent story.
+  - id: r-timeout-overflow-clamp
+    severity: low
+    summary: >-
+      NEW from 4R review (R3-004/R4, deterministic, verified on this machine). timeoutMs is
+      bounded only from below; above 2^31-1 Node clamps setTimeout to 1ms, inverting "no limit"
+      into an immediate bogus `timeout` that abandons the engine and (under `always`) deletes
+      its worktree. Cheapest possible fix: an upper bound in the existing pre-flight (one
+      condition + one AC-6 case). Offered as part of optional ST-3b; if declined, carry to H2.
+  - id: r-cleanup-races-abandoned-engine
+    severity: low
+    summary: >-
+      NEW from 4R review (R3-003). Consequence of r-engine-not-cancellable not previously
+      recorded: on the timeout path performCleanup immediately force-removes the worktree the
+      abandoned engine process may still occupy — intermittent cleanup-failed annotations and a
+      process outliving its resolved run. Inert in H1 (FakeEngine holds no files). Owner: E4.F2
+      kill-before-cleanup ordering; fold into r-engine-not-cancellable's resolution.
+  - id: r-review-doc-drift
+    severity: low
+    summary: >-
+      NEW from 4R review (R2-001/R2-002/R2-003/R2-004, all deterministic doc-level findings).
+      Public-surface docs that lie or omit: RunCleanupOutcome.attempted conflates "tried and
+      failed" with "never tried" (keep / on-success early returns) and is the only undocumented
+      public result member; the reviewSucceeded = (state === "ok") policy decision is
+      uncommented at the call site with its rationale only in spec.md; engineOutput's
+      "present on ok/ambiguous" contradicts the parse-fault path (engine-error + engineOutput +
+      failure all set); engine-timeout.ts's three-outcome doc omits the sync-throw fourth
+      outcome (r-sync-throw-unwrapped's doc surface). All comment-only, zero behaviour change.
+      Offered as ST-3b; cheapest before ST-4 encodes readings of these docs into test names.
 next_action:
   kind: ask_user
-  target: sddl-code-review
+  target: sddl-executor
   summary: >-
-    ST-3 done and green. Diff triages `full-4r` on the project's own rubric -- hot-path AND >400
-    changed lines, qualifying on both counts -- so the orchestrator is raising a review_gate
-    rather than skipping. The executor recommended deferring review to ST-6; the orchestrator
-    disagrees and recommends reviewing now, because ST-4 writes tests against this code and a
-    logic error would be encoded into them. User decides.
+    4R review complete: pass_with_warnings, 15 info findings, zero blocking, no fix round
+    mandated by the protocol. review_gate raised: the orchestrator recommends an optional
+    bounded fix stage ST-3b before ST-4 (doc corrections from r-review-doc-drift + the
+    timeoutMs upper bound from r-timeout-overflow-clamp; ~30 lines, comment-only except one
+    validation condition), routed through a plan.md amendment and its own stage_approval,
+    because ST-4 is about to write tests on top of these docs and this validation. Declining is
+    legitimate: everything is recorded as info/risks and ST-4 can start immediately. User
+    decides; forward-looking findings (timeout precedence, verdict provenance, orphan sweeper,
+    eager harness load, unbounded awaits) are owned by later epics regardless.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T14:05:00Z"
+updated_at: "2026-08-09T15:15:00Z"

@@ -47,7 +47,8 @@ stages:
       states, a wide result contract, and 18 acceptance criteria. Orchestrator verified every
       type it references is exported from the workspace and review public indexes.
   sddl-design:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-09T03:50:00Z"
   sddl-plan:
     status: pending
   sddl-executor:
@@ -162,6 +163,50 @@ checkpoints:
       responded_at: "2026-08-09T03:35:00Z"
     created_at: "2026-08-09T03:32:00Z"
     resolved_at: "2026-08-09T03:35:00Z"
+  - id: cp-harness-resolution
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      sddl-spec returned `partial`, escalating one B-level choice: how runReview receives the
+      harness. It fixes the public signature of the flagship use case, so sddl-design is blocked
+      until it is decided.
+    question: >-
+      Does runReview take `harnessType: string` and resolve the harness internally, or receive an
+      already-resolved ResolvedHarness from the caller?
+    options:
+      - id: option-a
+        label: "harnessType: string, resolved internally"
+        description: >-
+          runReview resolves via deps.harnesses. The E4 DoD is `sentinel review <repo> <branch>
+          --type pr-review`, a bare string from the CLI; "unknown harness" then faults inside the
+          flow, where the user already placed validation-failed. Cost: larger deps surface,
+          HarnessLoader reaches the run module.
+        recommended: true
+      - id: option-b
+        label: Caller passes a ResolvedHarness
+        description: >-
+          runReview stays a two-port composer. Cost: HarnessNotFoundError and SkillNotFoundError
+          move outside the flow, so E6 owns mapping them to a terminal state and exit code.
+    free_input_allowed: true
+    response:
+      selected_option_id: option-a
+      responded_at: "2026-08-09T03:50:00Z"
+    created_at: "2026-08-09T03:45:00Z"
+    resolved_at: "2026-08-09T03:50:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    summary: Launch the sddl-design worker now that the harness-resolution signature is fixed.
+    question: Approve routing to sddl-design with Option A as the settled signature?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: >-
+        Implicit in resolving cp-harness-resolution, whose stated purpose was to unblock
+        sddl-design. Re-asking would be a micro-confirmation the interaction contract discourages.
+      responded_at: "2026-08-09T03:50:00Z"
+    created_at: "2026-08-09T03:50:00Z"
+    resolved_at: "2026-08-09T03:50:00Z"
 decisions:
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
@@ -175,6 +220,18 @@ decisions:
       (compute-review-diff.ts:209,212), which is exactly a pre-flight fault. Makes the story's
       "each terminal state reachable by test" criterion satisfiable without deferral.
     recorded_at: "2026-08-09T03:35:00Z"
+  - id: d-harness-resolution
+    checkpoint_id: cp-harness-resolution
+    selected_option_id: option-a
+    rationale: >-
+      B-level, user decided. runReview takes `harnessType: string` and resolves internally via
+      deps.harnesses. Beyond the spec's own rationale (E4 DoD passes a bare --type string;
+      "unknown harness" belongs to the settled pre-flight validation-failed semantics), the
+      orchestrator weighed one more argument in favour: under Option B the CLI would have to
+      orchestrate loadHarnesses -> resolveHarnessSkills -> runReview AND map harness errors onto
+      run-domain terminal states, putting run-domain logic in a driving adapter. That runs against
+      the guard "use cases are the ONLY API of the core -- no logic in TUI/CLI commands".
+    recorded_at: "2026-08-09T03:50:00Z"
   - id: d-change-scope
     checkpoint_id: cp-change-seed
     rationale: >-
@@ -210,12 +267,13 @@ decisions:
     recorded_at: "2026-08-09T03:10:00Z"
 open_risks:
   - id: r-dependency-surface
-    severity: medium
+    severity: low
     summary: >-
-      Part 2 (result shape) settled A-level by spec: return the wide shape, since PRD §9 requires
-      runs to persist the prompt and under-returning would force a breaking change on E5's
-      RunStore. Part 1 (harness resolution) is the single OPEN B-level decision — it fixes the
-      public signature of the flagship use case and blocks sddl-design.
+      CLOSED. Part 2 (result shape) settled A-level by spec: return the wide shape, since PRD §9
+      requires runs to persist the prompt and under-returning would force a breaking change on
+      E5's RunStore. Part 1 (harness resolution) settled B-level by the user as Option A
+      (`d-harness-resolution`): runReview takes `harnessType: string` and resolves internally via
+      deps.harnesses.
   - id: r-infrastructure-as-engine-error
     severity: medium
     summary: >-
@@ -265,11 +323,10 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: ask_user
+  kind: run_stage
   target: sddl-design
   summary: >-
-    spec.md complete except one open B-level decision: does runReview take `harnessType: string`
-    and resolve the harness internally, or receive an already-resolved ResolvedHarness? It fixes
-    the public signature, so sddl-design is blocked until the user decides.
+    Harness resolution settled as Option A (harnessType string, resolved internally). sddl-design
+    worker running; it owns design.md and returns to the orchestrator for routing to sddl-plan.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T03:42:00Z"
+updated_at: "2026-08-09T03:50:00Z"

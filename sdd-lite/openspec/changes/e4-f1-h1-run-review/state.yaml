@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -47,8 +47,20 @@ stages:
       states, a wide result contract, and 18 acceptance criteria. Orchestrator verified every
       type it references is exported from the workspace and review public indexes.
   sddl-design:
-    status: in_progress
+    status: completed
     started_at: "2026-08-09T03:50:00Z"
+    completed_at: "2026-08-09T03:58:00Z"
+    notes: >-
+      design.md written, status `success`, no blocking questions. Core structural idea: runReview
+      is a thin shell over a private non-throwing `executePipeline` whose return type carries a
+      mandatory TerminalState, so "exactly one terminal state" becomes a compile-time obligation
+      and "no throwable escapes" collapses to one exhaustive catch at a single call site instead
+      of discipline across eight stages. Settled the four questions spec deferred: injectable
+      cancellable TimeoutScheduler (over vitest fake timers), a total classifyFailure keyed on
+      error class alone, cleanup run sequentially AFTER the pipeline rather than in a `finally`
+      (so no finally block can override the computed result -- the exact hazard AC-9/AC-10 test),
+      and the five-file layout with an append-only index. Full AC->test table included.
+      Orchestrator independently verified its three load-bearing source claims.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -295,6 +307,21 @@ open_risks:
       RESOLVED by spec: a cleanup fault ANNOTATES, never overrides and never rethrows. AC-9 and
       AC-10 prove both directions — a fault on the happy path keeps `ok`, and a fault after an
       engine rejection keeps both `engine-error` and the originating EngineInvocationError.
+  - id: r-test-fake-cross-boundary
+    severity: low
+    summary: >-
+      NEW from design. Run tests import an adapter (`createFakeEngine`) and another core module's
+      test fake. Verified legal by the orchestrator against `.dependency-cruiser.cjs` line 91
+      (`exclude: { path: "(^|/)__test__/" }`, dec-005), so `depcruise src` never cruises them,
+      while `tsc --noEmit` still typechecks them. First cross-module fake reuse in this repo, so
+      it reads like an AC-15 guard violation on casual inspection. Documented in design.md with
+      the evidence so QA does not re-litigate it.
+  - id: r-timeout-seam-surface
+    severity: low
+    summary: >-
+      NEW from design. `deps.scheduleTimeout?` widens the public deps surface for a test-driven
+      reason. Mitigated: optional, defaulted, precedented by `CreateReviewWorktreeDeps.now?`, and
+      it also buys a production-relevant guarantee (the timer is provably cleared).
   - id: r-engine-not-cancellable
     severity: low
     summary: >-
@@ -323,10 +350,11 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
-  target: sddl-design
+  kind: wait_for_approval
+  target: sddl-plan
   summary: >-
-    Harness resolution settled as Option A (harnessType string, resolved internally). sddl-design
-    worker running; it owns design.md and returns to the orchestrator for routing to sddl-plan.
+    design.md complete with no blocking questions. Awaiting the phase-validation checkpoint on the
+    approach before routing to sddl-plan, which becomes a pure ordering exercise -- file list,
+    per-file content, control flow and AC->test map are all already fixed.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T03:50:00Z"
+updated_at: "2026-08-09T03:58:00Z"

@@ -120,6 +120,16 @@ stages:
       in the module doc-comment, which made the AC-16 grep match its own comment and would have
       failed the ST-6 gate as a self-inflicted false positive. ST-4..ST-6 each still require
       their own stage_approval.
+
+      ST-3b COMPLETE (status `success`, commit 1be2946). Review-driven fix stage inserted by
+      plan amendment ff9173a after the user accepted the review_gate offer; approval was
+      granted at the gate itself, scoped to ledger ids R2-001..R2-004 + R3-004, and the
+      executor stayed exactly inside it (delta verified by the orchestrator). Doc corrections
+      on RunCleanupOutcome / reviewSucceeded / engineOutput+failure / engine-timeout outcomes;
+      MAX_TIMEOUT_MS pre-flight bound; spec.md AC-6 enumeration + result-contract row amended
+      under the same finding ids. Exit checks: `npm run check` green (76 files; depcruise 56
+      modules / 104 dependencies), `npm test` 163/163, AC-16 grep clean. ST-4 now owes 9 AC-6
+      cases; ST-5 additionally owes the R1-001 EngineTimeoutError escape-hatch pin.
   sddl-code-review:
     status: completed
     started_at: "2026-08-09T14:20:00Z"
@@ -633,11 +643,10 @@ open_risks:
   - id: r-timeout-overflow-clamp
     severity: low
     summary: >-
-      NEW from 4R review (R3-004/R4, deterministic, verified on this machine). timeoutMs is
-      bounded only from below; above 2^31-1 Node clamps setTimeout to 1ms, inverting "no limit"
-      into an immediate bogus `timeout` that abandons the engine and (under `always`) deletes
-      its worktree. Cheapest possible fix: an upper bound in the existing pre-flight (one
-      condition + one AC-6 case). Offered as part of optional ST-3b; if declined, carry to H2.
+      CLOSED by ST-3b (commit 1be2946), accepted by the user at the review_gate. MAX_TIMEOUT_MS
+      pre-flight bound added: values above 2^31-1 now reject as InvalidRunRequestError instead
+      of overflowing setTimeout to 1ms. Spec AC-6 enumeration extended; the ninth AC-6 test
+      case lands in ST-4.
   - id: r-cleanup-races-abandoned-engine
     severity: low
     summary: >-
@@ -657,19 +666,17 @@ open_risks:
       "present on ok/ambiguous" contradicts the parse-fault path (engine-error + engineOutput +
       failure all set); engine-timeout.ts's three-outcome doc omits the sync-throw fourth
       outcome (r-sync-throw-unwrapped's doc surface). All comment-only, zero behaviour change.
-      Offered as ST-3b; cheapest before ST-4 encodes readings of these docs into test names.
+      CLOSED by ST-3b (commit 1be2946): all four doc surfaces corrected in code, plus the
+      matching spec.md result-contract row (same R2-003 authority, A-level).
 next_action:
   kind: ask_user
   target: sddl-executor
   summary: >-
-    4R review complete: pass_with_warnings, 15 info findings, zero blocking, no fix round
-    mandated by the protocol. review_gate raised: the orchestrator recommends an optional
-    bounded fix stage ST-3b before ST-4 (doc corrections from r-review-doc-drift + the
-    timeoutMs upper bound from r-timeout-overflow-clamp; ~30 lines, comment-only except one
-    validation condition), routed through a plan.md amendment and its own stage_approval,
-    because ST-4 is about to write tests on top of these docs and this validation. Declining is
-    legitimate: everything is recorded as info/risks and ST-4 can start immediately. User
-    decides; forward-looking findings (timeout precedence, verdict provenance, orphan sweeper,
-    eager harness load, unbounded awaits) are owned by later epics regardless.
+    ST-3b complete and green (commit 1be2946): the user accepted the review_gate offer, the
+    plan was amended (ff9173a) and the fix stage executed exactly within the five approved
+    ledger ids. Review lineage closed at pass_with_warnings; r-timeout-overflow-clamp and
+    r-review-doc-drift CLOSED. Next: stage_approval for ST-4 (fixtures + terminal-state suite,
+    now 9 AC-6 cases including the ST-3b upper bound). ST-5 additionally owes the R1-001
+    escape-hatch pin. Both remain user-gated per the workflow contract.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T15:15:00Z"
+updated_at: "2026-08-09T15:45:00Z"

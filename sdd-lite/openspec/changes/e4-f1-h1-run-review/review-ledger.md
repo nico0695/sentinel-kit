@@ -12,11 +12,10 @@
 - open_severe_findings: 0
 - verdict: pass_with_warnings
 - next_action_digest: >-
-  No finding blocks. review_gate raised offering an optional bounded fix stage (ST-3b) for the
-  five deterministic, cheap items before ST-4 writes tests on top of them; user decides. Five
-  findings promoted to state.yaml open_risks as forward-looking constraints (E4.F2 and E5/E6
-  owners named per row).
-- updated_at: 2026-08-09T15:10:00Z
+  Review lineage closed. ST-3b accepted at the review_gate and executed (commit 1be2946),
+  addressing R2-001..R2-004 + R3-004; see Fix Rounds. Remaining info findings carried as
+  state.yaml open_risks with later-epic owners. Next: stage_approval for ST-4.
+- updated_at: 2026-08-09T15:45:00Z
 
 ## Review History
 
@@ -73,9 +72,15 @@ what ST-4/ST-5 must assert).
 
 ## Fix Rounds
 
-None mandated. Zero findings hold `status: open` — the severity floor leaves nothing in the fix
-loop. A `review_gate` was raised offering an optional bounded fix stage (ST-3b) for the cheap
-deterministic subset before ST-4 (see digest); its outcome is recorded in state.yaml checkpoints.
+None mandated by the protocol (zero `open` rows). The user accepted the offered optional fix
+stage at the `review_gate`: **ST-3b** (plan amendment ff9173a, fix delta commit 1be2946)
+addressed R2-001, R2-002, R2-003 (code doc + the matching spec result-contract row), R2-004,
+and R3-004 (MAX_TIMEOUT_MS pre-flight bound + spec AC-6 enumeration). Rows keep `status: info`
+per the severity floor — this section is the record that their content was addressed. Exit
+evidence: `npm run check` green, `npm test` 163/163, AC-16 grep clean, delta verified in-scope
+by the orchestrator. The remaining info rows (R1-001..R1-004, R3-001..R3-003, R3-005, R4-001,
+R4-002) are carried as state.yaml open_risks with later-epic owners, plus ST-4/ST-5 test
+obligations added by the same plan amendment.
 
 ## Verdict Rationale
 

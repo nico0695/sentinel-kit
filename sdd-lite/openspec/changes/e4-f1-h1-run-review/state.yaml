@@ -79,7 +79,7 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-09T04:20:00Z"
-    last_updated_at: "2026-08-09T13:45:00Z"
+    last_updated_at: "2026-08-09T14:05:00Z"
     notes: >-
       ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
       subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
@@ -102,8 +102,24 @@ stages:
       from 53/88 by exactly the two new modules, confirming no node:timers specifier slipped in)
       and `npm test` still 163/163. Diff triaged `trivial-plus` by the orchestrator: additive,
       no importers, no behavioural coverage yet -- review deferred to ST-6 / final QA where it
-      can be read in context alongside run-review.ts. ST-3..ST-6 each still require their own
-      stage_approval.
+      can be read in context alongside run-review.ts.
+
+      ST-3 COMPLETE (status `success`). Created run-review.ts (418 lines: the public shapes,
+      runReview, and the private executePipeline / classifyFailure / performCleanup / RunDraft)
+      and extended index.ts with an append-only export block. All four structural obligations
+      implemented literally and independently verified by the orchestrator against source:
+      executePipeline returns a mandatory TerminalState with a single exhaustive catch at line
+      340; zero `finally` control-flow constructs (the two textual hits are the doc-comment
+      explaining their absence); classifyFailure tests no base class, so WorktreeCreationError
+      falls through to engine-error as AC-4b needs; harness resolution hoisted ahead of worktree
+      creation with runReview owning the Map-miss HarnessNotFoundError. No public type altered --
+      strict mode was absorbed by conditional spreads, so the deviation rule never fired.
+      Exit checks: `npm run check` green (depcruise 56 modules / 104 dependencies), `npm test`
+      163/163, and the AC-16 grep on index.ts returns nothing. Six A-level internal decisions
+      logged; the sharpest is #3 -- a first draft named the four AC-16 exclusions by identifier
+      in the module doc-comment, which made the AC-16 grep match its own comment and would have
+      failed the ST-6 gate as a self-inflicted false positive. ST-4..ST-6 each still require
+      their own stage_approval.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -452,6 +468,16 @@ open_risks:
       adapter throwing on a missing binary would surface a raw error rather than the typed one.
       Not fixed here because the structure is design-fixed and runEngineWithTimeout is not
       exported from index.ts, so changing it later is free.
+  - id: r-st3-behaviour-unverified
+    severity: medium
+    summary: >-
+      NEW from ST-3, and now the dominant risk on the change. run-review.ts is 418 lines of
+      hot-path core composition with ZERO behavioural verification: `npm run check` proves types,
+      the strict-mode result shape and the architecture guards, and no behaviour whatsoever.
+      Every behavioural criterion (AC-1..AC-14) runs for the first time at ST-4/ST-5. Compounding
+      factor the orchestrator flags: the ST-4 executor will read run-review.ts while writing the
+      tests, so a logic error here risks being encoded into the tests meant to catch it. This is
+      the argument for reviewing before ST-4 rather than deferring to ST-6.
   - id: r-st2-behaviour-unverified
     severity: medium
     summary: >-
@@ -520,11 +546,13 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
-  target: sddl-executor
+  kind: ask_user
+  target: sddl-code-review
   summary: >-
-    ST-3 approved and running: run-review.ts + the append-only index.ts export block. On return,
-    the orchestrator triages the stage diff -- this is the first stage likely to warrant
-    sddl-code-review rather than a trivial skip -- and opens the ST-4 stage_approval.
+    ST-3 done and green. Diff triages `full-4r` on the project's own rubric -- hot-path AND >400
+    changed lines, qualifying on both counts -- so the orchestrator is raising a review_gate
+    rather than skipping. The executor recommended deferring review to ST-6; the orchestrator
+    disagrees and recommends reviewing now, because ST-4 writes tests against this code and a
+    logic error would be encoded into them. User decides.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T13:45:00Z"
+updated_at: "2026-08-09T14:05:00Z"

@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-2
+- latest_stage_id: ST-3
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/engine-timeout.ts`, `src/core/run/builtin-verdict-extraction.ts`
-- latest_check_result: `npm run check` green; `npm test` 163/163 (14 files) — unchanged baseline
-- latest_next_action: request `stage_approval` for ST-3 (`run-review.ts` use case + append-only `index.ts` export block)
+- latest_files_changed: `src/core/run/run-review.ts` (new), `src/core/run/index.ts` (modified, append-only)
+- latest_check_result: `npm run check` green; `npm test` 163/163 (14 files) — unchanged baseline; AC-16 grep returns nothing
+- latest_next_action: request `stage_approval` for ST-4 (`run-review-fixtures.ts` + the terminal-state half of `run-review.test.ts`)
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-2
+- current_stage_id: ST-3
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -27,7 +27,7 @@
 |---|---|---|---|---|---|---|
 | ST-1 | Run-domain leaf types: error family + verdict domain type | yes | approved (`cp-st1-approval`) | completed | 2026-08-09 | Two new leaf files, no importers yet (expected) |
 | ST-2 | Cancellable timeout race + naive verdict extraction | yes | approved (`cp-st2-approval`) | completed | 2026-08-09 | Riskiest stage per `plan.md`; behaviour unverified by the repo suite until ST-4/ST-5 |
-| ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | pending | pending | — | Largest stage |
+| ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | approved (`cp-st3-approval`) | completed | 2026-08-09 | Largest stage; behaviour still unverified by the suite until ST-4/ST-5 |
 | ST-4 | Fixtures + terminal-state coverage | yes | pending | pending | — | — |
 | ST-5 | Cleanup contract + the two seams | yes | pending | pending | — | — |
 | ST-6 | Whole-diff verification and PR readiness | no | pending | pending | — | Read-only evidence gate |
@@ -212,3 +212,103 @@
 - Quality gate is green and the suite is untouched at 163/163. Be aware that this stage adds no tests, so its behaviour is only proven once ST-4/ST-5 land; an out-of-repo smoke run (21/21) was used as an interim sanity check.
 - Nothing outside `src/core/run/` was touched, and `index.ts` stays unchanged until ST-3.
 - Next: approve ST-3 (`run-review.ts` + the append-only `index.ts` export block) — the largest stage in the change.
+
+### Stage `ST-3`
+
+- stage_digest: The use case and the module's public surface — `run-review.ts` (co-located request/deps/result types, `runReview`, and the private `executePipeline` / `classifyFailure` / `performCleanup`) plus the append-only `index.ts` export block. Written exactly to `design.md`'s interface block; no public type or signature altered.
+- approval_checkpoint_id: `cp-st3-approval`
+- approval_decision_id: user-approved ST-3 at `cp-st3-approval` (recorded in the orchestrator handoff)
+- planned_scope: `src/core/run/run-review.ts` (new), `src/core/run/index.ts` (modified, append-only)
+- actual_files_changed: `src/core/run/run-review.ts` (new, 418 lines), `src/core/run/index.ts` (modified, +30/-3 lines)
+- touches_code: yes
+- quick_check_status: passed
+- qa_review_status: deferred to the ST-6 / final gate — ST-3's behaviour is not exercised by any repository test yet, so a structured review is more informative once ST-4/ST-5 land
+- execution_status: completed
+- next_action: request `stage_approval` for ST-4
+
+#### Planned Work
+
+- `run-review.ts`: the public shapes (`RunReviewRequest`, `RunReviewDeps`, `RunReviewResult`, `RunFailure`, `RunStage`, `RunCleanupReason`, `RunCleanupOutcome`), the public `runReview`, and the three module-private units `executePipeline`, `classifyFailure`, `performCleanup`, plus the private `RunDraft` / `PipelineOutcome`.
+- `index.ts`: append the use case, its public types, `TimeoutScheduler`, the run error family and the verdict types. Do NOT export the built-in extraction, the default scheduler, the race helper or the classifier (AC-16).
+- Do not write tests or fixtures (ST-4/ST-5) and do not modify any other file.
+
+#### Preconditions And Sync Checks
+
+- Working tree clean at stage start (`git status --porcelain` empty); ST-1 and ST-2 are committed. Branch `claude/validar-e1-preparar-e4-m1xkhl`.
+- All four ST-1/ST-2 files re-read before writing. Call forms confirmed: `new InvalidRunRequestError(message)`, `new EngineTimeoutError(timeoutMs)`, `runEngineWithTimeout(invoke, timeoutMs, schedule)`, `extractBuiltInVerdict(output) => Verdict | null`.
+- All five consumed use cases re-read from source, not from memory, so the composition matches reality:
+  - `createReviewWorktree({ repoPath, commitish, branchLabel }, { git, worktreesDir, now? })`
+  - `computeReviewDiff({ repoPath, baseRef, targetRef, limits? }, { git })`
+  - `assemblePrompt({ resolvedHarness, diff, validationOutput? })`
+  - `loadHarnesses(deps, extraSkills?) => Promise<Map<string, ResolvedHarness>>` — **re-verified**: it does NOT throw on an unknown harness type, so the lookup miss is `runReview`'s own responsibility (load-bearing for AC-6 and AC-11).
+  - `cleanupWorktree({ repoPath, worktreePath, policy, reviewSucceeded }, { git })`
+- Error constructors re-verified: `HarnessNotFoundError(type, options?)` — the one-argument call form used at the harness stage is valid.
+- `design.md` and `plan.md` agree on every element of this stage. No contradiction found; the STOP rule was not triggered.
+
+#### Changes Applied
+
+- `src/core/run/run-review.ts`
+  - **`runReview`** — creates the `RunDraft`, awaits `executePipeline`, then awaits `performCleanup` SEQUENTIALLY (no `finally`, per executor note 3), then assembles the wide result with conditional spreads (executor note 4). `reviewSucceeded` is passed as `outcome.state === "ok"`, so `on-success` keeps the worktree for `ambiguous` too.
+  - **`executePipeline`** — `let stage: RunStage` reassigned before each step; one `try` over stages 1–8; one `catch (error: unknown) { return { state: classifyFailure(error), failure: { stage, error } }; }`. Its return type carries a mandatory `TerminalState`, so "exactly one terminal state" is a compile-time obligation, and the catch-all makes escape impossible.
+  - Stage 1 (request): empty-string checks on `repoPath` / `baseRef` / `targetRef` / `harnessType` plus `Number.isFinite(timeoutMs) && timeoutMs > 0`. It deliberately does NOT re-validate path absoluteness — the spec maps a relative `repoPath` to the worktree/diff stage, and duplicating the rule would silently relabel the stage.
+  - Stage 2 (harness) hoisted ahead of worktree creation: `loadHarnesses(deps.harnesses)` then `harnesses.get(request.harnessType)`; a miss throws `new HarnessNotFoundError(request.harnessType)`. An unknown harness therefore leaves no orphan worktree (AC-11).
+  - Stage 7 (engine): `runEngineWithTimeout(() => deps.engine.review({ worktree: { path }, prompt, timeoutMs }), request.timeoutMs, deps.scheduleTimeout ?? defaultTimeoutScheduler)`. `timeoutMs` is forwarded into the `ReviewRequest` as well, so real adapters can self-enforce.
+  - Stage 8 (parse): `(deps.parseVerdict ?? extractBuiltInVerdict)(output)`; `null` ⇒ `{ state: "ambiguous" }`, otherwise `{ state: "ok", verdict }`.
+  - **`classifyFailure`** — total, pure, keyed on the error class ALONE. `EngineTimeoutError` ⇒ `timeout`; the seven enumerated pre-flight classes ⇒ `validation-failed`; everything else ⇒ `engine-error`. It never tests `RunError`, `WorkspaceError` or `HarnessError`, so `WorktreeCreationError` correctly falls through to `engine-error` (AC-4b).
+  - **`performCleanup`** — returns `{ attempted: false }` when no worktree exists; otherwise calls `cleanupWorktree` with `policy: request.cleanupPolicy ?? "always"` and converts any throwable into `{ attempted: true, removed: false, reason: "cleanup-failed", error }`. It cannot throw, cannot rethrow, and receives `reviewSucceeded` as an already-computed read-only boolean, so it has no channel to the terminal state.
+  - E5 seam: `request.validationOutput` forwarded verbatim to `assemblePrompt` via a conditional spread. No E5 import, no new machinery.
+  - Cross-module imports go through public indexes only: `../repos/index.js`, `../review/index.js`, `../workspace/index.js`. Intra-module imports are relative file specifiers, which guard 3 permits.
+- `src/core/run/index.ts` (append-only)
+  - Added: `TimeoutScheduler`; `RunError`, `RunErrorOptions`, `InvalidRunRequestError`, `EngineInvocationError`, `EngineTimeoutError`; `runReview` plus `RunReviewRequest`, `RunReviewDeps`, `RunReviewResult`, `RunFailure`, `RunStage`, `RunCleanupOutcome`, `RunCleanupReason`; `Verdict`, `VerdictParser`.
+  - Not added (AC-16): the built-in verdict extraction, the default timeout scheduler, the engine race helper and the failure classifier.
+  - The three pre-existing export statements are unchanged in content and keep their relative order.
+
+#### Scope And Blast Radius Notes
+
+- `git status --porcelain` after the stage: `?? src/core/run/run-review.ts` and ` M src/core/run/index.ts` only. `git diff --stat` reports `src/core/run/index.ts | 33 +++---` and nothing else. AC-17 holds.
+- No workspace / review / repos file, no `ReviewEngine` port, no `FakeEngine` change. No test file created. No git side effects.
+- `depcruise src` grew from 55 modules / 91 dependencies (post-ST-2) to 56 / 104 — exactly the new module plus its 13 edges — with zero violations, which is AC-15 on production files.
+
+#### Quick Check
+
+- checks_planned: `npm run check`; `npm test` still 163/163; the AC-16 grep on `index.ts`; `git status --porcelain` / `git diff --stat` scope review
+- checks_run:
+  - `npm run check` → passed (biome: 76 files checked, no fixes; `tsc --noEmit`: clean; `depcruise src`: no dependency violations, 56 modules / 104 dependencies cruised)
+  - `npm test` → passed, 14 test files, 163/163, 0 failures — baseline unchanged, as planned for a pre-test stage
+  - `grep -E "extractBuiltInVerdict|defaultTimeoutScheduler|runEngineWithTimeout|classifyFailure" src/core/run/index.ts` → no output, exit 1 (AC-16 satisfied)
+  - `git status --porcelain` → the one new file and the one modified file only; `git diff --stat` → `index.ts` only
+- checks_skipped: none available in-repo. **ST-3's behaviour is still unverified by the test suite.** `npm run check` proves types, the strict-mode result shape and the architecture guards — it proves no behaviour at all. Every behavioural acceptance criterion (AC-1..AC-14) is exercised for the first time at ST-4/ST-5. Stated plainly so the green above is not over-read.
+- findings_summary: two biome formatting/ordering fixes applied during the stage (see decisions); no warnings, no failures, no design deviations.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npm run check` | biome 76 files clean · tsc clean · depcruise 56 modules / 104 deps, 0 violations |
+| command | `npm test` | 14 files / 163 tests passed — identical to the pre-stage baseline |
+| command | AC-16 grep on `src/core/run/index.ts` | no output, exit 1 |
+| command | `git status --porcelain` / `git diff --stat` | `?? run-review.ts`, ` M index.ts`; diff touches `index.ts` only |
+| file | `src/core/run/run-review.ts` | Non-throwing pipeline, sequential cleanup, class-keyed total classifier |
+| file | `src/core/run/index.ts` | Append-only block; AC-16 exclusions intact |
+| reference | `src/core/workspace/create-review-worktree.ts`, `cleanup-worktree.ts`, `compute-review-diff.ts`, `src/core/review/assemble-prompt.ts`, `load-harnesses.ts` | Signatures re-read from source before composing |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** biome's `organizeImports` assist sorts `export … from` statements by module specifier, so the four new statements were inserted in sorted positions rather than concatenated at the end of the file. This satisfies the append-only rule as written — the three pre-existing exports are untouched and keep their relative order — while keeping `npm run check` green. Appending literally at the end fails `biome check`.
+- **A-level (internal, logged):** `index.ts`'s module doc-comment was updated. The previous text said "Public API (types only in H1) … The runReview use case lands in E4.F1.x", which this stage makes false. The replacement also records the AC-16 exclusions. Comment-only; no export line was rewritten.
+- **A-level (internal, logged):** that doc-comment names the four excluded units in PROSE ("the built-in verdict extraction, the default timeout scheduler, the engine race helper and the failure classifier") rather than by identifier. A first draft used the identifiers and made the AC-16 grep match its own comment — a false positive that would fail the ST-6 gate. The prose form keeps the grep authoritative.
+- **A-level (internal, logged):** `RunCleanupReason` is formatted across three lines and `RunStage` one member per line — biome's formatter rejects the single-line forms from `design.md` (>80 chars). Semantically identical.
+- **A-level (internal, logged):** `draft.usage` is assigned inside an `if (engineResult.usage !== undefined)` guard rather than unconditionally. `exactOptionalPropertyTypes: true` rejects assigning `ReviewUsage | undefined` to an optional property. Internal (`RunDraft` is private); the public `RunReviewResult` shape from `design.md` is unchanged.
+- **A-level (internal, logged):** stage-1 validation is written inline in `executePipeline` rather than extracted into a helper, matching how `createReviewWorktree` and `computeReviewDiff` write their own pre-flight checks.
+- **No deviation from `design.md`'s public interface block.** Every public type and the `runReview` signature are byte-equivalent in meaning to the design; strict mode was absorbed entirely by conditional spreads and internal guards, never by widening a public type. The deviation rule for this stage did not fire.
+- **Carried forward from ST-2, unchanged:** a synchronously-throwing engine adapter escapes `runEngineWithTimeout` un-wrapped. `executePipeline`'s catch-all still yields `engine-error` with `stage: "engine"`, so no acceptance criterion is affected; AC-10 asserts `EngineInvocationError` only for an async rejection.
+- Blockers: none.
+
+#### User-Facing Summary
+
+- ST-3 is done: `runReview` exists, and the run module's public surface now exposes it along with its request/deps/result types, the error family and the two seams.
+- The two structural obligations are implemented literally: the pipeline cannot throw (its return type forces a terminal state, and one exhaustive catch absorbs everything else), and cleanup runs sequentially after it — no `finally` anywhere — so it can annotate but never override.
+- Quality gate is green, the suite is untouched at 163/163, and the AC-16 grep is clean. Be clear-eyed about what that proves: types, the strict-mode result shape and the architecture guards. **No behaviour is verified yet** — every behavioural criterion first runs at ST-4/ST-5.
+- Nothing outside `src/core/run/` was touched, and the three pre-existing exports in `index.ts` were left exactly as they were.
+- Next: approve ST-4 (fixtures + the terminal-state half of the test suite) — the stage that finally makes the last three stages provable.

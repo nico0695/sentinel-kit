@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-5
+- latest_stage_id: ST-6
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/__test__/run-review.test.ts` (extended, 339 → 630 lines); `run-review-fixtures.ts` untouched (no builder needed extending)
-- latest_check_result: `npx vitest run --project core` 145/145 (11 files, 16 new); `npm run check` green; `npm test` 198/198 (15 files) — 182 baseline + 16 new; `git diff --stat` shows only `run-review.test.ts`
-- latest_next_action: execute ST-6 (read-only whole-diff verification and PR readiness — no approval required per plan)
+- latest_files_changed: none (read-only evidence gate; only this log and `state.yaml` updated)
+- latest_check_result: `npm run check` green; `npm test` 198/198 (15 files); AC-15..AC-18 evidence recorded in the ST-6 entry
+- latest_next_action: request user approval to launch `sddl-qa-review` (final mode) — the last stage of the change
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-5
+- current_stage_id: ST-6
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -31,7 +31,7 @@
 | ST-3b | Review-driven doc corrections + `timeoutMs` upper bound (R2-001..R2-004, R3-004) | yes | granted (review_gate) | completed | 2026-08-09 | Amendment stage inserted after the full-4r review of 03bd7cf; comment-only except one validation condition |
 | ST-4 | Fixtures + terminal-state coverage | yes | approved (`cp-st4-approval`) | completed | 2026-08-09 | 19 new tests; all five terminal states now proven reachable, incl. the 9 AC-6 cases |
 | ST-5 | Cleanup contract + the two seams | yes | approved (`cp-st5-approval`) | completed | 2026-08-09 | 16 new tests; full behavioural surface AC-1..AC-14 now covered, plus timer hygiene and the R1-001 pin |
-| ST-6 | Whole-diff verification and PR readiness | no | pending | pending | — | Read-only evidence gate |
+| ST-6 | Whole-diff verification and PR readiness | no | not required (per plan) | completed | 2026-08-09 | Read-only; AC-15..AC-18 evidence recorded; executed inline by the orchestrator (A-level) |
 
 ## Execution Rules
 
@@ -583,3 +583,27 @@
 - The R1-001 review finding is now a test: an engine adapter that enforces its own budget and rejects with the public `EngineTimeoutError` lands on the `timeout` state, unwrapped — the documented route E4.F2 adapters will rely on.
 - Everything is green: core project 145/145, `npm run check` clean, full suite 198/198 with the 182 pre-existing tests untouched. The diff is one file: the test suite, extended in place; the fixtures needed no change.
 - Next: ST-6, the read-only whole-diff verification gate (no approval required per plan), then `sddl-qa-review` in final mode.
+
+### Stage `ST-6`
+
+- stage_digest: Whole-diff verification and PR readiness — read-only evidence gate for AC-15..AC-18 over the complete story diff vs `origin/main`. Executed inline by the orchestrator (A-level: the stage is four verification commands whose whole value is orchestrator-checked evidence; delegating a fresh context to re-run them would add isolation where none is needed — the stage writes no code and interprets nothing).
+- approval_checkpoint_id: none — `plan.md` marks ST-6 `Approval Required: no` (touches no code)
+- planned_scope: no files changed; record evidence here
+- actual_files_changed: `execution-log.md` (this entry), `state.yaml` (stage closeout)
+- touches_code: no
+- quick_check_status: passed
+- qa_review_status: recommended — `sddl-qa-review` (final mode) is the next and last stage of the change
+- execution_status: completed
+- next_action: request user approval to launch `sddl-qa-review` in final mode
+
+#### Evidence (verbatim outcomes, run at HEAD `a617fe3`)
+
+- **AC-17 — no scope leak.** `git diff origin/main...HEAD --stat -- src/` lists exactly 8 files, all under `src/core/run/**`: the five production files (`run-errors.ts` 76, `verdict.ts` 20, `engine-timeout.ts` 109, `builtin-verdict-extraction.ts` 39, `run-review.ts` 456), the modified `index.ts` (+33/−3) and the two `__test__/` files (229 + 630). 1589 insertions, 3 deletions. The 3 deletions audited individually: all in `index.ts`'s module doc-comment (ST-3 replaced the now-false "runReview lands in E4.F1.x" sentence); every pre-existing export line survives verbatim, so the append-only obligation holds in substance. No change to the `ReviewEngine` port, `FakeEngine`, workspace, review, or repos.
+- **AC-16 — private internals stay private.** `grep -E "extractBuiltInVerdict|defaultTimeoutScheduler|runEngineWithTimeout|classifyFailure" src/core/run/index.ts` exits 1 (no match).
+- **AC-15 — guards.** `depcruise src`: "no dependency violations found (56 modules, 104 dependencies cruised)". Counts unchanged since ST-3b, confirming the `__test__/` exclusion kept both test files out of the cruise while `tsc` typechecked them.
+- **AC-18 — full gate.** `npm run check` green (biome 78 files clean, `tsc --noEmit` clean, depcruise clean) and `npm test` 198/198 across 15 files — the 163 pre-story tests intact, plus the 35 story tests (19 from ST-4, 16 from ST-5).
+
+#### User-Facing Summary
+
+- The whole story diff is clean: only `src/core/run/**` touched, the four internals stay unexported, guards hold, and the full gate is green at 198/198.
+- The change is PR-ready pending the final QA review (`sddl-qa-review`, final mode), which is the only stage left and the only one that may mark the change completed.

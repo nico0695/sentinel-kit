@@ -161,6 +161,16 @@ stages:
       145/145, `npm run check` green, `npm test` 198/198 (182 baseline intact). Orchestrator
       independently re-ran check + full suite and spot-checked the describe map (35 tests, all
       ST-5 blocks present). Only ST-6 (read-only, no approval per plan) and QA remain.
+
+      ST-6 COMPLETE (status `success`, read-only, executed inline by the orchestrator --
+      A-level, logged in the entry: the stage is four verification commands whose value is
+      orchestrator-checked evidence, so fresh-context delegation adds nothing). Evidence at
+      HEAD a617fe3: AC-17 -- story diff vs origin/main is exactly 8 files, all src/core/run/**
+      (1589+/3-), the 3 deletions audited as ST-3's doc-comment truth-maintenance in index.ts
+      with every pre-existing export intact; AC-16 -- forbidden-internals grep exits 1;
+      AC-15 -- depcruise 56/104, unchanged since ST-3b; AC-18 -- check green, full suite
+      198/198. The change is PR-ready pending sddl-qa-review (final mode), the only remaining
+      stage and the only one that may mark the change completed.
   sddl-code-review:
     status: completed
     started_at: "2026-08-09T14:20:00Z"
@@ -732,13 +742,13 @@ open_risks:
       CLOSED by ST-3b (commit 1be2946): all four doc surfaces corrected in code, plus the
       matching spec.md result-contract row (same R2-003 authority, A-level).
 next_action:
-  kind: continue
-  target: sddl-executor
+  kind: ask_user
+  target: sddl-qa-review
   summary: >-
-    ST-5 complete and green: 16 new tests, full suite 198/198, `npm run check` clean, only the
-    test file changed. r-st3-behaviour-unverified and r-st2-behaviour-unverified CLOSED. Next:
-    ST-6, the read-only whole-diff verification gate -- per the approved plan it requires no
-    stage_approval (touches no code); it records AC-15..AC-18 evidence in execution-log.md and
-    feeds sddl-qa-review (final mode), which remains user-gated.
+    ST-6 complete: whole-diff evidence recorded, all four gate ACs (15..18) verified at
+    a617fe3. Executor stage fully done (ST-1..ST-6). Ask the user to approve launching
+    sddl-qa-review in FINAL mode -- the closeout review of the whole implemented change
+    against spec/design/plan; only it may mark the change completed. After its verdict:
+    open the story PR ([E4.F1.H1], Closes #26) per the workflow contract.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T17:06:33Z"
+updated_at: "2026-08-09T17:08:23Z"

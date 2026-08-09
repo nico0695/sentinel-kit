@@ -79,7 +79,7 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-09T04:20:00Z"
-    last_updated_at: "2026-08-09T13:20:00Z"
+    last_updated_at: "2026-08-09T13:40:00Z"
     notes: >-
       ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
       subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
@@ -90,7 +90,20 @@ stages:
       Three A-level internal choices logged in execution-log.md, no public-type deviation, no
       design/plan contradiction found. Diff triaged `trivial` by the orchestrator -- two
       dependency-free leaf files with no behaviour -- so sddl-code-review is skipped for this
-      stage per the routing table. ST-2..ST-6 each still require their own stage_approval.
+      stage per the routing table.
+
+      ST-2 COMPLETE (status `success`). Created engine-timeout.ts (TimeoutScheduler seam,
+      defaultTimeoutScheduler over the global setTimeout/clearTimeout, runEngineWithTimeout
+      racing against a module-private TIMED_OUT unique symbol, with a no-op late-rejection
+      handler and finally-cancel) and builtin-verdict-extraction.ts (anchored case-sensitive
+      VERDICT scan, zero normalization). The STOP rule did NOT fire: the race satisfies both
+      AC-5 reachability and timer hygiene, so no fallback to vitest fake timers was considered.
+      Exit checks: `npm run check` green (75 files; depcruise 55 modules / 91 dependencies, up
+      from 53/88 by exactly the two new modules, confirming no node:timers specifier slipped in)
+      and `npm test` still 163/163. Diff triaged `trivial-plus` by the orchestrator: additive,
+      no importers, no behavioural coverage yet -- review deferred to ST-6 / final QA where it
+      can be read in context alongside run-review.ts. ST-3..ST-6 each still require their own
+      stage_approval.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -408,6 +421,29 @@ open_risks:
       RESOLVED by spec: a cleanup fault ANNOTATES, never overrides and never rethrows. AC-9 and
       AC-10 prove both directions — a fault on the happy path keeps `ok`, and a fault after an
       engine rejection keeps both `engine-error` and the originating EngineInvocationError.
+  - id: r-sync-throw-unwrapped
+    severity: low
+    summary: >-
+      NEW from ST-2, flagged by the executor and verified by the orchestrator. In
+      runEngineWithTimeout, `const pending = invoke()` sits outside the try exactly as design.md
+      fixes it, so an engine adapter that throws SYNCHRONOUSLY escapes un-wrapped instead of
+      becoming an EngineInvocationError. No AC breaks: executePipeline's catch-all still yields
+      `engine-error` with `stage: "engine"` (AC-4a, AC-12), and AC-10 asserts the class only for
+      the async rejection createFakeEngine produces. Timer hygiene is unaffected -- nothing is
+      scheduled on that path. Inert in H1, but a real asymmetry for E4.F2 (#28-30), where an
+      adapter throwing on a missing binary would surface a raw error rather than the typed one.
+      Not fixed here because the structure is design-fixed and runEngineWithTimeout is not
+      exported from index.ts, so changing it later is free.
+  - id: r-st2-behaviour-unverified
+    severity: medium
+    summary: >-
+      NEW from ST-2. Neither engine-timeout.ts nor builtin-verdict-extraction.ts is exercised by
+      any repository test until ST-4 (AC-3, AC-5) and ST-5 (AC-14, timer hygiene). `npm run
+      check` proves types and guards, not behaviour, so this stage's green is structurally weaker
+      than the others'. The executor compensated with an out-of-repo smoke run (scratchpad copies,
+      21/21 assertions over 9 extraction cases plus happy path / timeout / rejection / sync-throw
+      / late-rejection, each asserting cancel count) -- interim evidence only, NOT a repository
+      artifact and not a substitute for ST-4/ST-5. Closes when those stages land.
   - id: r-st2-concurrency-stage
     severity: low
     summary: >-
@@ -466,10 +502,12 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
+  kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    ST-2 approved and running: engine-timeout.ts + builtin-verdict-extraction.ts. On return, the
-    orchestrator triages the stage diff and opens the ST-3 stage_approval.
+    ST-2 done and green. Awaiting stage_approval for ST-3 (run-review.ts + the append-only
+    index.ts export block) -- the largest stage, and the first place exactOptionalPropertyTypes
+    and noUncheckedIndexedAccess meet the wide result shape. It is also where the module first
+    gains a public surface, so AC-16 becomes live.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T13:20:00Z"
+updated_at: "2026-08-09T13:40:00Z"

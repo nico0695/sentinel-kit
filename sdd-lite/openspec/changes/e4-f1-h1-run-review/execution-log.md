@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-1
+- latest_stage_id: ST-2
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/run-errors.ts`, `src/core/run/verdict.ts`
+- latest_files_changed: `src/core/run/engine-timeout.ts`, `src/core/run/builtin-verdict-extraction.ts`
 - latest_check_result: `npm run check` green; `npm test` 163/163 (14 files) — unchanged baseline
-- latest_next_action: request `stage_approval` for ST-2 (timeout seam + built-in verdict extraction)
+- latest_next_action: request `stage_approval` for ST-3 (`run-review.ts` use case + append-only `index.ts` export block)
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-1
+- current_stage_id: ST-2
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -26,7 +26,7 @@
 | Stage Id | Goal | Touches Code | Approval Status | Execution Status | Last Updated | Notes |
 |---|---|---|---|---|---|---|
 | ST-1 | Run-domain leaf types: error family + verdict domain type | yes | approved (`cp-st1-approval`) | completed | 2026-08-09 | Two new leaf files, no importers yet (expected) |
-| ST-2 | Cancellable timeout race + naive verdict extraction | yes | pending | pending | — | Riskiest stage per `plan.md` |
+| ST-2 | Cancellable timeout race + naive verdict extraction | yes | approved (`cp-st2-approval`) | completed | 2026-08-09 | Riskiest stage per `plan.md`; behaviour unverified by the repo suite until ST-4/ST-5 |
 | ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | pending | pending | — | Largest stage |
 | ST-4 | Fixtures + terminal-state coverage | yes | pending | pending | — | — |
 | ST-5 | Cleanup contract + the two seams | yes | pending | pending | — | — |
@@ -124,3 +124,91 @@
 - Quality gate is green and the test suite is untouched at 163/163, as planned for a pre-test stage.
 - Nothing outside `src/core/run/` was touched, and `index.ts` stays unchanged until ST-3.
 - Next: approve ST-2 (`engine-timeout.ts` + `builtin-verdict-extraction.ts`) — the plan flags it as the riskiest stage, being the only concurrency in the core.
+
+### Stage `ST-2`
+
+- stage_digest: The two behavioural leaves — `engine-timeout.ts` (`TimeoutScheduler`, `defaultTimeoutScheduler`, `runEngineWithTimeout`) and `builtin-verdict-extraction.ts` (`extractBuiltInVerdict`). Both written exactly as fixed in `design.md`. No importers until ST-3, no tests until ST-4/ST-5.
+- approval_checkpoint_id: `cp-st2-approval`
+- approval_decision_id: user-approved ST-2 at `cp-st2-approval` (recorded in the orchestrator handoff and in commit `25f3b62`)
+- planned_scope: `src/core/run/engine-timeout.ts` (new), `src/core/run/builtin-verdict-extraction.ts` (new)
+- actual_files_changed: `src/core/run/engine-timeout.ts` (new, 105 lines), `src/core/run/builtin-verdict-extraction.ts` (new, 39 lines)
+- touches_code: yes
+- quick_check_status: passed
+- qa_review_status: recommended_before_st3 is NOT required; QA deferred to the ST-6 / final gate (the stage is additive, has no importers, and its behaviour is asserted at ST-4/ST-5)
+- execution_status: completed
+- next_action: request `stage_approval` for ST-3
+
+#### Planned Work
+
+- `engine-timeout.ts`: the cancellable timeout seam — the `TimeoutScheduler` type, a `defaultTimeoutScheduler` backed by the global `setTimeout`/`clearTimeout`, and `runEngineWithTimeout` racing the invocation against a module-private `TIMED_OUT` symbol, with `void pending.catch(() => {})` for late rejections and `finally { cancel(); }` for timer hygiene.
+- `builtin-verdict-extraction.ts`: `extractBuiltInVerdict` — anchored, case-sensitive, trimmed `VERDICT: approve|request-changes|comment` scan with NO normalization (no ANSI stripping, no fence unwrapping, no case folding). Exactly one distinct match ⇒ that verdict; zero or two distinct ⇒ `null` ⇒ `ambiguous`.
+- Do not touch `index.ts` (ST-3), do not create `run-review.ts` (ST-3), do not write tests (ST-4/ST-5), do not modify the ST-1 files or any other existing file.
+
+#### Preconditions And Sync Checks
+
+- Working tree clean at stage start (`git status --porcelain` empty); ST-1 is committed as `ec74f3f`, the ST-2 approval as `25f3b62`. Branch `claude/validar-e1-preparar-e4-m1xkhl`.
+- ST-1 outputs re-read before writing: `EngineTimeoutError(timeoutMs, options?)` and `EngineInvocationError(message, options?)` match the call forms `design.md` uses; `Verdict` is the three-value union the regex enumerates.
+- `ReviewResult` re-read from `src/core/run/ports/review-engine.ts` — same module, so the type-only import needs no `index.ts` hop (guard 3 applies to CROSS-module imports only).
+- `design.md` (timeout seam + extraction sections) and `plan.md` (ST-2 row, executor notes 1–2, rollback note) agree on every detail of this stage. No contradiction found.
+- Both files are orphans until ST-3 — re-confirmed green: `.dependency-cruiser.cjs` declares no `orphan` rule, `tsconfig.json` sets no `noUnusedLocals`.
+
+#### Changes Applied
+
+- `src/core/run/engine-timeout.ts`
+  - `export type TimeoutScheduler = (ms: number, onElapsed: () => void) => () => void;` — the injectable, cancellable seam.
+  - `export const defaultTimeoutScheduler: TimeoutScheduler` — `setTimeout` / `clearTimeout` used as runtime GLOBALS, never imported (executor note 2; `Date.now()` in `create-review-worktree.ts` is the precedent).
+  - `const TIMED_OUT = Symbol("engine-timed-out")` — module-private `unique symbol`, so `Promise.race`'s winner is discriminated with no assumption about `ReviewResult`'s shape.
+  - `export async function runEngineWithTimeout(invoke, timeoutMs, schedule)` — `const pending = invoke()`, `void pending.catch(() => {})`, the expiry promise whose executor runs synchronously and assigns `cancel`, then `try { race } catch { rethrow EngineTimeoutError, else wrap in EngineInvocationError with cause } finally { cancel(); }`.
+  - File-level `export` on all three (executor note 1): "module-private" means not re-exported from `index.ts` (AC-16), which stays an ST-3 concern.
+- `src/core/run/builtin-verdict-extraction.ts`
+  - `const VERDICT_LINE = /^VERDICT:\s*(approve|request-changes|comment)$/` applied to each `output.split("\n")` line after `trim()`.
+  - `extractBuiltInVerdict` collects distinct matches into a `Set<Verdict>`; returns the value only when `found.size === 1` (the `only !== undefined` guard is required by `noUncheckedIndexedAccess`).
+  - Doc-comment states the Non-Goals boundary explicitly: hardening is `[E4.F1.H2]` (#27) through the `deps.parseVerdict` seam.
+- Imports are intra-module only (`./run-errors.js`, `./verdict.js`, `./ports/review-engine.js`), so guards 1–5 are satisfied by construction; `depcruise src` confirms.
+
+#### Scope And Blast Radius Notes
+
+- `git status --porcelain` after the stage lists exactly the two new untracked files; `git diff --stat` is empty (no tracked file modified). No scope drift, no blast-radius expansion.
+- `index.ts` deliberately untouched; the module's public surface is still unchanged at the end of ST-2.
+- The `d-change-scope` boundary was actively defended: the extraction was NOT hardened (no ANSI/markdown/case handling), even though the temptation is one regex flag away. That work belongs to #27.
+
+#### Quick Check
+
+- checks_planned: `npm run check`; `npm test` still 163/163; `git status --porcelain` / `git diff --stat` scope review
+- checks_run:
+  - `npm run check` → passed (biome: 75 files checked, no fixes; `tsc --noEmit`: clean; `depcruise src`: no dependency violations, 55 modules / 91 dependencies cruised — up from 53/88, i.e. exactly the two new modules and their intra-module edges). Notably `depcruise` confirms no `node:timers` / `timers` import slipped in.
+  - `npm test` → passed, 14 test files, 163/163, 0 failures — baseline unchanged, as planned for a pre-test stage.
+  - `git status --porcelain` → `?? src/core/run/builtin-verdict-extraction.ts`, `?? src/core/run/engine-timeout.ts` only; `git diff --stat` empty.
+  - Out-of-repo behavioural smoke (see "Decisions" below): 21/21 assertions PASS, no unhandled rejection.
+- checks_skipped: none available in-repo. **ST-2's behaviour is NOT exercised by any repository test at this point** — by design, per the plan's ST-2 validation column: `runEngineWithTimeout` and `extractBuiltInVerdict` are proven through `runReview` at ST-4 (AC-3, AC-5) and ST-5 (timer hygiene, AC-14). This stage's green is therefore weaker than the other stages'.
+- findings_summary: one biome formatting fix applied during the stage (the `TimeoutScheduler` type signature had to be broken across lines); no warnings, no failures, no design deviations.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npm run check` | biome 75 files clean · tsc clean · depcruise 55 modules / 91 deps, 0 violations |
+| command | `npm test` | 14 files / 163 tests passed — identical to the pre-stage baseline |
+| command | `git status --porcelain` | the two new untracked files only; `git diff --stat` empty |
+| file | `src/core/run/engine-timeout.ts` | Race, sentinel symbol, late-rejection handler, `finally { cancel(); }` — as fixed in `design.md` |
+| file | `src/core/run/builtin-verdict-extraction.ts` | Naive anchored scan; no normalization (Non-Goals boundary against #27) |
+| smoke | scratchpad `st2-smoke.ts` (outside the repo, not committed) | 21/21 PASS: 9 extraction cases + happy path / timeout / rejection / sync-throw / late-rejection, each asserting the cancel count |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** the race sentinel is named `TIMED_OUT` with description `"engine-timed-out"`; the module doc-comment and per-symbol JSDoc follow the `create-review-worktree.ts` / `run-errors.ts` house style. No public type or signature from `design.md` was altered.
+- **A-level (internal, logged):** the `TimeoutScheduler` type signature is written across three lines. Not a choice — biome's formatter rejects the single-line form from `design.md` (81 chars). Semantically identical.
+- **A-level (internal, logged):** the two intentionally empty callbacks (`pending.catch`, the initial `cancel`) carry explanatory comments instead of bare `{}`, so a reader does not read them as oversights.
+- **A-level (internal, logged):** because no repository test covers this stage, the code was smoke-tested out-of-repo — the four run-module files were COPIED into the session scratchpad (`.js` specifiers rewritten to `.ts` so plain `node --experimental-strip-types` resolves them) and driven by a throwaway script. Nothing was added to, or changed in, the repository; no test file was created (that is ST-4/ST-5 scope). Recorded because the "checks_run" line above cites its result.
+- **Observation, not a deviation — carry to ST-3/QA:** `const pending = invoke()` sits OUTSIDE the `try`, exactly as `design.md` fixes it. Consequence: if an engine adapter throws SYNCHRONOUSLY instead of returning a rejected promise, the raw throwable escapes `runEngineWithTimeout` un-wrapped (confirmed by smoke) rather than becoming an `EngineInvocationError`. This breaks no acceptance criterion — `executePipeline`'s catch-all still yields `state: "engine-error"` with `stage: "engine"` (AC-4a, AC-12), and AC-10 asserts `EngineInvocationError` only for an async rejection, which is what `createFakeEngine` produces. Flagged so review does not read it as an accident. Also note the timer is never scheduled on that path, so timer hygiene is unaffected.
+- **STOP rule outcome:** not triggered. The race satisfies both halves of the ST-2 obligation — `EngineTimeoutError` is reachable deterministically through a manual scheduler with zero wall-clock waiting (AC-5's mechanism), and `finally { cancel(); }` clears the timer on all four exit paths (success, timeout, rejection, sync-throw-before-scheduling), verified by cancel-count assertions. Vitest fake timers were not used and were never needed.
+- Blockers: none.
+
+#### User-Facing Summary
+
+- ST-2 is done: the run module now has its cancellable timeout seam and the deliberately naive built-in verdict extraction, both written exactly as `design.md` fixes them.
+- The riskiest part — the promise race — satisfies both requirements the plan set for it: a timeout is reachable without waiting on the real clock, and the timer is cleared on every exit path. No fallback to fake timers was needed.
+- Quality gate is green and the suite is untouched at 163/163. Be aware that this stage adds no tests, so its behaviour is only proven once ST-4/ST-5 land; an out-of-repo smoke run (21/21) was used as an interim sanity check.
+- Nothing outside `src/core/run/` was touched, and `index.ts` stays unchanged until ST-3.
+- Next: approve ST-3 (`run-review.ts` + the append-only `index.ts` export block) — the largest stage in the change.

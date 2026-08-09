@@ -207,7 +207,8 @@ stages:
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-09T18:40:13Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f1-h1-run-review/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f1-h1-run-review/proposal.md
@@ -486,6 +487,23 @@ checkpoints:
       responded_at: "2026-08-09T16:59:48Z"
     created_at: "2026-08-09T16:59:48Z"
     resolved_at: "2026-08-09T16:59:48Z"
+  - id: cp-qa-final-approval
+    type: stage_approval
+    stage: sddl-qa-review
+    summary: >-
+      Launch sddl-qa-review in FINAL mode over the whole implemented change (ST-1..ST-6,
+      HEAD f0d66a7 for artifacts, story diff frozen at a617fe3): the closeout review against
+      spec/design/plan, the only stage that may mark the change completed. On a clean verdict
+      the orchestrator opens the story PR ([E4.F1.H1], Closes #26) per the workflow contract,
+      as recommended at the gate and accepted.
+    question: Approve launching sddl-qa-review in final mode?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, lanza qa-review final".
+      responded_at: "2026-08-09T18:40:13Z"
+    created_at: "2026-08-09T18:40:13Z"
+    resolved_at: "2026-08-09T18:40:13Z"
 decisions:
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
@@ -751,4 +769,4 @@ next_action:
     against spec/design/plan; only it may mark the change completed. After its verdict:
     open the story PR ([E4.F1.H1], Closes #26) per the workflow contract.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T17:08:23Z"
+updated_at: "2026-08-09T18:40:13Z"

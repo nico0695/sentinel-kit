@@ -1,8 +1,8 @@
-# S17 — E1.F1.H1 + E1.F1.H2: engine spikes executed (Claude Code, OpenCode)
+# S17 — E1 engine spikes executed (H1, H2, extended validation, H3 fixtures)
 
 - **Date**: 2026-08-08
 - **Branch**: `claude/project-status-backlog-ocdf7f`
-- **Scope**: `[E1.F1.H1]` (issue #7), `[E1.F1.H2]` (issue #8) — both spikes executed, deliverables written
+- **Scope**: `[E1.F1.H1]` (issue #7), `[E1.F1.H2]` (issue #8), `[E1.F1.H3]` (issue #9) — spikes executed + fixtures captured
 - **sdd-lite changes**: — (see Deviations)
 
 ## Objective
@@ -69,11 +69,30 @@ answer the four PRD §6.2 questions per engine with real evidence and write
 - Deliverable: `docs/engines/opencode.md`.
 - Raw outputs preserved in `~/spikes/oc-run*.{txt,json,out,err}` as candidate H3 fixtures.
 
+### Extended validation pass (user-requested re-analysis before H3)
+
+Eight gap checks executed to harden the H1/H2 docs; all landed in commit `fa40f67`:
+large-input runs (183 KB stdin, both engines, clean), context-overflow signatures
+captured for both, Claude unknown-model signature, Claude stderr-empty-on-success,
+Claude isolation/hygiene flags discovered (`--setting-sources`, `--strict-mcp-config`,
+`--no-session-persistence`, `--max-budget-usd`; no native timeout flag), OpenCode reads
+verified under deny config (+ `tool_use` event shape fixed in doc), OpenCode
+missing-credential = `ProviderModelNotFoundError` (no distinct auth signature;
+`opencode models` is the availability probe), worktree pristine but OpenCode hoards
+state under `~/.local/share/opencode/`.
+
+### Fixtures (H3)
+
+- Captured the two missing cases per engine (no-verdict, noisy/markdown-wrapped) with
+  prompt variants; recycled valid-verdict, SIGTERM-partial, overflow, auth/unknown-model
+  raw outputs from the spike runs.
+- `fixtures/claude-code/` (6 files) and `fixtures/opencode/` (6 files) + provenance
+  README. Anonymized (`/home/reviewer/...`), scanned clean for paths/tokens/emails.
+
 ## Pending and next steps
 
-- `[E1.F1.H3]` fixtures — recycle this session's raw outputs (`~/spikes/`); anonymize before committing.
 - `[E1.F1.H4]` context modes — optional, skipped unless requested.
-- E1 PR for H1+H2 (`Closes #7, #8`) — being opened at session close.
+- E1 PR for H1+H2+H3 (`Closes #7, #8, #9`) — user decides when to open.
 
 ## Open questions for the user
 

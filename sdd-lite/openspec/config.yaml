@@ -21,19 +21,17 @@ paths:
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
 
-# NOTE: [E0.F1.H1] landed (PR #47) — package.json exists and scripts follow
-# docs/setup-tecnico-sentinel.md §5.1. Runnable TODAY: `npm install`, `npm run check`
-# (currently `biome check . && tsc --noEmit`; depcruise is appended by [E0.F1.H2]) and
-# `npm run dev`. NOT runnable yet: `npm run build` (tsup lands in its own story) and
-# `npm test` (vitest lands with [E0.F2.x]) — the scripts exist but their tools are not
-# installed.
+# NOTE: E0, E1, E2 and E3 have landed on `main`. All four scripts are runnable and
+# verified exit 0 on 2026-08-09 against `main` @ f294af2: `npm run check` (full form,
+# biome + tsc + depcruise), `npm test` (vitest, 163/163), `npm run build` (tsup) and
+# `npm run dev`.
 quality_commands:
   install:
-    - npm install
+    - npm ci
   test:
-    - npm test # script defined; vitest not installed yet ([E0.F2.x])
+    - npm test
   build:
-    - npm run build # script defined; tsup not installed yet
+    - npm run build
   lint:
     - npm run check
   typecheck:
@@ -46,14 +44,15 @@ bootstrap:
   strategy: shallow-high-signal
   generated_at: "2026-08-01T14:39:32Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-01T14:39:32Z"
-  # Refreshed 2026-08-01 (post-[E0.F1.H1], PR #47): the repo is no longer
-  # pre-implementation. package.json (@nico0695/sentinel, ESM, node >=22, bin
-  # sentinel+snt), package-lock.json (v3), tsconfig.json, biome.json, and the PRD §4.2
-  # src/ skeleton (13 placeholder modules, zero imports) are observed in the working
-  # tree. `npm run check` and `npm run dev` verified exit 0 with the installed dev
-  # toolchain (biome 2.5.6, typescript 7.0.2, @types/node 22.20.1). Next refresh
-  # trigger: [E0.F1.H2] (depcruise joins `check`) or [E0.F2.x] (vitest lands).
+  last_validated_at: "2026-08-09T03:00:00Z"
+  # Surgical refresh 2026-08-09 by the orchestrator (not a full sddl-init run),
+  # post-E1/E2/E3 on `main` @ f294af2. What changed since the 2026-08-01 entry:
+  # full toolchain installed (vitest 4.1.10, dependency-cruiser 18.1.0, tsup 8.5.1;
+  # typescript is 5.9.3, not 7.0.2) and runtime deps present (execa, yaml, zod);
+  # `npm run check` reaches its full form with the five architecture guards;
+  # `npm test` runs 163 tests across 14 files; the E1 engine spikes are resolved
+  # (docs/engines/*.md + 12 fixtures under fixtures/). Next refresh trigger: E5
+  # (ProcessRunner + RunStore) or the first E6 runtime dependency.
   refresh_recommended: false
   refresh_reason_codes: []
   observed_files:
@@ -66,13 +65,29 @@ bootstrap:
       - docs/prd-sentinel.md
       - docs/setup-tecnico-sentinel.md
       - docs/backlog-mvp-sentinel.md
+      - docs/architecture.md
+      - docs/coding-standards.md
+      - docs/testing.md
+      - docs/engines/claude-code.md
+      - docs/engines/opencode.md
     tool_configs:
       - tsconfig.json
       - biome.json
+      - .dependency-cruiser.cjs
+      - vitest.config.ts
+      - tsup.config.ts
   observed_paths:
     source_roots:
       - src
-    test_roots: []
+    test_roots:
+      - src/core/repos/__test__
+      - src/core/review/__test__
+      - src/core/workspace/__test__
+      - src/adapters/driven/engines/__test__
+      - src/adapters/driven/git/__test__
+      - src/adapters/driven/storage/__test__
+    fixture_roots:
+      - fixtures
     config_roots:
       - .
 

@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-3b
+- latest_stage_id: ST-4
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/run-review.ts` (modified, doc-comments + `MAX_TIMEOUT_MS` + one validation condition), `src/core/run/engine-timeout.ts` (modified, doc-comment), `spec.md` (AC-6 producer + `engineOutput` row)
-- latest_check_result: `npm run check` green; `npm test` 163/163 (14 files) — unchanged baseline; AC-16 grep returns nothing
-- latest_next_action: request `stage_approval` for ST-4 (`run-review-fixtures.ts` + the terminal-state half of `run-review.test.ts`, now including the `timeoutMs > MAX_TIMEOUT_MS` AC-6 case)
+- latest_files_changed: `src/core/run/__test__/run-review-fixtures.ts` (new, 229 lines), `src/core/run/__test__/run-review.test.ts` (new, 339 lines)
+- latest_check_result: `npx vitest run --project core` 129/129 (11 files); `npm run check` green; `npm test` 182/182 (15 files) — 163 baseline + 19 new; `git status` shows only the two new test files
+- latest_next_action: request `stage_approval` for ST-5 (cleanup contract + the two seams: AC-7..AC-10, AC-13, AC-14, timer hygiene, the R1-001 escape-hatch pin)
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-3b
+- current_stage_id: ST-4
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -29,7 +29,7 @@
 | ST-2 | Cancellable timeout race + naive verdict extraction | yes | approved (`cp-st2-approval`) | completed | 2026-08-09 | Riskiest stage per `plan.md`; behaviour unverified by the repo suite until ST-4/ST-5 |
 | ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | approved (`cp-st3-approval`) | completed | 2026-08-09 | Largest stage; behaviour still unverified by the suite until ST-4/ST-5 |
 | ST-3b | Review-driven doc corrections + `timeoutMs` upper bound (R2-001..R2-004, R3-004) | yes | granted (review_gate) | completed | 2026-08-09 | Amendment stage inserted after the full-4r review of 03bd7cf; comment-only except one validation condition |
-| ST-4 | Fixtures + terminal-state coverage | yes | pending | pending | — | Now owns 9 AC-6 cases (the upper-bound case added by ST-3b) |
+| ST-4 | Fixtures + terminal-state coverage | yes | approved (`cp-st4-approval`) | completed | 2026-08-09 | 19 new tests; all five terminal states now proven reachable, incl. the 9 AC-6 cases |
 | ST-5 | Cleanup contract + the two seams | yes | pending | pending | — | — |
 | ST-6 | Whole-diff verification and PR readiness | no | pending | pending | — | Read-only evidence gate |
 
@@ -403,3 +403,97 @@
 - Quality gate is green, the suite is untouched at 163/163, and the AC-16 grep is clean. The new rejection is first exercised by a test at ST-4, by design.
 - Nothing beyond the frozen scope was touched; the deeper review findings (dual-budget precedence, orphan-recovery blind spot, etc.) remain open risks owned by later epics, exactly as the ledger assigned them.
 - Next: approve ST-4 (fixtures + the terminal-state suite, including the new upper-bound case).
+
+### Stage `ST-4`
+
+- stage_digest: Fixtures + terminal-state coverage — `run-review-fixtures.ts` (request/deps builders over the sanctioned fakes, manual `TimeoutScheduler`, request-recording hanging engine, validation-failing harness loader) and `run-review.test.ts` (AC-1, AC-2, AC-3a/b, AC-4a/b, AC-5, the nine AC-6 producers, AC-11, AC-12). The first stage that exercises any run-module behaviour: 19 new tests, all green on first run.
+- approval_checkpoint_id: `cp-st4-approval`
+- approval_decision_id: user-approved ST-4 at `cp-st4-approval` (recorded in the orchestrator handoff)
+- planned_scope: `src/core/run/__test__/run-review-fixtures.ts` (new), `src/core/run/__test__/run-review.test.ts` (new)
+- actual_files_changed: `src/core/run/__test__/run-review-fixtures.ts` (new, 229 lines), `src/core/run/__test__/run-review.test.ts` (new, 339 lines)
+- touches_code: yes
+- quick_check_status: passed
+- qa_review_status: not_requested — ST-5 extends the same suite next; a structured review is more informative once the full behavioural surface (AC-1..AC-14) exists
+- execution_status: completed
+- next_action: request `stage_approval` for ST-5
+
+#### Planned Work
+
+- `run-review-fixtures.ts`: shared builders — `buildRequest` / `buildDeps` / `buildGit` / `buildHarnessDeps` over `createFakeGitPort`, `FakeHarnessLoader` and `createFakeEngine`; `SAMPLE_DIFF_RESULT` (raw chunk + matching stats so `computeReviewDiff` yields a non-empty `ReviewDiff`); `createManualScheduler` (the AC-5 mechanism); plus the two seams no existing fake provides — a never-settling, request-recording engine and a `HarnessValidationError`-throwing loader pair.
+- `run-review.test.ts`: the terminal-state half of the suite — AC-1 (full result shape), AC-2 (`ok`), AC-3a/AC-3b (`ambiguous`), AC-4a/AC-4b (`engine-error`), AC-5 (`timeout`, deterministic), AC-6 (nine `validation-failed` producers, including ST-3b's upper bound), AC-11 (no worktree on stage-1/2 faults), AC-12 (never rejects).
+- Do not modify any production file, any other test, or `index.ts`; AC-7..AC-10, AC-13, AC-14 and the timer-hygiene case stay with ST-5.
+
+#### Preconditions And Sync Checks
+
+- Working tree clean at stage start (`git status --porcelain` empty); ST-1..ST-3b committed. Branch `claude/validar-e1-preparar-e4-m1xkhl`.
+- All five run-module production files re-read before writing: the stage-1 pre-flight order (empty-string checks before the `timeoutMs` checks, upper bound last), `classifyFailure`'s exact class list, and `MAX_TIMEOUT_MS = 2_147_483_647` all match spec/design/plan as amended by ST-3b.
+- The three sanctioned fakes re-read from source: `createFakeGitPort` exposes `addCalls`/`removeCalls`/`addError`/`mergeBaseError`/`diffResult` (all the suite needs); `FakeHarnessLoader` throws `HarnessNotFoundError`/`SkillNotFoundError` but has NO path that raises `HarnessValidationError` (hence the fixture stub, per design.md's AC-6 row); `createFakeEngine` cannot record requests or hang (hence `createHangingEngine`).
+- Plan traps re-verified against source before writing: `loadHarnesses` returns a `Map` and does not throw on an unknown type (the miss is `runReview`'s own `HarnessNotFoundError`); `createReviewWorktree` wraps only `GitWorktreeError`; `.dependency-cruiser.cjs` `options.exclude.path: "(^|/)__test__/"` sanctions the cross-boundary fake imports.
+- AC-6 count reconciled across artifacts (see Decisions): spec.md enumerates 8 producers; design.md's AC-6 row adds the `HarnessValidationError` stub case; plan.md's ST-4 row fixes the total at 9. The suite implements exactly those 9.
+
+#### Changes Applied
+
+- `src/core/run/__test__/run-review-fixtures.ts`
+  - Constants: `REPO_PATH`, `WORKTREES_DIR`, `BASE_REF`, `TARGET_REF` (`feature/login`), `HARNESS_TYPE` (`pr-review`), `FIXED_TS`, and `TIMEOUT_MS = 60_000` — deliberately large so any accidental real-clock wait blows past vitest's per-test timeout instead of passing slowly.
+  - `SAMPLE_DIFF_RESULT`: one-file raw diff chunk with a matching `stats` entry, served by `buildGit` as the fake port's default `diffResult`.
+  - `buildRequest(overrides?)` / `buildDeps(overrides?)`: a fully valid baseline (git + approving engine + resolvable harness + fixed clock) that each test breaks in exactly one place.
+  - `buildHarnessDeps({ contextMode?, harnessSkills?, registeredSkills? })`: the `{ factory, user }` pair with one `HARNESS_TYPE` harness; `contextMode: "agent"` and an unregistered `harnessSkills` entry produce the non-`inline` and missing-skill AC-6 cases.
+  - `buildValidationFailingHarnessDeps()`: a `HarnessLoader` stub advertising `HARNESS_TYPE` but throwing `HarnessValidationError` on load — the ninth AC-6 producer.
+  - `createHangingEngine()`: records every `ReviewRequest` and returns a promise that never settles (AC-5's forwarded-`timeoutMs` assertion needs the request; `createFakeEngine` records nothing).
+  - `createManualScheduler({ fireImmediately? })`: records `{ ms }` per scheduling call, exposes `cancelCount()` and `fireAll()`; with `fireImmediately` the budget elapses synchronously at schedule time — zero wall-clock waiting. `cancelCount`/`fireAll` are unused by ST-4 and exist for ST-5's timer-hygiene case.
+- `src/core/run/__test__/run-review.test.ts` — 19 tests in six describes:
+  - ok (AC-1, AC-2): full-shape happy path (`state`/`verdict`/`worktreePath` = the fake's recorded `targetPath`/`diff`/`prompt` sections/`engineOutput`/`usage` passthrough/`failure` absent/`cleanup: { attempted: true, removed: true, reason: "policy-always" }`), plus `ok` + `verdict: "request-changes"` proving the state describes the run, not the opinion.
+  - ambiguous (AC-3): no `VERDICT:` line, and two distinct conflicting verdicts; `verdict` absent, `failure` absent, `engineOutput` present.
+  - engine-error (AC-4): (a) engine rejection → `EngineInvocationError` at `stage: "engine"` with the raw error preserved as `cause`, earlier-stage fields still populated, `engineOutput` absent; (b) `addError: new GitWorktreeError(...)` → `WorktreeCreationError` at `stage: "worktree"`, `cleanup: { attempted: false }`, `removeCalls` empty.
+  - timeout (AC-5): hanging engine + `createManualScheduler({ fireImmediately: true })` → `state: "timeout"`, `EngineTimeoutError` carrying `timeoutMs`, elapsed wall time asserted far below the 60s budget, `calls[0].ms === TIMEOUT_MS`, and `timeoutMs` forwarded into the engine's own `ReviewRequest`.
+  - validation-failed (AC-6), one test per producer, asserting state + `failure.stage` + error class: `timeoutMs: 0` (request), `timeoutMs: 2_147_483_648` (request; message asserted to name the bound), empty `harnessType` (request), relative `repoPath` (worktree, `InvalidWorktreeRequestError`), `limits.maxLines: 0` (diff, `DiffSizePolicyError`), unknown harness (harness, `HarnessNotFoundError`), missing skill (harness, `SkillNotFoundError`), `contextMode: "agent"` (prompt, `ContextModeNotSupportedError`), validation-failing loader (harness, `HarnessValidationError`).
+  - AC-11: unknown harness and `timeoutMs: 0` each leave `addCalls` AND `removeCalls` empty with `cleanup: { attempted: false }`.
+  - AC-12: `mergeBaseError: new TypeError(...)` — the same promise is asserted to resolve (never rejects) and then to carry `state: "engine-error"`, `stage: "diff"`, with `failure.error` IDENTITY-equal to the thrown `TypeError` (proving the catch-all preserves, not wraps).
+
+#### Scope And Blast Radius Notes
+
+- `git diff --stat` is empty (no tracked file modified); `git status --short --untracked-files=all` lists exactly the two new files under `src/core/run/__test__/`. No production file, no other test, no `index.ts` change. AC-17 holds.
+- Both files sit inside a `__test__/` segment, so `depcruise src` never cruises them; the cross-boundary imports (`createFakeEngine` from adapters, the workspace git fake, the review harness fake) are the sanctioned ones (`r-test-fake-cross-boundary`, dec-005) and were not "fixed".
+- The suite runs entirely on injected fakes: no filesystem, no git binary, no real timers (the only `defaultTimeoutScheduler` uses are in non-timeout tests where the race settles immediately and `finally { cancel(); }` clears the 60s timer).
+
+#### Quick Check
+
+- checks_planned: `npx vitest run --project core`; `npm run check`; `npm test`; `git diff --stat` + `git status --short` scope review
+- checks_run:
+  - `npx vitest run --project core` → passed, 11 test files, 129/129 tests (110 prior core tests + the 19 new ones), 0 failures. All 19 passed on the first full run.
+  - `npm run check` → passed (biome: 78 files checked, no fixes pending; `tsc --noEmit`: clean; `depcruise src`: no dependency violations, 56 modules / 104 dependencies cruised — identical to post-ST-3b, confirming the test files are excluded from the cruise).
+  - `npm test` → passed, 15 test files, 182/182 tests, 0 failures — the 163 pre-existing tests untouched plus the 19 new ones.
+  - `git diff --stat` → empty; `git status --short --untracked-files=all` → `?? src/core/run/__test__/run-review-fixtures.ts`, `?? src/core/run/__test__/run-review.test.ts` only.
+- checks_skipped: none. During iteration, biome required a formatting pass on the two new files and flagged three `lint/correctness/noUnsafeOptionalChaining` uses (`(result.failure?.error as X).member`); fixed by extracting the cast into a local after the `toBeInstanceOf` assertion. No production file was touched at any point.
+- findings_summary: no warnings, no failures, no deviations. All five terminal states are now proven reachable, and no genuine defect surfaced in `src/core/run/**` — the blocked-return path was not needed.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npx vitest run --project core` | 11 files / 129 tests passed (19 new) |
+| command | `npm run check` | biome 78 files clean · tsc clean · depcruise 56 modules / 104 deps, 0 violations |
+| command | `npm test` | 15 files / 182 tests passed — 163 baseline intact + 19 new |
+| command | `git diff --stat` / `git status --short --untracked-files=all` | empty diff; only the two new `__test__/` files untracked |
+| file | `src/core/run/__test__/run-review-fixtures.ts` | Builders over the sanctioned fakes + manual scheduler + hanging engine + validation-failing loader |
+| file | `src/core/run/__test__/run-review.test.ts` | AC-1..AC-6, AC-11, AC-12 — 19 tests, six describes |
+| reference | plan.md "Traps that make a green test worthless" | Each trap deliberately asserted: `GitWorktreeError` fixtures, `runReview`-owned `HarnessNotFoundError`, both AC-5 halves |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** the AC-6 "nine cases" reconciled across artifacts — spec.md's AC-6 row enumerates 8 producers; design.md's AC-6 test row adds a ninth case (a `HarnessLoader` stub throwing `HarnessValidationError`, closing `classifyFailure`'s last `validation-failed` row); plan.md's ST-4 row fixes the total at 9. All three agree once read together; the suite implements exactly those 9. No contradiction, so no STOP.
+- **A-level (internal, logged):** two fixture-local test doubles were written where the sanctioned fakes cannot serve: `createHangingEngine` (AC-5 must assert `timeoutMs` inside the engine's `ReviewRequest`, and `createFakeEngine` neither records requests nor hangs) and the `buildValidationFailingHarnessDeps` loader stub (no `FakeHarnessLoader` path raises `HarnessValidationError`). Both live in the fixtures file, not as new shared fakes.
+- **A-level (internal, logged):** `TIMEOUT_MS = 60_000`, deliberately far above vitest's per-test timeout: if any test ever awaited the real wall clock the suite would fail loudly instead of passing slowly. The AC-5 test additionally asserts measured elapsed time below the budget.
+- **A-level (internal, logged):** AC-12's bare-`TypeError` producer is `git.mergeBase` (via the fake's `mergeBaseError`), which `computeReviewDiff` rethrows unwrapped — landing at `stage: "diff"` with the original preserved; the test asserts IDENTITY (`toBe`), not just class. The same promise is first asserted with `.resolves` to pin "never rejects" explicitly.
+- **A-level (internal, logged):** AC-1 asserts `worktreePath === git.addCalls[0]?.targetPath` rather than a hard-coded derived path, so the suite does not couple to `createReviewWorktree`'s naming scheme (already pinned by its own tests).
+- **A-level (internal, logged):** `createManualScheduler` also exposes `cancelCount()` and `fireAll()`, unused in ST-4 — the plan routes the timer-hygiene assertion (`cancelCount === 1`) to ST-5, and shipping the recording half now avoids reshaping the fixture mid-suite.
+- **A-level (internal, logged):** the three `noUnsafeOptionalChaining` biome findings were fixed by extracting `result.failure?.error as X` into a local AFTER the `toBeInstanceOf` assertion (house precedent: the `as`-cast in `create-review-worktree.test.ts`), keeping the runtime-safe assertion order.
+- Blockers: none. No production defect surfaced; no contradiction between spec/design/plan and observed behaviour.
+
+#### User-Facing Summary
+
+- ST-4 is done: the run module finally has behavioural proof. 19 new tests make all five terminal states reachable on demand — happy path, both ambiguity routes, both engine-error routes, a deterministic timeout with zero real waiting, and all nine validation-failed producers including the ST-3b upper bound.
+- The two guarantees the design staked everything on now have tests: `runReview` never rejects (a bare `TypeError` from a dependency resolves as `engine-error` with the original preserved untouched), and pre-flight faults leave no worktree behind.
+- Everything is green: core project 129/129, `npm run check` clean, full suite 182/182 with the 163 pre-existing tests untouched. The diff is exactly the two new test files — no production line changed.
+- Next: approve ST-5 (cleanup contract, the two seams, timer hygiene, and the R1-001 escape-hatch pin), which extends this same suite.

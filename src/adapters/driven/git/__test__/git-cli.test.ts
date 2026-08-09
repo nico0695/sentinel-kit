@@ -16,7 +16,13 @@
  * locale is pinned to `C` so the runner's ambient config cannot hijack the
  * fixture.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execa } from "execa";
@@ -61,7 +67,9 @@ const harness: GitPortContractHarness = {
   build: () => createGitCliAdapter(),
 
   setupFixture: async (): Promise<GitFixture> => {
-    const root = mkdtempSync(join(tmpdir(), "sentinel-git-"));
+    // realpath: on macOS tmpdir() lives under /var -> /private/var; git reports
+    // canonical paths (e.g. in `worktree list`), so the fixture must compare against them.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "sentinel-git-")));
 
     const barePath = join(root, "origin.git");
     const upstreamBarePath = join(root, "upstream.git");

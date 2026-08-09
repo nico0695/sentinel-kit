@@ -50,9 +50,16 @@ stage approvals allowed.
   it — a full read showed the file was healthy; the artifact was the orchestrator's own `sed`
   range slicing the id line out. No edit was made. Recorded as a cheap lesson: verify with a full
   read before repairing state.
-- **ST-4..ST-6 did not run.** The ST-4 `stage_approval` question got no answer; per the contract a
-  code-touching stage cannot proceed without it, so the session stops there rather than assuming
-  consent.
+- **ST-4's first `stage_approval` ask went unanswered** and the session stopped at the gate per
+  the contract; the user granted it on return ("abprobado st-4") and ST-4 then ran.
+- **`state.yaml` corrupted by the orchestrator's own edit script, committed, then repaired.**
+  While recording ST-4 completion, a slice with inverted anchors (`s.index` matched an earlier
+  `created_at` duplicate) produced `str.replace('', block)`, exploding the file to 426k lines —
+  and it was committed and pushed unverified. Caught from the commit stat, restored from
+  `a29365f`, edits re-applied with uniqueness-asserted anchors plus YAML validation, and the
+  pushed commit amended (`c240979` → `5a21623`, force-with-lease) so the 40MB blob never
+  reaches the PR. Lesson recorded: validate generated artifacts before committing, assert
+  anchor uniqueness in edit scripts.
 
 ## Work done
 
@@ -89,23 +96,28 @@ stage approvals allowed.
 - **ST-3b review-driven fix stage**: plan amendment `ff9173a`, fix delta `1be2946` (public doc
   corrections + `MAX_TIMEOUT_MS` pre-flight bound + spec sync), state/ledger closeout `d71d021`.
   Closed risks `r-timeout-overflow-clamp` and `r-review-doc-drift`.
-- No PR opened yet — the story is mid-execution (ST-4..ST-6 pending); one PR per story lands
+- **ST-4 executed and green** (`5a21623`): `run-review-fixtures.ts` (229 lines) +
+  `run-review.test.ts` (339 lines, 19 tests) — all five terminal states reachable, 9 AC-6
+  producers, AC-11, AC-12. Full suite 182/182, `npm run check` clean, depcruise unchanged;
+  orchestrator re-ran both independently. Risks `r-st3-behaviour-unverified` and
+  `r-st2-behaviour-unverified` downgraded medium → low.
+- No PR opened yet — the story is mid-execution (ST-5..ST-6 pending); one PR per story lands
   after ST-6/QA per the workflow contract.
 
 ## Pending and next steps
 
-- **User**: `stage_approval` for ST-4 (fixtures + terminal-state suite, 9 AC-6 cases). The change
-  stops here until granted; `state.yaml` `next_action` points at it, so any future session
-  resumes exactly at this gate.
-- **Claude**, once approved: ST-4, then ST-5 (cleanup/timer/escape-hatch suite) and ST-6 (QA +
-  AC-16 gate) each behind its own gate; then `sddl-qa-review` final, PR for `[E4.F1.H1]`
+- **User**: `stage_approval` for ST-5 (cleanup contract AC-7..AC-10, seams AC-13/AC-14, timer
+  hygiene, R1-001 escape-hatch pin). The change stops here until granted; `state.yaml`
+  `next_action` points at it.
+- **Claude**, once approved: ST-5, then ST-6 (read-only whole-diff gate) behind its own gate;
+  then `sddl-qa-review` final, PR for `[E4.F1.H1]`
   (`Closes #26`), then `[E4.F1.H2]` (#27) — scoping note: raise `r-verdict-provenance` there.
 - **⚪ optional and untouched**: #10 (context-mode measurement), #16 (remove/update registration),
   #25 (auto-include target repo `AGENTS.md`).
 
 ## Open questions for the user
 
-- ST-4 `stage_approval` — the session stops here until then.
+- ST-5 `stage_approval` — the session stops here until then.
 - Standing from earlier, unconfirmed either way: surgical bootstrap refresh (vs. full
   `sddl-init`) and `interactive` mode (vs. `auto`); both working assumptions have held all
   session without friction.

@@ -16,7 +16,7 @@ complexity_assessment:
     E5 validations seam is left open without implementing it.
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
-lifecycle_status: planned
+lifecycle_status: implementing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -77,7 +77,9 @@ stages:
       whole inside-out ordering rests on: no orphan rule in .dependency-cruiser.cjs and no
       noUnusedLocals in tsconfig.json, so a leaf file with no importers passes `npm run check`.
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-09T04:20:00Z"
+    notes: "ST-1 approved and running. ST-2..ST-6 each require their own stage_approval."
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -252,6 +254,42 @@ checkpoints:
       responded_at: "2026-08-09T04:05:00Z"
     created_at: "2026-08-09T03:58:00Z"
     resolved_at: "2026-08-09T04:05:00Z"
+  - id: cp-plan-validation
+    type: phase_validation
+    stage: sddl-plan
+    summary: >-
+      plan.md complete: six sequential stages, all 18 ACs assigned, plus the executor's
+      trap list. Presented alongside the one ambiguity the plan resolved in-place rather than
+      escalating -- design.md calls three functions "module-private" while run-review.ts imports
+      them, so they need file-level exports.
+    question: Approve the six-stage plan and open the ST-1 stage approval?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: >-
+        User approved with "si, comienza con ST-1". The orchestrator concurs with the plan's read
+        of the export ambiguity: AC-16 is worded about index.ts specifically ("the built-in
+        extraction is not exported from index.ts"), not about file-level visibility, so
+        file-level export plus no index re-export satisfies it. Recorded rather than escalated.
+      responded_at: "2026-08-09T04:20:00Z"
+    created_at: "2026-08-09T04:12:00Z"
+    resolved_at: "2026-08-09T04:20:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1: create src/core/run/run-errors.ts (RunError base + InvalidRunRequestError,
+      EngineInvocationError, EngineTimeoutError) and src/core/run/verdict.ts (Verdict,
+      VerdictParser). Two new leaf files, no importers yet, no existing file modified.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-1?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comienza con ST-1".
+      responded_at: "2026-08-09T04:20:00Z"
+    created_at: "2026-08-09T04:20:00Z"
+    resolved_at: "2026-08-09T04:20:00Z"
 decisions:
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
@@ -398,11 +436,10 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    Planning complete. Awaiting stage_approval for ST-1 (run-errors.ts + verdict.ts), the lowest-
-    risk stage in the change and a cheap way to confirm the executor's cadence before ST-2, the
-    only genuinely risky one.
+    ST-1 approved and running: run-errors.ts + verdict.ts. On return, the orchestrator triages the
+    stage diff for review and opens the ST-2 stage_approval.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T04:12:00Z"
+updated_at: "2026-08-09T04:20:00Z"

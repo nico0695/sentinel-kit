@@ -71,7 +71,7 @@ answer the four PRD §6.2 questions per engine with real evidence and write
 
 ### Extended validation pass (user-requested re-analysis before H3)
 
-Eight gap checks executed to harden the H1/H2 docs; all landed in commit `fa40f67`:
+Eight gap checks executed to harden the H1/H2 docs; all landed in commit `56af7e2`:
 large-input runs (183 KB stdin, both engines, clean), context-overflow signatures
 captured for both, Claude unknown-model signature, Claude stderr-empty-on-success,
 Claude isolation/hygiene flags discovered (`--setting-sources`, `--strict-mcp-config`,
@@ -89,10 +89,23 @@ state under `~/.local/share/opencode/`.
 - `fixtures/claude-code/` (6 files) and `fixtures/opencode/` (6 files) + provenance
   README. Anonymized (`/home/reviewer/...`), scanned clean for paths/tokens/emails.
 
+### Quality gate repair (pre-PR)
+
+- `npm run check` failed on 2 `core-no-io-libs` violations: a stray `pnpm-lock.yaml` +
+  pnpm-installed `node_modules` made zod resolve via `node_modules/.pnpm/...`, defeating
+  the guard whitelist. Removed the lockfile and reinstalled with `npm ci` — guards green.
+- 2 GitPort contract tests failed on macOS only: `os.tmpdir()` is under `/var` (symlink
+  to `/private/var`) while git reports canonical paths. Fixed by `realpathSync` on the
+  fixture root (commit `fix(test): canonicalize tmpdir in GitPort contract fixture for
+  macOS`, test-only change, declared outside E1 scope in the PR).
+- Final state: `npm run check` ✅ and 163/163 tests ✅.
+
 ## Pending and next steps
 
 - `[E1.F1.H4]` context modes — optional, skipped unless requested.
 - E1 PR for H1+H2+H3 (`Closes #7, #8, #9`) — user decides when to open.
+- `create-issues.sh` has pre-existing uncommitted modifications (predates this session) —
+  user to review/commit separately.
 
 ## Open questions for the user
 

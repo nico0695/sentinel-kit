@@ -1,0 +1,76 @@
+/**
+ * Core module: run — error family (PRD §4.2, sanctioned by `d-dec004-scope`).
+ *
+ * Base class + one typed subclass per failure family, following the same
+ * pattern as `WorkspaceError` / `GitError` / `HarnessError`: `Error` suffix,
+ * `cause` typed `unknown` and stored conditionally so callers may pass
+ * `{ cause: err }` unconditionally without violating
+ * exactOptionalPropertyTypes.
+ *
+ * These classes are what `runReview` (E4.F1.H1) discriminates on when it maps
+ * a stage fault to a `TerminalState`. That mapping keys on the concrete
+ * subclasses only: the `RunError` base is never tested, so adding a subclass
+ * later cannot silently reroute an existing state.
+ */
+
+/** Constructor options shared by every `RunError` subclass. */
+export interface RunErrorOptions {
+  readonly cause?: unknown;
+}
+
+/**
+ * Base class for every run-domain failure. Catch this to react to any run
+ * error without discriminating; catch a subclass to react to one specific
+ * family. Never thrown directly — every path chooses one of the subclasses
+ * below.
+ */
+export class RunError extends Error {
+  readonly cause?: unknown;
+  constructor(message: string, options?: RunErrorOptions) {
+    super(message);
+    this.name = "RunError";
+    if (options !== undefined && "cause" in options) {
+      this.cause = options.cause;
+    }
+  }
+}
+
+/**
+ * Raised by the run request pre-flight when the caller's `RunReviewRequest`
+ * is malformed (non-positive `timeoutMs`, empty `harnessType`, empty refs).
+ * An EXPECTED domain outcome, not a bug: `cause` is intentionally not
+ * populated, mirroring `InvalidWorktreeRequestError`.
+ */
+export class InvalidRunRequestError extends RunError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidRunRequestError";
+  }
+}
+
+/**
+ * Raised when the `ReviewEngine` invocation rejects. The raw rejection is
+ * preserved in `cause` for observability — the core never names the engine's
+ * own error types (guard 2 `core-no-io-libs`).
+ */
+export class EngineInvocationError extends RunError {
+  constructor(message: string, options?: RunErrorOptions) {
+    super(message, options);
+    this.name = "EngineInvocationError";
+  }
+}
+
+/**
+ * Raised when the `ReviewEngine` invocation exceeds the run's budget. Kept
+ * distinct from `EngineInvocationError` because it is the sole producer of
+ * the `timeout` terminal state. `timeoutMs` is the budget that elapsed, not
+ * the time actually spent.
+ */
+export class EngineTimeoutError extends RunError {
+  readonly timeoutMs: number;
+  constructor(timeoutMs: number, options?: RunErrorOptions) {
+    super(`Engine invocation timed out after ${timeoutMs}ms`, options);
+    this.name = "EngineTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}

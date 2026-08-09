@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -36,7 +36,8 @@ stages:
       coverage; the orchestrator's post-processing narrowed that escalation (see d-dec004-scope
       and r-validation-failed-semantics).
   sddl-spec:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-09T03:35:00Z"
   sddl-design:
     status: pending
   sddl-plan:
@@ -108,7 +109,64 @@ checkpoints:
       responded_at: "2026-08-09T03:25:00Z"
     created_at: "2026-08-09T03:15:00Z"
     resolved_at: "2026-08-09T03:25:00Z"
+  - id: cp-validation-failed-semantics
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      The `validation-failed` terminal state has no defined producer. E5.F1.H2 states declared
+      validations do NOT abort the review, so E5 never produces it; the PRD defines it only as
+      an enum member. Resolving this decides whether the story's acceptance criterion is
+      achievable and shapes the public result contract.
+    question: >-
+      What does the `validation-failed` terminal state mean, given E5 does not produce it?
+    options:
+      - id: preflight
+        label: Pre-flight validation failure
+        description: >-
+          The review never ran because input or config was invalid: malformed request, unknown
+          harness, invalid diff limits. Producible in H1, makes the acceptance criterion
+          satisfiable, and is consistent with E5 not producing it.
+        recommended: true
+      - id: defer-to-spec
+        label: Let spec decide with evidence
+        description: >-
+          Pass the question to the spec worker with both citations and have it propose the
+          interpretation as part of the contract, subject to review at the spec gate.
+      - id: explicit-deferral
+        label: Defer the state explicitly
+        description: >-
+          H1 does not produce `validation-failed`; record an explicit deferral naming the state
+          and its future producer, leaving the acceptance criterion partially met and documented.
+    free_input_allowed: true
+    response:
+      selected_option_id: preflight
+      responded_at: "2026-08-09T03:35:00Z"
+    created_at: "2026-08-09T03:32:00Z"
+    resolved_at: "2026-08-09T03:35:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: Launch the sddl-spec worker for [E4.F1.H1] with the four open risks carried forward.
+    question: Approve routing to sddl-spec?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-09T03:35:00Z"
+    created_at: "2026-08-09T03:32:00Z"
+    resolved_at: "2026-08-09T03:35:00Z"
 decisions:
+  - id: d-validation-failed-preflight
+    checkpoint_id: cp-validation-failed-semantics
+    selected_option_id: preflight
+    rationale: >-
+      B-level, user decided. `validation-failed` means a pre-flight validation failure: the
+      review never reached the engine because the request or configuration was invalid. Evidence
+      supporting the reading: E5.F1.H2 requires declared-validation failures to continue the
+      review with the evidence attached, so E5 cannot be the producer; and the only thing
+      DiffSizePolicyError actually raises on today is invalid limit configuration
+      (compute-review-diff.ts:209,212), which is exactly a pre-flight fault. Makes the story's
+      "each terminal state reachable by test" criterion satisfiable without deferral.
+    recorded_at: "2026-08-09T03:35:00Z"
   - id: d-change-scope
     checkpoint_id: cp-change-seed
     rationale: >-
@@ -154,16 +212,12 @@ open_risks:
       work here, not a port change requiring escalation. What remains for spec is the mapping
       itself, not permission to build it.
   - id: r-validation-failed-semantics
-    severity: medium
+    severity: low
     summary: >-
-      NEW, replaces the `validation-failed` half of r-terminal-state-coverage. The proposal
-      assumed `validation-failed` belongs to E5 and has no producer here, but E5.F1.H2 states
-      the opposite: declared-validation failures do NOT abort the review ("failed validation =
-      review continues with the evidence"). So E5 never produces this terminal state, and it
-      most plausibly means pre-flight/input validation failure — invalid request, unknown
-      harness, invalid diff-limit config (the only thing DiffSizePolicyError actually raises on)
-      — which IS producible in this story. This is an interpretation of a PRD term that shapes
-      the public contract: B-level, user decides.
+      RESOLVED by user decision d-validation-failed-preflight: `validation-failed` means
+      pre-flight validation failure (invalid request, unknown harness, invalid diff-limit
+      config), not a declared-validation failure. Downgraded to low; residual work is for spec
+      to enumerate exactly which pre-flight faults map to it and prove each by test.
   - id: r-parse-seam
     severity: medium
     summary: >-
@@ -193,12 +247,11 @@ open_risks:
       validationOutput, so the E5 seam is a pass-through parameter — no new machinery, no E5
       import, no guard risk.
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-spec
   summary: >-
-    proposal.md complete. Two medium risks must be surfaced before routing (interactive mode),
-    and r-validation-failed-semantics is a B-level interpretation the user should settle so spec
-    can convert "each terminal state reachable by test" into a defensible mapping rather than a
-    silent deferral.
+    Approved. sddl-spec worker running with proposal.md, the settled validation-failed semantics
+    (pre-flight), the withdrawn dec-004 escalation, and the parse-seam / cleanup-fault /
+    dependency-surface risks carried forward.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T03:30:00Z"
+updated_at: "2026-08-09T03:35:00Z"

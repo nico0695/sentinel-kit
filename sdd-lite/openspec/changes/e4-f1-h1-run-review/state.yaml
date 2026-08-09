@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -36,8 +36,16 @@ stages:
       coverage; the orchestrator's post-processing narrowed that escalation (see d-dec004-scope
       and r-validation-failed-semantics).
   sddl-spec:
-    status: in_progress
+    status: completed
     started_at: "2026-08-09T03:35:00Z"
+    completed_at: "2026-08-09T03:42:00Z"
+    notes: >-
+      Returned `partial`: spec.md is complete on every axis except one genuine B-level choice
+      (harness resolution shape) that it escalated rather than settling, because it fixes the
+      public signature sddl-design must write. Resolved six of the proposal's seven questions
+      A-level, specified an exhaustive stage-plus-error-class mapping onto all five terminal
+      states, a wide result contract, and 18 acceptance criteria. Orchestrator verified every
+      type it references is exported from the workspace and review public indexes.
   sddl-design:
     status: pending
   sddl-plan:
@@ -201,57 +209,67 @@ decisions:
       sddl-init to the user first; proceeded on the lower-blast-radius option without an answer.
     recorded_at: "2026-08-09T03:10:00Z"
 open_risks:
+  - id: r-dependency-surface
+    severity: medium
+    summary: >-
+      Part 2 (result shape) settled A-level by spec: return the wide shape, since PRD §9 requires
+      runs to persist the prompt and under-returning would force a breaking change on E5's
+      RunStore. Part 1 (harness resolution) is the single OPEN B-level decision — it fixes the
+      public signature of the flagship use case and blocks sddl-design.
+  - id: r-infrastructure-as-engine-error
+    severity: medium
+    summary: >-
+      NEW from spec. Git and infrastructure faults (WorktreeCreationError, GitDiffError) surface
+      as `engine-error` because the PRD fixes exactly five terminal states and a sixth would be a
+      C-level contradiction. Fidelity is preserved via `failure.stage` + `failure.error` so E6 can
+      render an accurate message. Revisit only if E6 proves the label misleads users.
+  - id: r-parse-seam
+    severity: low
+    summary: >-
+      RESOLVED by spec: a module-private naive extraction behind an injectable
+      `deps.parseVerdict`, not exported from index.ts. Residual: it could be mistaken for "good
+      enough" and weaken the case for H2 (#27). Mitigated by Non-Goals wording and by H2 owning
+      the fixture corpus and the >=90% parse-rate criterion, which the naive version cannot meet
+      by construction.
+  - id: r-cleanup-on-error
+    severity: low
+    summary: >-
+      RESOLVED by spec: a cleanup fault ANNOTATES, never overrides and never rethrows. AC-9 and
+      AC-10 prove both directions — a fault on the happy path keeps `ok`, and a fault after an
+      engine rejection keeps both `engine-error` and the originating EngineInvocationError.
+  - id: r-engine-not-cancellable
+    severity: low
+    summary: >-
+      NEW from spec. On timeout the engine promise is abandoned, not killed — the port has no
+      abort channel. Inert in H1 (FakeEngine, in-memory git), but cleanup could later remove a
+      worktree a live process still holds. `timeoutMs` is still passed to the engine so E4.F2
+      adapters (#28-30) own process kill. Flagged forward.
+  - id: r-catchall-masks-bugs
+    severity: low
+    summary: >-
+      NEW from spec. The fall-through mapping sends genuine programming bugs to `engine-error`.
+      Accepted for the "exactly one terminal state" invariant; the original throwable is
+      preserved in `failure.error`, so nothing is lost, only relabelled.
   - id: r-terminal-state-coverage
     severity: low
     summary: >-
-      DOWNGRADED from medium by orchestrator post-processing. The proposal read `timeout` and
-      `engine-error` as blocked behind a frozen port. Evidence says otherwise: the E0.F2.H2 spec
-      (dec-004) explicitly deferred both to this story — "real timeout enforcement is the run
-      flow's job (E4.F1.H1)" and "a typed error may arrive later (E4) without breaking this
-      contract". So wall-clock enforcement and a typed run-domain error are sanctioned A-level
-      work here, not a port change requiring escalation. What remains for spec is the mapping
-      itself, not permission to build it.
+      CLOSED by spec: full five-state mapping, every state with at least one named test producer
+      (AC-2 through AC-6).
   - id: r-validation-failed-semantics
     severity: low
     summary: >-
-      RESOLVED by user decision d-validation-failed-preflight: `validation-failed` means
-      pre-flight validation failure (invalid request, unknown harness, invalid diff-limit
-      config), not a declared-validation failure. Downgraded to low; residual work is for spec
-      to enumerate exactly which pre-flight faults map to it and prove each by test.
-  - id: r-parse-seam
-    severity: medium
-    summary: >-
-      NEW, surfaced by the proposal. The backlog flow reads "engine -> parsing -> terminal state"
-      but the verdict parser is issue #27. Spec must decide whether H1 does a deliberately
-      minimal internal extraction that H2 replaces, or takes an injected parse function with a
-      trivial default. Determines whether `ok` vs `ambiguous` is even distinguishable here, and
-      whether H1 pre-empts H2's scope.
-  - id: r-cleanup-on-error
-    severity: medium
-    summary: >-
-      "Correct cleanup even on error" means the worktree must be removed on every path,
-      including engine failure and timeout, without swallowing the original error. Sharpened by
-      the proposal with an edge the seed did not name: cleanupWorktree can itself throw
-      WorktreeCleanupError after the review already resolved, so spec must say whether a cleanup
-      fault overrides, annotates, or leaves intact the original outcome.
-  - id: r-dependency-surface
-    severity: low
-    summary: >-
-      NEW, surfaced by the proposal. runReview needs GitPort, engine, resolved harness (or
-      HarnessLoader), worktreesDir, diff limits, cleanup policy and timeout. Whether the harness
-      is resolved internally or passed in is a public-API shape decision (B-level) for spec.
+      CLOSED by spec: seven concrete pre-flight producers enumerated, one AC-6 case each.
   - id: r-e5-validation-seam
     severity: low
     summary: >-
-      Cheaper than the seed assumed: assemblePrompt already accepts an optional readonly
-      validationOutput, so the E5 seam is a pass-through parameter — no new machinery, no E5
-      import, no guard risk.
+      CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
+      assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
-  target: sddl-spec
+  kind: ask_user
+  target: sddl-design
   summary: >-
-    Approved. sddl-spec worker running with proposal.md, the settled validation-failed semantics
-    (pre-flight), the withdrawn dec-004 escalation, and the parse-seam / cleanup-fault /
-    dependency-surface risks carried forward.
+    spec.md complete except one open B-level decision: does runReview take `harnessType: string`
+    and resolve the harness internally, or receive an already-resolved ResolvedHarness? It fixes
+    the public signature, so sddl-design is blocked until the user decides.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T03:35:00Z"
+updated_at: "2026-08-09T03:42:00Z"

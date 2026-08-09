@@ -79,7 +79,7 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-09T04:20:00Z"
-    last_updated_at: "2026-08-09T13:15:00Z"
+    last_updated_at: "2026-08-09T13:20:00Z"
     notes: >-
       ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
       subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
@@ -301,6 +301,25 @@ checkpoints:
       responded_at: "2026-08-09T04:20:00Z"
     created_at: "2026-08-09T04:20:00Z"
     resolved_at: "2026-08-09T04:20:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2: create src/core/run/engine-timeout.ts (TimeoutScheduler, defaultTimeoutScheduler,
+      runEngineWithTimeout) and src/core/run/builtin-verdict-extraction.ts
+      (extractBuiltInVerdict). The riskiest stage in the change: the only concurrency in the core
+      (promise race, no-op late-rejection handler, finally-cancel). Carries no tests of its own --
+      its behaviour is proven through runReview at ST-4/ST-5 -- so its green is weaker than the
+      other stages', which was surfaced to the user before approval.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-2?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si", after being told ST-2 ships untested until ST-4/ST-5.
+      responded_at: "2026-08-09T13:20:00Z"
+    created_at: "2026-08-09T13:20:00Z"
+    resolved_at: "2026-08-09T13:20:00Z"
 decisions:
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
@@ -447,13 +466,10 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    ST-1 done and green. Awaiting stage_approval for ST-2 (engine-timeout.ts +
-    builtin-verdict-extraction.ts) -- the riskiest stage in the change: the only concurrency in
-    the core, with an explicit STOP-and-route-back rule if the promise race cannot satisfy both
-    AC-5 and timer hygiene. No unilateral fall back to vitest fake timers, which design evaluated
-    and rejected.
+    ST-2 approved and running: engine-timeout.ts + builtin-verdict-extraction.ts. On return, the
+    orchestrator triages the stage diff and opens the ST-3 stage_approval.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T13:15:00Z"
+updated_at: "2026-08-09T13:20:00Z"

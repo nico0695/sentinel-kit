@@ -1,8 +1,13 @@
 /**
- * `runReview` terminal-state suite (ST-4): every one of the five terminal
- * states is reachable, nothing escapes as a rejection, and pre-flight faults
- * leave no worktree behind. Covers AC-1..AC-6, AC-11 and AC-12; the cleanup
- * contract and the two seams (AC-7..AC-10, AC-13, AC-14) are ST-5's half.
+ * `runReview` behavioural suite.
+ *
+ * ST-4 half: every one of the five terminal states is reachable, nothing
+ * escapes as a rejection, and pre-flight faults leave no worktree behind
+ * (AC-1..AC-6, AC-11, AC-12).
+ *
+ * ST-5 half: the cleanup contract (AC-7..AC-10), the two seams (AC-13,
+ * AC-14), timer hygiene, and the adapter self-enforced timeout precedence
+ * route (R1-001).
  */
 
 import { describe, expect, it } from "vitest";
@@ -17,6 +22,7 @@ import {
 import {
   DiffSizePolicyError,
   InvalidWorktreeRequestError,
+  WorktreeCleanupError,
   WorktreeCreationError,
 } from "../../workspace/index.js";
 import {
@@ -334,6 +340,291 @@ describe("runReview", () => {
       expect(result.state).toBe("engine-error");
       expect(result.failure?.stage).toBe("diff");
       expect(result.failure?.error).toBe(rawError);
+    });
+  });
+
+  describe("cleanup on every path under policy always (AC-7)", () => {
+    // A failed worktree ADD (`cleanup: { attempted: false }`, no remove call)
+    // is already pinned by AC-4b above and is deliberately not re-counted here.
+    it("removes the worktree on ok", async () => {
+      const git = buildGit();
+
+      const result = await runReview(buildRequest(), buildDeps({ git }));
+
+      expect(result.state).toBe("ok");
+      expect(git.removeCalls).toHaveLength(1);
+      expect(git.removeCalls[0]?.worktreePath).toBe(result.worktreePath);
+    });
+
+    it("removes the worktree on ambiguous", async () => {
+      const git = buildGit();
+      const engine = createFakeEngine({
+        ok: true,
+        result: { output: "No verdict line anywhere." },
+      });
+
+      const result = await runReview(
+        buildRequest(),
+        buildDeps({ git, engine }),
+      );
+
+      expect(result.state).toBe("ambiguous");
+      expect(git.removeCalls).toHaveLength(1);
+    });
+
+    it("removes the worktree on a post-worktree engine-error", async () => {
+      const git = buildGit();
+      const engine = createFakeEngine({
+        ok: false,
+        error: new Error("engine exploded"),
+      });
+
+      const result = await runReview(
+        buildRequest(),
+        buildDeps({ git, engine }),
+      );
+
+      expect(result.state).toBe("engine-error");
+      expect(git.removeCalls).toHaveLength(1);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: true,
+        reason: "policy-always",
+      });
+    });
+
+    it("removes the worktree on timeout", async () => {
+      const git = buildGit();
+      const engine = createHangingEngine();
+      const manual = createManualScheduler({ fireImmediately: true });
+
+      const result = await runReview(
+        buildRequest(),
+        buildDeps({ git, engine, scheduleTimeout: manual.scheduler }),
+      );
+
+      expect(result.state).toBe("timeout");
+      expect(git.removeCalls).toHaveLength(1);
+    });
+  });
+
+  describe("cleanup honours the policy (AC-8)", () => {
+    it("keep never removes, even on ok", async () => {
+      const git = buildGit();
+
+      const result = await runReview(
+        buildRequest({ cleanupPolicy: "keep" }),
+        buildDeps({ git }),
+      );
+
+      expect(result.state).toBe("ok");
+      expect(git.removeCalls).toHaveLength(0);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "policy-keep",
+      });
+    });
+
+    it("on-success removes on ok", async () => {
+      const git = buildGit();
+
+      const result = await runReview(
+        buildRequest({ cleanupPolicy: "on-success" }),
+        buildDeps({ git }),
+      );
+
+      expect(result.state).toBe("ok");
+      expect(git.removeCalls).toHaveLength(1);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: true,
+        reason: "policy-on-success",
+      });
+    });
+
+    it("on-success keeps the worktree on engine-error", async () => {
+      const git = buildGit();
+      const engine = createFakeEngine({
+        ok: false,
+        error: new Error("engine exploded"),
+      });
+
+      const result = await runReview(
+        buildRequest({ cleanupPolicy: "on-success" }),
+        buildDeps({ git, engine }),
+      );
+
+      expect(result.state).toBe("engine-error");
+      expect(git.removeCalls).toHaveLength(0);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "review-failed",
+      });
+    });
+
+    it("on-success keeps the worktree on timeout", async () => {
+      const git = buildGit();
+      const engine = createHangingEngine();
+      const manual = createManualScheduler({ fireImmediately: true });
+
+      const result = await runReview(
+        buildRequest({ cleanupPolicy: "on-success" }),
+        buildDeps({ git, engine, scheduleTimeout: manual.scheduler }),
+      );
+
+      expect(result.state).toBe("timeout");
+      expect(git.removeCalls).toHaveLength(0);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "review-failed",
+      });
+    });
+
+    it("on-success keeps the worktree on ambiguous — literal reading of success (R2-002)", async () => {
+      const git = buildGit();
+      const engine = createFakeEngine({
+        ok: true,
+        result: { output: "No verdict line anywhere." },
+      });
+
+      const result = await runReview(
+        buildRequest({ cleanupPolicy: "on-success" }),
+        buildDeps({ git, engine }),
+      );
+
+      expect(result.state).toBe("ambiguous");
+      expect(git.removeCalls).toHaveLength(0);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "review-failed",
+      });
+    });
+  });
+
+  describe("a cleanup fault annotates, never overrides (AC-9, AC-10)", () => {
+    it("keeps state ok when only the cleanup fails (AC-9)", async () => {
+      const git = buildGit({ removeError: new GitWorktreeError("rm failed") });
+      const deps = buildDeps({ git });
+
+      // The same promise asserted twice: a cleanup fault must not reject.
+      const promise = runReview(buildRequest(), deps);
+      await expect(promise).resolves.toBeDefined();
+
+      const result = await promise;
+      expect(result.state).toBe("ok");
+      expect(result.verdict).toBe("approve");
+      expect(result.failure).toBeUndefined();
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "cleanup-failed",
+        error: expect.any(WorktreeCleanupError),
+      });
+    });
+
+    it("does not swallow the originating engine error when cleanup also fails (AC-10)", async () => {
+      const git = buildGit({ removeError: new GitWorktreeError("rm failed") });
+      const engine = createFakeEngine({
+        ok: false,
+        error: new Error("engine exploded"),
+      });
+
+      const result = await runReview(
+        buildRequest(),
+        buildDeps({ git, engine }),
+      );
+
+      expect(result.state).toBe("engine-error");
+      expect(result.failure?.stage).toBe("engine");
+      expect(result.failure?.error).toBeInstanceOf(EngineInvocationError);
+      expect(result.cleanup).toEqual({
+        attempted: true,
+        removed: false,
+        reason: "cleanup-failed",
+        error: expect.any(WorktreeCleanupError),
+      });
+    });
+  });
+
+  describe("E5 validation seam pass-through (AC-13)", () => {
+    it("renders a supplied validationOutput into the prompt", async () => {
+      const result = await runReview(
+        buildRequest({ validationOutput: ["lint: ok", "tests: 12 passed"] }),
+        buildDeps(),
+      );
+
+      expect(result.state).toBe("ok");
+      expect(result.prompt).toContain("<validation-output>");
+      expect(result.prompt).toContain("lint: ok");
+      expect(result.prompt).toContain("tests: 12 passed");
+    });
+
+    it("omits the validation-output section when none is supplied", async () => {
+      const result = await runReview(buildRequest(), buildDeps());
+
+      expect(result.state).toBe("ok");
+      expect(result.prompt).not.toContain("<validation-output>");
+    });
+  });
+
+  describe("parse seam injectable (AC-14)", () => {
+    it("lets deps.parseVerdict override the built-in extraction", async () => {
+      const seen: string[] = [];
+      const engine = createFakeEngine({
+        ok: true,
+        result: { output: "VERDICT: approve" },
+      });
+      const deps = buildDeps({
+        engine,
+        parseVerdict: (output) => {
+          seen.push(output);
+          return "comment";
+        },
+      });
+
+      const result = await runReview(buildRequest(), deps);
+
+      // The built-in extraction would say approve; the injected parser wins.
+      expect(result.state).toBe("ok");
+      expect(result.verdict).toBe("comment");
+      expect(seen).toEqual(["VERDICT: approve"]);
+    });
+  });
+
+  describe("timer hygiene", () => {
+    it("cancels the scheduled timer exactly once on the happy path", async () => {
+      // Non-firing manual scheduler: the default scheduler's real timer is
+      // unobservable, and a leaked (uncancelled) timer must be visible.
+      const manual = createManualScheduler();
+      const deps = buildDeps({ scheduleTimeout: manual.scheduler });
+
+      const result = await runReview(buildRequest(), deps);
+
+      expect(result.state).toBe("ok");
+      expect(manual.calls).toHaveLength(1);
+      expect(manual.cancelCount()).toBe(1);
+    });
+  });
+
+  describe("adapter self-enforced timeout (R1-001)", () => {
+    it("maps an engine rejection with the public EngineTimeoutError to timeout, unwrapped", async () => {
+      // An E4.F2 adapter that enforces its own budget rejects with the
+      // publicly-exported `EngineTimeoutError` (imported from the module
+      // index, as production adapters would). The race rethrows it UNWRAPPED
+      // instead of wrapping it in `EngineInvocationError`, so the run lands
+      // on `timeout`, not `engine-error` — the documented precedence route.
+      const adapterTimeout = new EngineTimeoutError(500);
+      const engine = createFakeEngine({ ok: false, error: adapterTimeout });
+
+      const result = await runReview(buildRequest(), buildDeps({ engine }));
+
+      expect(result.state).toBe("timeout");
+      expect(result.failure?.stage).toBe("engine");
+      expect(result.failure?.error).toBe(adapterTimeout);
     });
   });
 });

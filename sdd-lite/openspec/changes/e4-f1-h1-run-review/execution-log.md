@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-4
+- latest_stage_id: ST-5
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/__test__/run-review-fixtures.ts` (new, 229 lines), `src/core/run/__test__/run-review.test.ts` (new, 339 lines)
-- latest_check_result: `npx vitest run --project core` 129/129 (11 files); `npm run check` green; `npm test` 182/182 (15 files) — 163 baseline + 19 new; `git status` shows only the two new test files
-- latest_next_action: request `stage_approval` for ST-5 (cleanup contract + the two seams: AC-7..AC-10, AC-13, AC-14, timer hygiene, the R1-001 escape-hatch pin)
+- latest_files_changed: `src/core/run/__test__/run-review.test.ts` (extended, 339 → 630 lines); `run-review-fixtures.ts` untouched (no builder needed extending)
+- latest_check_result: `npx vitest run --project core` 145/145 (11 files, 16 new); `npm run check` green; `npm test` 198/198 (15 files) — 182 baseline + 16 new; `git diff --stat` shows only `run-review.test.ts`
+- latest_next_action: execute ST-6 (read-only whole-diff verification and PR readiness — no approval required per plan)
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-4
+- current_stage_id: ST-5
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -30,7 +30,7 @@
 | ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | approved (`cp-st3-approval`) | completed | 2026-08-09 | Largest stage; behaviour still unverified by the suite until ST-4/ST-5 |
 | ST-3b | Review-driven doc corrections + `timeoutMs` upper bound (R2-001..R2-004, R3-004) | yes | granted (review_gate) | completed | 2026-08-09 | Amendment stage inserted after the full-4r review of 03bd7cf; comment-only except one validation condition |
 | ST-4 | Fixtures + terminal-state coverage | yes | approved (`cp-st4-approval`) | completed | 2026-08-09 | 19 new tests; all five terminal states now proven reachable, incl. the 9 AC-6 cases |
-| ST-5 | Cleanup contract + the two seams | yes | pending | pending | — | — |
+| ST-5 | Cleanup contract + the two seams | yes | approved (`cp-st5-approval`) | completed | 2026-08-09 | 16 new tests; full behavioural surface AC-1..AC-14 now covered, plus timer hygiene and the R1-001 pin |
 | ST-6 | Whole-diff verification and PR readiness | no | pending | pending | — | Read-only evidence gate |
 
 ## Execution Rules
@@ -497,3 +497,89 @@
 - The two guarantees the design staked everything on now have tests: `runReview` never rejects (a bare `TypeError` from a dependency resolves as `engine-error` with the original preserved untouched), and pre-flight faults leave no worktree behind.
 - Everything is green: core project 129/129, `npm run check` clean, full suite 182/182 with the 163 pre-existing tests untouched. The diff is exactly the two new test files — no production line changed.
 - Next: approve ST-5 (cleanup contract, the two seams, timer hygiene, and the R1-001 escape-hatch pin), which extends this same suite.
+
+### Stage `ST-5`
+
+- stage_digest: Cleanup contract + the two seams — `run-review.test.ts` extended with 16 tests: AC-7 (cleanup on every path under `always`), AC-8 (policy honoured, including the R2-002 `ambiguous`-keeps-under-`on-success` policy), AC-9/AC-10 (a cleanup fault annotates, never overrides or swallows), AC-13 (E5 seam pass-through), AC-14 (injectable parse seam), timer hygiene (`cancelCount() === 1` via the non-firing manual scheduler), and the R1-001 escape-hatch pin (an engine rejecting with the public `EngineTimeoutError` lands on `timeout`, unwrapped). No fixture change needed.
+- approval_checkpoint_id: `cp-st5-approval`
+- approval_decision_id: user-approved ST-5 at `cp-st5-approval` (recorded in the orchestrator handoff)
+- planned_scope: `src/core/run/__test__/run-review.test.ts` (extended), `src/core/run/__test__/run-review-fixtures.ts` (only if a builder needed extending)
+- actual_files_changed: `src/core/run/__test__/run-review.test.ts` (339 → 630 lines, +295/−4); `run-review-fixtures.ts` untouched
+- touches_code: yes
+- quick_check_status: passed
+- qa_review_status: not_requested — ST-6 (whole-diff verification) is next, followed by `sddl-qa-review` in final mode at closeout
+- execution_status: completed
+- next_action: execute ST-6 (read-only, no approval required per plan)
+
+#### Planned Work
+
+- Extend the ST-4 suite with the cleanup contract and the seams: AC-7 (under `policy: "always"`, `worktreeRemove` recorded for `ok`, `ambiguous`, post-worktree `engine-error` and `timeout`), AC-8 (`keep` never removes; `on-success` removes on `ok` only — asserting the documented R2-002 policy that `ambiguous` keeps the worktree), AC-9 (`removeError` on a happy path leaves `state: "ok"` and annotates `cleanup-failed`), AC-10 (engine rejection + `removeError` preserves the `EngineInvocationError`), AC-13 (`validationOutput` in/absent from `result.prompt`), AC-14 (`deps.parseVerdict` overrides the built-in), timer hygiene (`cancelCount() === 1` on a happy path with a non-firing manual scheduler), and the R1-001 pin (engine rejection with the publicly-exported `EngineTimeoutError` ⇒ `timeout`).
+- Modify no production file, no other test, no `index.ts`; extend fixtures only if a builder falls short.
+
+#### Preconditions And Sync Checks
+
+- Working tree clean at stage start (`git status --porcelain` empty); ST-1..ST-4 committed. Branch `claude/validar-e1-preparar-e4-m1xkhl`.
+- ST-4's `risks_observed` notes (addressed to this stage) honoured: the non-firing manual scheduler used for timer hygiene; `removeError` built as a `GitWorktreeError` instance; AC-4b's `attempted: false` pin NOT re-counted under AC-7 (a code comment in the AC-7 describe records the exclusion).
+- Plan traps re-verified against source before writing: `cleanupWorktree` wraps ONLY `GitWorktreeError` into `WorktreeCleanupError` (`cleanup-worktree.ts:54`), so the `removeError` fixtures use exactly that class; the fake git port's `removeError` config and the `cleanupPolicy` request field both flow through the existing `buildGit`/`buildRequest` builders, so no fixture extension was required.
+- `engine-timeout.ts:100-101` re-read: an engine rejection that is `instanceof EngineTimeoutError` is rethrown unwrapped (the R1-001 route); `EngineTimeoutError` confirmed publicly exported from `src/core/run/index.ts`, and the suite already imports it from `../index.js` — the same specifier a production adapter caller would use.
+- `assemblePrompt` re-read: `validationOutput` renders as a `<validation-output>` section, omitted when absent — fixing the AC-13 assertions.
+- `createFakeEngine`'s rejecting outcome takes any `Error`; `EngineTimeoutError extends RunError extends Error`, so the R1-001 case reuses the sanctioned fake unchanged.
+
+#### Changes Applied
+
+- `src/core/run/__test__/run-review.test.ts` — 16 tests in seven new describes, appended after AC-12 inside the existing `runReview` describe; file header doc-comment updated to describe both halves of the suite; `WorktreeCleanupError` added to the workspace import block:
+  - cleanup on every path under policy always (AC-7): `removeCalls` has exactly one entry on `ok` (also asserting `removeCalls[0].worktreePath === result.worktreePath`), `ambiguous`, post-worktree `engine-error` (also asserting the full `policy-always` cleanup shape), and `timeout` (hanging engine + `fireImmediately` manual scheduler). A comment records that the failed-add `attempted: false` path is pinned by AC-4b and deliberately not re-counted.
+  - cleanup honours the policy (AC-8), five cases: `keep` on `ok` (no removal, `reason: "policy-keep"`); `on-success` on `ok` (removed, `reason: "policy-on-success"`); `on-success` on `engine-error`, on `timeout`, and on `ambiguous` (all kept, `reason: "review-failed"`) — the `ambiguous` case named for R2-002's literal reading of "success".
+  - cleanup fault annotates, never overrides (AC-9, AC-10): AC-9 asserts on the same promise first `.resolves` then `state: "ok"`, `verdict: "approve"`, `failure` absent, and `cleanup` equal to `{ attempted: true, removed: false, reason: "cleanup-failed", error: expect.any(WorktreeCleanupError) }`; AC-10 combines the engine rejection with `removeError` and asserts `state: "engine-error"`, `failure.error instanceof EngineInvocationError`, and the same `cleanup-failed` annotation.
+  - E5 validation seam pass-through (AC-13): supplied `validationOutput` lines appear inside `<validation-output>` in `result.prompt`; with none supplied the section is absent.
+  - parse seam injectable (AC-14): a recording `deps.parseVerdict` stub returns `"comment"` against output the built-in would read as `approve`; asserts `verdict: "comment"` and that the stub received the raw engine output.
+  - timer hygiene: happy path with the NON-firing manual scheduler — `calls` has one entry and `cancelCount() === 1` after the run resolves.
+  - adapter self-enforced timeout (R1-001): `createFakeEngine({ ok: false, error: new EngineTimeoutError(500) })` — the run lands on `state: "timeout"` with `failure.error` IDENTITY-equal to the adapter's error (proving the unwrapped rethrow), documenting the E4.F2 precedence route.
+- `src/core/run/__test__/run-review-fixtures.ts` — untouched: `removeError` (fake git config) and `cleanupPolicy` (request field) already flow through `buildGit`/`buildRequest`, and ST-4 shipped `cancelCount()`/`fireAll()` in advance.
+
+#### Scope And Blast Radius Notes
+
+- `git status --short` after the stage: ` M src/core/run/__test__/run-review.test.ts` only; `git diff --stat` → `run-review.test.ts | 299 +/-` (+295/−4) and nothing else. Narrower than the approved scope (fixtures untouched). AC-17 holds.
+- No production file, no other test, no `index.ts` change. Test-only imports added: `WorktreeCleanupError` via the public `../../workspace/index.js` (guard-conformant, and excluded from the cruise anyway as a `__test__/` file).
+- The suite still runs entirely on injected fakes: no filesystem, no git binary, no real timers awaited.
+
+#### Quick Check
+
+- checks_planned: `npx vitest run --project core`; `npm run check`; `npm test`; `git status --short` / `git diff --stat` scope review
+- checks_run:
+  - `npx vitest run --project core` → passed, 11 test files, 145/145 tests (129 prior + 16 new), 0 failures. All 16 passed on the first run.
+  - `npm run check` → passed after one `biome check --write` formatting pass on the extended file (three long `runReview(...)` call lines broken across lines; no semantic change). Final: biome 78 files clean; `tsc --noEmit` clean; `depcruise src` no violations (56 modules / 104 dependencies — unchanged, test files excluded from the cruise). Core project re-run post-format: 145/145.
+  - `npm test` → passed, 15 test files, 198/198 tests, 0 failures — the 182 pre-existing tests intact plus the 16 new ones.
+  - `git status --short` → ` M src/core/run/__test__/run-review.test.ts` only; `git diff --stat` → that one file, +295/−4.
+- checks_skipped: none.
+- findings_summary: no warnings, no failures, no deviations. No genuine production defect surfaced — the blocked-return path was not needed. The cleanup contract, both seams, timer hygiene and the R1-001 precedence route are now all pinned by tests.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npx vitest run --project core` | 11 files / 145 tests passed (16 new); re-confirmed post-format |
+| command | `npm run check` | biome 78 files clean · tsc clean · depcruise 56 modules / 104 deps, 0 violations |
+| command | `npm test` | 15 files / 198 tests passed — 182 baseline intact + 16 new |
+| command | `git status --short` / `git diff --stat` | only `run-review.test.ts` modified, +295/−4 |
+| file | `src/core/run/__test__/run-review.test.ts` | AC-7..AC-10, AC-13, AC-14, timer hygiene, R1-001 pin — 16 tests, seven describes |
+| reference | `src/core/workspace/cleanup-worktree.ts:54` | `GitWorktreeError`-only wrapping re-verified before building the `removeError` fixtures |
+| reference | `src/core/run/engine-timeout.ts:100-101` | Unwrapped `EngineTimeoutError` rethrow — the R1-001 route the pin documents |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** the fixtures file was NOT extended — `removeError` and `cleanupPolicy` already flow through the existing builders, and extending a shared fixture without need would widen the diff for nothing. The approved scope permitted but did not require it.
+- **A-level (internal, logged):** AC-8 asserts five cases, not the four the AC row literally names — the fifth (`ambiguous` under `on-success` keeps the worktree) is the R2-002 documented policy the handoff explicitly routes to this stage; asserting it pins the spec's literal-success reading against regression.
+- **A-level (internal, logged):** the AC-9/AC-10 cleanup annotation is asserted with `toEqual` + `expect.any(WorktreeCleanupError)` rather than a discriminated-union narrowing dance — it keeps the whole-shape `toEqual` style ST-4 established for `cleanup` while still asserting the error's class.
+- **A-level (internal, logged):** the R1-001 case reuses `createFakeEngine` (its rejecting outcome accepts any `Error`, and `EngineTimeoutError` is one) instead of adding a bespoke engine fixture; `failure.error` is asserted with `toBe` (identity), which proves the unwrapped rethrow more strongly than `toBeInstanceOf` would.
+- **A-level (internal, logged):** the AC-7 describe carries a comment excluding the failed-add path (`attempted: false`) from its census, honouring ST-4's "do not double-count AC-4b" note while keeping the exclusion legible to a future reader.
+- **A-level (internal, logged):** the file header doc-comment was rewritten from "ST-4 half only, ST-5 pending" to describe both halves — leaving it stale would have made the suite's own header false.
+- Blockers: none. No contradiction between spec/design/plan and observed behaviour; every new test passed on its first run.
+
+#### User-Facing Summary
+
+- ST-5 is done: the behavioural surface of `runReview` is now fully pinned. 16 new tests prove the cleanup guarantee on every path, all three cleanup policies (including the deliberate "ambiguous keeps the worktree under on-success" policy), that a cleanup fault can annotate but never change or swallow an outcome, both injectable seams, and that the timeout timer is cancelled exactly once.
+- The R1-001 review finding is now a test: an engine adapter that enforces its own budget and rejects with the public `EngineTimeoutError` lands on the `timeout` state, unwrapped — the documented route E4.F2 adapters will rely on.
+- Everything is green: core project 145/145, `npm run check` clean, full suite 198/198 with the 182 pre-existing tests untouched. The diff is one file: the test suite, extended in place; the fixtures needed no change.
+- Next: ST-6, the read-only whole-diff verification gate (no approval required per plan), then `sddl-qa-review` in final mode.

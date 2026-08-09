@@ -146,6 +146,21 @@ stages:
       182/182 (163 pre-existing intact + 19 new). Orchestrator independently re-ran check +
       full suite and spot-checked the AC map (19 its, 8 describes, upper-bound case present).
       Seven A-level decisions logged in the ST-4 entry. ST-5 and ST-6 still user-gated.
+
+      ST-5 COMPLETE (status `success`). Extended __test__/run-review.test.ts (339 -> 630 lines,
+      16 new tests; fixtures file untouched -- both needed knobs already flowed through the
+      existing builders, an A-level restraint logged in the entry): AC-7 cleanup census on all
+      four post-worktree paths under `always`; AC-8 with FIVE cases, pinning the R2-002
+      literal-success policy (`ambiguous` kept under `on-success`); AC-9/AC-10 cleanup faults
+      annotate (`cleanup-failed` + WorktreeCleanupError) without overriding state or swallowing
+      the EngineInvocationError; AC-13 seam pass-through both directions; AC-14 parseVerdict
+      override; timer hygiene (cancelCount === 1 on the happy path, injected manual scheduler);
+      and the R1-001 escape-hatch pin -- an engine rejecting with the publicly-exported
+      EngineTimeoutError lands on `timeout` with the identity-asserted unwrapped rethrow. No
+      production file touched, no deviation, no defect surfaced. Exit checks: vitest core
+      145/145, `npm run check` green, `npm test` 198/198 (182 baseline intact). Orchestrator
+      independently re-ran check + full suite and spot-checked the describe map (35 tests, all
+      ST-5 blocks present). Only ST-6 (read-only, no approval per plan) and QA remain.
   sddl-code-review:
     status: completed
     started_at: "2026-08-09T14:20:00Z"
@@ -565,21 +580,18 @@ open_risks:
   - id: r-st3-behaviour-unverified
     severity: low
     summary: >-
-      DOWNGRADED by ST-4 (was medium, the dominant risk). The terminal-state half of the
-      behaviour is now proven: AC-1..AC-6, AC-11 and AC-12 all green (19 tests, 182/182), all
-      five terminal states reached, never-rejects pinned with an identity assertion. The
-      encode-the-bug hazard was additionally mitigated by the full-4r review landing BEFORE
-      ST-4. Residual until ST-5: the cleanup contract (AC-7..AC-10) and the two seams
-      (AC-13/AC-14) plus timer hygiene remain unexercised. Closes fully when ST-5 lands.
+      CLOSED by ST-5 (downgraded by ST-4 from medium, the then-dominant risk). The full
+      behavioural contract is now proven by the repository suite: all five terminal states
+      (AC-1..AC-6), the cleanup contract (AC-7..AC-10), the two seams (AC-13/AC-14), AC-11,
+      AC-12 -- 35 tests over run-review.ts, 198/198 overall.
   - id: r-st2-behaviour-unverified
     severity: low
     summary: >-
-      DOWNGRADED by ST-4 (was medium). builtin-verdict-extraction.ts is now exercised through
-      AC-2/AC-3 (one match, zero matches, conflicting matches) and engine-timeout.ts through
-      AC-4a (rejection wrap) and AC-5 (race reachability with a manual scheduler), all via the
-      repository suite -- the out-of-repo smoke run is superseded as evidence for those paths.
-      Residual until ST-5: timer hygiene (cancelCount on the happy path) and the R1-001
-      EngineTimeoutError escape-hatch rethrow have no repository test yet. Closes at ST-5.
+      CLOSED by ST-5 (downgraded by ST-4 from medium). engine-timeout.ts is now covered on
+      every reachable path via the repository suite: rejection wrap (AC-4a), race reachability
+      (AC-5), timer hygiene (cancelCount === 1), and the EngineTimeoutError unwrapped-rethrow
+      escape hatch (R1-001 pin). builtin-verdict-extraction.ts covered via AC-2/AC-3. The
+      ST-2 out-of-repo smoke run is fully superseded as evidence.
   - id: r-st2-concurrency-stage
     severity: low
     summary: >-
@@ -648,8 +660,9 @@ open_risks:
       and a kill-based adapter would lose the race to the outer timer anyway). Owner: E4.F2
       (#28-30) must fix a precedence rule. Working escape hatch to document and pin: an adapter
       rejecting with the publicly-exported EngineTimeoutError is rethrown unwrapped and lands on
-      `timeout` (engine-timeout.ts:96-97, index.ts). ST-5 should add that case; AC-5 alone
-      proves timeout only with a budget-ignoring fake.
+      `timeout` (engine-timeout.ts:96-97, index.ts). ST-5 landed that pin as a named test
+      (identity-asserted), so E4.F2 adapters have a documented, regression-guarded precedence
+      route; the E4.F2 obligation to fix a precedence rule stands.
   - id: r-verdict-provenance
     severity: medium
     summary: >-
@@ -719,14 +732,13 @@ open_risks:
       CLOSED by ST-3b (commit 1be2946): all four doc surfaces corrected in code, plus the
       matching spec.md result-contract row (same R2-003 authority, A-level).
 next_action:
-  kind: ask_user
+  kind: continue
   target: sddl-executor
   summary: >-
-    ST-4 complete and green: 19 new tests, full suite 182/182, `npm run check` clean,
-    depcruise unchanged (56/104), no production file touched, no deviation. All five terminal
-    states are now reachable by repository test; r-st3-behaviour-unverified and
-    r-st2-behaviour-unverified downgraded to low. Next: stage_approval for ST-5 (cleanup
-    contract AC-7..AC-10, seams AC-13/AC-14, timer hygiene, and the R1-001
-    EngineTimeoutError escape-hatch pin). User-gated per the workflow contract.
+    ST-5 complete and green: 16 new tests, full suite 198/198, `npm run check` clean, only the
+    test file changed. r-st3-behaviour-unverified and r-st2-behaviour-unverified CLOSED. Next:
+    ST-6, the read-only whole-diff verification gate -- per the approved plan it requires no
+    stage_approval (touches no code); it records AC-15..AC-18 evidence in execution-log.md and
+    feeds sddl-qa-review (final mode), which remains user-gated.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T16:59:48Z"
+updated_at: "2026-08-09T17:06:33Z"

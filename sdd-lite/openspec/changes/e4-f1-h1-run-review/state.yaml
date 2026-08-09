@@ -79,7 +79,18 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-09T04:20:00Z"
-    notes: "ST-1 approved and running. ST-2..ST-6 each require their own stage_approval."
+    last_updated_at: "2026-08-09T13:15:00Z"
+    notes: >-
+      ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
+      subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
+      verdict.ts (Verdict per PRD §9 + the VerdictParser seam). Neither file imports anything,
+      so guards 2 and 3 are trivially satisfied; index.ts untouched (ST-3), no tests (ST-4/ST-5),
+      no existing file modified. Exit checks: `npm run check` green (73 files, 53 modules, 88
+      dependencies, 0 violations) and `npm test` at exactly 163/163, the required baseline.
+      Three A-level internal choices logged in execution-log.md, no public-type deviation, no
+      design/plan contradiction found. Diff triaged `trivial` by the orchestrator -- two
+      dependency-free leaf files with no behaviour -- so sddl-code-review is skipped for this
+      stage per the routing table. ST-2..ST-6 each still require their own stage_approval.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -436,10 +447,13 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
+  kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    ST-1 approved and running: run-errors.ts + verdict.ts. On return, the orchestrator triages the
-    stage diff for review and opens the ST-2 stage_approval.
+    ST-1 done and green. Awaiting stage_approval for ST-2 (engine-timeout.ts +
+    builtin-verdict-extraction.ts) -- the riskiest stage in the change: the only concurrency in
+    the core, with an explicit STOP-and-route-back rule if the promise race cannot satisfy both
+    AC-5 and timer hygiene. No unilateral fall back to vitest fake timers, which design evaluated
+    and rejected.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T04:20:00Z"
+updated_at: "2026-08-09T13:15:00Z"

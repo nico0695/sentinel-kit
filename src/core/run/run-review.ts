@@ -128,6 +128,19 @@ export type RunCleanupReason =
   | CleanupWorktreeResult["reason"]
   | "cleanup-failed";
 
+/**
+ * Cleanup outcome, annotation-only (it never influences `state`).
+ *
+ * `attempted: true` means a worktree existed and `cleanupWorktree` was
+ * consulted — INCLUDING the paths where it returns without ever invoking git:
+ * `policy: "keep"` (`reason: "policy-keep"`) and `on-success` after a failed
+ * review (`reason: "review-failed"`). So `attempted: true, removed: false`
+ * does not by itself mean "tried and failed"; read `reason` to distinguish a
+ * policy retention from an actual `"cleanup-failed"` fault.
+ *
+ * `attempted: false` means no worktree was ever created (a stage-1/stage-2
+ * fault), so there was nothing to consult.
+ */
 export type RunCleanupOutcome =
   | { readonly attempted: false }
   | {
@@ -148,11 +161,18 @@ export interface RunReviewResult {
   readonly diff?: ReviewDiff;
   /** Present once the prompt stage succeeded (PRD §9 persists it). */
   readonly prompt?: string;
-  /** Raw, unparsed engine output — present on `ok` / `ambiguous`. */
+  /**
+   * Raw, unparsed engine output — present whenever the ENGINE stage
+   * succeeded, not only on `ok` / `ambiguous`: a parse-stage fault yields
+   * `engine-error` with `engineOutput` AND `failure` both set.
+   */
   readonly engineOutput?: string;
   /** Passthrough of whatever the engine reported, if anything. */
   readonly usage?: ReviewUsage;
-  /** Present on every state other than `ok` / `ambiguous`. */
+  /**
+   * Present on every state other than `ok` / `ambiguous`. Not exclusive with
+   * `engineOutput` — see its comment above.
+   */
   readonly failure?: RunFailure;
   /** Always present. Never influences `state`. */
   readonly cleanup: RunCleanupOutcome;
@@ -161,6 +181,14 @@ export interface RunReviewResult {
 /* ------------------------------------------------------------------ */
 /*  Internal state (NOT exported)                                      */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Node's `setTimeout` upper bound (2^31 - 1 ms). Larger values overflow the
+ * signed 32-bit timer and are clamped to 1 ms, which would invert an
+ * "effectively no limit" budget into an immediate bogus `timeout` — so the
+ * pre-flight rejects them instead.
+ */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * Partial results accumulated as the pipeline advances. Mutable by design so
@@ -202,6 +230,11 @@ export async function runReview(
 ): Promise<RunReviewResult> {
   const draft: RunDraft = {};
   const outcome = await executePipeline(request, deps, draft);
+  // Deliberate policy: `ambiguous` counts as NOT succeeded for cleanup
+  // purposes, so under `on-success` the worktree is retained for inspection.
+  // Rationale fixed in spec.md (Cleanup semantics): literal reading of
+  // "success" — keeping a worktree is cheap and reversible, deleting one
+  // someone wanted is not.
   const cleanup = await performCleanup(
     request,
     deps,
@@ -259,6 +292,11 @@ async function executePipeline(
     if (!Number.isFinite(request.timeoutMs) || request.timeoutMs <= 0) {
       throw new InvalidRunRequestError(
         "timeoutMs must be a finite number greater than 0",
+      );
+    }
+    if (request.timeoutMs > MAX_TIMEOUT_MS) {
+      throw new InvalidRunRequestError(
+        `timeoutMs must not exceed ${MAX_TIMEOUT_MS} (Node's setTimeout upper bound)`,
       );
     }
 

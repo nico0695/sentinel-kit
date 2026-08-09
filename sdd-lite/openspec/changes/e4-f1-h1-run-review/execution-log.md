@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h1-run-review
 - route: continue-lite
-- latest_stage_id: ST-3
+- latest_stage_id: ST-3b
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/run-review.ts` (new), `src/core/run/index.ts` (modified, append-only)
+- latest_files_changed: `src/core/run/run-review.ts` (modified, doc-comments + `MAX_TIMEOUT_MS` + one validation condition), `src/core/run/engine-timeout.ts` (modified, doc-comment), `spec.md` (AC-6 producer + `engineOutput` row)
 - latest_check_result: `npm run check` green; `npm test` 163/163 (14 files) — unchanged baseline; AC-16 grep returns nothing
-- latest_next_action: request `stage_approval` for ST-4 (`run-review-fixtures.ts` + the terminal-state half of `run-review.test.ts`)
+- latest_next_action: request `stage_approval` for ST-4 (`run-review-fixtures.ts` + the terminal-state half of `run-review.test.ts`, now including the `timeoutMs > MAX_TIMEOUT_MS` AC-6 case)
 
 ## Summary
 
@@ -16,7 +16,7 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-3
+- current_stage_id: ST-3b
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
 - git_side_effects: none
@@ -28,7 +28,8 @@
 | ST-1 | Run-domain leaf types: error family + verdict domain type | yes | approved (`cp-st1-approval`) | completed | 2026-08-09 | Two new leaf files, no importers yet (expected) |
 | ST-2 | Cancellable timeout race + naive verdict extraction | yes | approved (`cp-st2-approval`) | completed | 2026-08-09 | Riskiest stage per `plan.md`; behaviour unverified by the repo suite until ST-4/ST-5 |
 | ST-3 | `run-review.ts` use case + append-only `index.ts` export block | yes | approved (`cp-st3-approval`) | completed | 2026-08-09 | Largest stage; behaviour still unverified by the suite until ST-4/ST-5 |
-| ST-4 | Fixtures + terminal-state coverage | yes | pending | pending | — | — |
+| ST-3b | Review-driven doc corrections + `timeoutMs` upper bound (R2-001..R2-004, R3-004) | yes | granted (review_gate) | completed | 2026-08-09 | Amendment stage inserted after the full-4r review of 03bd7cf; comment-only except one validation condition |
+| ST-4 | Fixtures + terminal-state coverage | yes | pending | pending | — | Now owns 9 AC-6 cases (the upper-bound case added by ST-3b) |
 | ST-5 | Cleanup contract + the two seams | yes | pending | pending | — | — |
 | ST-6 | Whole-diff verification and PR readiness | no | pending | pending | — | Read-only evidence gate |
 
@@ -312,3 +313,93 @@
 - Quality gate is green, the suite is untouched at 163/163, and the AC-16 grep is clean. Be clear-eyed about what that proves: types, the strict-mode result shape and the architecture guards. **No behaviour is verified yet** — every behavioural criterion first runs at ST-4/ST-5.
 - Nothing outside `src/core/run/` was touched, and the three pre-existing exports in `index.ts` were left exactly as they were.
 - Next: approve ST-4 (fixtures + the terminal-state half of the test suite) — the stage that finally makes the last three stages provable.
+
+### Stage `ST-3b`
+
+- stage_digest: Review-driven amendment stage — the four deterministic doc corrections (R2-001, R2-002, R2-003, R2-004) and the `timeoutMs` upper bound (R3-004) from the full-4r ledger of commit 03bd7cf, landed before ST-4 so tests are written against corrected contracts. Comment-only except one module-level constant and one validation condition; plus the two same-authority spec.md consistency edits (AC-6 producer, `engineOutput` row).
+- approval_checkpoint_id: review_gate (post-review checkpoint after ST-3)
+- approval_decision_id: user granted `stage_approval` at the review_gate for exactly this scope — the comment corrections plus the single validation condition; anything beyond is a deviation requiring STOP (recorded verbatim in `plan.md`, ST-3b stage detail)
+- planned_scope: `src/core/run/run-review.ts` (doc-comments + one constant + one condition), `src/core/run/engine-timeout.ts` (doc-comment), `spec.md` (AC-6 line + `engineOutput` row)
+- actual_files_changed: `src/core/run/run-review.ts` (+40/−2), `src/core/run/engine-timeout.ts` (+5/−1), `sdd-lite/openspec/changes/e4-f1-h1-run-review/spec.md` (+2/−2)
+- touches_code: yes
+- quick_check_status: passed
+- qa_review_status: not_applicable — the stage exists BECAUSE of a structured review; each edit's authority is a ledger row
+- execution_status: completed
+- next_action: request `stage_approval` for ST-4
+
+#### Planned Work
+
+- Land the five ledger findings exactly as fixed in the ST-3b stage detail of `plan.md`: R2-001 (`RunCleanupOutcome` doc-comment), R2-002 (`reviewSucceeded` call-site comment), R2-003 (`engineOutput` / `failure` doc correction), R2-004 (`engine-timeout.ts` fourth outcome), R3-004 (`MAX_TIMEOUT_MS` constant + upper-bound rejection).
+- Keep spec.md and code from drifting: add the upper-bound producer to AC-6 and apply the same R2-003 wording fix to the result-contract `engineOutput` row.
+- No public type changes, no tests (the AC-6 upper-bound case is ST-4 scope), no `index.ts` change, no other file.
+
+#### Preconditions And Sync Checks
+
+- Working tree clean at stage start (`git status --porcelain` empty), branch `claude/validar-e1-preparar-e4-m1xkhl`; ST-3 committed as part of 03bd7cf, the review target.
+- `review-ledger.md` rows R2-001..R2-004 and R3-004 re-read as the authority on what each correction must say; `plan.md`'s ST-3b stage detail re-read as the work order. No contradiction between them.
+- `cleanup-worktree.ts:40-46` re-read before writing R2-001 so the doc names the real early returns and their reasons: `policy-keep` (policy `keep`) and `review-failed` (`on-success` + `!reviewSucceeded`) — both return without invoking `git.worktreeRemove`.
+- spec.md Cleanup semantics (the "literal reading of success" rationale) re-read before writing the R2-002 comment so the citation is accurate.
+- R3-004's proof re-checked against the ledger: `setTimeout(f, 2147483648)` → TimeoutOverflowWarning, fires ~16ms (empirically verified by the R4 lens on this machine).
+
+#### Changes Applied
+
+- `src/core/run/run-review.ts`
+  - **R2-001** — `RunCleanupOutcome` now carries the doc-comment it lacked (it was the only public result member without one): `attempted: true` means a worktree existed and `cleanupWorktree` was consulted, INCLUDING the `keep` and `on-success`-after-a-failed-review early returns where git is never invoked — so `attempted: true, removed: false` does not by itself mean "tried and failed"; `reason` is the discriminator. `attempted: false` means no worktree was ever created.
+  - **R2-002** — the `reviewSucceeded: outcome.state === "ok"` call site now states the deliberate policy: `ambiguous` counts as not-succeeded for cleanup purposes, so under `on-success` the worktree is retained for inspection; rationale cited to spec.md (Cleanup semantics — literal reading of "success"; keeping a worktree is cheap and reversible, deleting one someone wanted is not).
+  - **R2-003** — the `engineOutput` doc-comment now says "present whenever the ENGINE stage succeeded, not only on `ok`/`ambiguous`: a parse-stage fault yields `engine-error` with `engineOutput` AND `failure` both set"; the neighbouring `failure` comment adds "not exclusive with `engineOutput`" so the pair no longer implies a strict partition.
+  - **R3-004** — new module-level `const MAX_TIMEOUT_MS = 2_147_483_647` (doc-comment: Node's `setTimeout` upper bound; larger values overflow the signed 32-bit timer and are clamped to 1 ms). The `timeoutMs` pre-flight gains one condition, in the style of its neighbours: `request.timeoutMs > MAX_TIMEOUT_MS` ⇒ `InvalidRunRequestError` with a message naming the bound. No public type changed.
+- `src/core/run/engine-timeout.ts`
+  - **R2-004** — the "Outcomes:" doc-list on `runEngineWithTimeout` names the fourth outcome it previously denied: a synchronously-throwing `invoke` escapes UNWRAPPED (not as `EngineInvocationError`) because `invoke()` runs outside the `try`; referenced to the recorded risk `r-sync-throw-unwrapped` and to the sole call site's catch-all absorbing it as `engine-error`. Behaviour unchanged — only the doc gap closed.
+- `sdd-lite/openspec/changes/e4-f1-h1-run-review/spec.md`
+  - AC-6 producer enumeration extended with `timeoutMs > 2147483647` (Node's `setTimeout` upper bound), cited as R3-004, review-driven A-level amendment — so AC-6 now enumerates 8 producers / 9 test cases for ST-4.
+  - Result-contract `engineOutput` row corrected with the same R2-003 wording: presence is "once stage 7 (engine) succeeded", meaning notes the `engine-error` + `engineOutput` + `failure` overlap. Nothing else in spec.md changed.
+
+#### Scope And Blast Radius Notes
+
+- `git diff --stat` after the stage: `run-review.ts`, `engine-timeout.ts`, `spec.md`, `execution-log.md` — exactly the frozen scope, nothing else. `index.ts` untouched (AC-16 grep still empty).
+- The only behaviour change in the whole stage is the one new rejection: a `timeoutMs` above 2^31−1 now resolves as `validation-failed` at stage 1 instead of producing an immediate bogus `timeout` that abandons the engine and (under `always`) deletes its worktree.
+- The scope-freeze was defended: R1-00x / R3-00x / R4-00x findings promoted to `state.yaml` open_risks were NOT acted on here — they are forward-looking constraints owned by E4.F2 / E5 / E6 per the ledger.
+
+#### Quick Check
+
+- checks_planned: `npm run check`; `npm test` still 163/163 (no new tests by design); AC-16 grep on `index.ts`; `git diff --stat` scope review
+- checks_run:
+  - `npm run check` → passed (biome: 76 files checked, no fixes; `tsc --noEmit`: clean; `depcruise src`: no dependency violations, 56 modules / 104 dependencies cruised — identical to post-ST-3, as expected for a stage adding no imports)
+  - `npm test` → passed, 14 test files, 163/163, 0 failures — baseline unchanged; the AC-6 upper-bound case is deliberately NOT written here (ST-4 owns it)
+  - `grep -nE "extractBuiltInVerdict|defaultTimeoutScheduler|runEngineWithTimeout|classifyFailure" src/core/run/index.ts` → no output, exit 1 (AC-16 satisfied)
+  - `git diff --numstat` → `run-review.ts` +40/−2, `engine-timeout.ts` +5/−1, `spec.md` +2/−2, `execution-log.md` (this entry) only
+- checks_skipped: none. The new rejection condition is unverified by any repository test until ST-4 — same standing caveat as ST-1..ST-3, and the reason the plan sequences ST-3b before ST-4.
+- findings_summary: no warnings, no failures, no deviations. All five ledger obligations landed; the review_gate scope freeze held.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npm run check` | biome 76 files clean · tsc clean · depcruise 56 modules / 104 deps, 0 violations |
+| command | `npm test` | 14 files / 163 tests passed — identical to the pre-stage baseline |
+| command | AC-16 grep on `src/core/run/index.ts` | no output, exit 1 |
+| command | `git diff --numstat` | the four in-scope files only |
+| file | `src/core/run/run-review.ts` | R2-001, R2-002, R2-003 doc corrections + R3-004 constant and condition |
+| file | `src/core/run/engine-timeout.ts` | R2-004 fourth-outcome doc, citing `r-sync-throw-unwrapped` |
+| file | `sdd-lite/openspec/changes/e4-f1-h1-run-review/spec.md` | AC-6 producer + `engineOutput` row, both citing their ledger ids |
+| reference | `review-ledger.md` rows R2-001..R2-004, R3-004 | Authority for every edit's wording |
+| reference | `src/core/workspace/cleanup-worktree.ts:40-46` | Early returns re-read so R2-001's wording matches reality |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** `MAX_TIMEOUT_MS` is written `2_147_483_647` with numeric separators, matching modern house style, and placed in the module's internal (non-exported) region next to `RunDraft` — it is an implementation bound, not part of the public request contract, and AC-16's spirit (no internal machinery on the public surface) extends to it.
+- **A-level (internal, logged):** the upper-bound check is a SEPARATE condition with its own message rather than folded into the existing finiteness/positivity condition — each pre-flight fault names its own violated rule, matching the one-check-one-message style of the four preceding conditions.
+- **A-level (internal, logged):** the rejection message interpolates the constant (`timeoutMs must not exceed 2147483647 (Node's setTimeout upper bound)`) so message and bound cannot drift.
+- **A-level (review-driven, logged, cite R3-004):** spec.md AC-6 amended with the upper-bound producer — the exact one-line spec amendment the plan authorizes, so spec and code do not drift.
+- **A-level (review-driven, logged, cite R2-003):** spec.md's result-contract `engineOutput` row corrected under the same authority as the code doc-comment it mirrored — leaving it stale would have re-introduced in the spec the exact contradiction the ledger row fixed in the code.
+- **A-level (internal, logged):** the R2-004 amendment keeps the original three outcomes verbatim and appends the fourth as a continuation of the same list, so the diff is additive and the contract's existing guarantees are visibly unchanged.
+- Blockers: none. The frozen scope was sufficient for all five findings; the STOP/rollback path was not needed.
+
+#### User-Facing Summary
+
+- ST-3b is done: the five cheap, deterministic review findings are landed — four documentation corrections that make the public contracts say what the code actually does, and one real fix: `timeoutMs` above Node's `setTimeout` limit (2^31−1 ms) is now rejected as `validation-failed` instead of silently becoming an instant bogus timeout that could delete a worktree.
+- spec.md was kept in lockstep: AC-6 now lists the new producer (so ST-4 writes 9 validation cases, not 8) and the `engineOutput` row carries the corrected presence rule.
+- Quality gate is green, the suite is untouched at 163/163, and the AC-16 grep is clean. The new rejection is first exercised by a test at ST-4, by design.
+- Nothing beyond the frozen scope was touched; the deeper review findings (dual-budget precedence, orphan-recovery blind spot, etc.) remain open risks owned by later epics, exactly as the ledger assigned them.
+- Next: approve ST-4 (fixtures + the terminal-state suite, including the new upper-bound case).

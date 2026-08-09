@@ -95,7 +95,7 @@ The stage decides the family; the error class discriminates within it. Anything 
 | `worktreePath` | once stage 3 succeeded | the ephemeral worktree used |
 | `diff` | once stage 4 succeeded | the full `ReviewDiff`, warnings included |
 | `prompt` | once stage 6 succeeded | PRD §9 requires runs to persist the prompt |
-| `engineOutput` | on `ok` / `ambiguous` | raw, unparsed engine output |
+| `engineOutput` | once stage 7 (engine) succeeded | raw, unparsed engine output — not only on `ok` / `ambiguous`: a parse-stage fault yields `engine-error` with `engineOutput` and `failure` both set (R2-003) |
 | `usage` | when the engine reported it | `ReviewUsage` passthrough |
 | `failure` | on any non-`ok`/non-`ambiguous` state | `{ stage, error }` — original domain error, `instanceof`-discriminable |
 | `cleanup` | always | see below; never influences `state` |
@@ -124,7 +124,7 @@ Over-returning is deliberate: E5's `RunStore` and E6's rendering both consume th
 | AC-3 | `ambiguous` reachable, two ways | (a) output with no `VERDICT:` line; (b) output with two distinct conflicting verdicts | must |
 | AC-4 | `engine-error` reachable, two ways | (a) `createFakeEngine({ ok: false, error })`; (b) fake `GitPort` `addError: GitWorktreeError` ⇒ `WorktreeCreationError` | must |
 | AC-5 | `timeout` reachable | engine that never settles, short `timeoutMs`, deterministic clock; asserts `state: "timeout"` and no hang | must |
-| AC-6 | `validation-failed` reachable from every enumerated pre-flight producer | one case each: `timeoutMs <= 0`; empty `harnessType`; relative `repoPath`; `limits.maxLines = 0`; unknown harness; missing skill; non-`inline` `contextMode` | must |
+| AC-6 | `validation-failed` reachable from every enumerated pre-flight producer | one case each: `timeoutMs <= 0`; `timeoutMs > 2147483647` (Node's `setTimeout` upper bound; review-driven A-level amendment, R3-004); empty `harnessType`; relative `repoPath`; `limits.maxLines = 0`; unknown harness; missing skill; non-`inline` `contextMode` | must |
 | AC-7 | Cleanup on every path: under `policy: "always"`, `git.worktreeRemove` is recorded in `removeCalls` for `ok`, `ambiguous`, `engine-error` and `timeout` | assert against the fake's `removeCalls` in each state test | must |
 | AC-8 | Cleanup honours policy: `keep` never removes; `on-success` removes on `ok` and does not remove on `engine-error`/`timeout` | `removeCalls` length assertions per policy | must |
 | AC-9 | A cleanup fault does not change the outcome: `removeError: GitWorktreeError` on a happy path ⇒ `state` stays `"ok"`, `cleanup.reason === "cleanup-failed"`, and the promise resolves (does not reject) | unit test | must |

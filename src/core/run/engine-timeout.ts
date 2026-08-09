@@ -59,7 +59,11 @@ const TIMED_OUT = Symbol("engine-timed-out");
  * - the budget elapses first → `EngineTimeoutError` (the sole producer of the
  *   `timeout` terminal state);
  * - the invocation rejects → `EngineInvocationError` with the raw rejection
- *   preserved in `cause` (the core never names an engine's own error types).
+ *   preserved in `cause` (the core never names an engine's own error types);
+ * - `invoke` throws SYNCHRONOUSLY → the raw throwable escapes UNWRAPPED (not
+ *   as `EngineInvocationError`): `invoke()` runs outside the `try` below.
+ *   Accepted behaviour, recorded as risk `r-sync-throw-unwrapped`; the sole
+ *   call site's catch-all still absorbs it into `engine-error`.
  *
  * The abandoned invocation keeps a no-op rejection handler attached, so a
  * late failure after a timeout can never surface as an unhandled rejection.

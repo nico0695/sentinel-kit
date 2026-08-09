@@ -16,7 +16,7 @@ complexity_assessment:
     E5 validations seam is left open without implementing it.
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
-lifecycle_status: implementing
+lifecycle_status: completed
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -207,8 +207,26 @@ stages:
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: in_progress
+    status: completed
     started_at: "2026-08-09T18:40:13Z"
+    completed_at: "2026-08-09T18:45:23Z"
+    notes: >-
+      FINAL mode over the whole implemented change. Verdict: pass. 18/18 ACs verified -- every
+      criterion traced to a named test or a re-run command; load-bearing assertions (AC-5 both
+      halves, AC-9/AC-10 both directions, AC-12 identity, the 9 AC-6 producers, the R1-001 pin)
+      verified against test source, and the fixture traps confirmed genuine against workspace
+      source (only GitWorktreeError is wrapped; createFakeEngine rejects asynchronously). The
+      reviewer re-ran the gate itself: check green, 198/198, core 145/145, AC-16 grep clean,
+      story diff exactly 8 files under src/core/run/**. Risk closeout audit: all CLOSED /
+      DOWNGRADED claims independently re-located; the 9 remaining open risks are forward-looking
+      with later-epic owners and none blocks completion. Findings: 3 INFO only (empty-string
+      ref producers untested individually, cancel-after-fire uncounted, state sync left to the
+      orchestrator). Full report: qa-report.md.
+    qa_summary:
+      mode: final
+      verdict: pass
+      ac_results: 18/18 verified
+      findings: 0 blocker / 0 major / 0 minor / 3 info
 artifacts:
   state: sdd-lite/openspec/changes/e4-f1-h1-run-review/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f1-h1-run-review/proposal.md
@@ -760,13 +778,13 @@ open_risks:
       CLOSED by ST-3b (commit 1be2946): all four doc surfaces corrected in code, plus the
       matching spec.md result-contract row (same R2-003 authority, A-level).
 next_action:
-  kind: ask_user
-  target: sddl-qa-review
+  kind: done
+  target: orchestrator
   summary: >-
-    ST-6 complete: whole-diff evidence recorded, all four gate ACs (15..18) verified at
-    a617fe3. Executor stage fully done (ST-1..ST-6). Ask the user to approve launching
-    sddl-qa-review in FINAL mode -- the closeout review of the whole implemented change
-    against spec/design/plan; only it may mark the change completed. After its verdict:
-    open the story PR ([E4.F1.H1], Closes #26) per the workflow contract.
+    Change COMPLETED: sddl-qa-review (final) returned pass with 18/18 ACs verified and only
+    INFO findings. Story PR [E4.F1.H1] opened with Closes #26 per the workflow contract; the
+    human reviews and merges. Follow-ups live in open_risks with their later-epic owners
+    (raise r-verdict-provenance when scoping #27; the timeout-precedence rule and
+    kill-before-cleanup belong to E4.F2 #28-30).
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T18:40:13Z"
+updated_at: "2026-08-09T18:45:23Z"

@@ -16,8 +16,8 @@ complexity_assessment:
     E5 validations seam is left open without implementing it.
   confidence: high
   recorded_at: "2026-08-09T03:15:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: planned
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -62,8 +62,20 @@ stages:
       and the five-file layout with an append-only index. Full AC->test table included.
       Orchestrator independently verified its three load-bearing source claims.
   sddl-plan:
-    status: in_progress
+    status: completed
     started_at: "2026-08-09T04:05:00Z"
+    completed_at: "2026-08-09T04:12:00Z"
+    notes: >-
+      plan.md written, status `success`. Six strictly sequential stages ordered by the module's
+      import graph (a chain, nothing parallelises): ST-1 leaf types, ST-2 timeout seam +
+      extraction, ST-3 use case + append-only index, ST-4 fixtures + terminal-state suite,
+      ST-5 cleanup contract + seams, ST-6 read-only whole-diff verification. Five code-touching
+      stages, each with its own stage_approval; ST-6 feeds sddl-qa-review rather than replacing
+      it. All 18 ACs assigned, none orphaned; the four whole-diff ACs are recurring per-stage
+      obligations rather than end-loaded. Carries a "traps that make a green test worthless"
+      list the executor cannot re-derive. Orchestrator independently verified the premise the
+      whole inside-out ordering rests on: no orphan rule in .dependency-cruiser.cjs and no
+      noUnusedLocals in tsconfig.json, so a leaf file with no importers passes `npm run check`.
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -328,6 +340,21 @@ open_risks:
       RESOLVED by spec: a cleanup fault ANNOTATES, never overrides and never rethrows. AC-9 and
       AC-10 prove both directions — a fault on the happy path keeps `ok`, and a fault after an
       engine rejection keeps both `engine-error` and the originating EngineInvocationError.
+  - id: r-st2-concurrency-stage
+    severity: low
+    summary: >-
+      NEW from plan. ST-2 concentrates the only concurrency in the core (promise race, no-op
+      late-rejection handler, finally-cancel). Mitigated structurally: the file has no importers
+      until ST-3, so rollback is one `git checkout --` with zero blast radius. The plan instructs
+      a STOP rather than a unilateral fall back to vitest fake timers, which design already
+      evaluated and rejected.
+  - id: r-st3-strict-mode-pressure
+    severity: low
+    summary: >-
+      NEW from plan. ST-3 is the largest stage and the first place exactOptionalPropertyTypes and
+      noUncheckedIndexedAccess meet the wide result shape. Line drawn: internal adjustments are
+      A-level and logged; any change to a PUBLIC type in design.md's interface block is a
+      deviation to report and stop on, not to absorb.
   - id: r-test-fake-cross-boundary
     severity: low
     summary: >-
@@ -371,10 +398,11 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: wait_for_approval
+  target: sddl-executor
   summary: >-
-    Design approach approved at cp-design-validation. sddl-plan worker running; it owns plan.md
-    and is the terminal stage before execution, so its output gates the first stage_approval.
+    Planning complete. Awaiting stage_approval for ST-1 (run-errors.ts + verdict.ts), the lowest-
+    risk stage in the change and a cheap way to confirm the executor's cadence before ST-2, the
+    only genuinely risky one.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T04:05:00Z"
+updated_at: "2026-08-09T04:12:00Z"

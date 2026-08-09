@@ -1,14 +1,16 @@
-# S18 — E1 validation and E4 preparation
+# S18 — E1 validation, E4 preparation, and [E4.F1.H1] through ST-3b
 
 - **Date**: 2026-08-09
 - **Branch**: `claude/validar-e1-preparar-e4-m1xkhl`
-- **Scope**: project-state validation after the E1 merge · bootstrap refresh · seeding of the first E4 change
-- **sdd-lite changes**: [`e4-f1-h1-run-review/`](../../sdd-lite/openspec/changes/e4-f1-h1-run-review/) (seeded, stage `sddl-proposal` pending)
+- **Scope**: project-state validation after the E1 merge · bootstrap refresh · `[E4.F1.H1]` (issue #26) from seed through proposal → spec → design → plan → ST-1..ST-3 → full-4r review → ST-3b
+- **sdd-lite changes**: [`e4-f1-h1-run-review/`](../../sdd-lite/openspec/changes/e4-f1-h1-run-review/) (stage `sddl-executor`, ST-1..ST-3b complete, review lineage closed `pass_with_warnings`, ST-4 gated)
 
 ## Objective
 
 Validate the user's claim that E1 was complete and the project was ready for E4, then prepare
-everything needed to open the first E4 sdd-lite change.
+everything needed to open the first E4 sdd-lite change — and, once the gates were approved,
+carry `[E4.F1.H1]` (the `runReview` use case) through the canonical lite flow as far as the
+stage approvals allowed.
 
 ## Decisions
 
@@ -20,6 +22,11 @@ everything needed to open the first E4 sdd-lite change.
 | S18-D4 | Refresh the stale sdd-lite bootstrap surgically instead of regenerating with `sddl-init` | Full `sddl-init` run (recommended to the user); proceeding without any refresh | Asked the user, got no answer. Chose the lower-blast-radius option: it avoids re-injecting the `CLAUDE.md` wrapper block and rewriting three files wholesale, and is reversible via git. Stated the assumption explicitly in chat | `claude` |
 | S18-D5 | Scope the first E4 change to `[E4.F1.H1]` alone | Bundling `[E4.F1.H2]` (verdict parser) into the same change | Separate issues (#26, #27) with different risk profiles: H1 orchestrates against FakeEngine, H2 does defensive parsing against real E1 fixtures. Bundling would put both behind one approval gate | `claude` |
 | S18-D6 | Execution mode for the session: `interactive` (sdd-lite contract default) | `auto` | Asked, no answer; took the contract's documented default and said so | `claude` |
+| S18-D7 | Stage gates through execution: proposal launch, design approach, plan, and ST-1/ST-2/ST-3 approvals granted one by one | — | Workflow contract: every code-touching stage requires explicit `stage_approval`; each approval commit is in the git log | `user` |
+| S18-D8 | Review ST-1..ST-3 now (full-4r) instead of deferring to ST-6 as the executor recommended | Defer to ST-6 / final QA | Diff triaged `full-4r` on both rubric criteria (hot-path AND >400 lines); ST-4 writes tests against this code, so a logic defect would be encoded into the tests meant to catch it. `review_gate` raised; user did not answer; proceeded on own recommendation, stated in chat | `claude` |
+| S18-D9 | Widen review scope from the ST-3 diff to the cumulative ST-1..ST-3 source delta | Review only ST-3's diff | ST-1/ST-2 were triaged trivial/trivial-plus at their own gates, so `engine-timeout.ts` — the core's only concurrency — had never been reviewed; the cumulative delta brings it under the same frozen target | `claude` |
+| S18-D10 | Merge the three-lens convergent finding (dual timeout budget) at lens severity WARNING after the refuter split, not at the provisional CRITICAL | Keep the convergence-escalated CRITICAL (contract: `inconclusive` leaves severe findings standing) | The escalation was the orchestrator's own and provisional; the refuter refuted the ordering sub-claim (depends on unwritten E4.F2 adapters; the design-named kill mechanism would let the outer timer win) and corroborated only the weak form. Recorded in the ledger Corroboration Log with the full split | `claude` |
+| S18-D11 | Insert bounded fix stage ST-3b (5 ledger ids: 4 doc corrections + `timeoutMs` upper bound) before ST-4 | Proceed straight to ST-4 with findings as info/risks only; or a wider ST-3b also touching forward-looking findings | Cheapest moment: ST-4 encodes readings of those docs into test names. User chose the recommended bounded option at the `review_gate`; the gate's precise scope description was treated as the stage's `stage_approval`, recorded in `state.yaml` | `claude→user` |
 
 ## Deviations
 
@@ -36,6 +43,16 @@ everything needed to open the first E4 sdd-lite change.
 - **Two consultations went unanswered** (bootstrap strategy, execution mode). Proceeded on the
   lower-risk option and the documented default respectively, both stated explicitly in chat and
   recorded in `state.yaml` checkpoint `cp-change-seed`.
+- **A third consultation went unanswered** (review-now vs defer, S18-D8); proceeded on the stated
+  recommendation. The ST-3b routing gate, by contrast, was answered by the user.
+- **False-positive integrity scare, self-caught.** Mid-update the orchestrator believed
+  `state.yaml`'s `open_risks` had an orphan entry (missing `- id:` line) and prepared to "restore"
+  it — a full read showed the file was healthy; the artifact was the orchestrator's own `sed`
+  range slicing the id line out. No edit was made. Recorded as a cheap lesson: verify with a full
+  read before repairing state.
+- **ST-4..ST-6 did not run.** The ST-4 `stage_approval` question got no answer; per the contract a
+  code-touching stage cannot proceed without it, so the session stops there rather than assuming
+  consent.
 
 ## Work done
 
@@ -55,22 +72,40 @@ everything needed to open the first E4 sdd-lite change.
   refresh of `project-context.md`, `skill-catalog.md` and `openspec/config.yaml` against reality,
   plus the seeded change `state.yaml` (complexity assessment `continue-lite`/high, one resolved
   checkpoint, one pending `stage_approval`, two decisions, three open risks).
-- No PR opened this session — nothing implementable landed yet.
+- **`[E4.F1.H1]` lite flow, seed through ST-3b** (artifacts under
+  [`e4-f1-h1-run-review/`](../../sdd-lite/openspec/changes/e4-f1-h1-run-review/) — linked, not
+  copied): proposal, spec (16 ACs, five-terminal-state contract), design, plan (6 stages), then
+  execution. `ec74f3f` ST-1 (error family + verdict type), `7c26fcd` ST-2 (timeout seam +
+  built-in verdict extraction), `03bd7cf` ST-3 (`run-review.ts`, 418 lines, + public surface).
+  Every stage exited with `npm run check` green and `npm test` 163/163.
+- **Full-4r review of the cumulative ST-1..ST-3 delta** frozen at `03bd7cf`: four parallel
+  read-only lenses, 15 merged findings (all `info` under the severity floor), one refuter pass
+  splitting the three-lens convergent timeout finding (ordering refuted / weak consequence
+  corroborated). Verdict `pass_with_warnings`; ledger at `cd950e5`, eight risks promoted to
+  `state.yaml` with later-epic owners (timeout precedence → E4.F2, verdict provenance → with #27,
+  orphan-sweeper blind spot → E2/E6, eager harness load → E3, unbounded non-engine awaits → git
+  adapter). Chief yield is test-shaping obligations now in the plan: a 9th AC-6 case and the
+  `EngineTimeoutError` escape-hatch pin for ST-5.
+- **ST-3b review-driven fix stage**: plan amendment `ff9173a`, fix delta `1be2946` (public doc
+  corrections + `MAX_TIMEOUT_MS` pre-flight bound + spec sync), state/ledger closeout `d71d021`.
+  Closed risks `r-timeout-overflow-clamp` and `r-review-doc-drift`.
+- No PR opened yet — the story is mid-execution (ST-4..ST-6 pending); one PR per story lands
+  after ST-6/QA per the workflow contract.
 
 ## Pending and next steps
 
-- **User**: approve launching `sddl-proposal` for `[E4.F1.H1]` (issue #26), or redirect
-  (full `sddl-init` refresh, `auto` mode, or a different first E4 story).
-- **Claude**, once approved: run the canonical lite flow (proposal → spec → design → plan →
-  executor → QA) for `e4-f1-h1-run-review`, then `[E4.F1.H2]` (#27), then E4.F2 (#28-30).
-- **Three open risks** recorded in `state.yaml` for the spec stage to resolve: terminal-state test
-  coverage (`validation-failed` belongs to E5, `engine-error`/`timeout` are adapter concerns),
-  the cleanup-on-error guarantee, and where the E5 validations seam is left open.
+- **User**: `stage_approval` for ST-4 (fixtures + terminal-state suite, 9 AC-6 cases). The change
+  stops here until granted; `state.yaml` `next_action` points at it, so any future session
+  resumes exactly at this gate.
+- **Claude**, once approved: ST-4, then ST-5 (cleanup/timer/escape-hatch suite) and ST-6 (QA +
+  AC-16 gate) each behind its own gate; then `sddl-qa-review` final, PR for `[E4.F1.H1]`
+  (`Closes #26`), then `[E4.F1.H2]` (#27) — scoping note: raise `r-verdict-provenance` there.
 - **⚪ optional and untouched**: #10 (context-mode measurement), #16 (remove/update registration),
   #25 (auto-include target repo `AGENTS.md`).
 
 ## Open questions for the user
 
-- Approval to launch `sddl-proposal` for `[E4.F1.H1]` — the session stops here until then.
-- Confirm or override the two unanswered choices: surgical bootstrap refresh (vs. full `sddl-init`)
-  and `interactive` execution mode (vs. `auto`).
+- ST-4 `stage_approval` — the session stops here until then.
+- Standing from earlier, unconfirmed either way: surgical bootstrap refresh (vs. full
+  `sddl-init`) and `interactive` mode (vs. `auto`); both working assumptions have held all
+  session without friction.

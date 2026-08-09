@@ -1,9 +1,9 @@
-# S18 — E1 validation, E4 preparation, and [E4.F1.H1] through ST-3b
+# S18 — E1 validation, E4 preparation, and [E4.F1.H1] complete (PR #64)
 
 - **Date**: 2026-08-09
 - **Branch**: `claude/validar-e1-preparar-e4-m1xkhl`
-- **Scope**: project-state validation after the E1 merge · bootstrap refresh · `[E4.F1.H1]` (issue #26) from seed through proposal → spec → design → plan → ST-1..ST-3 → full-4r review → ST-3b
-- **sdd-lite changes**: [`e4-f1-h1-run-review/`](../../sdd-lite/openspec/changes/e4-f1-h1-run-review/) (stage `sddl-executor`, ST-1..ST-3b complete, review lineage closed `pass_with_warnings`, ST-4 gated)
+- **Scope**: project-state validation after the E1 merge · bootstrap refresh · `[E4.F1.H1]` (issue #26) end to end: seed → proposal → spec → design → plan → ST-1..ST-6 (with full-4r review + ST-3b) → final QA `pass` → PR #64
+- **sdd-lite changes**: [`e4-f1-h1-run-review/`](../../sdd-lite/openspec/changes/e4-f1-h1-run-review/) (**completed** — QA final `pass`, 18/18 ACs)
 
 ## Objective
 
@@ -96,6 +96,18 @@ stage approvals allowed.
 - **ST-3b review-driven fix stage**: plan amendment `ff9173a`, fix delta `1be2946` (public doc
   corrections + `MAX_TIMEOUT_MS` pre-flight bound + spec sync), state/ledger closeout `d71d021`.
   Closed risks `r-timeout-overflow-clamp` and `r-review-doc-drift`.
+- **ST-5 executed and green** (`a617fe3`): 16 tests — cleanup contract AC-7..AC-10 (including
+  the R2-002 ambiguous-keeps-worktree policy pin), seams AC-13/AC-14, timer hygiene, and the
+  R1-001 `EngineTimeoutError` escape-hatch pin. 198/198. Risks `r-st3-behaviour-unverified`
+  and `r-st2-behaviour-unverified` CLOSED.
+- **ST-6 executed** (`f0d66a7`, read-only, no gate per the approved plan; run inline by the
+  orchestrator, A-level): AC-15..AC-18 whole-diff evidence — story diff exactly 8 files under
+  `src/core/run/**`, AC-16 grep clean, depcruise 56/104, full gate green.
+- **Final QA review: `pass`** (`ae46951`, fresh-context worker, gate approved by the user):
+  18/18 ACs independently verified, all risk-closeout claims re-located in code/tests, 3 INFO
+  findings only. Change marked `completed` — the only stage allowed to do so.
+- **PR #64 opened**: `[E4.F1.H1] runReview use case`, `Closes #26`, check+test green locally
+  (workflow contract rules 2 and 4 satisfied; 1 of max 5 PRs open).
 - **ST-4 executed and green** (`5a21623`): `run-review-fixtures.ts` (229 lines) +
   `run-review.test.ts` (339 lines, 19 tests) — all five terminal states reachable, 9 AC-6
   producers, AC-11, AC-12. Full suite 182/182, `npm run check` clean, depcruise unchanged;
@@ -106,18 +118,16 @@ stage approvals allowed.
 
 ## Pending and next steps
 
-- **User**: `stage_approval` for ST-5 (cleanup contract AC-7..AC-10, seams AC-13/AC-14, timer
-  hygiene, R1-001 escape-hatch pin). The change stops here until granted; `state.yaml`
-  `next_action` points at it.
-- **Claude**, once approved: ST-5, then ST-6 (read-only whole-diff gate) behind its own gate;
-  then `sddl-qa-review` final, PR for `[E4.F1.H1]`
-  (`Closes #26`), then `[E4.F1.H2]` (#27) — scoping note: raise `r-verdict-provenance` there.
-- **⚪ optional and untouched**: #10 (context-mode measurement), #16 (remove/update registration),
-  #25 (auto-include target repo `AGENTS.md`).
+- **User**: review and merge PR #64 (the human merges everything — workflow contract rule 5).
+- **Claude, next session**: `[E4.F1.H2]` verdict parser (#27) as the next sdd-lite change —
+  raise `r-verdict-provenance` at its scoping so both land together; then E4.F2 (#28-30),
+  which owns the timeout-precedence rule, kill-before-cleanup, and the unbounded-await
+  adapter gap (all recorded in `state.yaml` open_risks with owners).
+- **⚪ optional and untouched**: #10 (context-mode measurement), #16 (remove/update
+  registration), #25 (auto-include target repo `AGENTS.md`).
 
 ## Open questions for the user
 
-- ST-5 `stage_approval` — the session stops here until then.
-- Standing from earlier, unconfirmed either way: surgical bootstrap refresh (vs. full
-  `sddl-init`) and `interactive` mode (vs. `auto`); both working assumptions have held all
-  session without friction.
+- None — the story is closed pending PR review. The two early unanswered choices (surgical
+  bootstrap refresh, `interactive` mode) held all session without friction and stand as
+  working assumptions.

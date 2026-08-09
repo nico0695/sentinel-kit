@@ -79,7 +79,7 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-09T04:20:00Z"
-    last_updated_at: "2026-08-09T13:40:00Z"
+    last_updated_at: "2026-08-09T13:45:00Z"
     notes: >-
       ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
       subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
@@ -333,6 +333,24 @@ checkpoints:
       responded_at: "2026-08-09T13:20:00Z"
     created_at: "2026-08-09T13:20:00Z"
     resolved_at: "2026-08-09T13:20:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3: create src/core/run/run-review.ts (request/deps/result types, runReview,
+      executePipeline, classifyFailure, performCleanup) and extend src/core/run/index.ts with an
+      append-only export block. The largest stage in the change and the first convergence point:
+      strict mode meets the wide result shape, the module gains a public surface so AC-16 becomes
+      live, and the four ST-1/ST-2 files gain their first importers.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-3?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si apruebo st-3".
+      responded_at: "2026-08-09T13:45:00Z"
+    created_at: "2026-08-09T13:45:00Z"
+    resolved_at: "2026-08-09T13:45:00Z"
 decisions:
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
@@ -502,12 +520,11 @@ open_risks:
       CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
       assemblePrompt. No E5 import, no new machinery.
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    ST-2 done and green. Awaiting stage_approval for ST-3 (run-review.ts + the append-only
-    index.ts export block) -- the largest stage, and the first place exactOptionalPropertyTypes
-    and noUncheckedIndexedAccess meet the wide result shape. It is also where the module first
-    gains a public surface, so AC-16 becomes live.
+    ST-3 approved and running: run-review.ts + the append-only index.ts export block. On return,
+    the orchestrator triages the stage diff -- this is the first stage likely to warrant
+    sddl-code-review rather than a trivial skip -- and opens the ST-4 stage_approval.
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T13:40:00Z"
+updated_at: "2026-08-09T13:45:00Z"

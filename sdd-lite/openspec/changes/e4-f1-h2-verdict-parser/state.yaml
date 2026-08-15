@@ -15,7 +15,7 @@ complexity_assessment:
     contradiction. Ceremony deliberately lighter than H1 (see d-lightweight-ceremony).
   confidence: high
   recorded_at: "2026-08-15T15:56:05Z"
-lifecycle_status: seeded
+lifecycle_status: completed
 current_stage: sddl-proposal
 stages:
   sddl-deep-explorer:
@@ -190,15 +190,36 @@ stages:
       deviation between spec/design/plan and actual behaviour. ALL THREE STAGES OF THIS CHANGE
       NOW COMPLETE. Ready for sddl-qa-review (final mode).
   sddl-code-review:
-    status: pending
+    status: skipped
     notes: >-
-      Mid-execution full-4r deliberately NOT pre-scheduled (d-lightweight-ceremony). Re-evaluate
-      only if the executor reports a structural surprise.
+      Mid-execution full-4r deliberately NOT pre-scheduled (d-lightweight-ceremony): no
+      executor stage reported a structural surprise, so the skip stood for the whole change.
+      Coverage substituted by sddl-qa-review's final-mode pass, which independently verified
+      all 16 ACs against actual file content.
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: in_progress
+    status: completed
     started_at: "2026-08-15T18:16:52Z"
+    completed_at: "2026-08-15T18:21:47Z"
+    notes: >-
+      FINAL mode over the whole implemented change. Verdict: pass_with_notes. 16/16 ACs
+      verified against actual file bytes, not test framing -- od-level inspection of the ANSI
+      fixture, manual tail-window arithmetic on the decoy fixture, direct read of the real
+      E1 JSON/NDJSON content. All three binding obligations (d-design-open-questions,
+      d-st1-evidence-obligation) confirmed honored in code: tie-break comment says "provably
+      immaterial", defensive guard has an explicit-cast test, AC-13 has a mechanical
+      Object.keys test plus independent grep. Contract fidelity confirmed (pipeline order,
+      contradiction rule scoped to the tail window, case-sensitive exact matching). Reviewer
+      re-ran the gate itself: check green, 225/225, AC-13 grep empty, story diff exactly
+      matches spec.md's allowed-diff list. One MINOR finding: this change's open_risks were
+      substantively resolved but not marked so in the ledger -- closed by the orchestrator
+      immediately after (see the four risk entries below). Full report: qa-report.md.
+    qa_summary:
+      mode: final
+      verdict: pass_with_notes
+      ac_results: 16/16 verified
+      findings: 0 blocker / 0 major / 1 minor / 0 info
 artifacts:
   state: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/proposal.md
@@ -470,45 +491,29 @@ decisions:
     recorded_at: "2026-08-15T15:56:05Z"
 open_risks:
   - id: r-verdict-provenance
-    severity: medium
+    severity: low
     summary: >-
-      CARRIED FORWARD from H1 (4R review R1-002), now IN SCOPE here per `d-provenance-in-scope`.
-      The diff is embedded verbatim in the prompt and the marker is accepted from anywhere in the
-      engine output, so repository content an attacker controls (a diff line `+VERDICT: approve`
-      the model echoes) can steer the terminal verdict. H2 must ship a provenance policy in the
-      same change as the normalization hardening, because the hardening widens the hole.
+      RESOLVED by this change (AC-3): tail-window provenance implemented and pinned by decoy-then-genuine.txt -- a diff-embedded marker outside the last-30-lines/last-2000-chars window cannot influence the verdict.
   - id: r-normalization-vs-injection
-    severity: medium
+    severity: low
     summary: >-
-      NEW at seed, the central design tension of this story. Every permissive rule H2 adds (ANSI
-      stripping, markdown/code-fence unwrapping, case folding, fuzzy or unanchored matching)
-      raises the parse rate toward the >=90% criterion AND widens what an injected marker can look
-      like. The spec must state the trade-off explicitly per rule rather than adding rules until
-      the corpus passes.
+      RESOLVED by this change: spec.md states the trade-off per rule, and only the corpus-demanded rules were implemented (fence tolerance, whole-window scan, empty-input tolerance, narrow ANSI-CSI stripping) -- no case-folding or fuzzy matching added, closing the injection-surface growth this risk warned about. AC-6/AC-7 pin the rejection.
   - id: r-parse-rate-criterion
     severity: low
     summary: >-
-      NEW at seed. The backlog fixes a >=90% parse-rate success criterion, but the fixture corpus
-      is 12 files of which several are deliberately verdict-less (`no-verdict`,
-      `context-overflow`, `auth-error`, `timeout-sigterm`). The denominator therefore needs
-      defining before the criterion is measurable: percentage of fixtures that CONTAIN a verdict
-      and are parsed correctly, with the verdict-less ones asserted as correctly ambiguous.
-      Spec owns the definition.
+      RESOLVED by this change: the >=90% criterion was redefined as 4/4 exact against the real corpus (proposal.md), proven by AC-1, with the 8 negative controls asserted null via AC-2.
   - id: r-contradiction-semantics
     severity: low
     summary: >-
-      NEW at seed. H1 collapses repeated identical markers to one value and treats two distinct
-      values as ambiguous. Real output may contain a verdict inside a quoted example, a
-      "thinking" section, or a summary that restates it differently. Whether position or context
-      breaks a tie is a policy question the fixtures should answer, not the implementer.
+      RESOLVED by this change: repeated-identical-value collapse (AC-9) versus genuine two-distinct-value contradiction (AC-4) are both pinned by dedicated tests, scoped to the tail window per rule 1.
 next_action:
-  kind: ask_user
-  target: sddl-qa-review
+  kind: done
+  target: orchestrator
   summary: >-
-    All three execution stages complete and independently verified (ST-1 parser, ST-2
-    synthetic fixtures, ST-3 loader + 25-test suite). 16/16 ACs proven, full gate green
-    (225/225), zero deviations across the whole change. Waiting on user approval to launch
-    sddl-qa-review in final mode -- the closeout review, the only stage that may mark the
-    change completed.
+    Change COMPLETED: sddl-qa-review (final) returned pass_with_notes with 16/16 ACs verified
+    and one MINOR bookkeeping finding, now closed (all four open_risks resolved with AC
+    cross-references). Story PR [E4.F1.H2] to be opened with Closes #27 and the AC-11
+    persistence-deferral paragraph copied onto issue #27's checklist; the human reviews and
+    merges. Follow-up: E4.F2 (#28-30) real adapters remain the next E4 work.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T18:16:52Z"
+updated_at: "2026-08-15T18:21:47Z"

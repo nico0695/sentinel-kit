@@ -1,0 +1,810 @@
+version: "0.1"
+change_name: e4-f1-h1-run-review
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F1.H1] (issue #26): the runReview use case in core/run — the product's central
+    flow (worktree -> diff -> prompt -> engine -> parse -> terminal state -> cleanup), complete
+    against FakeEngine. Bounded to one core module plus its unit tests, but hot-path: it is the
+    first code that composes four existing core modules (workspace, review, run ports, repos)
+    and it fixes the shape every later E4/E5 story plugs into. Every dependency is already
+    merged on main, so the work needs no new ports and no adapter changes. Ambiguity is
+    concentrated in three places, all resolvable at spec/design time: how each failure maps
+    onto the five terminal states, how cleanup is guaranteed on the error paths, and where the
+    E5 validations seam is left open without implementing it.
+  confidence: high
+  recorded_at: "2026-08-09T03:15:00Z"
+lifecycle_status: completed
+current_stage: sddl-executor
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing. All four dependencies (E2.F3.H1 worktree lifecycle,
+      E2.F3.H2 diff size policy, E3.F1.H2 prompt assembler, E0.F2.H2 FakeEngine + contract
+      suite) are merged on main and their public index modules are readable at spec time.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-09T03:25:00Z"
+    completed_at: "2026-08-09T03:29:00Z"
+    notes: >-
+      proposal.md written. Exploration performed. Sharpened the three seeded risks into six open
+      questions for spec and surfaced a seventh the seed did not carry (how runReview reaches a
+      terminal state without the H2 parser). Recommended a user checkpoint on terminal-state
+      coverage; the orchestrator's post-processing narrowed that escalation (see d-dec004-scope
+      and r-validation-failed-semantics).
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-09T03:35:00Z"
+    completed_at: "2026-08-09T03:42:00Z"
+    notes: >-
+      Returned `partial`: spec.md is complete on every axis except one genuine B-level choice
+      (harness resolution shape) that it escalated rather than settling, because it fixes the
+      public signature sddl-design must write. Resolved six of the proposal's seven questions
+      A-level, specified an exhaustive stage-plus-error-class mapping onto all five terminal
+      states, a wide result contract, and 18 acceptance criteria. Orchestrator verified every
+      type it references is exported from the workspace and review public indexes.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-09T03:50:00Z"
+    completed_at: "2026-08-09T03:58:00Z"
+    notes: >-
+      design.md written, status `success`, no blocking questions. Core structural idea: runReview
+      is a thin shell over a private non-throwing `executePipeline` whose return type carries a
+      mandatory TerminalState, so "exactly one terminal state" becomes a compile-time obligation
+      and "no throwable escapes" collapses to one exhaustive catch at a single call site instead
+      of discipline across eight stages. Settled the four questions spec deferred: injectable
+      cancellable TimeoutScheduler (over vitest fake timers), a total classifyFailure keyed on
+      error class alone, cleanup run sequentially AFTER the pipeline rather than in a `finally`
+      (so no finally block can override the computed result -- the exact hazard AC-9/AC-10 test),
+      and the five-file layout with an append-only index. Full AC->test table included.
+      Orchestrator independently verified its three load-bearing source claims.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-09T04:05:00Z"
+    completed_at: "2026-08-09T04:12:00Z"
+    notes: >-
+      plan.md written, status `success`. Six strictly sequential stages ordered by the module's
+      import graph (a chain, nothing parallelises): ST-1 leaf types, ST-2 timeout seam +
+      extraction, ST-3 use case + append-only index, ST-4 fixtures + terminal-state suite,
+      ST-5 cleanup contract + seams, ST-6 read-only whole-diff verification. Five code-touching
+      stages, each with its own stage_approval; ST-6 feeds sddl-qa-review rather than replacing
+      it. All 18 ACs assigned, none orphaned; the four whole-diff ACs are recurring per-stage
+      obligations rather than end-loaded. Carries a "traps that make a green test worthless"
+      list the executor cannot re-derive. Orchestrator independently verified the premise the
+      whole inside-out ordering rests on: no orphan rule in .dependency-cruiser.cjs and no
+      noUnusedLocals in tsconfig.json, so a leaf file with no importers passes `npm run check`.
+  sddl-executor:
+    status: in_progress
+    started_at: "2026-08-09T04:20:00Z"
+    last_updated_at: "2026-08-09T14:05:00Z"
+    notes: >-
+      ST-1 COMPLETE (status `success`). Created run-errors.ts (RunError base + the three
+      subclasses, mirroring workspace-errors.ts with the conditional-cause pattern) and
+      verdict.ts (Verdict per PRD §9 + the VerdictParser seam). Neither file imports anything,
+      so guards 2 and 3 are trivially satisfied; index.ts untouched (ST-3), no tests (ST-4/ST-5),
+      no existing file modified. Exit checks: `npm run check` green (73 files, 53 modules, 88
+      dependencies, 0 violations) and `npm test` at exactly 163/163, the required baseline.
+      Three A-level internal choices logged in execution-log.md, no public-type deviation, no
+      design/plan contradiction found. Diff triaged `trivial` by the orchestrator -- two
+      dependency-free leaf files with no behaviour -- so sddl-code-review is skipped for this
+      stage per the routing table.
+
+      ST-2 COMPLETE (status `success`). Created engine-timeout.ts (TimeoutScheduler seam,
+      defaultTimeoutScheduler over the global setTimeout/clearTimeout, runEngineWithTimeout
+      racing against a module-private TIMED_OUT unique symbol, with a no-op late-rejection
+      handler and finally-cancel) and builtin-verdict-extraction.ts (anchored case-sensitive
+      VERDICT scan, zero normalization). The STOP rule did NOT fire: the race satisfies both
+      AC-5 reachability and timer hygiene, so no fallback to vitest fake timers was considered.
+      Exit checks: `npm run check` green (75 files; depcruise 55 modules / 91 dependencies, up
+      from 53/88 by exactly the two new modules, confirming no node:timers specifier slipped in)
+      and `npm test` still 163/163. Diff triaged `trivial-plus` by the orchestrator: additive,
+      no importers, no behavioural coverage yet -- review deferred to ST-6 / final QA where it
+      can be read in context alongside run-review.ts.
+
+      ST-3 COMPLETE (status `success`). Created run-review.ts (418 lines: the public shapes,
+      runReview, and the private executePipeline / classifyFailure / performCleanup / RunDraft)
+      and extended index.ts with an append-only export block. All four structural obligations
+      implemented literally and independently verified by the orchestrator against source:
+      executePipeline returns a mandatory TerminalState with a single exhaustive catch at line
+      340; zero `finally` control-flow constructs (the two textual hits are the doc-comment
+      explaining their absence); classifyFailure tests no base class, so WorktreeCreationError
+      falls through to engine-error as AC-4b needs; harness resolution hoisted ahead of worktree
+      creation with runReview owning the Map-miss HarnessNotFoundError. No public type altered --
+      strict mode was absorbed by conditional spreads, so the deviation rule never fired.
+      Exit checks: `npm run check` green (depcruise 56 modules / 104 dependencies), `npm test`
+      163/163, and the AC-16 grep on index.ts returns nothing. Six A-level internal decisions
+      logged; the sharpest is #3 -- a first draft named the four AC-16 exclusions by identifier
+      in the module doc-comment, which made the AC-16 grep match its own comment and would have
+      failed the ST-6 gate as a self-inflicted false positive. ST-4..ST-6 each still require
+      their own stage_approval.
+
+      ST-3b COMPLETE (status `success`, commit 1be2946). Review-driven fix stage inserted by
+      plan amendment ff9173a after the user accepted the review_gate offer; approval was
+      granted at the gate itself, scoped to ledger ids R2-001..R2-004 + R3-004, and the
+      executor stayed exactly inside it (delta verified by the orchestrator). Doc corrections
+      on RunCleanupOutcome / reviewSucceeded / engineOutput+failure / engine-timeout outcomes;
+      MAX_TIMEOUT_MS pre-flight bound; spec.md AC-6 enumeration + result-contract row amended
+      under the same finding ids. Exit checks: `npm run check` green (76 files; depcruise 56
+      modules / 104 dependencies), `npm test` 163/163, AC-16 grep clean. ST-4 now owes 9 AC-6
+      cases; ST-5 additionally owes the R1-001 EngineTimeoutError escape-hatch pin.
+
+      ST-4 COMPLETE (status `success`). Created __test__/run-review-fixtures.ts (229 lines:
+      buildRequest/buildDeps over the sanctioned fakes, createManualScheduler with
+      cancelCount/fireAll shipped ahead for ST-5, createHangingEngine and the
+      HarnessValidationError loader pair as fixture-local doubles the sanctioned fakes cannot
+      express) and __test__/run-review.test.ts (339 lines, 19 tests): AC-1/AC-2 ok, AC-3a/b
+      ambiguous, AC-4a/b engine-error, AC-5 timeout (manual scheduler, both halves + forwarded
+      timeoutMs + elapsed-time bound), the 9 AC-6 validation-failed producers (spec's 8 plus
+      design's HarnessValidationError stub, reconciling the plan's count of 9 -- A-level,
+      logged), AC-11, AC-12 (identity assertion on the bare TypeError via mergeBaseError +
+      `.resolves` pin). No production file touched; no defect surfaced, the blocked path was
+      never needed. Exit checks: vitest core 129/129, `npm run check` green (78 files; depcruise
+      56 modules / 104 dependencies unchanged, confirming the __test__ exclusion), `npm test`
+      182/182 (163 pre-existing intact + 19 new). Orchestrator independently re-ran check +
+      full suite and spot-checked the AC map (19 its, 8 describes, upper-bound case present).
+      Seven A-level decisions logged in the ST-4 entry. ST-5 and ST-6 still user-gated.
+
+      ST-5 COMPLETE (status `success`). Extended __test__/run-review.test.ts (339 -> 630 lines,
+      16 new tests; fixtures file untouched -- both needed knobs already flowed through the
+      existing builders, an A-level restraint logged in the entry): AC-7 cleanup census on all
+      four post-worktree paths under `always`; AC-8 with FIVE cases, pinning the R2-002
+      literal-success policy (`ambiguous` kept under `on-success`); AC-9/AC-10 cleanup faults
+      annotate (`cleanup-failed` + WorktreeCleanupError) without overriding state or swallowing
+      the EngineInvocationError; AC-13 seam pass-through both directions; AC-14 parseVerdict
+      override; timer hygiene (cancelCount === 1 on the happy path, injected manual scheduler);
+      and the R1-001 escape-hatch pin -- an engine rejecting with the publicly-exported
+      EngineTimeoutError lands on `timeout` with the identity-asserted unwrapped rethrow. No
+      production file touched, no deviation, no defect surfaced. Exit checks: vitest core
+      145/145, `npm run check` green, `npm test` 198/198 (182 baseline intact). Orchestrator
+      independently re-ran check + full suite and spot-checked the describe map (35 tests, all
+      ST-5 blocks present). Only ST-6 (read-only, no approval per plan) and QA remain.
+
+      ST-6 COMPLETE (status `success`, read-only, executed inline by the orchestrator --
+      A-level, logged in the entry: the stage is four verification commands whose value is
+      orchestrator-checked evidence, so fresh-context delegation adds nothing). Evidence at
+      HEAD a617fe3: AC-17 -- story diff vs origin/main is exactly 8 files, all src/core/run/**
+      (1589+/3-), the 3 deletions audited as ST-3's doc-comment truth-maintenance in index.ts
+      with every pre-existing export intact; AC-16 -- forbidden-internals grep exits 1;
+      AC-15 -- depcruise 56/104, unchanged since ST-3b; AC-18 -- check green, full suite
+      198/198. The change is PR-ready pending sddl-qa-review (final mode), the only remaining
+      stage and the only one that may mark the change completed.
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-09T14:20:00Z"
+    completed_at: "2026-08-09T15:10:00Z"
+    notes: >-
+      Full-4r review of the cumulative ST-1..ST-3 source delta, frozen at 03bd7cf. The review
+      gate was raised (review-now vs defer-to-ST-6) with review-now recommended; the user did
+      not respond, and the orchestrator proceeded on its own recommendation — authorship
+      claude, recorded here rather than silently. Scope was widened from the ST-3 diff to the
+      cumulative delta (A-level) so engine-timeout.ts, skipped at its own trivial-plus gate,
+      finally came under review. Four lenses ran as parallel read-only workers; 15 merged
+      findings, all WARNING/SUGGESTION -> info under the severity floor. One three-lens
+      convergent finding (dual timeout budget) was provisionally escalated to CRITICAL and put
+      through the single refuter pass: ordering sub-claim REFUTED (depends on unwritten E4.F2
+      adapter behaviour; the design-named kill mechanism would actually let the outer timer
+      win), consequence sub-claim corroborated in weak form (nondeterministic terminal state
+      across adapter implementations; undocumented escape hatch: publicly-exported
+      EngineTimeoutError is rethrown unwrapped). Merged at lens severity WARNING. Verdict:
+      pass_with_warnings, zero open severe findings, no fix round mandated. The lenses also
+      hand-verified clean: the full stage->terminal-state mapping row by row, the
+      cannot-reject/exactly-one-state invariant, timer hygiene on all exit paths, guards
+      (depcruise+tsc re-run in-review) and secrets. Chief yield is test-shaping for ST-4/ST-5:
+      AC-5's fake ignores the budget, so tests must also pin the EngineTimeoutError-rejection
+      escape hatch and (if ST-3b lands) the timeoutMs upper bound. review_gate raised for
+      optional fix routing; see next_action.
+    review_summary:
+      mode: 4r
+      tier: full-4r
+      target: 03bd7cf8a1204f2aa23a7619b4ef6203f7db073c
+      round: 1
+      counts: confirmed=0 suspect=0 escalated=0 info=15
+      open_severe_findings: 0
+      verdict: pass_with_warnings
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-09T18:40:13Z"
+    completed_at: "2026-08-09T18:45:23Z"
+    notes: >-
+      FINAL mode over the whole implemented change. Verdict: pass. 18/18 ACs verified -- every
+      criterion traced to a named test or a re-run command; load-bearing assertions (AC-5 both
+      halves, AC-9/AC-10 both directions, AC-12 identity, the 9 AC-6 producers, the R1-001 pin)
+      verified against test source, and the fixture traps confirmed genuine against workspace
+      source (only GitWorktreeError is wrapped; createFakeEngine rejects asynchronously). The
+      reviewer re-ran the gate itself: check green, 198/198, core 145/145, AC-16 grep clean,
+      story diff exactly 8 files under src/core/run/**. Risk closeout audit: all CLOSED /
+      DOWNGRADED claims independently re-located; the 9 remaining open risks are forward-looking
+      with later-epic owners and none blocks completion. Findings: 3 INFO only (empty-string
+      ref producers untested individually, cancel-after-fire uncounted, state sync left to the
+      orchestrator). Full report: qa-report.md.
+    qa_summary:
+      mode: final
+      verdict: pass
+      ac_results: 18/18 verified
+      findings: 0 blocker / 0 major / 0 minor / 3 info
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f1-h1-run-review/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f1-h1-run-review/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f1-h1-run-review/spec.md
+  design: sdd-lite/openspec/changes/e4-f1-h1-run-review/design.md
+  plan: sdd-lite/openspec/changes/e4-f1-h1-run-review/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f1-h1-run-review/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f1-h1-run-review/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e4-f1-h1-run-review/review-ledger.md
+checkpoints:
+  - id: cp-change-seed
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      Bootstrap preflight for E4 read `stale` in a materially misleading way for a code-touching
+      epic; asked the user how to resolve it before seeding the change.
+    question: >-
+      The sdd-lite bootstrap is materially stale for E4. Refresh it with a full sddl-init run,
+      refresh only the false facts surgically, or proceed without refreshing?
+    options:
+      - id: sddl-init
+        label: Refresh with sddl-init
+        description: >-
+          Regenerate project-context.md, skill-catalog.md and config.yaml. Highest fidelity, but
+          rewrites three files wholesale and re-injects the CLAUDE.md wrapper block.
+        recommended: true
+      - id: surgical
+        label: Surgical manual refresh
+        description: >-
+          Edit only the stale facts (toolchain versions, quality commands, test roots, engine
+          risk zones). Lower blast radius, fully reversible via git.
+      - id: skip
+        label: Proceed without refreshing
+        description: >-
+          Seed the change on the current bootstrap and correct each handoff envelope by hand.
+    free_input_allowed: true
+    response:
+      selected_option_id: surgical
+      free_text: >-
+        User did not answer. Orchestrator proceeded on the lower-blast-radius option and stated
+        the assumption explicitly in chat, leaving the choice open to reversal.
+      responded_at: "2026-08-09T03:10:00Z"
+    created_at: "2026-08-09T03:08:00Z"
+    resolved_at: "2026-08-09T03:10:00Z"
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    summary: >-
+      Launch the sddl-proposal worker for [E4.F1.H1] runReview (issue #26), the first stage of
+      the E4 epic.
+    question: >-
+      Approve launching sddl-proposal for [E4.F1.H1] runReview, scoped to the core/run use case
+      against FakeEngine only?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "comienza".
+      responded_at: "2026-08-09T03:25:00Z"
+    created_at: "2026-08-09T03:15:00Z"
+    resolved_at: "2026-08-09T03:25:00Z"
+  - id: cp-validation-failed-semantics
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      The `validation-failed` terminal state has no defined producer. E5.F1.H2 states declared
+      validations do NOT abort the review, so E5 never produces it; the PRD defines it only as
+      an enum member. Resolving this decides whether the story's acceptance criterion is
+      achievable and shapes the public result contract.
+    question: >-
+      What does the `validation-failed` terminal state mean, given E5 does not produce it?
+    options:
+      - id: preflight
+        label: Pre-flight validation failure
+        description: >-
+          The review never ran because input or config was invalid: malformed request, unknown
+          harness, invalid diff limits. Producible in H1, makes the acceptance criterion
+          satisfiable, and is consistent with E5 not producing it.
+        recommended: true
+      - id: defer-to-spec
+        label: Let spec decide with evidence
+        description: >-
+          Pass the question to the spec worker with both citations and have it propose the
+          interpretation as part of the contract, subject to review at the spec gate.
+      - id: explicit-deferral
+        label: Defer the state explicitly
+        description: >-
+          H1 does not produce `validation-failed`; record an explicit deferral naming the state
+          and its future producer, leaving the acceptance criterion partially met and documented.
+    free_input_allowed: true
+    response:
+      selected_option_id: preflight
+      responded_at: "2026-08-09T03:35:00Z"
+    created_at: "2026-08-09T03:32:00Z"
+    resolved_at: "2026-08-09T03:35:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: Launch the sddl-spec worker for [E4.F1.H1] with the four open risks carried forward.
+    question: Approve routing to sddl-spec?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-08-09T03:35:00Z"
+    created_at: "2026-08-09T03:32:00Z"
+    resolved_at: "2026-08-09T03:35:00Z"
+  - id: cp-harness-resolution
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      sddl-spec returned `partial`, escalating one B-level choice: how runReview receives the
+      harness. It fixes the public signature of the flagship use case, so sddl-design is blocked
+      until it is decided.
+    question: >-
+      Does runReview take `harnessType: string` and resolve the harness internally, or receive an
+      already-resolved ResolvedHarness from the caller?
+    options:
+      - id: option-a
+        label: "harnessType: string, resolved internally"
+        description: >-
+          runReview resolves via deps.harnesses. The E4 DoD is `sentinel review <repo> <branch>
+          --type pr-review`, a bare string from the CLI; "unknown harness" then faults inside the
+          flow, where the user already placed validation-failed. Cost: larger deps surface,
+          HarnessLoader reaches the run module.
+        recommended: true
+      - id: option-b
+        label: Caller passes a ResolvedHarness
+        description: >-
+          runReview stays a two-port composer. Cost: HarnessNotFoundError and SkillNotFoundError
+          move outside the flow, so E6 owns mapping them to a terminal state and exit code.
+    free_input_allowed: true
+    response:
+      selected_option_id: option-a
+      responded_at: "2026-08-09T03:50:00Z"
+    created_at: "2026-08-09T03:45:00Z"
+    resolved_at: "2026-08-09T03:50:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    summary: Launch the sddl-design worker now that the harness-resolution signature is fixed.
+    question: Approve routing to sddl-design with Option A as the settled signature?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: >-
+        Implicit in resolving cp-harness-resolution, whose stated purpose was to unblock
+        sddl-design. Re-asking would be a micro-confirmation the interaction contract discourages.
+      responded_at: "2026-08-09T03:50:00Z"
+    created_at: "2026-08-09T03:50:00Z"
+    resolved_at: "2026-08-09T03:50:00Z"
+  - id: cp-design-validation
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md complete, status `success`, no blocking questions. Presented the approach
+      (non-throwing executePipeline with a mandatory TerminalState in its return type; injectable
+      cancellable TimeoutScheduler; total classifyFailure keyed on error class; cleanup run
+      sequentially after the pipeline rather than in a `finally`; five-file append-only layout)
+      plus the three source findings the design surfaced that the spec had not: loadHarnesses
+      returns a Map rather than throwing on an unknown type, the workspace use cases wrap only
+      GitWorktreeError, and the run tests' cross-boundary fake imports are legal under the
+      dependency-cruiser `__test__` exclusion.
+    question: Approve the design approach and route to sddl-plan?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si".
+      responded_at: "2026-08-09T04:05:00Z"
+    created_at: "2026-08-09T03:58:00Z"
+    resolved_at: "2026-08-09T04:05:00Z"
+  - id: cp-plan-validation
+    type: phase_validation
+    stage: sddl-plan
+    summary: >-
+      plan.md complete: six sequential stages, all 18 ACs assigned, plus the executor's
+      trap list. Presented alongside the one ambiguity the plan resolved in-place rather than
+      escalating -- design.md calls three functions "module-private" while run-review.ts imports
+      them, so they need file-level exports.
+    question: Approve the six-stage plan and open the ST-1 stage approval?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: >-
+        User approved with "si, comienza con ST-1". The orchestrator concurs with the plan's read
+        of the export ambiguity: AC-16 is worded about index.ts specifically ("the built-in
+        extraction is not exported from index.ts"), not about file-level visibility, so
+        file-level export plus no index re-export satisfies it. Recorded rather than escalated.
+      responded_at: "2026-08-09T04:20:00Z"
+    created_at: "2026-08-09T04:12:00Z"
+    resolved_at: "2026-08-09T04:20:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1: create src/core/run/run-errors.ts (RunError base + InvalidRunRequestError,
+      EngineInvocationError, EngineTimeoutError) and src/core/run/verdict.ts (Verdict,
+      VerdictParser). Two new leaf files, no importers yet, no existing file modified.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-1?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comienza con ST-1".
+      responded_at: "2026-08-09T04:20:00Z"
+    created_at: "2026-08-09T04:20:00Z"
+    resolved_at: "2026-08-09T04:20:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2: create src/core/run/engine-timeout.ts (TimeoutScheduler, defaultTimeoutScheduler,
+      runEngineWithTimeout) and src/core/run/builtin-verdict-extraction.ts
+      (extractBuiltInVerdict). The riskiest stage in the change: the only concurrency in the core
+      (promise race, no-op late-rejection handler, finally-cancel). Carries no tests of its own --
+      its behaviour is proven through runReview at ST-4/ST-5 -- so its green is weaker than the
+      other stages', which was surfaced to the user before approval.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-2?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si", after being told ST-2 ships untested until ST-4/ST-5.
+      responded_at: "2026-08-09T13:20:00Z"
+    created_at: "2026-08-09T13:20:00Z"
+    resolved_at: "2026-08-09T13:20:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3: create src/core/run/run-review.ts (request/deps/result types, runReview,
+      executePipeline, classifyFailure, performCleanup) and extend src/core/run/index.ts with an
+      append-only export block. The largest stage in the change and the first convergence point:
+      strict mode meets the wide result shape, the module gains a public surface so AC-16 becomes
+      live, and the four ST-1/ST-2 files gain their first importers.
+      Exit check: `npm run check` green and `npm test` still 163/163.
+    question: Approve execution of ST-3?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si apruebo st-3".
+      responded_at: "2026-08-09T13:45:00Z"
+    created_at: "2026-08-09T13:45:00Z"
+    resolved_at: "2026-08-09T13:45:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4: create src/core/run/__test__/run-review-fixtures.ts and
+      src/core/run/__test__/run-review.test.ts -- the terminal-state suite: AC-1, AC-2,
+      AC-3(a/b), AC-4(a/b), AC-5, AC-6 (9 pre-flight cases, including the ST-3b
+      timeoutMs-above-MAX_TIMEOUT_MS case), AC-11, AC-12. First behavioural verification of
+      the ST-2/ST-3 code (closes the dominant risk r-st3-behaviour-unverified when green).
+      Exit check: `npx vitest run --project core`, then `npm run check` and `npm test`.
+    question: Approve execution of ST-4?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "abprobado st-4".
+      responded_at: "2026-08-09T15:53:00Z"
+    created_at: "2026-08-09T15:45:00Z"
+    resolved_at: "2026-08-09T15:53:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-5: extend src/core/run/__test__/run-review.test.ts (fixtures extended if needed) --
+      cleanup contract AC-7..AC-10, seams AC-13/AC-14, the timer-hygiene case (cancelCount === 1
+      on the happy path), and the R1-001 escape-hatch pin (adapter rejecting with the
+      publicly-exported EngineTimeoutError lands on terminal state `timeout`). Last
+      code-touching stage; closes r-st3-behaviour-unverified and r-st2-behaviour-unverified.
+      Exit check: `npx vitest run --project core`, then `npm run check` and `npm test`.
+    question: Approve execution of ST-5?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si aprueba st-5".
+      responded_at: "2026-08-09T16:59:48Z"
+    created_at: "2026-08-09T16:59:48Z"
+    resolved_at: "2026-08-09T16:59:48Z"
+  - id: cp-qa-final-approval
+    type: stage_approval
+    stage: sddl-qa-review
+    summary: >-
+      Launch sddl-qa-review in FINAL mode over the whole implemented change (ST-1..ST-6,
+      HEAD f0d66a7 for artifacts, story diff frozen at a617fe3): the closeout review against
+      spec/design/plan, the only stage that may mark the change completed. On a clean verdict
+      the orchestrator opens the story PR ([E4.F1.H1], Closes #26) per the workflow contract,
+      as recommended at the gate and accepted.
+    question: Approve launching sddl-qa-review in final mode?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, lanza qa-review final".
+      responded_at: "2026-08-09T18:40:13Z"
+    created_at: "2026-08-09T18:40:13Z"
+    resolved_at: "2026-08-09T18:40:13Z"
+decisions:
+  - id: d-pr64-copilot-fixes
+    checkpoint_id: cp-qa-final-approval
+    rationale: >-
+      A-level, post-QA/post-completion fix on PR #64: GitHub Copilot's automated PR review
+      flagged two real findings. (1) engine-timeout.ts's file docstring claimed nothing in the
+      file is re-exported from index.ts, while `TimeoutScheduler` (the type) is -- corrected
+      the doc to name the type/runtime-helper split accurately. (2) `baseRef`/`targetRef` were
+      only checked for non-empty at the request pre-flight, then passed positionally (no `--`
+      separator) into `git diff`/`git merge-base` in git-cli.ts -- a ref starting with `-`
+      would be parsed as a git option, e.g. `git diff --output=<path>` writes an attacker-
+      chosen file. Security-relevant given this tool operates on externally-supplied branch
+      names. Fixed by rejecting a leading `-` in both refs at the existing request pre-flight
+      (InvalidRunRequestError -> validation-failed), matching the pattern already used for
+      every other AC-6 producer. Treated as a clear, bounded fix (CLAUDE.md sdd-lite exemption
+      3) rather than reopening full ceremony on a change already marked completed: single
+      file touched for the guard, two new AC-6 test cases, spec.md's AC-6 enumeration and the
+      request-stage mapping row amended for consistency, full gate re-run green (200/200).
+    recorded_at: "2026-08-15T14:32:23Z"
+  - id: d-validation-failed-preflight
+    checkpoint_id: cp-validation-failed-semantics
+    selected_option_id: preflight
+    rationale: >-
+      B-level, user decided. `validation-failed` means a pre-flight validation failure: the
+      review never reached the engine because the request or configuration was invalid. Evidence
+      supporting the reading: E5.F1.H2 requires declared-validation failures to continue the
+      review with the evidence attached, so E5 cannot be the producer; and the only thing
+      DiffSizePolicyError actually raises on today is invalid limit configuration
+      (compute-review-diff.ts:209,212), which is exactly a pre-flight fault. Makes the story's
+      "each terminal state reachable by test" criterion satisfiable without deferral.
+    recorded_at: "2026-08-09T03:35:00Z"
+  - id: d-harness-resolution
+    checkpoint_id: cp-harness-resolution
+    selected_option_id: option-a
+    rationale: >-
+      B-level, user decided. runReview takes `harnessType: string` and resolves internally via
+      deps.harnesses. Beyond the spec's own rationale (E4 DoD passes a bare --type string;
+      "unknown harness" belongs to the settled pre-flight validation-failed semantics), the
+      orchestrator weighed one more argument in favour: under Option B the CLI would have to
+      orchestrate loadHarnesses -> resolveHarnessSkills -> runReview AND map harness errors onto
+      run-domain terminal states, putting run-domain logic in a driving adapter. That runs against
+      the guard "use cases are the ONLY API of the core -- no logic in TUI/CLI commands".
+    recorded_at: "2026-08-09T03:50:00Z"
+  - id: d-change-scope
+    checkpoint_id: cp-change-seed
+    rationale: >-
+      A-level: scope this change to [E4.F1.H1] alone rather than bundling [E4.F1.H2] (verdict
+      parser). They are separate backlog stories with separate issues (#26, #27); H1 orchestrates
+      the flow against FakeEngine while H2 owns defensive parsing against the real E1 fixtures.
+      Bundling them would put two distinct risk profiles behind one approval gate.
+    recorded_at: "2026-08-09T03:15:00Z"
+  - id: d-dec004-scope
+    checkpoint_id: cp-proposal-approval
+    rationale: >-
+      A-level: the proposal flagged "timeout vs engine-error may require touching the frozen
+      ReviewEngine port (dec-004)" as a B/C escalation. Checked the source. dec-004 is recorded
+      in the E0.F2.H2 spec and it froze the port against *that* story, explicitly deferring both
+      concerns to this one: "No typed port error added to src/core/run in H2 (dec-004) — a typed
+      error may arrive later (E4) without breaking this contract" and "The fake does NOT enforce
+      timeoutMs (dec-004) — real timeout enforcement is the run flow's job (E4.F1.H1)". So
+      wall-clock enforcement in runReview and a typed run-domain error are pre-sanctioned work
+      here, not scope expansion. Escalation withdrawn; r-terminal-state-coverage downgraded to
+      low. Spec still owns the mapping design.
+    recorded_at: "2026-08-09T03:30:00Z"
+  - id: d-bootstrap-surgical-refresh
+    checkpoint_id: cp-change-seed
+    selected_option_id: surgical
+    rationale: >-
+      A-level: bootstrap preflight read `stale` in a materially misleading way for a
+      code-touching epic (config.yaml and skill-catalog.md still claimed vitest/tsup were not
+      installed, typescript was recorded as 7.0.2 instead of 5.9.3, test_roots was empty, and
+      risk_zones still listed the E1 engine spikes as unresolved unknowns). Refreshed those
+      facts surgically against main @ f294af2 instead of regenerating via sddl-init, to avoid
+      re-injecting the CLAUDE.md wrapper block and rewriting three files wholesale. Recommended
+      sddl-init to the user first; proceeded on the lower-blast-radius option without an answer.
+    recorded_at: "2026-08-09T03:10:00Z"
+open_risks:
+  - id: r-dependency-surface
+    severity: low
+    summary: >-
+      CLOSED. Part 2 (result shape) settled A-level by spec: return the wide shape, since PRD §9
+      requires runs to persist the prompt and under-returning would force a breaking change on
+      E5's RunStore. Part 1 (harness resolution) settled B-level by the user as Option A
+      (`d-harness-resolution`): runReview takes `harnessType: string` and resolves internally via
+      deps.harnesses.
+  - id: r-infrastructure-as-engine-error
+    severity: medium
+    summary: >-
+      NEW from spec. Git and infrastructure faults (WorktreeCreationError, GitDiffError) surface
+      as `engine-error` because the PRD fixes exactly five terminal states and a sixth would be a
+      C-level contradiction. Fidelity is preserved via `failure.stage` + `failure.error` so E6 can
+      render an accurate message. Revisit only if E6 proves the label misleads users.
+  - id: r-parse-seam
+    severity: low
+    summary: >-
+      RESOLVED by spec: a module-private naive extraction behind an injectable
+      `deps.parseVerdict`, not exported from index.ts. Residual: it could be mistaken for "good
+      enough" and weaken the case for H2 (#27). Mitigated by Non-Goals wording and by H2 owning
+      the fixture corpus and the >=90% parse-rate criterion, which the naive version cannot meet
+      by construction.
+  - id: r-cleanup-on-error
+    severity: low
+    summary: >-
+      RESOLVED by spec: a cleanup fault ANNOTATES, never overrides and never rethrows. AC-9 and
+      AC-10 prove both directions — a fault on the happy path keeps `ok`, and a fault after an
+      engine rejection keeps both `engine-error` and the originating EngineInvocationError.
+  - id: r-sync-throw-unwrapped
+    severity: low
+    summary: >-
+      NEW from ST-2, flagged by the executor and verified by the orchestrator. In
+      runEngineWithTimeout, `const pending = invoke()` sits outside the try exactly as design.md
+      fixes it, so an engine adapter that throws SYNCHRONOUSLY escapes un-wrapped instead of
+      becoming an EngineInvocationError. No AC breaks: executePipeline's catch-all still yields
+      `engine-error` with `stage: "engine"` (AC-4a, AC-12), and AC-10 asserts the class only for
+      the async rejection createFakeEngine produces. Timer hygiene is unaffected -- nothing is
+      scheduled on that path. Inert in H1, but a real asymmetry for E4.F2 (#28-30), where an
+      adapter throwing on a missing binary would surface a raw error rather than the typed one.
+      Not fixed here because the structure is design-fixed and runEngineWithTimeout is not
+      exported from index.ts, so changing it later is free.
+  - id: r-st3-behaviour-unverified
+    severity: low
+    summary: >-
+      CLOSED by ST-5 (downgraded by ST-4 from medium, the then-dominant risk). The full
+      behavioural contract is now proven by the repository suite: all five terminal states
+      (AC-1..AC-6), the cleanup contract (AC-7..AC-10), the two seams (AC-13/AC-14), AC-11,
+      AC-12 -- 35 tests over run-review.ts, 198/198 overall.
+  - id: r-st2-behaviour-unverified
+    severity: low
+    summary: >-
+      CLOSED by ST-5 (downgraded by ST-4 from medium). engine-timeout.ts is now covered on
+      every reachable path via the repository suite: rejection wrap (AC-4a), race reachability
+      (AC-5), timer hygiene (cancelCount === 1), and the EngineTimeoutError unwrapped-rethrow
+      escape hatch (R1-001 pin). builtin-verdict-extraction.ts covered via AC-2/AC-3. The
+      ST-2 out-of-repo smoke run is fully superseded as evidence.
+  - id: r-st2-concurrency-stage
+    severity: low
+    summary: >-
+      NEW from plan. ST-2 concentrates the only concurrency in the core (promise race, no-op
+      late-rejection handler, finally-cancel). Mitigated structurally: the file has no importers
+      until ST-3, so rollback is one `git checkout --` with zero blast radius. The plan instructs
+      a STOP rather than a unilateral fall back to vitest fake timers, which design already
+      evaluated and rejected.
+  - id: r-st3-strict-mode-pressure
+    severity: low
+    summary: >-
+      NEW from plan. ST-3 is the largest stage and the first place exactOptionalPropertyTypes and
+      noUncheckedIndexedAccess meet the wide result shape. Line drawn: internal adjustments are
+      A-level and logged; any change to a PUBLIC type in design.md's interface block is a
+      deviation to report and stop on, not to absorb.
+  - id: r-test-fake-cross-boundary
+    severity: low
+    summary: >-
+      NEW from design. Run tests import an adapter (`createFakeEngine`) and another core module's
+      test fake. Verified legal by the orchestrator against `.dependency-cruiser.cjs` line 91
+      (`exclude: { path: "(^|/)__test__/" }`, dec-005), so `depcruise src` never cruises them,
+      while `tsc --noEmit` still typechecks them. First cross-module fake reuse in this repo, so
+      it reads like an AC-15 guard violation on casual inspection. Documented in design.md with
+      the evidence so QA does not re-litigate it.
+  - id: r-timeout-seam-surface
+    severity: low
+    summary: >-
+      NEW from design. `deps.scheduleTimeout?` widens the public deps surface for a test-driven
+      reason. Mitigated: optional, defaulted, precedented by `CreateReviewWorktreeDeps.now?`, and
+      it also buys a production-relevant guarantee (the timer is provably cleared).
+  - id: r-engine-not-cancellable
+    severity: low
+    summary: >-
+      NEW from spec. On timeout the engine promise is abandoned, not killed — the port has no
+      abort channel. Inert in H1 (FakeEngine, in-memory git), but cleanup could later remove a
+      worktree a live process still holds. `timeoutMs` is still passed to the engine so E4.F2
+      adapters (#28-30) own process kill. Flagged forward.
+  - id: r-catchall-masks-bugs
+    severity: low
+    summary: >-
+      NEW from spec. The fall-through mapping sends genuine programming bugs to `engine-error`.
+      Accepted for the "exactly one terminal state" invariant; the original throwable is
+      preserved in `failure.error`, so nothing is lost, only relabelled.
+  - id: r-terminal-state-coverage
+    severity: low
+    summary: >-
+      CLOSED by spec: full five-state mapping, every state with at least one named test producer
+      (AC-2 through AC-6).
+  - id: r-validation-failed-semantics
+    severity: low
+    summary: >-
+      CLOSED by spec: seven concrete pre-flight producers enumerated, one AC-6 case each.
+  - id: r-e5-validation-seam
+    severity: low
+    summary: >-
+      CLOSED by spec: `request.validationOutput?: readonly string[]` forwarded verbatim to
+      assemblePrompt. No E5 import, no new machinery.
+  - id: r-timeout-budget-precedence
+    severity: medium
+    summary: >-
+      NEW from 4R review (R1-001, convergent across three lenses; refuter split the claim). The
+      identical timeoutMs feeds the adapter's self-enforced budget and the outer race with zero
+      headroom and no precedence rule, so which terminal state (`timeout` vs `engine-error`) an
+      over-budget engine yields depends on adapter implementation detail. Not a defect at this
+      commit (the strong "timeout unreachable" form was refuted: no adapter self-enforces yet,
+      and a kill-based adapter would lose the race to the outer timer anyway). Owner: E4.F2
+      (#28-30) must fix a precedence rule. Working escape hatch to document and pin: an adapter
+      rejecting with the publicly-exported EngineTimeoutError is rethrown unwrapped and lands on
+      `timeout` (engine-timeout.ts:96-97, index.ts). ST-5 landed that pin as a named test
+      (identity-asserted), so E4.F2 adapters have a documented, regression-guarded precedence
+      route; the E4.F2 obligation to fix a precedence rule stands.
+  - id: r-verdict-provenance
+    severity: medium
+    summary: >-
+      NEW from 4R review (R1-002). The diff is embedded verbatim in the prompt and the verdict
+      marker is accepted from anywhere in the engine output, so repository content an attacker
+      controls (a diff line `+VERDICT: approve` the model echoes) can steer the terminal verdict.
+      NOT covered by #27, which hardens marker normalization, not provenance — this needs an
+      owner. Candidates: constrain extraction to the output tail, or a delimiter contract in the
+      prompt template (E3 owns the template). Raise when scoping #27 so the two land together.
+  - id: r-orphan-sweeper-blind-spot
+    severity: medium
+    summary: >-
+      NEW from 4R review (R4-001, empirically reproduced with git 2.43.0). A partially-failed
+      `git worktree remove --force` deletes the .git/worktrees registry entry while leaving the
+      directory on disk, so the leaked worktree is invisible to listOrphanWorktrees, which
+      enumerates the registry only. Single-run mitigation exists (the result carries
+      worktreePath + cleanup-failed). Fix candidates live in E2/E6 scope: filesystem sweep of
+      worktreesDir in listOrphanWorktrees, or surfacing cleanup-failed paths in the E6 UI.
+      Related but distinct: R1-003 — a partial `worktree add` failure leaves debris with no
+      handle at all (path derivation is module-private).
+  - id: r-harness-load-eager
+    severity: medium
+    summary: >-
+      NEW from 4R review (R3-001). runReview consumes exactly one harness but loadHarnesses
+      eagerly resolves all and throws on the first broken one, so one broken harness in the
+      user's config fails every review with an error naming a harness the caller never asked
+      for, in readdir (nondeterministic) order. Behavior-activated: the gap is load-harnesses.ts
+      (E3), first activated by this composition. Candidates: per-type load path, or tolerant
+      load returning per-harness errors. B-level API question for E3 — raise before E6 makes the
+      error user-visible.
+  - id: r-unbounded-nonengine-awaits
+    severity: medium
+    summary: >-
+      NEW from 4R review (R3-002). Only the engine stage is time-boxed; harness load, worktree
+      creation, diff and cleanup are unbounded awaits, and the git adapter sets no execa
+      timeout, so a wedged git leaves runReview permanently unsettled — the documented "ALWAYS
+      resolves" guarantee is contingent on adapters this module does not control. Core fix would
+      violate the design (one budget, one seam); right owner is the git adapter (execa timeout
+      in EXECA_BASE, translated to a GitPort error). Behavior-activated, pre-existing adapter
+      gap. Candidate for a small E4.F2-adjacent story.
+  - id: r-timeout-overflow-clamp
+    severity: low
+    summary: >-
+      CLOSED by ST-3b (commit 1be2946), accepted by the user at the review_gate. MAX_TIMEOUT_MS
+      pre-flight bound added: values above 2^31-1 now reject as InvalidRunRequestError instead
+      of overflowing setTimeout to 1ms. Spec AC-6 enumeration extended; the ninth AC-6 test
+      case lands in ST-4.
+  - id: r-cleanup-races-abandoned-engine
+    severity: low
+    summary: >-
+      NEW from 4R review (R3-003). Consequence of r-engine-not-cancellable not previously
+      recorded: on the timeout path performCleanup immediately force-removes the worktree the
+      abandoned engine process may still occupy — intermittent cleanup-failed annotations and a
+      process outliving its resolved run. Inert in H1 (FakeEngine holds no files). Owner: E4.F2
+      kill-before-cleanup ordering; fold into r-engine-not-cancellable's resolution.
+  - id: r-review-doc-drift
+    severity: low
+    summary: >-
+      NEW from 4R review (R2-001/R2-002/R2-003/R2-004, all deterministic doc-level findings).
+      Public-surface docs that lie or omit: RunCleanupOutcome.attempted conflates "tried and
+      failed" with "never tried" (keep / on-success early returns) and is the only undocumented
+      public result member; the reviewSucceeded = (state === "ok") policy decision is
+      uncommented at the call site with its rationale only in spec.md; engineOutput's
+      "present on ok/ambiguous" contradicts the parse-fault path (engine-error + engineOutput +
+      failure all set); engine-timeout.ts's three-outcome doc omits the sync-throw fourth
+      outcome (r-sync-throw-unwrapped's doc surface). All comment-only, zero behaviour change.
+      CLOSED by ST-3b (commit 1be2946): all four doc surfaces corrected in code, plus the
+      matching spec.md result-contract row (same R2-003 authority, A-level).
+next_action:
+  kind: done
+  target: orchestrator
+  summary: >-
+    Change COMPLETED (QA final pass, 18/18 ACs). PR #64 open; GitHub Copilot's automated
+    review left two comments, both verified real and fixed in a follow-up commit on the same
+    branch/PR (see decision d-pr64-copilot-fixes): stale re-export docstring in
+    engine-timeout.ts, and a leading-dash option-injection guard added for baseRef/targetRef.
+    Full gate re-verified green (200/200). Waiting on human review/merge of PR #64. Follow-ups
+    live in open_risks with their later-epic owners (raise r-verdict-provenance when scoping
+    #27; timeout-precedence and kill-before-cleanup belong to E4.F2 #28-30).
+created_at: "2026-08-09T03:15:00Z"
+updated_at: "2026-08-15T14:32:23Z"

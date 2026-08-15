@@ -16,7 +16,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-15T20:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -114,7 +114,33 @@ stages:
       (SIGTERM->SIGKILL ordering) needs an explicit test-case strategy since the runProcess seam
       itself carries no timing; r-claude-cli-version-drift remains informational-only.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T20:35:00Z"
+    completed_at: "2026-08-15T20:35:00Z"
+    notes: >-
+      plan.md complete: 5 executor stages (ST-1 errors.ts+envelope.ts, ST-2 process-runner.ts,
+      ST-3 claude-code-adapter.ts orchestration + barrel export, ST-4 the single AC-covering test
+      file, ST-5 manual AC-24 verification + closing gate). Split design.md's rough 4-bullet
+      order one level finer, separating ST-4 (automated, gates on a green vitest run) from ST-5
+      (manual, gates on a human running a real authenticated claude CLI review) since the two
+      have exit conditions different in kind.
+
+      Closed the AC-16/17 test-strategy gap design.md flagged concretely, not left to the
+      executor to interpret: (1) a vi.mock("execa") option-wiring test importing process-runner
+      .ts's factory directly, asserting execa is called with { timeout, killSignal:"SIGTERM",
+      forceKillAfterDelay:2000, reject:false } -- the actual, only-automatable proof of AC-16/17;
+      (2) two adapter-level stub tests proving classification (SIGTERM-flushed-JSON ->
+      ClaudeCodeReviewError, SIGKILL-empty-stdout -> ClaudeCodeInvocationError), not escalation.
+      Plainly documents that real OS-level signal ordering stays unprovable in CI -- accepted
+      residual gap, same class as AC-19's.
+
+      Orchestrator independently re-ran the measured baseline before accepting: npm test =
+      226/226 passing, 16 test files -- confirmed exactly matching plan.md's Budget Notes claim.
+      One executor-level naming decision flagged explicitly by the plan itself (not hidden): ST-2
+      needs a small factory (e.g. createDefaultRunProcess(binaryPath)) since design.md described
+      binaryPath as "closed over" without fixing a literal export signature -- recorded as an
+      A-level executor decision, to be logged in execution-log.md when made, not re-escalated
+      here.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -208,7 +234,34 @@ checkpoints:
         label: Request design changes first
         description: Send design.md back for rework before plan starts.
     free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-plan
+      free_text: "si avanzar al plan"
+      responded_at: "2026-08-15T20:30:00Z"
     created_at: "2026-08-15T20:26:00Z"
+    resolved_at: "2026-08-15T20:30:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      plan.md complete for [E4.F2.H1] (#28): 5 sequential executor stages, each requiring its own
+      approval. AC-16/17's test-strategy gap closed with two concretely-specified tests
+      (mocked-execa option wiring + adapter classification stubs), not left vague. Orchestrator
+      independently re-ran the baseline (226/226, 16 files) confirming the plan's Budget Notes
+      claim exactly. No open items require escalation before ST-1 starts.
+    question: Approve ST-1 (errors.ts + envelope.ts) to start execution, or request plan changes first?
+    options:
+      - id: approve-st1
+        label: Approve ST-1 (recommended)
+        description: >-
+          Start executor on ST-1: land the three typed error classes and the JSON-envelope
+          parsing/extraction helpers, pure and execa-free.
+        recommended: true
+      - id: revise-plan
+        label: Request plan changes first
+        description: Send plan.md back for rework before executor starts.
+    free_input_allowed: true
+    created_at: "2026-08-15T20:36:00Z"
 decisions:
   - id: d-ac19-timeout-equal-not-shortened
     checkpoint_id: cp-design-approval
@@ -313,13 +366,10 @@ open_risks:
     severity: low
 next_action:
   kind: wait_for_approval
-  target: sddl-plan
+  target: sddl-executor
   summary: >-
-    Awaiting user approval to proceed from design to plan for [E4.F2.H1] (#28). Plan must
-    sequence the four source files (errors.ts + envelope.ts first, pure/no execa dependency;
-    then process-runner.ts; then claude-code-adapter.ts orchestration; then the contract-test
-    harness covering all 27 ACs) plus the manual AC-24 verification step recorded in
-    execution-log.md, and give AC-16/17's SIGTERM->SIGKILL ordering its own explicit test-case
-    strategy since the runProcess seam contract carries no timing on its own.
+    Awaiting user approval to start sddl-executor ST-1 for [E4.F2.H1] (#28): land
+    src/adapters/driven/engines/claude-code/errors.ts and envelope.ts (pure, no execa
+    dependency), exit on npm run check green + npm test unchanged at 226/226.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T20:26:00Z"
+updated_at: "2026-08-15T20:36:00Z"

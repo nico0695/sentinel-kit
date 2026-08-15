@@ -32,3 +32,12 @@ output shapes without invoking the engines.
 
 `.ndjson` files are line-delimited event streams; `timeout-sigterm-partial.ndjson`
 intentionally ends mid-line — parsers must tolerate a truncated final line.
+
+## Synthetic fixtures (`fixtures/synthetic/`)
+
+The `synthetic/` subdirectory is a separate corpus, not part of the real captured set
+described above. Its 3 files are hand-written for `[E4.F1.H2]` (#27) to pin the built-in
+verdict parser's edge-case behavior — tail-window provenance, fail-closed contradiction
+handling, and ANSI-SGR stripping — none of which the 12-file real corpus exercises. These
+files are plain reconstructed text, not JSON/NDJSON envelopes, and are **not** part of the
+`>=90%`/4-of-4 real-corpus parse-rate figure quoted for the engine fixtures above.

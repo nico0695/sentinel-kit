@@ -1,0 +1,542 @@
+version: "0.1"
+change_name: e4-f1-h2-verdict-parser
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F1.H2] (issue #27): the defensive verdict parser that replaces H1's deliberately
+    naive built-in extraction through the already-shipped `deps.parseVerdict` seam. Smaller and
+    better-bounded than H1: a pure function plus its fixture corpus, no composition, no
+    concurrency, no new ports. The seam, the `Verdict` type and the `VerdictParser` contract all
+    exist and are tested, and the 12 real engine fixtures from E1.F1.H3 are on main — so the
+    oracle is already written. Risk is concentrated in policy, not structure: how permissive
+    normalization may be before it becomes an injection vector, and what counts as a
+    contradiction. Ceremony deliberately lighter than H1 (see d-lightweight-ceremony).
+  confidence: high
+  recorded_at: "2026-08-15T15:56:05Z"
+lifecycle_status: completed
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing. The seam contract (`VerdictParser`), the terminal-state
+      mapping and the 12 fixtures are all merged or on the PR branch and readable at spec time.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-15T16:05:54Z"
+    completed_at: "2026-08-15T16:05:54Z"
+    notes: >-
+      proposal.md written by a Sonnet worker (d-lightweight-ceremony), status ready-for-spec.
+      Full 12-fixture inventory: only 4/12 contain a real VERDICT marker (2 wrapping forms --
+      bare-first-line, fenced-tail-after-prose), 8/12 are negative controls, zero ANSI bytes
+      anywhere. The >=90% criterion collapses to 4/4 exact against this corpus (independently
+      verified by the orchestrator via grep). Normalization rules the corpus actually demands:
+      fence tolerance, whole-output scanning, empty/absent-input tolerance, non-JSON
+      plain-text tolerance -- ANSI stripping/case-folding/fuzzy-matching NOT demanded, flagged
+      against unless the PRD's own ANSI requirement overrides (see spec). Provenance: Option A
+      (tail-window scan) recommended and adopted; Option B (prompt delimiter) checked against
+      assemble-prompt.ts and found infeasible (E3-owned content, parses 0/4 real fixtures) --
+      recorded as rejected/deferred. Orchestrator independently verified the fixture
+      positioning: noisy-output.* really does place VERDICT at the tail inside a markdown
+      fence, confirming the flagged PRD Sec4 "at the top" contradiction is real, not a
+      misreading. Most consequential finding: the >=90% criterion is fully satisfiable without
+      ever exercising the injection scenario H2 exists to defend against -- no fixture has an
+      adversarial or contradiction case. Routed to the user as two B-level questions before
+      spec locks the ACs.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-15T16:09:51Z"
+    completed_at: "2026-08-15T16:09:51Z"
+    notes: >-
+      spec.md complete, status success, no open questions carried forward (all 5 proposal-stage
+      decisions already fixed the scope). Parser body replaces extractBuiltInVerdict in place
+      (same file, same exported name) -- zero diff on the seam wiring line. Six testable rules
+      fixed: tail-window provenance (union of last 30 lines / last 2000 chars), fence
+      tolerance, whole-window scan, empty-input tolerance, narrow ANSI-CSI stripping, exact
+      case-sensitive match -- plus H1's inherited fail-closed contradiction rule, now scoped to
+      the tail window. Three synthetic fixtures specified structurally (decoy-then-genuine,
+      contradiction, ansi-wrapped; only the ANSI one is literally byte-exact -- the other two
+      are specified by structure plus hard size bounds) under fixtures/synthetic/, explicitly excluded from the
+      >=90% real-corpus figure and made the sole mandatory evidence (AC-3/AC-4) for the
+      provenance/contradiction properties -- converts the proposal's chief risk finding into a
+      must-pass criterion rather than leaving it as commentary. 16 ACs total. Persistence
+      deferral restated copy-ready for issue #27, naming E5.F2.H1. Orchestrator independently
+      verified AC-1's four expected values against source (all four real marker fixtures do
+      read "request-changes") and the regex against PRD Sec9's glossary. PRD Sec4 "at the top"
+      vs corpus reality flagged non-blocking in Approval Notes, per proposal.
+
+      SPEC REVALIDATION ROUND (user-requested, before the design gate). An adversarial
+      fresh-context validator (Sonnet, read-only) was run against spec.md with a mandate to
+      find false claims, vacuous-test risks, internal contradictions and dropped requirements,
+      in parallel with the orchestrator's own checks. Verdict `sound-with-fixes`: no dropped
+      requirements (all 5 binding decisions faithfully restated), but 3 MAJOR + 3 MINOR
+      findings, all confirmed against source by the orchestrator before acting and all fixed
+      in place:
+      (1) MAJOR, factual -- rule 4 cited opencode/no-verdict.ndjson as having "no text events,
+      empty reconstructed text". FALSE: it has 2 text events with ~449 chars of real prose.
+      The error originated in proposal.md's inventory table (the document the spec worker was
+      told to trust) and propagated. Both documents corrected; rule 4 now separates
+      genuinely-empty inputs from real-content-without-marker inputs and names which fixtures
+      belong to each, since they prove different properties.
+      (2) MAJOR, buildability trap -- decoy-then-genuine.txt gave a 55-line hint AND a
+      "decoy outside both windows" constraint that the hint does not imply. With short filler
+      the file falls under 2000 chars, the char-window degenerates to the whole file, wins the
+      union, readmits the decoy, trips the contradiction rule and the fixture resolves null,
+      FAILING AC-3 rather than passing it. Fixed with a mandatory dual bound (>=55 lines AND
+      >=2200 chars) plus an explicit post-build check.
+      (3) MAJOR, unhandled consequence -- fixtures/README.md frames the whole tree as "real
+      captured outputs"; adding fixtures/synthetic/ falsifies that, and AC-15's allowed-diff
+      list omitted the README, so an executor fixing the doc would trip the scope check.
+      Independently found by the orchestrator too. README provenance note added to In Scope
+      and to AC-15.
+      (4-6) MINOR -- "never the full output" corrected to "at most" (verified: valid-verdict
+      is 402 chars/4 lines, so the window IS the whole output there); routing digest said 3
+      doc-comment files where the body says 4; AC-12's hint omitted index.ts. All corrected.
+      Also corrected here: this note previously overstated the synthetic fixtures as
+      "byte-exact".
+  sddl-design:
+    status: completed
+    started_at: "2026-08-15T16:27:22Z"
+    completed_at: "2026-08-15T16:27:22Z"
+    notes: >-
+      design.md written by a Sonnet worker. Decomposition: extractBuiltInVerdict keeps its name
+      and signature and becomes a thin orchestrator over three file-private helpers --
+      computeTailWindow (rule 1), stripAnsiSgr (rule 5), collectDistinctVerdicts (rules 2/3/6,
+      merged with the good argument that those three rules are the ABSENCE of special-casing,
+      not separable code). Pipeline order pinned as spec fixed it (window on raw, then strip,
+      then split/trim/match/collect/decide), with the ANSI-bytes-count-toward-budget consequence
+      restated rather than reordered. New test file
+      __test__/builtin-verdict-extraction.test.ts plus a test-only
+      __test__/verdict-fixture-loader.ts for envelope reconstruction (import.meta.url path
+      resolution; verified no existing test reads fixtures from disk, so the pattern is new and
+      designed explicitly). 16/16 ACs mapped. Worker correctly flagged 3 open questions instead
+      of settling them silently; all three resolved by the orchestrator (A-level) -- see
+      d-design-open-questions.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-15T16:31:43Z"
+    completed_at: "2026-08-15T16:31:43Z"
+    notes: >-
+      plan.md written by a Sonnet worker. Three sequential stages per d-lightweight-ceremony:
+      ST-1 parser body + the four doc-comment updates, ST-2 the three synthetic fixtures +
+      fixtures/README.md provenance note (data only), ST-3 the fixture loader + the full
+      16-AC test suite + full gate. Test baseline measured, not guessed: 200 passing across 15
+      files (orchestrator confirms -- matches the post-security-fix count from H1's PR).
+      16/16 ACs assigned, no orphans. Carries a traps list derived from this change's OWN
+      history: the decoy fixture's dual size bound (with wc/tail checks promoted into ST-2's
+      exit criteria rather than trusting design.md's arithmetic), the corrected
+      opencode/no-verdict.ndjson characterization, and AC-5's both-assertions requirement.
+      All three d-design-open-questions obligations carried forward explicitly.
+      ORDERING RATIONALE (orchestrator concurs): implementation-first is the only sequence that
+      leaves the tree green at every stage -- a tests-first/TDD order would leave npm test red
+      between stages, which the workflow contract does not allow. The cost is that ST-1 lands
+      executable behaviour change whose only witness is the pre-existing suite.
+      ORCHESTRATOR ADDITION to ST-1's exit criteria (A-level, see d-st1-evidence-obligation).
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-15T16:43:12Z"
+    last_updated_at: "2026-08-15T16:43:12Z"
+    notes: >-
+      ST-1 COMPLETE (status success). Rewrote extractBuiltInVerdict's body in
+      builtin-verdict-extraction.ts (39 -> 98 lines) with the three file-private helpers exactly
+      as design.md specified: computeTailWindow (rule 1, tie-break documented in-source as
+      provably immaterial per d-design-open-questions), stripAnsiSgr (rule 5, one biome-ignore
+      for the deliberate ESC byte -- a design deviation the plan did not anticipate but is
+      behavior-neutral and narrowly justified), collectDistinctVerdicts (rules 2/3/6, no
+      special-case branches). Defensive non-string guard implemented as the one-line coercion.
+      Four doc-comments updated to past tense (builtin-verdict-extraction.ts, index.ts,
+      run-review.ts, verdict.ts) -- orchestrator confirmed all three narrative files are
+      comment-only diffs, and the seam wiring line itself is byte-identical. The mandatory
+      d-st1-evidence-obligation ad-hoc run confirmed all four real marker fixtures still
+      resolve to "request-changes". Exit checks independently re-run by the orchestrator:
+      npm run check green (78 files, depcruise 56/104 unchanged), npm test 200/200 unchanged,
+      diff exactly the four approved files plus the new execution-log.md. Full source read and
+      compared line-by-line against design.md's sketch -- matches. ST-2/ST-3 still user-gated.
+
+      ST-2 COMPLETE (status success). Three synthetic fixtures created under fixtures/synthetic/
+      -- decoy-then-genuine.txt (62 lines, 7714 chars: comfortably clears the mandatory dual
+      bound of >=55 lines AND >=2200 chars; orchestrator independently reproduced the wc/tail
+      checks -- the decoy line is confirmed outside the last-2000-char window), contradiction.txt
+      (5 lines, two distinct verdicts), ansi-wrapped-verdict.txt (29 bytes, orchestrator
+      independently confirmed via od that all three SGR sequences contain the literal 0x1b byte).
+      fixtures/README.md got an 8-line append-only provenance section distinguishing the real
+      corpus from the synthetic one -- orchestrator confirmed no existing section was rewritten.
+      xxd was unavailable in the executor's environment; od -c / od -A x -t x1z substituted with
+      equal evidentiary value, logged as a stated A-level substitution. Exit checks re-run
+      independently by the orchestrator: npm run check green (unchanged from ST-1 baseline),
+      npm test 200/200 unchanged (fixtures are inert until ST-3 imports them), diff exactly the
+      4 approved paths. ST-3 (final stage) still user-gated.
+
+      ST-3 COMPLETE (status success) -- FINAL execution stage. Created
+      __test__/verdict-fixture-loader.ts (76 lines, test-only scaffolding: .result extraction
+      for Claude Code JSON, text-event concatenation for OpenCode NDJSON tolerating the
+      truncated final line, plain-text read for the synthetic fixtures and
+      unknown-model-stdout.txt) and __test__/builtin-verdict-extraction.test.ts (244 lines, 25
+      tests). All 16 ACs covered: AC-1..AC-10 and AC-13 as real unit tests (AC-13 upgraded to
+      the mechanical Object.keys(index namespace) assertion per d-design-open-questions), the
+      defensive-guard cast test proving the coercion branch is exercised (not merely present),
+      AC-2's opencode/no-verdict.ndjson test uses the CORRECTED characterization (real prose,
+      length asserted >400 chars) rather than the false "empty" description the spec
+      revalidation caught upstream, AC-3 asserts the decoy fixture resolves to "approve" AND
+      explicitly not "comment"/null, AC-5 carries both required assertions (stripped matches,
+      raw does not) in one test. AC-11/12/14/15/16 correctly left as process/inspection steps
+      per spec.md's own Validation Hint column, not forced into unit tests. Full source of both
+      files read and reviewed by the orchestrator -- matches design.md's plan, no vacuous
+      assertions found. Exit checks independently re-run: npm run check green (80 files,
+      depcruise 56/104 unchanged), npm test 225/225 (200 baseline + 25 new), diff exactly the
+      two new test files, AC-13 grep independently reproduced (exit 1, no match). No
+      deviation between spec/design/plan and actual behaviour. ALL THREE STAGES OF THIS CHANGE
+      NOW COMPLETE. Ready for sddl-qa-review (final mode).
+  sddl-code-review:
+    status: skipped
+    notes: >-
+      Mid-execution full-4r deliberately NOT pre-scheduled (d-lightweight-ceremony): no
+      executor stage reported a structural surprise, so the skip stood for the whole change.
+      Coverage substituted by sddl-qa-review's final-mode pass, which independently verified
+      all 16 ACs against actual file content.
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-15T18:16:52Z"
+    completed_at: "2026-08-15T18:21:47Z"
+    notes: >-
+      FINAL mode over the whole implemented change. Verdict: pass_with_notes. 16/16 ACs
+      verified against actual file bytes, not test framing -- od-level inspection of the ANSI
+      fixture, manual tail-window arithmetic on the decoy fixture, direct read of the real
+      E1 JSON/NDJSON content. All three binding obligations (d-design-open-questions,
+      d-st1-evidence-obligation) confirmed honored in code: tie-break comment says "provably
+      immaterial", defensive guard has an explicit-cast test, AC-13 has a mechanical
+      Object.keys test plus independent grep. Contract fidelity confirmed (pipeline order,
+      contradiction rule scoped to the tail window, case-sensitive exact matching). Reviewer
+      re-ran the gate itself: check green, 225/225, AC-13 grep empty, story diff exactly
+      matches spec.md's allowed-diff list. One MINOR finding: this change's open_risks were
+      substantively resolved but not marked so in the ledger -- closed by the orchestrator
+      immediately after (see the four risk entries below). Full report: qa-report.md.
+    qa_summary:
+      mode: final
+      verdict: pass_with_notes
+      ac_results: 16/16 verified
+      findings: 0 blocker / 0 major / 1 minor / 0 info
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/spec.md
+  design: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/design.md
+  plan: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
+checkpoints:
+  - id: cp-h2-qa-final-approval
+    type: stage_approval
+    stage: sddl-qa-review
+    summary: >-
+      Launch sddl-qa-review in FINAL mode over the whole implemented change (ST-1..ST-3, all
+      16 ACs claimed proven, full gate 225/225, zero deviations recorded across the whole
+      lite flow). The only stage that may mark the change completed. On a clean verdict the
+      orchestrator opens the story PR ([E4.F1.H2], Closes #27, with the persistence-deferral
+      note copied into the issue per AC-11) per the workflow contract.
+    question: Approve launching sddl-qa-review in final mode?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, lanza qa-review final".
+      responded_at: "2026-08-15T18:16:52Z"
+    created_at: "2026-08-15T18:16:52Z"
+    resolved_at: "2026-08-15T18:16:52Z"
+  - id: cp-h2-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3, final stage: create src/core/run/__test__/verdict-fixture-loader.ts (test-only
+      envelope reconstruction: .result extraction for Claude Code JSON, concatenated text-event
+      part.text for OpenCode NDJSON) and src/core/run/__test__/builtin-verdict-extraction.test.ts
+      covering all 16 ACs -- 4 real marker fixtures, 8 real negative controls (with the
+      corrected opencode/no-verdict.ndjson characterization as real prose, not empty input), 3
+      synthetic fixtures, case-sensitivity/fuzzy-matching rejection, fence tolerance, repeated-
+      value collapse, empty-input tolerance, the defensive-guard cast test, the mechanical
+      AC-13 export assertion (Object.keys on the index.js namespace), architecture guards, and
+      the full gate. On green this change is ready for sddl-qa-review.
+    question: Approve execution of ST-3?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con ST-3".
+      responded_at: "2026-08-15T17:49:03Z"
+    created_at: "2026-08-15T17:49:03Z"
+    resolved_at: "2026-08-15T17:49:03Z"
+  - id: cp-h2-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2: build the three synthetic fixtures under fixtures/synthetic/ (decoy-then-genuine.txt
+      with the mandatory dual size bound >=55 lines AND >=2200 chars, plus the post-build
+      wc/tail check per the spec revalidation fix; contradiction.txt; ansi-wrapped-verdict.txt
+      via printf with literal ESC bytes) and the fixtures/README.md provenance note
+      distinguishing the real captured corpus from the hand-written synthetic set. Data-only,
+      no code touched, zero regression risk (nothing imports these files until ST-3).
+    question: Approve execution of ST-2?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con ST-2".
+      responded_at: "2026-08-15T16:44:21Z"
+    created_at: "2026-08-15T16:44:21Z"
+    resolved_at: "2026-08-15T16:44:21Z"
+  - id: cp-h2-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1: replace the body of extractBuiltInVerdict in
+      src/core/run/builtin-verdict-extraction.ts with the three-helper defensive parser
+      (computeTailWindow, stripAnsiSgr, collectDistinctVerdicts) in the pinned pipeline order,
+      plus the four H1->H2 doc-comment updates (builtin-verdict-extraction.ts, run-review.ts,
+      index.ts, verdict.ts -- prose only). Riskiest stage of the change: executable behaviour
+      change behind a live caller, witnessed only by the 200-test baseline. Exit checks:
+      `npm run check` green, `npm test` still 200/200, plus the ad-hoc four-fixture evidence
+      run required by d-st1-evidence-obligation.
+    question: Approve execution of ST-1?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con S1".
+      responded_at: "2026-08-15T16:38:14Z"
+    created_at: "2026-08-15T16:31:43Z"
+    resolved_at: "2026-08-15T16:38:14Z"
+  - id: cp-h2-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      spec.md complete and orchestrator-verified: 16 ACs, six-rule parsing algorithm, 3
+      byte-exact synthetic fixtures making the injection/contradiction properties mandatory
+      (AC-3/AC-4), persistence deferral restated. Route to sddl-design.
+    question: Approve the spec and route to sddl-design?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-after-revalidation
+      free_text: >-
+        User asked to revalidate the spec first ("quiero revalidarlo por si encontramos alguna
+        diferencia o algo a corregir y si esta todo ok avanzar a design"), explicitly
+        anticipating corrections. The adversarial validation round ran, found 3 MAJOR + 3 MINOR
+        issues, all were verified against source and fixed in place, and the approval condition
+        is treated as met on the corrected spec. Advancing to sddl-design under that
+        pre-authorization rather than re-asking.
+      responded_at: "2026-08-15T16:21:23Z"
+    created_at: "2026-08-15T16:09:51Z"
+    resolved_at: "2026-08-15T16:38:14Z"
+  - id: cp-h2-proposal-decisions
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      The proposal surfaced that the >=90% corpus criterion never exercises H2's actual
+      security property (no adversarial/contradiction fixture exists), and that the tail-window
+      provenance size has no corpus ground truth. Both routed to the user before spec fixes
+      them as ACs.
+    question: >-
+      (1) Add 2-3 hand-written synthetic fixtures for the adversarial and contradiction cases,
+      separate from the real-corpus >=90% figure? (2) What sizing rule for the tail-window
+      provenance constraint?
+    options:
+      - id: synthetic-yes+generous-window
+        label: Add synthetic fixtures; generous window (~30 lines / ~2000 chars, whichever larger)
+        description: >-
+          Both recommended options together: the synthetic fixtures are the only test that
+          proves the provenance policy actually stops the attack it exists to stop; the
+          generous window covers all 4 real fixtures with margin and is validated against the
+          adversarial case by the synthetic fixtures rather than left as an unverified
+          assumption.
+        recommended: true
+    free_input_allowed: true
+    response:
+      selected_option_id: synthetic-yes+generous-window
+      responded_at: "2026-08-15T16:05:54Z"
+    created_at: "2026-08-15T16:05:54Z"
+    resolved_at: "2026-08-15T16:05:54Z"
+  - id: cp-h2-scoping
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      Two scoping questions raised BEFORE the spec is written, both carried from H1: whether H2
+      owns verdict provenance, and how to treat issue #27's persistence acceptance criterion,
+      which depends on E5.F2.H1 (RunStore) and cannot be satisfied here.
+    question: >-
+      Does H2 own the provenance policy alongside normalization, and how is the persistence
+      criterion treated?
+    free_input_allowed: true
+    response:
+      selected_option_id: provenance-in-scope+persistence-deferred
+      free_text: >-
+        User chose both recommended options. (1) H2 OWNS provenance: it defines the extraction
+        boundary policy together with the normalization hardening, because the two pull in
+        opposite directions -- every permissive rule added (ANSI stripping, fence unwrapping,
+        fuzzy matching) widens the injection surface a diff-embedded marker can exploit, so
+        deciding them separately means hardening the parser now and patching the hole it opens
+        later. (2) The persistence criterion is DEFERRED with an explicit record: it is blocked
+        on E5.F2.H1 and noted in the spec and on issue #27; the other two criteria are met here.
+      responded_at: "2026-08-15T15:56:05Z"
+    created_at: "2026-08-15T15:56:05Z"
+    resolved_at: "2026-08-15T15:56:05Z"
+decisions:
+  - id: d-pr65-copilot-fixes
+    checkpoint_id: cp-h2-qa-final-approval
+    rationale: >-
+      A-level, post-QA/post-completion fix on PR #65: GitHub Copilot's automated review flagged
+      three findings, all verified real against source before acting. (1) computeTailWindow's
+      raw.split("\n") allocated for the full output regardless of the 30-line window it needed
+      -- replaced with a backward lastIndexOf scan (lastNLines), fuzz-verified equivalent to the
+      original split/slice/join over ~2000 random cases plus boundary cases before committing.
+      The rewrite itself surfaced a real bug: String.lastIndexOf clamps a negative fromIndex to
+      0 instead of reporting "not found", which broke the loop's exhaustion check for inputs
+      with fewer newlines than the window -- caught by the fuzz comparison, fixed with an
+      explicit pre-check, and pinned with a new regression test (fewer-newlines-than-bound
+      case). (2) The file header doc-comment said the tail window is "never the whole thing",
+      contradicting computeTailWindow's own correct "at most the full input" doc -- aligned.
+      (3) verdict-fixture-loader.ts's reconstructClaudeCodeResult claimed "never throwing" while
+      JSON.parse can throw on malformed input -- made tolerant (catch -> ""), matching its
+      sibling reconstructOpenCodeText's existing pattern. Treated as a clear, bounded fix
+      (CLAUDE.md sdd-lite exemption 3) on a change already marked completed, matching the
+      precedent from H1's PR #64 review response: single-file-plus-test-file scope, full gate
+      re-verified green (226/226, +1 regression test), replied on all three PR threads with the
+      fix commit.
+    recorded_at: "2026-08-15T18:32:45Z"
+  - id: d-st1-evidence-obligation
+    rationale: >-
+      A-level, orchestrator. The plan correctly identifies ST-1 as the riskiest stage: it
+      replaces the body of a function that has a live caller, and its only regression signal is
+      the 200-test baseline, none of which exercises the tail window, the narrowed contradiction
+      scope, or SGR stripping. Rather than reorder (implementation-first is the only green-at-
+      every-stage sequence available), ST-1's exit criteria gain one obligation: before
+      reporting done, the executor runs an ad-hoc throwaway script that feeds the FOUR real
+      marker-bearing fixtures' reconstructed text through the new parser and prints each result,
+      confirming all four still resolve to "request-changes", and pastes that output into the
+      execution log as interim evidence. This is explicitly NOT a repository artifact and NOT a
+      substitute for ST-3's real tests -- it is the same interim-evidence pattern H1's ST-2
+      executor used when shipping untested concurrency, and it converts ST-1's weakest claim
+      ("the existing suite did not break") into a positive check of the property the stage
+      actually changes.
+    recorded_at: "2026-08-15T16:31:43Z"
+  - id: d-design-open-questions
+    rationale: >-
+      A-level x3, orchestrator, resolving the open questions sddl-design correctly escalated
+      rather than baking in silently.
+      (1) TAIL-WINDOW TIE-BREAK IS VACUOUS -- the design proposed keeping `tailByLines` as the
+      tie-winner and warned that an equal-length tie could select different starting content.
+      That premise is false and the concern is removed rather than carried: both candidates are
+      SUFFIXES of the same raw string (split/slice/join on "\n" round-trips exactly, and
+      slice(-N) is a suffix by definition), and two suffixes of one string with equal length are
+      necessarily identical. The `>` vs `>=` choice therefore cannot affect any input. Keep the
+      code as written, but document it as provably immaterial instead of as a conservative
+      default, so no future reader re-litigates a non-choice.
+      (2) DEFENSIVE NON-STRING GUARD: ACCEPTED, WITH A TEST. The one-line coercion stays. It is
+      not dead code in practice: extractBuiltInVerdict is the DEFAULT behind
+      `deps.parseVerdict ??`, fed by engineResult.output, and the E4.F2 adapters that will
+      produce that value parse JSON at a real JS boundary where a malformed field can yield a
+      non-string despite the port's type. The "never throws" guarantee is inherited from H1 and
+      is worth one line. Condition attached: it must be exercised by a test using an explicit
+      cast, so the change does not add an untested branch -- which was the only real objection.
+      (3) AC-13 IS AUTOMATABLE; THE DESIGN'S REASON FOR NOT AUTOMATING IT IS WRONG. The design
+      declined an automated export check on the premise that enforcement would require a
+      ts-expect-error-style negative test, which is unusual house style. It does not: a
+      positive-space assertion -- import the module namespace from ../index.js and assert
+      Object.keys() does not contain "extractBuiltInVerdict" -- is one ordinary line, matches
+      house style, and mechanically catches the real regression (a future edit re-exporting the
+      internal). Added as an obligation for the plan/executor. This upgrades AC-13 from a manual
+      inspection step to a mechanically enforced one; spec.md's Validation Hint stays valid
+      since it named source inspection as sufficient, not as maximal.
+    recorded_at: "2026-08-15T16:27:22Z"
+  - id: d-synthetic-adversarial-fixtures
+    checkpoint_id: cp-h2-proposal-decisions
+    selected_option_id: synthetic-yes+generous-window
+    rationale: >-
+      B-level, user decided. 2-3 hand-written fixtures added alongside the 12 real ones: (a) a
+      marker-shaped VERDICT line quoted early/mid-output with the genuine verdict stated later
+      -- proves the tail-window provenance rule actually resolves to the genuine one, not the
+      quoted one; (b) two distinct VERDICT values present -- proves the contradiction rule
+      still fires with the widened whole-output scan. These do NOT count toward the >=90%
+      real-corpus figure (r-parse-rate-criterion stays defined against the 12 real fixtures
+      alone) -- they are the sole evidence for the provenance/contradiction properties, which
+      the real corpus cannot exercise at all.
+    recorded_at: "2026-08-15T16:05:54Z"
+  - id: d-tail-window-size
+    checkpoint_id: cp-h2-proposal-decisions
+    selected_option_id: synthetic-yes+generous-window
+    rationale: >-
+      B-level, user decided. Tail-window provenance constraint sized generously: last ~30
+      lines or last ~2000 characters, whichever is LARGER (union, not intersection) -- covers
+      both real marker-bearing fixtures with wide margin (first-line and last-line placements
+      both fall inside almost any reasonable window at this corpus's output lengths) while
+      still excluding a hypothetical much-earlier quoted line in a long response. Explicitly a
+      judgment call, not derived from data; the synthetic adversarial fixture
+      (d-synthetic-adversarial-fixtures) is what actually validates the boundary this number
+      draws, not the corpus.
+    recorded_at: "2026-08-15T16:05:54Z"
+  - id: d-provenance-in-scope
+    checkpoint_id: cp-h2-scoping
+    selected_option_id: provenance-in-scope
+    rationale: >-
+      B-level, user decided. `r-verdict-provenance` (raised by the H1 4R review as R1-002 and
+      recorded there as needing an owner) is resolved inside H2. Decisive argument: normalization
+      and provenance are not independent. H1's parser is anchored and case-sensitive, which
+      incidentally makes injection hard; H2's mandate is to relax exactly those anchors for real
+      engine output, so shipping normalization without a provenance policy would leave the
+      product strictly MORE injectable than it is today. Candidate mechanisms for the spec to
+      choose between: constrain extraction to the output tail, or a delimiter contract in the
+      prompt template (E3 owns the template, so that route needs a cross-module check).
+    recorded_at: "2026-08-15T15:56:05Z"
+  - id: d-persistence-ac-deferred
+    checkpoint_id: cp-h2-scoping
+    selected_option_id: persistence-deferred
+    rationale: >-
+      B-level, user decided. Issue #27's third acceptance criterion ("ambiguous run persisted
+      with a marker") is not satisfiable in H2: persistence is `RunStore` (E5.F2.H1), which does
+      not exist, and H1's spec already fixed that this flow writes no run anywhere. Deferred with
+      an explicit record rather than pulled forward as a stub, which would expand H2 into E5 and
+      create an interface E5.F2.H1 would then have to replace. The spec states the deferral and
+      names the blocking story; the issue gets the same note before the PR.
+    recorded_at: "2026-08-15T15:56:05Z"
+  - id: d-lightweight-ceremony
+    rationale: >-
+      A-level, orchestrator, with the user's explicit token-cost goal as input. H2 runs the full
+      canonical lite flow but with deliberately lighter machinery than H1, justified by risk
+      profile rather than by budget alone: (a) target ~3 executor stages instead of 6, because
+      the deliverable is one pure function plus tests rather than a composition across four
+      modules; (b) no mid-execution full-4r pre-scheduled -- for a pure function the 12-fixture
+      corpus IS the oracle, and the empirical lesson from H1 is that its expensive four-lens
+      review missed the git option-injection defect that the PR's free automated reviewer caught,
+      so the marginal value of that layer here is low; (c) stage workers run on a smaller model
+      (proposal, design, plan, executor, QA) while the spec -- which fixes the contract every
+      later stage validates against -- and orchestration keep the larger one. Revisit (b) if the
+      executor reports a structural surprise.
+    recorded_at: "2026-08-15T15:56:05Z"
+open_risks:
+  - id: r-verdict-provenance
+    severity: low
+    summary: >-
+      RESOLVED by this change (AC-3): tail-window provenance implemented and pinned by decoy-then-genuine.txt -- a diff-embedded marker outside the last-30-lines/last-2000-chars window cannot influence the verdict.
+  - id: r-normalization-vs-injection
+    severity: low
+    summary: >-
+      RESOLVED by this change: spec.md states the trade-off per rule, and only the corpus-demanded rules were implemented (fence tolerance, whole-window scan, empty-input tolerance, narrow ANSI-CSI stripping) -- no case-folding or fuzzy matching added, closing the injection-surface growth this risk warned about. AC-6/AC-7 pin the rejection.
+  - id: r-parse-rate-criterion
+    severity: low
+    summary: >-
+      RESOLVED by this change: the >=90% criterion was redefined as 4/4 exact against the real corpus (proposal.md), proven by AC-1, with the 8 negative controls asserted null via AC-2.
+  - id: r-contradiction-semantics
+    severity: low
+    summary: >-
+      RESOLVED by this change: repeated-identical-value collapse (AC-9) versus genuine two-distinct-value contradiction (AC-4) are both pinned by dedicated tests, scoped to the tail window per rule 1.
+next_action:
+  kind: done
+  target: orchestrator
+  summary: >-
+    Change COMPLETED (QA final pass_with_notes, 16/16 ACs). PR #65 open; GitHub Copilot's
+    automated review left three comments (performance, docstring contradiction, test-loader
+    over-claim), all verified real and fixed in a follow-up commit (ef2ffde) on the same
+    branch/PR (see decision d-pr65-copilot-fixes). Full gate re-verified green (226/226).
+    Waiting on human review/merge of PR #65. Follow-up: E4.F2 (#28-30) real adapters remain the
+    next E4 work.
+created_at: "2026-08-15T15:56:05Z"
+updated_at: "2026-08-15T18:32:45Z"

@@ -115,7 +115,25 @@ stages:
       of settling them silently; all three resolved by the orchestrator (A-level) -- see
       d-design-open-questions.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T16:31:43Z"
+    completed_at: "2026-08-15T16:31:43Z"
+    notes: >-
+      plan.md written by a Sonnet worker. Three sequential stages per d-lightweight-ceremony:
+      ST-1 parser body + the four doc-comment updates, ST-2 the three synthetic fixtures +
+      fixtures/README.md provenance note (data only), ST-3 the fixture loader + the full
+      16-AC test suite + full gate. Test baseline measured, not guessed: 200 passing across 15
+      files (orchestrator confirms -- matches the post-security-fix count from H1's PR).
+      16/16 ACs assigned, no orphans. Carries a traps list derived from this change's OWN
+      history: the decoy fixture's dual size bound (with wc/tail checks promoted into ST-2's
+      exit criteria rather than trusting design.md's arithmetic), the corrected
+      opencode/no-verdict.ndjson characterization, and AC-5's both-assertions requirement.
+      All three d-design-open-questions obligations carried forward explicitly.
+      ORDERING RATIONALE (orchestrator concurs): implementation-first is the only sequence that
+      leaves the tree green at every stage -- a tests-first/TDD order would leave npm test red
+      between stages, which the workflow contract does not allow. The cost is that ST-1 lands
+      executable behaviour change whose only witness is the pre-existing suite.
+      ORCHESTRATOR ADDITION to ST-1's exit criteria (A-level, see d-st1-evidence-obligation).
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -137,6 +155,25 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1: replace the body of extractBuiltInVerdict in
+      src/core/run/builtin-verdict-extraction.ts with the three-helper defensive parser
+      (computeTailWindow, stripAnsiSgr, collectDistinctVerdicts) in the pinned pipeline order,
+      plus the four H1->H2 doc-comment updates (builtin-verdict-extraction.ts, run-review.ts,
+      index.ts, verdict.ts -- prose only). Riskiest stage of the change: executable behaviour
+      change behind a live caller, witnessed only by the 200-test baseline. Exit checks:
+      `npm run check` green, `npm test` still 200/200, plus the ad-hoc four-fixture evidence
+      run required by d-st1-evidence-obligation.
+    question: Approve execution of ST-1?
+    free_input_allowed: true
+    response:
+      selected_option_id: pending
+      responded_at: ""
+    created_at: "2026-08-15T16:31:43Z"
+    resolved_at: ""
   - id: cp-h2-spec-approval
     type: stage_approval
     stage: sddl-spec
@@ -211,6 +248,22 @@ checkpoints:
     created_at: "2026-08-15T15:56:05Z"
     resolved_at: "2026-08-15T15:56:05Z"
 decisions:
+  - id: d-st1-evidence-obligation
+    rationale: >-
+      A-level, orchestrator. The plan correctly identifies ST-1 as the riskiest stage: it
+      replaces the body of a function that has a live caller, and its only regression signal is
+      the 200-test baseline, none of which exercises the tail window, the narrowed contradiction
+      scope, or SGR stripping. Rather than reorder (implementation-first is the only green-at-
+      every-stage sequence available), ST-1's exit criteria gain one obligation: before
+      reporting done, the executor runs an ad-hoc throwaway script that feeds the FOUR real
+      marker-bearing fixtures' reconstructed text through the new parser and prints each result,
+      confirming all four still resolve to "request-changes", and pastes that output into the
+      execution log as interim evidence. This is explicitly NOT a repository artifact and NOT a
+      substitute for ST-3's real tests -- it is the same interim-evidence pattern H1's ST-2
+      executor used when shipping untested concurrency, and it converts ST-1's weakest claim
+      ("the existing suite did not break") into a positive check of the property the stage
+      actually changes.
+    recorded_at: "2026-08-15T16:31:43Z"
   - id: d-design-open-questions
     rationale: >-
       A-level x3, orchestrator, resolving the open questions sddl-design correctly escalated
@@ -338,13 +391,12 @@ open_risks:
       "thinking" section, or a summary that restates it differently. Whether position or context
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
-  kind: continue
-  target: sddl-plan
+  kind: ask_user
+  target: sddl-executor
   summary: >-
-    design.md complete; its three escalated open questions resolved A-level
-    (d-design-open-questions): tie-break proven immaterial, defensive guard kept but now owes a
-    cast-based test, AC-13 upgraded to a mechanical export assertion. Plan stage should produce
-    ~3 executor stages per d-lightweight-ceremony and carry those three obligations forward
-    explicitly so the executor does not have to re-derive them.
+    plan.md complete (3 stages, 16/16 ACs assigned, baseline 200 measured). Waiting on
+    stage_approval at cp-h2-st1-approval for ST-1, the parser implementation -- the riskiest
+    stage, now carrying an added four-fixture evidence obligation. ST-2 (fixtures) and ST-3
+    (tests + full gate) follow behind their own gates.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:27:22Z"
+updated_at: "2026-08-15T16:31:43Z"

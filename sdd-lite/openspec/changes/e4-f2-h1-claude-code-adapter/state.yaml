@@ -16,7 +16,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-15T20:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -49,7 +49,35 @@ stages:
       run recorded in execution-log.md, not an automated CI test -- mirrors H1/H2 precedent
       (d-st1-evidence-obligation).
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T20:15:00Z"
+    completed_at: "2026-08-15T20:15:00Z"
+    notes: >-
+      spec.md complete, 27 ACs, status complete -- all four open_risks scoped to this stage
+      resolved as firm rules: (1) isAvailable() gap closed WITHOUT a port change (AC-5-7): an
+      internal `claude --version` pre-check runs inside review() before the real invocation;
+      auth failure is instead surfaced from the real invocation's own response shape
+      (is_error:true, api_error_status:401), never as a raw crash; (2) binary-mocking seam is an
+      injectable `runProcess: ClaudeCodeProcessRunner` factory option, default execa-backed
+      (AC-20-21); (3) is_error:true uniformly REJECTS review() regardless of cause -- auth,
+      context-overflow, or an adapter-initiated timeout kill that still flushed JSON (AC-13,
+      AC-18); (4) totalTokens = inputTokens + outputTokens only, cache fields excluded (AC-11).
+      Orchestrator independently verified: ReviewEngine.contract.ts's rejects.toBeInstanceOf(Error)
+      assertion at line 57 (AC-23's basis); execa@9.6.1 natively supports timeout/killSignal/
+      forceKillAfterDelay (AC-17's feasibility evidence); all six fixture files' is_error/subtype/
+      result/usage fields byte-for-byte.
+
+      ORCHESTRATOR CORRECTION before acceptance: the spec's Expected Behavior table and AC-11's
+      validation hint originally cited noisy-output.json's usage as output_tokens:164,
+      cache_read_input_tokens:16246, cache_creation_input_tokens:9386, totalTokens:166 (NOT
+      22794) -- none of which match the fixture. Direct re-parse found the real values are
+      output_tokens:529, cache_read_input_tokens:21886, cache_creation_input_tokens:3810, so the
+      correct totalTokens is 531, not 166. This was a spec-authoring error (not inherited from
+      proposal.md, which never cited these numbers) -- both spots corrected in place (see
+      d-noisy-output-usage-correction) before this stage was marked complete. Two narrower items
+      stay explicitly open for design, per proposal's own ratified decision: exact
+      adapter-vs-outer-race timeout precedence (r-timeout-budget-precedence, AC-19) and CLI
+      version-drift re-verification (r-claude-cli-version-drift, informational).
   sddl-design:
     status: pending
   sddl-plan:
@@ -89,8 +117,53 @@ checkpoints:
         label: Revise scope first
         description: Send proposal.md back for rework before spec starts.
     free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-spec
+      free_text: "si, avanza con el spec"
+      responded_at: "2026-08-15T20:10:00Z"
     created_at: "2026-08-15T20:06:00Z"
+    resolved_at: "2026-08-15T20:10:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      spec.md complete for [E4.F2.H1] (#28), 27 ACs, all four scoped open_risks resolved as firm
+      rules. Orchestrator independently verified the contract suite's Error-rejection assertion,
+      execa's native timeout/kill support, and all six fixtures' fields -- and caught + fixed one
+      spec-authoring error (noisy-output.json usage figures) before acceptance. No open items
+      require escalation before design; the two remaining open items (timeout precedence,
+      CLI version drift) were already scoped to design/later by proposal.md itself.
+    question: Proceed to sddl-design for [E4.F2.H1], or request spec changes first?
+    options:
+      - id: proceed-to-design
+        label: Proceed to design (recommended)
+        description: >-
+          Accept spec.md's 27 ACs as the firm contract; let design fix internal file/function
+          decomposition, exact ClaudeCodeProcessRunner/ClaudeCodeProcessResult shapes, the three
+          error classes' constructors, and the AC-19 timeout-precedence ordering.
+        recommended: true
+      - id: revise-spec
+        label: Request spec changes first
+        description: Send spec.md back for rework before design starts.
+    free_input_allowed: true
+    created_at: "2026-08-15T20:16:00Z"
 decisions:
+  - id: d-noisy-output-usage-correction
+    checkpoint_id: cp-spec-approval
+    free_text: >-
+      Corrected noisy-output.json's usage figures in spec.md (Expected Behavior table + AC-11)
+      from a spec-authoring error (output_tokens:164, cache_read:16246, cache_creation:9386,
+      totalTokens:166/NOT-22794) to the fixture's real byte values (output_tokens:529,
+      cache_read:21886, cache_creation:3810, totalTokens:531/NOT-26227).
+    rationale: >-
+      Orchestrator re-verification (python3 json.load against the raw fixture file) found the
+      spec's cited numbers did not match fixture bytes. Left uncorrected, AC-11's own validation
+      hint would have told a future test-writer to assert a totalTokens value (166) that no
+      fixture actually produces -- the exact class of error this session's standing practice
+      (independently verify every subagent claim against source before accepting a stage) exists
+      to catch. Not attributable to proposal.md, which never cited these specific numbers -- a
+      spec-stage-introduced error, caught and fixed before the stage was accepted.
+    recorded_at: "2026-08-15T20:15:00Z"
   - id: d-timeout-ownership-in-scope
     checkpoint_id: cp-proposal-approval
     free_text: >-
@@ -117,36 +190,30 @@ decisions:
     recorded_at: "2026-08-15T20:05:00Z"
 open_risks:
   - id: r-isavailable-port-gap
-    summary: >-
-      PRD Sec6.2 names isAvailable()-before-running as settled product direction; the frozen
-      ReviewEngine port (E0.F2.H2) has only review(), no availability-check surface. Issue #28
-      AC-3 ("missing/unauthenticated engine reported clearly before running") cannot be
-      satisfied without deciding: (a) an internal pre-check inside review() itself, (b) a port
-      shape change (B/C-level, touches a frozen E0.F2.H2 deliverable), or (c) a check one layer
-      up in src/main/ composition, outside this adapter entirely. Escalated to spec as the
-      first thing to fix.
-    severity: high
-  - id: r-binary-mocking-seam
-    summary: >-
-      The contract suite needs "binary mocked by fixtures" (issue #28 AC-1), but neither the
-      ReviewEngine port nor the git-cli.ts precedent expose an injection seam for swapping the
-      real spawned claude binary for a fixture-replaying mock. Affects the adapter factory's
-      public signature -- must be fixed before design, not discovered mid-implementation.
-    severity: high
-  - id: r-is-error-classification
-    summary: >-
-      A non-auth, non-timeout is_error:true result (e.g. context-overflow.json) has no fixed
-      handling rule yet: reject (engine-error, most accurate -- no real review happened) vs.
-      resolve with the error text as output (falls through to H2's parser, likely reads as
-      ambiguous prose). Fixture-backed test cases exist on both sides; needs a firm spec rule.
-    severity: medium
-  - id: r-total-tokens-computation
-    summary: >-
-      ReviewUsage.totalTokens has no direct source field in the engine's JSON output (only
-      input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens are
-      reported separately). Low stakes (usage is best-effort per the port's own doc-comment)
-      but needs a stated summation rule.
     severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-5-7): no ReviewEngine port change. review() runs an internal
+      `claude --version` pre-check before the real invocation, inside one async call --
+      "missing" is caught pre-flight, "unauthenticated" is caught from the real invocation's own
+      response shape (is_error:true, api_error_status:401), never as a raw crash.
+  - id: r-binary-mocking-seam
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-20-21): an injectable `runProcess: ClaudeCodeProcessRunner` factory
+      option is the sole mocking seam, defaulting to a real execa-backed runner. No PATH
+      shimming, no monkey-patching.
+  - id: r-is-error-classification
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-13, AC-18): is_error:true uniformly REJECTS review() regardless of
+      cause (auth, context-overflow, or an adapter-initiated timeout kill that still flushed
+      JSON) -- never resolves with error text as output.
+  - id: r-total-tokens-computation
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-11): totalTokens = inputTokens + outputTokens only; cache-read/
+      cache-creation fields excluded, keeping totalTokens an invariant sum of the two other
+      exposed fields.
   - id: r-timeout-budget-precedence
     summary: >-
       Carried forward from e4-f1-h1-run-review/state.yaml, now concrete: the exact ordering
@@ -160,12 +227,11 @@ open_risks:
     severity: low
 next_action:
   kind: wait_for_approval
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Awaiting user approval to proceed from proposal to spec for [E4.F2.H1] (#28). Spec must fix
-    four open questions as firm ACs: the isAvailable() mechanism, the binary-mocking seam, the
-    is_error:true non-auth classification rule, and the totalTokens computation rule. Must also
-    formally record the manual-verification approach for issue #28 AC-2 ("successful real
-    review") so it is not silently dropped as untestable.
+    Awaiting user approval to proceed from spec to design for [E4.F2.H1] (#28). Design must fix
+    internal file/function decomposition, the exact ClaudeCodeProcessRunner/
+    ClaudeCodeProcessResult field shapes, the three error classes' constructors, and the AC-19
+    timeout-precedence ordering between the adapter's internal kill and runReview's outer race.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T20:06:00Z"
+updated_at: "2026-08-15T20:16:00Z"

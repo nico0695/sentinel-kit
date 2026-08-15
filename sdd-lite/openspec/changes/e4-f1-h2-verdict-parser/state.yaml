@@ -24,7 +24,27 @@ stages:
       No material unknown blocks routing. The seam contract (`VerdictParser`), the terminal-state
       mapping and the 12 fixtures are all merged or on the PR branch and readable at spec time.
   sddl-proposal:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T16:05:54Z"
+    completed_at: "2026-08-15T16:05:54Z"
+    notes: >-
+      proposal.md written by a Sonnet worker (d-lightweight-ceremony), status ready-for-spec.
+      Full 12-fixture inventory: only 4/12 contain a real VERDICT marker (2 wrapping forms --
+      bare-first-line, fenced-tail-after-prose), 8/12 are negative controls, zero ANSI bytes
+      anywhere. The >=90% criterion collapses to 4/4 exact against this corpus (independently
+      verified by the orchestrator via grep). Normalization rules the corpus actually demands:
+      fence tolerance, whole-output scanning, empty/absent-input tolerance, non-JSON
+      plain-text tolerance -- ANSI stripping/case-folding/fuzzy-matching NOT demanded, flagged
+      against unless the PRD's own ANSI requirement overrides (see spec). Provenance: Option A
+      (tail-window scan) recommended and adopted; Option B (prompt delimiter) checked against
+      assemble-prompt.ts and found infeasible (E3-owned content, parses 0/4 real fixtures) --
+      recorded as rejected/deferred. Orchestrator independently verified the fixture
+      positioning: noisy-output.* really does place VERDICT at the tail inside a markdown
+      fence, confirming the flagged PRD Sec4 "at the top" contradiction is real, not a
+      misreading. Most consequential finding: the >=90% criterion is fully satisfiable without
+      ever exercising the injection scenario H2 exists to defend against -- no fixture has an
+      adversarial or contradiction case. Routed to the user as two B-level questions before
+      spec locks the ACs.
   sddl-spec:
     status: pending
   sddl-design:
@@ -52,6 +72,34 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-proposal-decisions
+    type: risk_review
+    stage: orchestrator
+    summary: >-
+      The proposal surfaced that the >=90% corpus criterion never exercises H2's actual
+      security property (no adversarial/contradiction fixture exists), and that the tail-window
+      provenance size has no corpus ground truth. Both routed to the user before spec fixes
+      them as ACs.
+    question: >-
+      (1) Add 2-3 hand-written synthetic fixtures for the adversarial and contradiction cases,
+      separate from the real-corpus >=90% figure? (2) What sizing rule for the tail-window
+      provenance constraint?
+    options:
+      - id: synthetic-yes+generous-window
+        label: Add synthetic fixtures; generous window (~30 lines / ~2000 chars, whichever larger)
+        description: >-
+          Both recommended options together: the synthetic fixtures are the only test that
+          proves the provenance policy actually stops the attack it exists to stop; the
+          generous window covers all 4 real fixtures with margin and is validated against the
+          adversarial case by the synthetic fixtures rather than left as an unverified
+          assumption.
+        recommended: true
+    free_input_allowed: true
+    response:
+      selected_option_id: synthetic-yes+generous-window
+      responded_at: "2026-08-15T16:05:54Z"
+    created_at: "2026-08-15T16:05:54Z"
+    resolved_at: "2026-08-15T16:05:54Z"
   - id: cp-h2-scoping
     type: risk_review
     stage: orchestrator
@@ -77,6 +125,32 @@ checkpoints:
     created_at: "2026-08-15T15:56:05Z"
     resolved_at: "2026-08-15T15:56:05Z"
 decisions:
+  - id: d-synthetic-adversarial-fixtures
+    checkpoint_id: cp-h2-proposal-decisions
+    selected_option_id: synthetic-yes+generous-window
+    rationale: >-
+      B-level, user decided. 2-3 hand-written fixtures added alongside the 12 real ones: (a) a
+      marker-shaped VERDICT line quoted early/mid-output with the genuine verdict stated later
+      -- proves the tail-window provenance rule actually resolves to the genuine one, not the
+      quoted one; (b) two distinct VERDICT values present -- proves the contradiction rule
+      still fires with the widened whole-output scan. These do NOT count toward the >=90%
+      real-corpus figure (r-parse-rate-criterion stays defined against the 12 real fixtures
+      alone) -- they are the sole evidence for the provenance/contradiction properties, which
+      the real corpus cannot exercise at all.
+    recorded_at: "2026-08-15T16:05:54Z"
+  - id: d-tail-window-size
+    checkpoint_id: cp-h2-proposal-decisions
+    selected_option_id: synthetic-yes+generous-window
+    rationale: >-
+      B-level, user decided. Tail-window provenance constraint sized generously: last ~30
+      lines or last ~2000 characters, whichever is LARGER (union, not intersection) -- covers
+      both real marker-bearing fixtures with wide margin (first-line and last-line placements
+      both fall inside almost any reasonable window at this corpus's output lengths) while
+      still excluding a hypothetical much-earlier quoted line in a long response. Explicitly a
+      judgment call, not derived from data; the synthetic adversarial fixture
+      (d-synthetic-adversarial-fixtures) is what actually validates the boundary this number
+      draws, not the corpus.
+    recorded_at: "2026-08-15T16:05:54Z"
   - id: d-provenance-in-scope
     checkpoint_id: cp-h2-scoping
     selected_option_id: provenance-in-scope
@@ -150,9 +224,18 @@ open_risks:
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
   kind: continue
-  target: sddl-proposal
+  target: sddl-spec
   summary: >-
-    Change seeded with both scoping decisions already settled by the user, so the proposal starts
-    from a fixed scope: provenance in, persistence AC deferred. Launch sddl-proposal.
+    Proposal complete; both B-level open questions resolved by the user (synthetic adversarial
+    fixtures added, generous tail-window sizing). Spec should now fix: the >=90% criterion
+    restated as 4/4 real + the 2-3 synthetic fixtures as separate provenance/contradiction
+    ACs, the tail-window rule (~30 lines / ~2000 chars, whichever larger), the H1-inherited
+    contradiction rule (fail-closed, more than one distinct value anywhere -> ambiguous), the
+    normalization rule list from the proposal (fence tolerance, whole-output scan,
+    empty-input tolerance, narrow ANSI-CSI stripping per PRD Sec4, no case-folding, no fuzzy
+    matching), Option B (delimiter contract) recorded as rejected/deferred, and the
+    persistence-AC deferral restated per d-persistence-ac-deferred. Flag the PRD Sec4
+    "verdict at the top" vs corpus-reality contradiction in spec's approval notes (informational,
+    non-blocking, build against fixture reality).
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T15:56:05Z"
+updated_at: "2026-08-15T16:05:54Z"

@@ -187,6 +187,27 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3, final stage: create src/core/run/__test__/verdict-fixture-loader.ts (test-only
+      envelope reconstruction: .result extraction for Claude Code JSON, concatenated text-event
+      part.text for OpenCode NDJSON) and src/core/run/__test__/builtin-verdict-extraction.test.ts
+      covering all 16 ACs -- 4 real marker fixtures, 8 real negative controls (with the
+      corrected opencode/no-verdict.ndjson characterization as real prose, not empty input), 3
+      synthetic fixtures, case-sensitivity/fuzzy-matching rejection, fence tolerance, repeated-
+      value collapse, empty-input tolerance, the defensive-guard cast test, the mechanical
+      AC-13 export assertion (Object.keys on the index.js namespace), architecture guards, and
+      the full gate. On green this change is ready for sddl-qa-review.
+    question: Approve execution of ST-3?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con ST-3".
+      responded_at: "2026-08-15T17:49:03Z"
+    created_at: "2026-08-15T17:49:03Z"
+    resolved_at: "2026-08-15T17:49:03Z"
   - id: cp-h2-st2-approval
     type: stage_approval
     stage: sddl-executor
@@ -450,4 +471,4 @@ next_action:
     loader plus the full 16-AC test suite plus the whole-change gate. On green, this change is
     ready for sddl-qa-review.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:47:46Z"
+updated_at: "2026-08-15T17:49:03Z"

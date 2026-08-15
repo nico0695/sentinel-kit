@@ -16,7 +16,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-15T20:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -79,7 +79,40 @@ stages:
       adapter-vs-outer-race timeout precedence (r-timeout-budget-precedence, AC-19) and CLI
       version-drift re-verification (r-claude-cli-version-drift, informational).
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T20:25:00Z"
+    completed_at: "2026-08-15T20:25:00Z"
+    notes: >-
+      design.md complete, all 27 ACs mapped. Four files under
+      src/adapters/driven/engines/claude-code/: claude-code-adapter.ts (factory + review()
+      orchestration), process-runner.ts (ClaudeCodeProcessRunner seam + execa-backed default,
+      reject:false so the seam only ever resolves except on genuine spawn failure), errors.ts
+      (3 typed classes), envelope.ts (pure JSON parsing, no execa dependency). AC-19 (the sole
+      item spec deferred) resolved: adapter's own execa `timeout` = request.timeoutMs exactly
+      (not shortened), forceKillAfterDelay explicitly lowered to 2000ms (execa default 5000ms).
+
+      AC-19 justification, orchestrator-verified against engine-timeout.ts:76-111 directly:
+      runEngineWithTimeout calls invoke() first, then schedules its own timeoutMs-delay timer
+      whose callback synchronously resolve()s -- no I/O wait -- while the adapter's own kill
+      sequence requires an OS-mediated round trip (signal delivery, process exit, stream drain)
+      that inherently settles later. So the outer race reliably wins in real execution,
+      producing the correct "timeout" terminal state, without shrinking the user's configured
+      budget. A deliberately-shortened adapter budget was considered and rejected: spec's
+      already-approved AC-13/14/18 fix the adapter's own timeout-kill rejection to
+      ClaudeCodeReviewError/ClaudeCodeInvocationError, never EngineTimeoutError, so shortening
+      would only make the adapter's OWN rejection win more often -- degrading the terminal state
+      to "engine-error" more, not less. The EngineTimeoutError "escape hatch" named in H1's
+      state.yaml was investigated and explicitly rejected: using it would contradict the already
+      -approved AC-13/14/18 mapping. Orchestrator independently confirmed engine-timeout.ts's
+      catch clause does rethrow EngineTimeoutError unwrapped (line 102-104), and confirmed
+      execa's ExecaError carries the same CommonResult fields as SuccessResult (result.d.ts),
+      supporting the reject:false seam design. Residual risk (adapter occasionally wins the
+      race, yielding "engine-error" instead of "timeout") accepted as low-severity, documented,
+      not eliminable without unfreezing core.
+
+      r-timeout-budget-precedence now RESOLVED. Two low-severity items carried to plan: AC-16/17
+      (SIGTERM->SIGKILL ordering) needs an explicit test-case strategy since the runProcess seam
+      itself carries no timing; r-claude-cli-version-drift remains informational-only.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -146,8 +179,56 @@ checkpoints:
         label: Request spec changes first
         description: Send spec.md back for rework before design starts.
     free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-design
+      free_text: "si, avanza con el diseño"
+      responded_at: "2026-08-15T20:20:00Z"
     created_at: "2026-08-15T20:16:00Z"
+    resolved_at: "2026-08-15T20:20:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      design.md complete for [E4.F2.H1] (#28), all 27 ACs mapped. AC-19 (the one item spec
+      deferred) resolved: adapter timeout = request.timeoutMs exactly, forceKillAfterDelay
+      lowered to 2000ms, so the outer runReview race reliably wins and reports "timeout" in
+      practice. Orchestrator independently re-read engine-timeout.ts:76-111 and confirmed the
+      race mechanics and the EngineTimeoutError rethrow-unwrapped behavior the design's
+      reasoning depends on; also confirmed execa's ExecaError field-carrying claim against
+      result.d.ts. No open items require escalation before plan.
+    question: Proceed to sddl-plan for [E4.F2.H1], or request design changes first?
+    options:
+      - id: proceed-to-plan
+        label: Proceed to plan (recommended)
+        description: >-
+          Accept design.md's file/function decomposition and AC-19 resolution; let plan sequence
+          the four source files plus the contract-test harness into ordered execution stages.
+        recommended: true
+      - id: revise-design
+        label: Request design changes first
+        description: Send design.md back for rework before plan starts.
+    free_input_allowed: true
+    created_at: "2026-08-15T20:26:00Z"
 decisions:
+  - id: d-ac19-timeout-equal-not-shortened
+    checkpoint_id: cp-design-approval
+    free_text: >-
+      Adapter's own execa timeout for the real review invocation is set to request.timeoutMs
+      exactly (not artificially shortened), paired with an explicit forceKillAfterDelay:2000
+      (execa default 5000).
+    rationale: >-
+      engine-timeout.ts:76-111 (read directly): the outer race's expiry timer resolves
+      synchronously with no I/O wait, while the adapter's own OS-mediated process kill
+      inherently settles later -- so the outer race reliably wins in real execution without
+      needing to shrink the user's configured budget. A shortened adapter budget was considered
+      and rejected: spec's approved AC-13/14/18 already fix the adapter's own timeout-kill
+      rejection to ClaudeCodeReviewError/ClaudeCodeInvocationError (never EngineTimeoutError),
+      so shortening would only make the adapter's own rejection win the race MORE often,
+      degrading the terminal state to "engine-error" more, not less -- the opposite of the
+      intended outcome. The EngineTimeoutError "escape hatch" (H1 state.yaml) was investigated
+      and rejected: using it would require the adapter to throw the core's own error type,
+      contradicting the already-approved AC-13/14/18 mapping.
+    recorded_at: "2026-08-15T20:25:00Z"
   - id: d-noisy-output-usage-correction
     checkpoint_id: cp-spec-approval
     free_text: >-
@@ -215,23 +296,30 @@ open_risks:
       cache-creation fields excluded, keeping totalTokens an invariant sum of the two other
       exposed fields.
   - id: r-timeout-budget-precedence
+    severity: low
     summary: >-
-      Carried forward from e4-f1-h1-run-review/state.yaml, now concrete: the exact ordering
-      between the adapter's own internal SIGTERM/SIGKILL kill and runReview's outer timeout
-      race (EngineTimeoutError) is not yet fixed. Left open for spec/design.
-    severity: medium
+      RESOLVED by design.md (AC-19): adapter's own execa timeout = request.timeoutMs exactly,
+      forceKillAfterDelay lowered to 2000ms. The outer runEngineWithTimeout race reliably wins
+      in real execution (verified against engine-timeout.ts:76-111), producing "timeout" as the
+      terminal state without shrinking the user's configured budget. Residual: the rare case
+      where the adapter's own rejection wins the race degrades to "engine-error" instead of
+      "timeout" -- accepted, low-severity, not eliminable without unfreezing core.
   - id: r-claude-cli-version-drift
     summary: >-
       docs/engines/claude-code.md flags are "verified only against 2.1.226" and the spike is 7
       days old (2026-08-08 -> today). Low material risk but not re-verified for this story.
+      Carried forward unresolved through spec and design -- informational only, to be checked
+      before/during sddl-executor.
     severity: low
 next_action:
   kind: wait_for_approval
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Awaiting user approval to proceed from spec to design for [E4.F2.H1] (#28). Design must fix
-    internal file/function decomposition, the exact ClaudeCodeProcessRunner/
-    ClaudeCodeProcessResult field shapes, the three error classes' constructors, and the AC-19
-    timeout-precedence ordering between the adapter's internal kill and runReview's outer race.
+    Awaiting user approval to proceed from design to plan for [E4.F2.H1] (#28). Plan must
+    sequence the four source files (errors.ts + envelope.ts first, pure/no execa dependency;
+    then process-runner.ts; then claude-code-adapter.ts orchestration; then the contract-test
+    harness covering all 27 ACs) plus the manual AC-24 verification step recorded in
+    execution-log.md, and give AC-16/17's SIGTERM->SIGKILL ordering its own explicit test-case
+    strategy since the runProcess seam contract carries no timing on its own.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T20:16:00Z"
+updated_at: "2026-08-15T20:26:00Z"

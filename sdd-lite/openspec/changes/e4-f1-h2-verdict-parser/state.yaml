@@ -197,7 +197,8 @@ stages:
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-15T18:16:52Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/proposal.md
@@ -208,6 +209,23 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-qa-final-approval
+    type: stage_approval
+    stage: sddl-qa-review
+    summary: >-
+      Launch sddl-qa-review in FINAL mode over the whole implemented change (ST-1..ST-3, all
+      16 ACs claimed proven, full gate 225/225, zero deviations recorded across the whole
+      lite flow). The only stage that may mark the change completed. On a clean verdict the
+      orchestrator opens the story PR ([E4.F1.H2], Closes #27, with the persistence-deferral
+      note copied into the issue per AC-11) per the workflow contract.
+    question: Approve launching sddl-qa-review in final mode?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, lanza qa-review final".
+      responded_at: "2026-08-15T18:16:52Z"
+    created_at: "2026-08-15T18:16:52Z"
+    resolved_at: "2026-08-15T18:16:52Z"
   - id: cp-h2-st3-approval
     type: stage_approval
     stage: sddl-executor
@@ -493,4 +511,4 @@ next_action:
     sddl-qa-review in final mode -- the closeout review, the only stage that may mark the
     change completed.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T17:55:12Z"
+updated_at: "2026-08-15T18:16:52Z"

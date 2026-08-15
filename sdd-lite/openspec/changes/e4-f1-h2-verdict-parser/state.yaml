@@ -380,6 +380,28 @@ checkpoints:
     created_at: "2026-08-15T15:56:05Z"
     resolved_at: "2026-08-15T15:56:05Z"
 decisions:
+  - id: d-pr65-copilot-fixes
+    checkpoint_id: cp-h2-qa-final-approval
+    rationale: >-
+      A-level, post-QA/post-completion fix on PR #65: GitHub Copilot's automated review flagged
+      three findings, all verified real against source before acting. (1) computeTailWindow's
+      raw.split("\n") allocated for the full output regardless of the 30-line window it needed
+      -- replaced with a backward lastIndexOf scan (lastNLines), fuzz-verified equivalent to the
+      original split/slice/join over ~2000 random cases plus boundary cases before committing.
+      The rewrite itself surfaced a real bug: String.lastIndexOf clamps a negative fromIndex to
+      0 instead of reporting "not found", which broke the loop's exhaustion check for inputs
+      with fewer newlines than the window -- caught by the fuzz comparison, fixed with an
+      explicit pre-check, and pinned with a new regression test (fewer-newlines-than-bound
+      case). (2) The file header doc-comment said the tail window is "never the whole thing",
+      contradicting computeTailWindow's own correct "at most the full input" doc -- aligned.
+      (3) verdict-fixture-loader.ts's reconstructClaudeCodeResult claimed "never throwing" while
+      JSON.parse can throw on malformed input -- made tolerant (catch -> ""), matching its
+      sibling reconstructOpenCodeText's existing pattern. Treated as a clear, bounded fix
+      (CLAUDE.md sdd-lite exemption 3) on a change already marked completed, matching the
+      precedent from H1's PR #64 review response: single-file-plus-test-file scope, full gate
+      re-verified green (226/226, +1 regression test), replied on all three PR threads with the
+      fix commit.
+    recorded_at: "2026-08-15T18:32:45Z"
   - id: d-st1-evidence-obligation
     rationale: >-
       A-level, orchestrator. The plan correctly identifies ST-1 as the riskiest stage: it
@@ -510,10 +532,11 @@ next_action:
   kind: done
   target: orchestrator
   summary: >-
-    Change COMPLETED: sddl-qa-review (final) returned pass_with_notes with 16/16 ACs verified
-    and one MINOR bookkeeping finding, now closed (all four open_risks resolved with AC
-    cross-references). Story PR [E4.F1.H2] to be opened with Closes #27 and the AC-11
-    persistence-deferral paragraph copied onto issue #27's checklist; the human reviews and
-    merges. Follow-up: E4.F2 (#28-30) real adapters remain the next E4 work.
+    Change COMPLETED (QA final pass_with_notes, 16/16 ACs). PR #65 open; GitHub Copilot's
+    automated review left three comments (performance, docstring contradiction, test-loader
+    over-claim), all verified real and fixed in a follow-up commit (ef2ffde) on the same
+    branch/PR (see decision d-pr65-copilot-fixes). Full gate re-verified green (226/226).
+    Waiting on human review/merge of PR #65. Follow-up: E4.F2 (#28-30) real adapters remain the
+    next E4 work.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T18:21:47Z"
+updated_at: "2026-08-15T18:32:45Z"

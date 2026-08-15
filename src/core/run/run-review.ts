@@ -92,7 +92,7 @@ export interface RunReviewDeps {
   readonly worktreesDir: string;
   /** Clock seam, forwarded to `createReviewWorktree`. */
   readonly now?: () => number;
-  /** Verdict parsing seam replaced by `[E4.F1.H2]` (#27). */
+  /** Verdict parsing seam; the built-in default was hardened by `[E4.F1.H2]` (#27). */
   readonly parseVerdict?: VerdictParser;
   /** Timeout scheduling seam; defaults to the global-timer scheduler. */
   readonly scheduleTimeout?: TimeoutScheduler;

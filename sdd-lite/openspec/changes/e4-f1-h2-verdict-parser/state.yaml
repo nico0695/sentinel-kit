@@ -135,7 +135,25 @@ stages:
       executable behaviour change whose only witness is the pre-existing suite.
       ORCHESTRATOR ADDITION to ST-1's exit criteria (A-level, see d-st1-evidence-obligation).
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-15T16:43:12Z"
+    last_updated_at: "2026-08-15T16:43:12Z"
+    notes: >-
+      ST-1 COMPLETE (status success). Rewrote extractBuiltInVerdict's body in
+      builtin-verdict-extraction.ts (39 -> 98 lines) with the three file-private helpers exactly
+      as design.md specified: computeTailWindow (rule 1, tie-break documented in-source as
+      provably immaterial per d-design-open-questions), stripAnsiSgr (rule 5, one biome-ignore
+      for the deliberate ESC byte -- a design deviation the plan did not anticipate but is
+      behavior-neutral and narrowly justified), collectDistinctVerdicts (rules 2/3/6, no
+      special-case branches). Defensive non-string guard implemented as the one-line coercion.
+      Four doc-comments updated to past tense (builtin-verdict-extraction.ts, index.ts,
+      run-review.ts, verdict.ts) -- orchestrator confirmed all three narrative files are
+      comment-only diffs, and the seam wiring line itself is byte-identical. The mandatory
+      d-st1-evidence-obligation ad-hoc run confirmed all four real marker fixtures still
+      resolve to "request-changes". Exit checks independently re-run by the orchestrator:
+      npm run check green (78 files, depcruise 56/104 unchanged), npm test 200/200 unchanged,
+      diff exactly the four approved files plus the new execution-log.md. Full source read and
+      compared line-by-line against design.md's sketch -- matches. ST-2/ST-3 still user-gated.
   sddl-code-review:
     status: pending
     notes: >-
@@ -395,9 +413,9 @@ next_action:
   kind: ask_user
   target: sddl-executor
   summary: >-
-    plan.md complete (3 stages, 16/16 ACs assigned, baseline 200 measured). Waiting on
-    stage_approval at cp-h2-st1-approval for ST-1, the parser implementation -- the riskiest
-    stage, now carrying an added four-fixture evidence obligation. ST-2 (fixtures) and ST-3
-    (tests + full gate) follow behind their own gates.
+    ST-1 complete and independently verified: check green, 200/200 unchanged, the four-fixture
+    evidence run confirmed, diff exactly the four approved files. Next: stage_approval for
+    ST-2 (the three synthetic fixtures under fixtures/synthetic/ plus the fixtures/README.md
+    provenance note -- data-only, zero regression risk, nothing imports them until ST-3).
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:38:14Z"
+updated_at: "2026-08-15T16:43:12Z"

@@ -10,8 +10,8 @@
  * Deliberately NOT public (AC-16): the built-in verdict extraction, the
  * default timeout scheduler, the engine race helper and the failure
  * classifier. They are implementation detail of the use case — `[E4.F1.H2]`
- * (#27) replaces the built-in extraction through the `deps.parseVerdict`
- * seam without touching this surface.
+ * (#27) hardened the built-in extraction in place, still reached only
+ * through the `deps.parseVerdict` seam, without touching this surface.
  */
 
 export type { TimeoutScheduler } from "./engine-timeout.js";

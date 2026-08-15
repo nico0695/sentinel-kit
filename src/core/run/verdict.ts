@@ -13,8 +13,8 @@ export type Verdict = "approve" | "request-changes" | "comment";
  * distinct verdict" — zero matches or conflicting matches — which the run
  * domain turns into the `ambiguous` terminal state.
  *
- * H1 ships a deliberately naive built-in implementation; `[E4.F1.H2]` (#27)
- * replaces it with the defensive parser through this same type, so
- * `runReview` does not change.
+ * H1 shipped a deliberately naive built-in implementation; `[E4.F1.H2]`
+ * (#27) replaced it with the defensive parser through this same type, so
+ * `runReview` did not change.
  */
 export type VerdictParser = (output: string) => Verdict | null;

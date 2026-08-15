@@ -20,7 +20,22 @@
 
 ---
 
-## ST-2 — pending (not yet started)
+## ST-2 — `process-runner.ts` (execa seam)
+
+**Status:** completed
+**File created:**
+- `src/adapters/driven/engines/claude-code/process-runner.ts` — `ClaudeCodeProcessRunOptions`, `ClaudeCodeProcessRunner`, `ClaudeCodeProcessResult` types, plus `createDefaultRunProcess(binaryPath: string): ClaudeCodeProcessRunner`. Factory name follows `git-cli.ts`'s `createGitCliAdapter` (`create<Thing>`) convention, scoped to this narrower seam — per plan.md's own note that this naming choice is an A-level executor decision, not a new one to escalate.
+
+Implementation matches design.md's exact snippet: `execa(binaryPath, args, { cwd, ...input spread, ...timeout/killSignal:"SIGTERM"/forceKillAfterDelay:2000 spread, reject: false })`, conditional `exitCode`/`signal` spreads (`exactOptionalPropertyTypes`-safe). Zero dependency on `errors.ts`/`envelope.ts` or `src/core/**` — pure process plumbing, `execa` the only import (syntax matches `git-cli.ts`'s own `import { execa } from "execa"` usage).
+
+**Validation (independently re-run by the orchestrator):**
+- `npm run check`: `Checked 83 files in 75ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (59 modules, 107 dependencies cruised)`.
+- `npm test`: `Test Files 16 passed (16)` / `Tests 226 passed (226)` — unchanged (still a leaf file, `claude-code-adapter.ts` doesn't exist yet to import it).
+- `git status --short`: only `process-runner.ts` is new.
+
+**Judgment calls:** none of real weight. Factory name (`createDefaultRunProcess`) was the one open naming choice design.md left; consistent with the repo's `create<Thing>` convention.
+
+## ST-3 — pending (not yet started)
 
 ## ST-3 — pending (not yet started)
 

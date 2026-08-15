@@ -157,7 +157,20 @@ stages:
       the executor made and disclosed: literal error-message wording (design.md specifies
       behavior, not exact strings) and treating an empty `.result` string as "absent" in
       buildReviewErrorMessage's fallback branch -- both reversible, neither affects any ST-1
-      fixture, no escalation needed. ST-2 (process-runner.ts) approved to start next.
+      fixture, no escalation needed.
+
+      ST-2 complete: src/adapters/driven/engines/claude-code/process-runner.ts created --
+      ClaudeCodeProcessRunOptions/ClaudeCodeProcessResult/ClaudeCodeProcessRunner types plus
+      createDefaultRunProcess(binaryPath), matching design.md's exact execa call shape
+      (reject:false, conditional timeout/killSignal:"SIGTERM"/forceKillAfterDelay:2000 spread).
+      Factory name follows git-cli.ts's createGitCliAdapter create<Thing> convention, per
+      plan.md's own instruction that this naming choice is A-level, not a new decision to
+      escalate. Zero dependency on errors.ts/envelope.ts or src/core/** -- pure process
+      plumbing, execa the only import. Orchestrator independently re-read the file in full,
+      confirmed the execa import syntax matches git-cli.ts's own usage, and re-ran validation
+      directly: npm run check clean (83 files, 0 dependency violations, 59 modules/107
+      dependencies), npm test 226/226 unchanged, git status confirms only process-runner.ts is
+      new. ST-3 (claude-code-adapter.ts orchestration + barrel export) approved to start next.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -301,7 +314,33 @@ checkpoints:
         label: Pause here
         description: Stop after ST-1; resume ST-2 later.
     free_input_allowed: true
+    response:
+      selected_option_id: approve-st2
+      free_text: "si apruebo"
+      responded_at: "2026-08-15T20:48:00Z"
     created_at: "2026-08-15T20:45:00Z"
+    resolved_at: "2026-08-15T20:48:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2 complete and independently verified: process-runner.ts lands exactly per design.md
+      (createDefaultRunProcess factory, reject:false, AC-19's forceKillAfterDelay:2000
+      override), npm run check clean, npm test 226/226 unchanged, diff scope confirmed. Ready
+      for ST-3: claude-code-adapter.ts orchestration + the barrel export.
+    question: Approve ST-3 (claude-code-adapter.ts + barrel export) to start execution, or pause here?
+    options:
+      - id: approve-st3
+        label: Approve ST-3 (recommended)
+        description: >-
+          Land createClaudeCodeAdapter's review() orchestration (pre-flight, invocation, parse,
+          is_error branch, resolve) wiring ST-1/ST-2 together, plus the engines/index.ts export.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-2; resume ST-3 later.
+    free_input_allowed: true
+    created_at: "2026-08-15T22:00:00Z"
 decisions:
   - id: d-ac19-timeout-equal-not-shortened
     checkpoint_id: cp-design-approval
@@ -408,8 +447,9 @@ next_action:
   kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    ST-1 complete and verified (errors.ts + envelope.ts, check clean, 226/226 unchanged).
-    Awaiting user approval to start ST-2 for [E4.F2.H1] (#28): land process-runner.ts (the
-    execa-backed runProcess seam), exit on npm run check green + npm test unchanged at 226/226.
+    ST-2 complete and verified (process-runner.ts, check clean, 226/226 unchanged). Awaiting
+    user approval to start ST-3 for [E4.F2.H1] (#28): land claude-code-adapter.ts orchestration
+    + the engines/index.ts barrel export, exit on npm run check green (depcruise in particular)
+    + npm test unchanged at 226/226.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T20:45:00Z"
+updated_at: "2026-08-15T22:00:00Z"

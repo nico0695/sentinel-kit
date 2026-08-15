@@ -27,6 +27,7 @@ stage approvals allowed.
 | S18-D9 | Widen review scope from the ST-3 diff to the cumulative ST-1..ST-3 source delta | Review only ST-3's diff | ST-1/ST-2 were triaged trivial/trivial-plus at their own gates, so `engine-timeout.ts` — the core's only concurrency — had never been reviewed; the cumulative delta brings it under the same frozen target | `claude` |
 | S18-D10 | Merge the three-lens convergent finding (dual timeout budget) at lens severity WARNING after the refuter split, not at the provisional CRITICAL | Keep the convergence-escalated CRITICAL (contract: `inconclusive` leaves severe findings standing) | The escalation was the orchestrator's own and provisional; the refuter refuted the ordering sub-claim (depends on unwritten E4.F2 adapters; the design-named kill mechanism would let the outer timer win) and corroborated only the weak form. Recorded in the ledger Corroboration Log with the full split | `claude` |
 | S18-D11 | Insert bounded fix stage ST-3b (5 ledger ids: 4 doc corrections + `timeoutMs` upper bound) before ST-4 | Proceed straight to ST-4 with findings as info/risks only; or a wider ST-3b also touching forward-looking findings | Cheapest moment: ST-4 encodes readings of those docs into test names. User chose the recommended bounded option at the `review_gate`; the gate's precise scope description was treated as the stage's `stage_approval`, recorded in `state.yaml` | `claude→user` |
+| S18-D12 | Fix both PR #64 Copilot review findings directly (leading-dash ref guard, docstring) rather than reopening full sdd-lite ceremony on a change already marked completed | Reply explaining without fixing; relaunch sddl-executor/qa for a formal amendment stage | Both findings verified real against source first. Bounded, single-file-plus-tests fix matching the existing AC-6 pattern — qualifies as CLAUDE.md sdd-lite exemption 3 ("clear one-line fixes"). The option-injection finding is security-relevant (git option injection via a hostile branch name), not stylistic, so silence/reply-only was not an acceptable outcome per the PR-ownership rule (fix or explain, no third option) | `claude` |
 
 ## Deviations
 
@@ -108,6 +109,15 @@ stage approvals allowed.
   findings only. Change marked `completed` — the only stage allowed to do so.
 - **PR #64 opened**: `[E4.F1.H1] runReview use case`, `Closes #26`, check+test green locally
   (workflow contract rules 2 and 4 satisfied; 1 of max 5 PRs open).
+- **PR #64 review response** (`b0970ae`, next-day follow-up in the same session): GitHub
+  Copilot's automated review left 2 comments. Both verified real against source before
+  acting, not taken at face value: a stale `engine-timeout.ts` docstring claiming nothing is
+  re-exported (`TimeoutScheduler` is), and a genuine option-injection risk —
+  `baseRef`/`targetRef` reach `git diff`/`git merge-base` positionally with no `--` separator,
+  so a leading `-` is parsed as a git option (e.g. `--output=<path>` writes an
+  attacker-chosen file), security-relevant since the tool reviews externally-supplied
+  branches. Fixed both at the existing request pre-flight (2 new AC-6 producers), amended
+  spec.md, re-ran the full gate (200/200), replied on both review threads with the fix commit.
 - **ST-4 executed and green** (`5a21623`): `run-review-fixtures.ts` (229 lines) +
   `run-review.test.ts` (339 lines, 19 tests) — all five terminal states reachable, 9 AC-6
   producers, AC-11, AC-12. Full suite 182/182, `npm run check` clean, depcruise unchanged;

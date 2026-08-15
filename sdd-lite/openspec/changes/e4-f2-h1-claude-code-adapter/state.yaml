@@ -170,7 +170,30 @@ stages:
       confirmed the execa import syntax matches git-cli.ts's own usage, and re-ran validation
       directly: npm run check clean (83 files, 0 dependency violations, 59 modules/107
       dependencies), npm test 226/226 unchanged, git status confirms only process-runner.ts is
-      new. ST-3 (claude-code-adapter.ts orchestration + barrel export) approved to start next.
+      new.
+
+      ST-3 complete: src/adapters/driven/engines/claude-code/claude-code-adapter.ts created --
+      ClaudeCodeAdapterOptions + createClaudeCodeAdapter(options?), the five-step review() body
+      (pre-flight -> real invocation -> parseEnvelope -> is_error branch -> extractSuccess)
+      exactly per design.md's pseudocode, PREFLIGHT_TIMEOUT_MS=5_000 module constant (not
+      derived from request.timeoutMs, AC-15). Barrel export added to engines/index.ts (2 lines,
+      Biome's organizeImports assist alphabetized them ahead of FakeEngine's -- content
+      unchanged, just the file's own existing lint convention firing). This is the first stage
+      with a real cross-file import graph (adapter -> errors.js/envelope.js/process-runner.js
+      siblings + core/run/index.js) -- depcruise reports 0 violations (60 modules, 113
+      dependencies cruised), confirming adapters-isolated/core-no-adapters guards hold.
+
+      ORCHESTRATOR FIX before acceptance: engines/index.ts's header doc-comment still read
+      "Public API today: the scripted FakeEngine..." after this stage added
+      createClaudeCodeAdapter to the same barrel -- stale as of this exact commit. Corrected in
+      place (now names both the landed claude-code adapter and the not-yet-built opencode
+      adapter, #29) before the stage was accepted -- same class of self-caught doc-staleness
+      as H1/H2's Copilot-flagged findings, caught here before it ever reached a PR. Orchestrator
+      independently re-read the full adapter file and the edited barrel file, and re-ran
+      validation directly (not just trusting the executor's report): npm run check clean (84
+      files, 0 dependency violations), npm test 226/226 unchanged, git diff --stat confirms only
+      the two expected files touched. ST-4 (the single AC-covering test file) approved to start
+      next.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -340,8 +363,50 @@ checkpoints:
         label: Pause here
         description: Stop after ST-2; resume ST-3 later.
     free_input_allowed: true
+    response:
+      selected_option_id: approve-st3
+      free_text: "si"
+      responded_at: "2026-08-15T22:03:00Z"
     created_at: "2026-08-15T22:00:00Z"
+    resolved_at: "2026-08-15T22:03:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3 complete and independently verified: claude-code-adapter.ts lands the five-step
+      review() body exactly per design.md, barrel export wired, first real cross-file import
+      graph checked clean by depcruise (0 violations). Orchestrator also caught and fixed a
+      stale doc-comment in engines/index.ts (still described FakeEngine as the sole public API
+      after this stage added createClaudeCodeAdapter to the same file) before accepting. Ready
+      for ST-4: the single test file covering all 27 ACs, including the AC-16/17 execa-option
+      test.
+    question: Approve ST-4 (the AC-covering test file) to start execution, or pause here?
+    options:
+      - id: approve-st4
+        label: Approve ST-4 (recommended)
+        description: >-
+          Write __test__/claude-code-adapter.test.ts: the shared reviewEngineContract harness
+          plus every AC-specific test, per plan.md's Stage 4 Test Layout and AC-16/AC-17 Test
+          Strategy sections.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-3; resume ST-4 later.
+    free_input_allowed: true
+    created_at: "2026-08-15T22:10:00Z"
 decisions:
+  - id: d-st3-index-docstring-fix
+    checkpoint_id: cp-st4-approval
+    free_text: >-
+      Corrected engines/index.ts's header doc-comment during ST-3 acceptance: it still read
+      "Public API today: the scripted FakeEngine..." after this same stage added
+      createClaudeCodeAdapter to the barrel. Now names both the landed claude-code adapter and
+      the not-yet-built opencode adapter (#29).
+    rationale: >-
+      Same class of self-caught doc-staleness this session's H1/H2 PRs had flagged by GitHub
+      Copilot's automated review after the fact -- caught here, before any PR, at zero cost.
+      Low-risk, in-scope (same file the stage already touched), reversible; not escalated.
+    recorded_at: "2026-08-15T22:12:00Z"
   - id: d-ac19-timeout-equal-not-shortened
     checkpoint_id: cp-design-approval
     free_text: >-
@@ -447,9 +512,10 @@ next_action:
   kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    ST-2 complete and verified (process-runner.ts, check clean, 226/226 unchanged). Awaiting
-    user approval to start ST-3 for [E4.F2.H1] (#28): land claude-code-adapter.ts orchestration
-    + the engines/index.ts barrel export, exit on npm run check green (depcruise in particular)
-    + npm test unchanged at 226/226.
+    ST-3 complete and verified (claude-code-adapter.ts + barrel export, first real import graph
+    depcruise-clean, 226/226 unchanged, one stale doc-comment self-caught and fixed). Awaiting
+    user approval to start ST-4 for [E4.F2.H1] (#28): write __test__/claude-code-adapter.test.ts
+    covering all 27 ACs, exit on `npx vitest run --project adapters -t "claude-code"` green then
+    the full gate.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T22:00:00Z"
+updated_at: "2026-08-15T22:12:00Z"

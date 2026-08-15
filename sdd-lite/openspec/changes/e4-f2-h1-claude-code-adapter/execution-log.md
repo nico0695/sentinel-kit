@@ -35,9 +35,23 @@ Implementation matches design.md's exact snippet: `execa(binaryPath, args, { cwd
 
 **Judgment calls:** none of real weight. Factory name (`createDefaultRunProcess`) was the one open naming choice design.md left; consistent with the repo's `create<Thing>` convention.
 
-## ST-3 — pending (not yet started)
+## ST-3 — `claude-code-adapter.ts` (orchestration) + barrel export
 
-## ST-3 — pending (not yet started)
+**Status:** completed
+**Files:**
+- `src/adapters/driven/engines/claude-code/claude-code-adapter.ts` (new) — `ClaudeCodeAdapterOptions`, `createClaudeCodeAdapter(options?)`, the five-step `review()` body: pre-flight `--version` check (AC-5/6/15, `PREFLIGHT_TIMEOUT_MS = 5_000` module constant) → real invocation (AC-3/4/16/17) → `parseEnvelope` (AC-8/14) → `is_error` branch → `ClaudeCodeReviewError` (AC-13/18) or `extractSuccess` (AC-9-12).
+- `src/adapters/driven/engines/index.ts` (modified) — added `createClaudeCodeAdapter`/`ClaudeCodeAdapterOptions` exports (Biome's `organizeImports` alphabetized them ahead of `FakeEngine`'s, content unchanged).
+
+First stage with a real cross-file import graph (adapter → `errors.js`/`envelope.js`/`process-runner.js` siblings + `core/run/index.js`). `depcruise` reports 0 violations (60 modules, 113 dependencies), confirming the `adapters-isolated`/`core-no-adapters` guards hold.
+
+**Orchestrator fix before acceptance:** `engines/index.ts`'s header doc-comment still read "Public API today: the scripted `FakeEngine`..." after this same stage added `createClaudeCodeAdapter` to the barrel — stale as of this commit. Corrected to name both the landed claude-code adapter and the not-yet-built opencode adapter (#29). Same class of doc-staleness GitHub Copilot flagged post-hoc on H1/H2's PRs — caught here before any PR this time.
+
+**Validation (independently re-run by the orchestrator):**
+- `npm run check`: `Checked 84 files in 84ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (60 modules, 113 dependencies cruised)`.
+- `npm test`: `Test Files 16 passed (16)` / `Tests 226 passed (226)` — unchanged (no test file yet — ST-4 writes it).
+- `git diff --stat` / `git status --short`: exactly the two expected files touched (one new, one modified).
+
+**Judgment calls:** none of real weight — design.md's pseudocode was implemented literally.
 
 ## ST-4 — pending (not yet started)
 

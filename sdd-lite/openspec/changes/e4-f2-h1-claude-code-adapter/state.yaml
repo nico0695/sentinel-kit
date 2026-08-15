@@ -15,8 +15,8 @@ complexity_assessment:
     escalated to spec rather than decided in proposal.
   confidence: high
   recorded_at: "2026-08-15T20:05:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -142,7 +142,22 @@ stages:
       A-level executor decision, to be logged in execution-log.md when made, not re-escalated
       here.
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-15T20:40:00Z"
+    last_updated_at: "2026-08-15T20:45:00Z"
+    notes: >-
+      ST-1 complete: src/adapters/driven/engines/claude-code/errors.ts (3 typed classes) and
+      envelope.ts (pure JSON-envelope parsing) created exactly per design.md's shapes.
+      Orchestrator independently re-read both files, confirmed the import path
+      (../../../../core/run/index.js) matches fake-engine.ts's own import line exactly, and
+      re-ran validation directly rather than trusting the executor's report: npm run check
+      clean (82 files, 0 dependency violations, 58 modules/106 dependencies), npm test 226/226
+      unchanged (no regression -- leaf files, nothing imports them yet), git status confirms
+      only src/adapters/driven/engines/claude-code/ is new. Two minor A-level judgment calls
+      the executor made and disclosed: literal error-message wording (design.md specifies
+      behavior, not exact strings) and treating an empty `.result` string as "absent" in
+      buildReviewErrorMessage's fallback branch -- both reversible, neither affects any ST-1
+      fixture, no escalation needed. ST-2 (process-runner.ts) approved to start next.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -261,7 +276,32 @@ checkpoints:
         label: Request plan changes first
         description: Send plan.md back for rework before executor starts.
     free_input_allowed: true
+    response:
+      selected_option_id: approve-st1
+      free_text: "si"
+      responded_at: "2026-08-15T20:38:00Z"
     created_at: "2026-08-15T20:36:00Z"
+    resolved_at: "2026-08-15T20:38:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1 complete and independently verified: errors.ts + envelope.ts land exactly per
+      design.md, npm run check clean, npm test 226/226 unchanged, diff scope confirmed. Ready
+      for ST-2: the execa-backed runProcess seam (process-runner.ts).
+    question: Approve ST-2 (process-runner.ts) to start execution, or pause here?
+    options:
+      - id: approve-st2
+        label: Approve ST-2 (recommended)
+        description: >-
+          Land ClaudeCodeProcessRunOptions/ClaudeCodeProcessResult/ClaudeCodeProcessRunner types
+          and the execa-backed defaultRunProcess (reject:false), per design.md's exact snippet.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-1; resume ST-2 later.
+    free_input_allowed: true
+    created_at: "2026-08-15T20:45:00Z"
 decisions:
   - id: d-ac19-timeout-equal-not-shortened
     checkpoint_id: cp-design-approval
@@ -368,8 +408,8 @@ next_action:
   kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    Awaiting user approval to start sddl-executor ST-1 for [E4.F2.H1] (#28): land
-    src/adapters/driven/engines/claude-code/errors.ts and envelope.ts (pure, no execa
-    dependency), exit on npm run check green + npm test unchanged at 226/226.
+    ST-1 complete and verified (errors.ts + envelope.ts, check clean, 226/226 unchanged).
+    Awaiting user approval to start ST-2 for [E4.F2.H1] (#28): land process-runner.ts (the
+    execa-backed runProcess seam), exit on npm run check green + npm test unchanged at 226/226.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T20:36:00Z"
+updated_at: "2026-08-15T20:45:00Z"

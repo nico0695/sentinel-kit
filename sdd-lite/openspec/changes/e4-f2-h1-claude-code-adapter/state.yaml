@@ -1,0 +1,171 @@
+version: "0.1"
+change_name: e4-f2-h1-claude-code-adapter
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F2.H1] (issue #28): the first real ReviewEngine adapter, wrapping the canonical
+    claude-code CLI invocation the [E1.F1.H1] spike already captured with real evidence (exact
+    command, stdin path, JSON shape, all five failure signatures). Depends only on closed/merged
+    work (E1.F1.H1 spike, E1.F1.H3 fixtures, E0.F2.H2 port + contract suite + FakeEngine). Risk is
+    concentrated in two structural gaps the frozen ReviewEngine port does not cover today: an
+    isAvailable()-style pre-check (PRD Sec6.2 names it as settled, the port has only review()) and
+    a contract-test binary-mocking seam (no existing injection pattern in this repo). Both
+    escalated to spec rather than decided in proposal.
+  confidence: high
+  recorded_at: "2026-08-15T20:05:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing to proposal. The spike doc, fixtures, port, and contract
+      suite are all merged and directly readable.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-15T19:55:00Z"
+    completed_at: "2026-08-15T20:05:00Z"
+    notes: >-
+      proposal.md written by a Sonnet worker, status ready-for-spec (with two open questions).
+      Grounded in direct inspection of review-engine.ts, run-review.ts, git-cli.ts (the only
+      existing spawn-a-binary adapter precedent), the FakeEngine contract suite, both E4.F1
+      state.yaml files' open_risks, docs/engines/claude-code.md, fixtures/README.md, and the raw
+      bytes of four fixtures (auth-error.json, timeout-sigterm.json, context-overflow.json,
+      valid-verdict.json) -- confirmed .is_error is the authoritative success flag (.subtype
+      reads "success" even on auth-error and context-overflow) and timeout-sigterm.json
+      genuinely has no .result field. Orchestrator independently re-read review-engine.ts and
+      confirmed the port is exactly one method, review(request) -> Promise<ReviewResult>, with
+      no isAvailable() surface -- the proposal's central finding is real, not a misreading.
+      Two A-level judgment calls made and ratified: (1) adapter-owned SIGTERM->SIGKILL timeout
+      enforcement is in scope now, closing r-engine-not-cancellable and
+      r-cleanup-races-abandoned-engine, both of which H1's state.yaml named "E4.F2" as owner;
+      (2) JSON envelope extraction (.result/.usage) is in scope here, restating a boundary H2's
+      own proposal already fixed, not re-litigating it. Four items escalated as B-level open
+      questions for spec to fix as firm ACs: the isAvailable() port gap, the binary-mocking seam,
+      the is_error:true non-auth classification rule, and the totalTokens computation rule.
+      "Successful real review" (issue #28 AC-2) proposed as satisfied by a manual verification
+      run recorded in execution-log.md, not an automated CI test -- mirrors H1/H2 precedent
+      (d-st1-evidence-obligation).
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/spec.md
+  design: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/design.md
+  plan: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/qa-report.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      proposal.md complete for [E4.F2.H1] (#28). Central open item: the ReviewEngine port has
+      no isAvailable()-style method, yet PRD Sec6.2 and issue #28 AC-3 both expect
+      missing/unauthenticated detection before running. Orchestrator independently verified
+      this gap against review-engine.ts source. Presented to the user with a recommendation to
+      proceed to spec, where the four open questions get fixed as firm ACs.
+    question: Proceed to sddl-spec for [E4.F2.H1], or revise scope first?
+    options:
+      - id: proceed-to-spec
+        label: Proceed to spec (recommended)
+        description: >-
+          Accept the proposal's scope sketch and open-questions list; let spec fix the
+          isAvailable() mechanism, the binary-mocking seam, the is_error classification rule,
+          and totalTokens as firm acceptance criteria.
+        recommended: true
+      - id: revise-scope
+        label: Revise scope first
+        description: Send proposal.md back for rework before spec starts.
+    free_input_allowed: true
+    created_at: "2026-08-15T20:06:00Z"
+decisions:
+  - id: d-timeout-ownership-in-scope
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      Adapter-owned SIGTERM->SIGKILL timeout enforcement is in scope for this story, not
+      deferred again.
+    rationale: >-
+      Both e4-f1-h1-run-review/state.yaml open risks that named "E4.F2" as owner
+      (r-engine-not-cancellable, r-cleanup-races-abandoned-engine) point specifically at "the
+      E4.F2 adapters" as the place process-kill gets implemented, and claude-code is the first
+      of those adapters. Deferring again would mean no E4.F2 story ever picks it up. The exact
+      precedence rule against runReview's outer timeout race (r-timeout-budget-precedence) is
+      narrower and left open for spec/design, since the outer race's EngineTimeoutError escape
+      hatch already exists and could be the adapter's own mechanism.
+    recorded_at: "2026-08-15T20:05:00Z"
+  - id: d-json-envelope-in-scope
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      JSON envelope extraction (.result/.usage) is confirmed in scope for this adapter, not the
+      verdict parser.
+    rationale: >-
+      Not new scope -- [E4.F1.H2]'s own proposal already fixed this exact boundary ("this
+      happens before deps.parseVerdict is called ... that is the ReviewEngine adapter's job,
+      E4.F2.x, not built yet"). Restated here as confirmed, not re-litigated.
+    recorded_at: "2026-08-15T20:05:00Z"
+open_risks:
+  - id: r-isavailable-port-gap
+    summary: >-
+      PRD Sec6.2 names isAvailable()-before-running as settled product direction; the frozen
+      ReviewEngine port (E0.F2.H2) has only review(), no availability-check surface. Issue #28
+      AC-3 ("missing/unauthenticated engine reported clearly before running") cannot be
+      satisfied without deciding: (a) an internal pre-check inside review() itself, (b) a port
+      shape change (B/C-level, touches a frozen E0.F2.H2 deliverable), or (c) a check one layer
+      up in src/main/ composition, outside this adapter entirely. Escalated to spec as the
+      first thing to fix.
+    severity: high
+  - id: r-binary-mocking-seam
+    summary: >-
+      The contract suite needs "binary mocked by fixtures" (issue #28 AC-1), but neither the
+      ReviewEngine port nor the git-cli.ts precedent expose an injection seam for swapping the
+      real spawned claude binary for a fixture-replaying mock. Affects the adapter factory's
+      public signature -- must be fixed before design, not discovered mid-implementation.
+    severity: high
+  - id: r-is-error-classification
+    summary: >-
+      A non-auth, non-timeout is_error:true result (e.g. context-overflow.json) has no fixed
+      handling rule yet: reject (engine-error, most accurate -- no real review happened) vs.
+      resolve with the error text as output (falls through to H2's parser, likely reads as
+      ambiguous prose). Fixture-backed test cases exist on both sides; needs a firm spec rule.
+    severity: medium
+  - id: r-total-tokens-computation
+    summary: >-
+      ReviewUsage.totalTokens has no direct source field in the engine's JSON output (only
+      input_tokens / output_tokens / cache_read_input_tokens / cache_creation_input_tokens are
+      reported separately). Low stakes (usage is best-effort per the port's own doc-comment)
+      but needs a stated summation rule.
+    severity: low
+  - id: r-timeout-budget-precedence
+    summary: >-
+      Carried forward from e4-f1-h1-run-review/state.yaml, now concrete: the exact ordering
+      between the adapter's own internal SIGTERM/SIGKILL kill and runReview's outer timeout
+      race (EngineTimeoutError) is not yet fixed. Left open for spec/design.
+    severity: medium
+  - id: r-claude-cli-version-drift
+    summary: >-
+      docs/engines/claude-code.md flags are "verified only against 2.1.226" and the spike is 7
+      days old (2026-08-08 -> today). Low material risk but not re-verified for this story.
+    severity: low
+next_action:
+  kind: wait_for_approval
+  target: sddl-spec
+  summary: >-
+    Awaiting user approval to proceed from proposal to spec for [E4.F2.H1] (#28). Spec must fix
+    four open questions as firm ACs: the isAvailable() mechanism, the binary-mocking seam, the
+    is_error:true non-auth classification rule, and the totalTokens computation rule. Must also
+    formally record the manual-verification approach for issue #28 AC-2 ("successful real
+    review") so it is not silently dropped as untestable.
+created_at: "2026-08-15T19:55:00Z"
+updated_at: "2026-08-15T20:06:00Z"

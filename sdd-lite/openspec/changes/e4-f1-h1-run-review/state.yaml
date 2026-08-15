@@ -523,6 +523,24 @@ checkpoints:
     created_at: "2026-08-09T18:40:13Z"
     resolved_at: "2026-08-09T18:40:13Z"
 decisions:
+  - id: d-pr64-copilot-fixes
+    checkpoint_id: cp-qa-final-approval
+    rationale: >-
+      A-level, post-QA/post-completion fix on PR #64: GitHub Copilot's automated PR review
+      flagged two real findings. (1) engine-timeout.ts's file docstring claimed nothing in the
+      file is re-exported from index.ts, while `TimeoutScheduler` (the type) is -- corrected
+      the doc to name the type/runtime-helper split accurately. (2) `baseRef`/`targetRef` were
+      only checked for non-empty at the request pre-flight, then passed positionally (no `--`
+      separator) into `git diff`/`git merge-base` in git-cli.ts -- a ref starting with `-`
+      would be parsed as a git option, e.g. `git diff --output=<path>` writes an attacker-
+      chosen file. Security-relevant given this tool operates on externally-supplied branch
+      names. Fixed by rejecting a leading `-` in both refs at the existing request pre-flight
+      (InvalidRunRequestError -> validation-failed), matching the pattern already used for
+      every other AC-6 producer. Treated as a clear, bounded fix (CLAUDE.md sdd-lite exemption
+      3) rather than reopening full ceremony on a change already marked completed: single
+      file touched for the guard, two new AC-6 test cases, spec.md's AC-6 enumeration and the
+      request-stage mapping row amended for consistency, full gate re-run green (200/200).
+    recorded_at: "2026-08-15T14:32:23Z"
   - id: d-validation-failed-preflight
     checkpoint_id: cp-validation-failed-semantics
     selected_option_id: preflight
@@ -781,10 +799,12 @@ next_action:
   kind: done
   target: orchestrator
   summary: >-
-    Change COMPLETED: sddl-qa-review (final) returned pass with 18/18 ACs verified and only
-    INFO findings. Story PR [E4.F1.H1] opened with Closes #26 per the workflow contract; the
-    human reviews and merges. Follow-ups live in open_risks with their later-epic owners
-    (raise r-verdict-provenance when scoping #27; the timeout-precedence rule and
-    kill-before-cleanup belong to E4.F2 #28-30).
+    Change COMPLETED (QA final pass, 18/18 ACs). PR #64 open; GitHub Copilot's automated
+    review left two comments, both verified real and fixed in a follow-up commit on the same
+    branch/PR (see decision d-pr64-copilot-fixes): stale re-export docstring in
+    engine-timeout.ts, and a leading-dash option-injection guard added for baseRef/targetRef.
+    Full gate re-verified green (200/200). Waiting on human review/merge of PR #64. Follow-ups
+    live in open_risks with their later-epic owners (raise r-verdict-provenance when scoping
+    #27; timeout-precedence and kill-before-cleanup belong to E4.F2 #28-30).
 created_at: "2026-08-09T03:15:00Z"
-updated_at: "2026-08-09T18:45:23Z"
+updated_at: "2026-08-15T14:32:23Z"

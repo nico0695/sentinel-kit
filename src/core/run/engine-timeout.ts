@@ -13,8 +13,10 @@
  * `timers` specifier. `Date.now()` in `create-review-worktree.ts` is the
  * standing precedent.
  *
- * Nothing here is re-exported from the module's public `index.ts`: the seam
- * is reachable only through `runReview`.
+ * The `TimeoutScheduler` type is re-exported from the module's public
+ * `index.ts` so callers can type an injected scheduler; the runtime helpers
+ * (`defaultTimeoutScheduler`, `runEngineWithTimeout`) are not — the seam's
+ * implementation is reachable only through `runReview`.
  */
 
 import type { ReviewResult } from "./ports/review-engine.js";

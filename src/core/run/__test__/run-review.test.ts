@@ -213,6 +213,28 @@ describe("runReview", () => {
       expect(requestError.message).toContain("2147483647");
     });
 
+    it("rejects a baseRef starting with '-' at the request stage", async () => {
+      const result = await runReview(
+        buildRequest({ baseRef: "--upload-pack=evil" }),
+        buildDeps(),
+      );
+
+      expect(result.state).toBe("validation-failed");
+      expect(result.failure?.stage).toBe("request");
+      expect(result.failure?.error).toBeInstanceOf(InvalidRunRequestError);
+    });
+
+    it("rejects a targetRef starting with '-' at the request stage", async () => {
+      const result = await runReview(
+        buildRequest({ targetRef: "--output=/tmp/pwned" }),
+        buildDeps(),
+      );
+
+      expect(result.state).toBe("validation-failed");
+      expect(result.failure?.stage).toBe("request");
+      expect(result.failure?.error).toBeInstanceOf(InvalidRunRequestError);
+    });
+
     it("rejects an empty harnessType at the request stage", async () => {
       const result = await runReview(
         buildRequest({ harnessType: "" }),

@@ -283,8 +283,18 @@ async function executePipeline(
     if (request.baseRef === "") {
       throw new InvalidRunRequestError("baseRef must not be empty");
     }
+    if (request.baseRef.startsWith("-")) {
+      throw new InvalidRunRequestError(
+        "baseRef must not start with '-' (would be parsed as a git option)",
+      );
+    }
     if (request.targetRef === "") {
       throw new InvalidRunRequestError("targetRef must not be empty");
+    }
+    if (request.targetRef.startsWith("-")) {
+      throw new InvalidRunRequestError(
+        "targetRef must not start with '-' (would be parsed as a git option)",
+      );
     }
     if (request.harnessType === "") {
       throw new InvalidRunRequestError("harnessType must not be empty");

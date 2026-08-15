@@ -52,7 +52,7 @@ Story `[E4.F1.H1]` / issue #26. This is the first code in the repo that turns "r
 
 ### Flow order
 
-1. **request** — `runReview` validates its own request (`timeoutMs > 0`, non-empty `harnessType`, non-empty refs) → `InvalidRunRequestError`.
+1. **request** — `runReview` validates its own request (`timeoutMs > 0`, non-empty `harnessType`, non-empty refs, `baseRef`/`targetRef` not starting with `-` — an option-injection guard: they are later passed positionally to `git diff`/`git merge-base` without a `--` separator) → `InvalidRunRequestError`.
 2. **harness** — resolve the harness. *Hoisted ahead of worktree creation* so an unknown harness never leaves an orphan worktree behind. This does not contradict the backlog sequence, which names "prompt", not "harness load".
 3. **worktree** — `createReviewWorktree({ repoPath, commitish: targetRef, branchLabel: targetRef }, { git, worktreesDir, now? })`.
 4. **diff** — `computeReviewDiff({ repoPath, baseRef, targetRef, limits? }, { git })`. Runs against the managed clone, not the worktree; semantics are already `merge-base(base, target)..target`.
@@ -124,7 +124,7 @@ Over-returning is deliberate: E5's `RunStore` and E6's rendering both consume th
 | AC-3 | `ambiguous` reachable, two ways | (a) output with no `VERDICT:` line; (b) output with two distinct conflicting verdicts | must |
 | AC-4 | `engine-error` reachable, two ways | (a) `createFakeEngine({ ok: false, error })`; (b) fake `GitPort` `addError: GitWorktreeError` ⇒ `WorktreeCreationError` | must |
 | AC-5 | `timeout` reachable | engine that never settles, short `timeoutMs`, deterministic clock; asserts `state: "timeout"` and no hang | must |
-| AC-6 | `validation-failed` reachable from every enumerated pre-flight producer | one case each: `timeoutMs <= 0`; `timeoutMs > 2147483647` (Node's `setTimeout` upper bound; review-driven A-level amendment, R3-004); empty `harnessType`; relative `repoPath`; `limits.maxLines = 0`; unknown harness; missing skill; non-`inline` `contextMode` | must |
+| AC-6 | `validation-failed` reachable from every enumerated pre-flight producer | one case each: `timeoutMs <= 0`; `timeoutMs > 2147483647` (Node's `setTimeout` upper bound; review-driven A-level amendment, R3-004); empty `harnessType`; relative `repoPath`; `limits.maxLines = 0`; unknown harness; missing skill; non-`inline` `contextMode`; `baseRef`/`targetRef` starting with `-` (option-injection guard; review-driven A-level amendment, PR #64 Copilot comment) | must |
 | AC-7 | Cleanup on every path: under `policy: "always"`, `git.worktreeRemove` is recorded in `removeCalls` for `ok`, `ambiguous`, `engine-error` and `timeout` | assert against the fake's `removeCalls` in each state test | must |
 | AC-8 | Cleanup honours policy: `keep` never removes; `on-success` removes on `ok` and does not remove on `engine-error`/`timeout` | `removeCalls` length assertions per policy | must |
 | AC-9 | A cleanup fault does not change the outcome: `removeError: GitWorktreeError` on a happy path ⇒ `state` stays `"ok"`, `cleanup.reason === "cleanup-failed"`, and the promise resolves (does not reject) | unit test | must |

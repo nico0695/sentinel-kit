@@ -216,6 +216,18 @@ describe("extractBuiltInVerdict", () => {
       }).not.toThrow();
       expect(result).toBeNull();
     });
+
+    it("an input with fewer newlines than the tail-window line bound resolves to null and never throws (PR #65 review: lastNLines boundary)", () => {
+      // Regression pin for a fromIndex(-1)-clamping bug caught while fixing a
+      // Copilot review finding: an input whose newline count is well under
+      // TAIL_LINES must fall back to the whole string, not throw or hang.
+      const fewNewlines = "\n\n\n";
+      let result: unknown;
+      expect(() => {
+        result = extractBuiltInVerdict(fewNewlines);
+      }).not.toThrow();
+      expect(result).toBeNull();
+    });
   });
 
   describe("defensive non-string-input coercion (d-design-open-questions (b))", () => {

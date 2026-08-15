@@ -35,12 +35,17 @@ function fixturePath(relativePath: string): string {
 /**
  * Reads and JSON-parses a Claude Code fixture, returning `.result` — or
  * `""` when the field is absent (`timeout-sigterm.json` has no `.result` at
- * all), never throwing.
+ * all) or when the file is not valid JSON, never throwing. Symmetric with
+ * `reconstructOpenCodeText`'s tolerance of a malformed/truncated line.
  */
 export function reconstructClaudeCodeResult(relativePath: string): string {
-  const doc = JSON.parse(readFileSync(fixturePath(relativePath), "utf-8")) as {
-    result?: string;
-  };
+  const raw = readFileSync(fixturePath(relativePath), "utf-8");
+  let doc: { result?: string };
+  try {
+    doc = JSON.parse(raw) as { result?: string };
+  } catch {
+    return "";
+  }
   return doc.result ?? "";
 }
 

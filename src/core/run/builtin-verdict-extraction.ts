@@ -2,7 +2,8 @@
  * Core module: run — the built-in `VerdictParser` implementation.
  *
  * Defensive against real engine output: it scans only a bounded tail window
- * of the raw output (never the whole thing), strips narrow ANSI SGR color
+ * of the raw output (at most the full input — a no-op on outputs shorter
+ * than the window, see `computeTailWindow`), strips narrow ANSI SGR color
  * codes before matching, and tolerates markdown-fence wrapping and prose
  * surrounding the marker line. It stays case-sensitive and exact — no fuzzy
  * or fold-cased matching. Hardened by `[E4.F1.H2]` (#27), which replaced the
@@ -39,9 +40,34 @@ const TAIL_CHARS = 2000;
  * result.
  */
 function computeTailWindow(raw: string): string {
-  const tailByLines = raw.split("\n").slice(-TAIL_LINES).join("\n");
+  const tailByLines = lastNLines(raw, TAIL_LINES);
   const tailByChars = raw.slice(-TAIL_CHARS);
   return tailByChars.length > tailByLines.length ? tailByChars : tailByLines;
+}
+
+/**
+ * The last `n` lines of `raw`, equivalent to
+ * `raw.split("\n").slice(-n).join("\n")` but without allocating an array or
+ * a copy for every line in `raw` — it scans backward from the end for the
+ * n-th newline and slices once. Large outputs (the case this optimization
+ * targets) no longer pay an O(length) split just to keep a 30-line tail.
+ */
+function lastNLines(raw: string, n: number): string {
+  let searchEnd = raw.length;
+  for (let i = 0; i < n; i++) {
+    // Guard BEFORE calling lastIndexOf: a negative fromIndex is clamped to 0
+    // by the spec rather than reported as "not found", so searchEnd === 0
+    // must be treated as exhausted here, not fed to lastIndexOf again.
+    if (searchEnd <= 0) {
+      return raw;
+    }
+    const found = raw.lastIndexOf("\n", searchEnd - 1);
+    if (found === -1) {
+      return raw; // fewer than n newlines total: the whole input is <= n lines
+    }
+    searchEnd = found;
+  }
+  return raw.slice(searchEnd + 1);
 }
 
 /**

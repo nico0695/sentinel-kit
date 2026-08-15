@@ -173,6 +173,24 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2: build the three synthetic fixtures under fixtures/synthetic/ (decoy-then-genuine.txt
+      with the mandatory dual size bound >=55 lines AND >=2200 chars, plus the post-build
+      wc/tail check per the spec revalidation fix; contradiction.txt; ansi-wrapped-verdict.txt
+      via printf with literal ESC bytes) and the fixtures/README.md provenance note
+      distinguishing the real captured corpus from the hand-written synthetic set. Data-only,
+      no code touched, zero regression risk (nothing imports these files until ST-3).
+    question: Approve execution of ST-2?
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con ST-2".
+      responded_at: "2026-08-15T16:44:21Z"
+    created_at: "2026-08-15T16:44:21Z"
+    resolved_at: "2026-08-15T16:44:21Z"
   - id: cp-h2-st1-approval
     type: stage_approval
     stage: sddl-executor
@@ -418,4 +436,4 @@ next_action:
     ST-2 (the three synthetic fixtures under fixtures/synthetic/ plus the fixtures/README.md
     provenance note -- data-only, zero regression risk, nothing imports them until ST-3).
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:43:12Z"
+updated_at: "2026-08-15T16:44:21Z"

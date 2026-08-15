@@ -28,6 +28,7 @@ version was never asked to resist. Run the change with deliberately lighter cere
 | S19-D7 | Resolve all three questions design.md escalated (tail-window tie-break, defensive non-string guard, AC-13 automatability) at the orchestrator level rather than sending back for another design pass | Route back to design for a second pass | All three were genuinely A-level once examined: the tie-break turned out to be mathematically immaterial (both windows are suffixes of the same string; equal length implies identical content), the guard was a one-line addition with an attached test condition, and AC-13's mechanical form was one ordinary assertion the design worker had incorrectly ruled out | `claude` |
 | S19-D8 | Add a mandatory ad-hoc evidence obligation to ST-1 (run the four real marker fixtures through the new parser and record the output) before approving it | Approve ST-1 on the strength of the 200-test baseline alone | Plan itself flagged ST-1 as the riskiest stage: it replaces executable code behind a live caller, and none of the 200 pre-existing tests exercise the tail window, the narrowed contradiction scope, or ANSI stripping — the baseline proves "nothing broke," not "the new behavior works" | `claude` |
 | S19-D9 | Detected PR #64 was merged mid-session (via a `git push` remote hint) and rebased the H2 seed commit onto the new `main` instead of continuing on the stale branch | Ignore the hint and keep committing on the old base; ask the user before acting | The branch's PR had closed — new commits on it would not land in any open PR. Rebase was the correct, low-risk recovery (one commit, clean rebase, force-with-lease) and was reported after the fact rather than blocking on it, since it was mechanical and reversible | `claude` |
+| S19-D10 | Fix all 3 PR #65 Copilot review findings directly (tail-window allocation, docstring contradiction, test-loader over-claim) rather than replying without fixing | Reply explaining without fixing; relaunch sddl-executor/qa for a formal amendment stage | All three verified real against source first. Bounded, single-production-file-plus-test-file scope, matching the exemption used for H1's PR #64 review response. None was security-relevant on its own, but the performance finding's fix surfaced and fixed a genuine correctness bug (see Deviations) that would have shipped un-caught otherwise | `claude` |
 
 ## Deviations
 
@@ -59,6 +60,17 @@ version was never asked to resist. Run the change with deliberately lighter cere
 - **PR #64 (H1, from S18) was merged mid-session**, discovered from a `git push` remote hint rather
   than proactively. The branch was rebased onto the new `main` (one commit, clean, force-with-lease)
   before continuing H2 work. See `S19-D9`.
+- **A self-authored optimization introduced a real bug, caught before it reached the repo.**
+  Fixing PR #65's performance finding (replacing `raw.split("\n")` with a backward `lastIndexOf`
+  scan) required a loop that terminates on "no more newlines found". The first version relied on
+  `lastIndexOf` returning `-1` for that signal — but `String.lastIndexOf` clamps a negative
+  `fromIndex` to `0` and then checks index `0` normally, so it can return `0` (a valid index)
+  instead of `-1` when the search has actually run out of room. This broke the exhaustion check
+  for inputs with fewer newlines than the tail-window bound. Found by fuzz-comparing the new
+  implementation against the original `split/slice/join` over ~2000 random cases before
+  committing anything — not by inspection. Fixed with an explicit `searchEnd <= 0` guard checked
+  before each `lastIndexOf` call, re-verified against the same fuzz suite (all equivalent), and
+  pinned with a dedicated regression test. Nothing incorrect was ever committed.
 
 ## Work done
 
@@ -105,6 +117,17 @@ version was never asked to resist. Run the change with deliberately lighter cere
   spec's persistence-deferral paragraph and the `E5.F2.H1` blocker named.
 - **PR #65 opened**: `[E4.F1.H2] Verdict and ambiguity parser`, `Closes #27`. 2 of max 5 PRs open
   (alongside none currently — PR #64 merged this session).
+- **PR #65 review response** (`ef2ffde`): GitHub Copilot's automated review left 3 comments, all
+  verified real before acting. (1) `computeTailWindow`'s `raw.split("\n")` allocated over the
+  full output just to keep a 30-line tail — replaced with a backward `lastIndexOf` scan
+  (`lastNLines`), fuzz-verified equivalent to the original over ~2000 random cases before
+  committing. The rewrite itself surfaced a genuine bug (`String.lastIndexOf` clamps a negative
+  `fromIndex` to `0` instead of "not found", breaking the loop's exhaustion check) — caught by
+  the same fuzz comparison, fixed, and pinned with a new regression test. (2) The file header
+  contradicted `computeTailWindow`'s own doc ("never the whole thing" vs. "at most") — aligned.
+  (3) The test-only fixture loader's "never throwing" doc-comment was false for malformed JSON —
+  made tolerant, matching its sibling function's existing pattern. Full gate re-verified green
+  (226/226); replied on all three PR threads with the fix commit.
 - **Mid-session recovery**: rebased the branch onto `main` @ `5ae835c` (post-PR-#64-merge) after
   detecting the merge from a `git push` hint; force-with-lease pushed the single unmerged H2-seed
   commit on top.

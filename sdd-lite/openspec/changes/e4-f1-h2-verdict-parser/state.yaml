@@ -170,10 +170,11 @@ checkpoints:
     question: Approve execution of ST-1?
     free_input_allowed: true
     response:
-      selected_option_id: pending
-      responded_at: ""
+      selected_option_id: approve
+      free_text: User approved with "si, comenzar con S1".
+      responded_at: "2026-08-15T16:38:14Z"
     created_at: "2026-08-15T16:31:43Z"
-    resolved_at: ""
+    resolved_at: "2026-08-15T16:38:14Z"
   - id: cp-h2-spec-approval
     type: stage_approval
     stage: sddl-spec
@@ -194,7 +195,7 @@ checkpoints:
         pre-authorization rather than re-asking.
       responded_at: "2026-08-15T16:21:23Z"
     created_at: "2026-08-15T16:09:51Z"
-    resolved_at: ""
+    resolved_at: "2026-08-15T16:38:14Z"
   - id: cp-h2-proposal-decisions
     type: risk_review
     stage: orchestrator
@@ -399,4 +400,4 @@ next_action:
     stage, now carrying an added four-fixture evidence obligation. ST-2 (fixtures) and ST-3
     (tests + full gate) follow behind their own gates.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:31:43Z"
+updated_at: "2026-08-15T16:38:14Z"

@@ -4,22 +4,22 @@
 
 - change_name: e4-f1-h2-verdict-parser
 - route: continue-lite
-- latest_stage_id: ST-2
+- latest_stage_id: ST-3
 - latest_stage_status: completed
-- latest_files_changed: `fixtures/synthetic/decoy-then-genuine.txt` (new, 62 lines / 7714 chars), `fixtures/synthetic/contradiction.txt` (new, 5 lines / 96 chars), `fixtures/synthetic/ansi-wrapped-verdict.txt` (new, 29 bytes, no trailing newline), `fixtures/README.md` (+8 lines, append-only provenance section)
-- latest_check_result: `npm run check` green (78 files clean, 0 depcruise violations); `npm test` 200/200 (15 files, unchanged from baseline — fixtures are inert); all three mandatory build/verify checks passed with large margin (see ST-2 Evidence)
-- latest_next_action: request user approval to launch ST-3 (fixture-reconstruction loader + full 16-AC test file + full gate)
+- latest_files_changed: `src/core/run/__test__/verdict-fixture-loader.ts` (new, 76 lines), `src/core/run/__test__/builtin-verdict-extraction.test.ts` (new, 244 lines, 25 `it` blocks)
+- latest_check_result: `npx vitest run --project core -t "extractBuiltInVerdict"` → 25/25 passed; `npx vitest run --project core` → 172/172 (147 pre-existing + 25 new); `npm run check` green (biome 80 files clean, `tsc --noEmit` clean, `depcruise src` 56 modules / 104 dependencies, 0 violations — identical counts to ST-2's baseline); `npm test` → 225/225 (200 pre-existing + 25 new, 16 test files); `git status --short` shows exactly the two new test files, nothing else; AC-13 grep against `index.ts` returns no match (exit 1)
+- latest_next_action: change is ready for `sddl-qa-review` (final mode)
 
 ## Summary
 
 - change_name: e4-f1-h2-verdict-parser
 - objective: new-feature
 - route: continue-lite
-- lifecycle_status: implementing
-- current_stage_id: ST-2
+- lifecycle_status: implemented
+- current_stage_id: ST-3
 - execution_source: plan-stage-table
-- qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
-- git_side_effects: none (no commit made by this or the prior stage; working tree left with ST-1's four modified files plus ST-2's three new fixture files and the README edit, all uncommitted)
+- qa_handoff_policy: `sddl-qa-review` (final mode) next — all three stages complete, full gate green
+- git_side_effects: none (no commit made by this stage; working tree left with the two new test files under `src/core/run/__test__/`, uncommitted, on top of whatever commit state ST-1/ST-2 were left in)
 
 ## Stage Overview
 
@@ -27,7 +27,7 @@
 |---|---|---|---|---|---|---|
 | ST-1 | Replace `extractBuiltInVerdict`'s body with the three-helper defensive parser in the pinned pipeline order; update the four H1→H2 doc comments to past tense | yes | approved (`cp-h2-st1-approval`) | completed | 2026-08-15 | Riskiest stage per `plan.md`; witnessed by the 200-test baseline plus the mandatory four-fixture evidence run (`d-st1-evidence-obligation`) |
 | ST-2 | Build the three synthetic fixtures under `fixtures/synthetic/` and append the provenance note to `fixtures/README.md` | no | approved (`cp-h2-st2-approval`) | completed | 2026-08-15 | Fixtures-only; inert until ST-3 imports them. All three mandatory build/verify checks passed with large margin |
-| ST-3 | Write the fixture-reconstruction loader and the full 16-AC test file; run the full gate | yes | pending | pending | — | Only stage that imports both ST-1's implementation and ST-2's fixtures |
+| ST-3 | Write the fixture-reconstruction loader and the full 16-AC test file; run the full gate | yes | approved (`cp-h2-st3-approval`) | completed | 2026-08-15 | Final stage. Only stage that imports both ST-1's implementation and ST-2's fixtures. All 16 ACs proven; full gate green |
 
 ## Execution Rules
 
@@ -214,3 +214,113 @@
 - Quality gate is green (`npm run check`) and the pre-existing suite is unchanged at 200/200, as the plan predicted for this fixtures-only, inert stage.
 - Nothing outside the four planned paths was touched; no `src/` file, no test file, `fixtures/claude-code/`, and `fixtures/opencode/` are all untouched.
 - Next: approve ST-3 (the fixture-reconstruction loader `verdict-fixture-loader.ts` and the full 16-AC test file `builtin-verdict-extraction.test.ts`, then the full gate) — the only remaining stage, and the only one that imports both ST-1's implementation and ST-2's fixtures.
+
+### Stage `ST-3`
+
+- stage_digest: Wrote the test-only fixture-reconstruction helper (`verdict-fixture-loader.ts`) and the full `builtin-verdict-extraction.test.ts` suite (25 `it` blocks across 8 `describe` groups), covering every AC that spec.md assigns a unit test to, plus the `d-design-open-questions` (b) defensive-guard cast test and the `d-design-open-questions` (c) AC-13 mechanical export assertion. Ran the full gate: fast loop, `npm run check`, `npm test`, scope check, AC-13 independent grep. This is the final stage of the change.
+- approval_checkpoint_id: `cp-h2-st3-approval`
+- approval_decision_id: user approved ST-3 at `cp-h2-st3-approval` ("si, comenzar con ST-3", recorded in `state.yaml`)
+- planned_scope: `src/core/run/__test__/verdict-fixture-loader.ts` (new), `src/core/run/__test__/builtin-verdict-extraction.test.ts` (new)
+- actual_files_changed: same two paths, no deviation — `verdict-fixture-loader.ts` (76 lines), `builtin-verdict-extraction.test.ts` (244 lines, 25 `it` blocks)
+- touches_code: yes (test-only; no production file, no fixture file)
+- quick_check_status: passed
+- qa_review_status: pending — `sddl-qa-review` (final mode) is the recommended next stage
+- execution_status: completed
+- next_action: change ready for `sddl-qa-review`
+
+#### Planned Work
+
+- Create `src/core/run/__test__/verdict-fixture-loader.ts`: three exported reconstruction functions (`reconstructClaudeCodeResult`, `reconstructOpenCodeText`, `readPlainTextFixture`) plus a file-private `fixturePath` helper using `import.meta.url`-based path resolution, exactly per `design.md`'s sketch.
+- Create `src/core/run/__test__/builtin-verdict-extraction.test.ts` covering all 16 ACs: AC-1 (4 real marker fixtures), AC-2 (8 real negative controls, with the corrected `opencode/no-verdict.ndjson` characterization), AC-3/AC-4/AC-5 (3 synthetic fixtures), AC-6 (case sensitivity), AC-7 (fuzzy-match rejection), AC-8 (fence tolerance), AC-9 (repeated-value collapse), AC-10 (empty/absent input), plus the `d-design-open-questions` (b) defensive-guard cast test, plus AC-13's mechanical export assertion. AC-11/AC-12/AC-14/AC-15/AC-16 are process/validation steps, not unit tests, per `spec.md`'s own Validation Hint column and `design.md`'s AC→test mapping.
+- Run the fast loop (`npx vitest run --project core -t "extractBuiltInVerdict"`), then the full gate (`npm run check && npm test`), then the scope check (`git status --short` / `git diff --stat`), then the independent AC-13 grep.
+- Do not touch `src/core/run/builtin-verdict-extraction.ts`, `run-review.ts`, `index.ts`, `verdict.ts`, or any file under `fixtures/`.
+
+#### Preconditions And Sync Checks
+
+- `plan.md` (ST-3 row, the "Traps" section, the AC ownership table), `spec.md` (all 16 ACs, Validation Hints read literally), `design.md` (the exact test layout, the fixture-loader sketch, the AC→test mapping table), and `state.yaml` (decisions `d-design-open-questions` and `d-st1-evidence-obligation`) all re-read before writing.
+- `execution-log.md`'s ST-1 and ST-2 entries re-read; not erased, format matched for this ST-3 entry.
+- Source under test re-read in full: `builtin-verdict-extraction.ts` (98 lines — exported `extractBuiltInVerdict`, file-private `computeTailWindow`/`stripAnsiSgr`/`collectDistinctVerdicts`, `TAIL_LINES = 30`/`TAIL_CHARS = 2000`), `verdict.ts`, `index.ts` — confirmed `extractBuiltInVerdict` absent from `index.ts`'s export list going in.
+- Full fixture set re-read directly (not trusted from prior notes alone): all 6 `fixtures/claude-code/*` files, all 6 `fixtures/opencode/*` files, all 3 `fixtures/synthetic/*` files. Independently confirmed: `claude-code/timeout-sigterm.json` has no `.result` field at all (reconstructs to `""`); `opencode/no-verdict.ndjson` has exactly 2 `type: "text"` events (~440 chars combined: "I'm checking the surrounding file..." plus a "Findings:" paragraph), no marker line — matches the corrected characterization in `plan.md` trap 2 and `state.yaml`, not "empty"; `opencode/context-overflow.ndjson` and `opencode/timeout-sigterm-partial.ndjson` have zero `text` events each (reconstruct to `""` — genuinely empty, the other sub-case of rule 4).
+- Test conventions read: `run-review.test.ts` and `run-review-fixtures.ts` (naming, `describe`/`it` nesting, `.js`-extension imports). Confirmed by grep across `src/` that no existing test reads a fixture file from disk via `readFileSync`/`import.meta.url` — the fixture-loader pattern is new, as `design.md` anticipated.
+- `.dependency-cruiser.cjs` re-read: confirmed the `exclude: { path: "(^|/)__test__/" }` rule (line 91) sanctions `verdict-fixture-loader.ts`'s `node:fs`/`node:url` imports.
+- Working tree at stage start: `git status --short` showed no pending changes (ST-1/ST-2 were already committed by a prior session — `git log` shows `06a6ee0` and `08ecd01` — so this stage started from a clean tree, not an uncommitted one as the ST-2 handoff digest anticipated; noted as a factual correction below, not a scope problem, since ST-3's own planned scope is unaffected).
+- Baseline re-measured immediately before writing: `npx vitest run --project core` → 147 passed (11 files); `npm test` → 200 passed (200), 15 test files — matches `plan.md`'s recorded baseline exactly.
+
+#### Changes Applied
+
+- `src/core/run/__test__/verdict-fixture-loader.ts` (new, 76 lines) — `fixturePath` (file-private, `import.meta.url` + `fileURLToPath`, 4 levels up to repo root), `reconstructClaudeCodeResult` (JSON-parses, returns `.result ?? ""`), `reconstructOpenCodeText` (splits on `\n`, JSON-parses each non-blank line inside a `try`/`catch` that skips a truncated final line, concatenates every `type === "text"` event's `part.text`), `readPlainTextFixture` (verbatim `readFileSync`). Matches `design.md`'s sketch with no behavioral deviation.
+- `src/core/run/__test__/builtin-verdict-extraction.test.ts` (new, 244 lines, 25 `it` blocks in 8 `describe` groups): `real fixtures — marker-bearing (AC-1)` (4 its), `real fixtures — negative controls (AC-2)` (8 its, `opencode/no-verdict.ndjson`'s it-name and a `.length > 400` assertion state the corrected real-prose characterization explicitly, not "empty"), `synthetic fixtures (AC-3, AC-4, AC-5)` (3 its — AC-5's it makes both the stripped-result assertion and the raw-regex control assertion in the same test), `case sensitivity (AC-6)` (2 its), `fuzzy-match rejection (AC-7)` (2 its), `fence tolerance (AC-8)` (1 it), `repeated-value collapse (AC-9)` (1 it), `empty / absent input (AC-10)` (2 its), `defensive non-string-input coercion (d-design-open-questions (b))` (1 it, explicit `123 as unknown as string` cast), `not exported from the module's public index (AC-13, mechanical)` (1 it, `Object.keys(runIndex)` against all four names).
+
+#### Scope And Blast Radius Notes
+
+- `git status --short` after the stage: exactly two untracked files, `src/core/run/__test__/verdict-fixture-loader.ts` and `src/core/run/__test__/builtin-verdict-extraction.test.ts` — no modified file, no other untracked file. `git diff --stat` is empty (both new files are untracked, not modifications to tracked files); the untracked listing is the complete diff footprint for this stage.
+- No production file touched: `builtin-verdict-extraction.ts`, `run-review.ts`, `index.ts`, `verdict.ts` all absent from `git status --short`. No fixture file touched: `fixtures/` shows no changes.
+- AC-13 reconfirmed independently: `grep -E "extractBuiltInVerdict|computeTailWindow|stripAnsiSgr|collectDistinctVerdicts" src/core/run/index.ts` → no output, exit 1 — matches the new mechanical test's own assertion (belt-and-suspenders, per the stage instructions).
+- No new import added anywhere outside the two new test files; both are excluded from `depcruise src` by the `__test__/` rule, confirmed by `npm run check`'s unchanged dependency count (56 modules / 104 dependencies — identical to ST-1/ST-2's baseline, since test-only files add no cruised edge).
+
+#### Quick Check
+
+- checks_planned: fast loop (`npx vitest run --project core -t "extractBuiltInVerdict"`); `npx vitest run --project core` (full core project); `npm run check`; `npm test` (full suite, 200 existing + new); `git status --short` / `git diff --stat` scope review; independent AC-13 grep.
+- checks_run:
+  - Fast loop → passed on the second attempt. First attempt failed `npm run check`'s biome step with two formatting findings (import-order in `builtin-verdict-extraction.test.ts`'s named import block, and three multi-line call sites biome's formatter collapses to single-line under this repo's line width) — not a logic error, a house-style formatting gap between the initial draft and the project's biome config. Fixed with `npx biome check --write` on the two new files (see Decisions below). Second run: 25/25 passed.
+  - `npx vitest run --project core` → 172/172 passed (147 pre-existing + 25 new), 12 test files (11 pre-existing + 1 new), 0 failures.
+  - `npm run check` → passed after the biome auto-fix: biome 80 files clean (78 pre-existing + 2 new), `tsc --noEmit` clean, `depcruise src` — 56 modules / 104 dependencies, 0 violations, identical counts to ST-1/ST-2's baseline (test-only files are excluded from cruising).
+  - `npm test` → passed, 16 test files (15 pre-existing + 1 new), 225/225 (200 pre-existing + 25 new), 0 failures.
+  - `git status --short` → exactly the two new files, untracked, nothing else. `git diff --stat` → empty (no tracked file modified).
+  - Independent AC-13 grep (`grep -E "extractBuiltInVerdict|computeTailWindow|stripAnsiSgr|collectDistinctVerdicts" src/core/run/index.ts`) → no output, exit 1.
+- checks_skipped: none.
+- findings_summary: one formatting fix cycle (biome import-order + line-collapse, resolved with `biome check --write` on the two new files, no logic change); no other warnings, no failures, no test regressions; full suite grew from 200 to 225 exactly as the plan's budget note predicted (~24 new, actual 25).
+- continue_recommendation: continue — change is complete, route to `sddl-qa-review` (final mode).
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `npx vitest run --project core -t "extractBuiltInVerdict"` | 1 test file, 25/25 passed |
+| command | `npx vitest run --project core` | 12 test files, 172/172 passed (147 pre-existing + 25 new) |
+| command | `npm run check` | biome 80 files clean (after `biome check --write` fix) · `tsc --noEmit` clean · `depcruise src`: 56 modules / 104 dependencies, 0 violations — identical to ST-1/ST-2's baseline |
+| command | `npm test` | 16 test files / 225 tests passed (200 pre-existing + 25 new), 0 failures |
+| command | `git status --short` | `?? src/core/run/__test__/builtin-verdict-extraction.test.ts` / `?? src/core/run/__test__/verdict-fixture-loader.ts` — exactly the planned two files |
+| command | `git diff --stat` | empty — both new files are untracked, no tracked file modified |
+| command | `grep -E "extractBuiltInVerdict\|computeTailWindow\|stripAnsiSgr\|collectDistinctVerdicts" src/core/run/index.ts` | no output, exit 1 — AC-13 independently reconfirmed alongside the new mechanical test |
+| file | `src/core/run/__test__/verdict-fixture-loader.ts` | 76 lines: `fixturePath` (file-private) + 3 exported reconstruction functions |
+| file | `src/core/run/__test__/builtin-verdict-extraction.test.ts` | 244 lines, 25 `it` blocks across 8 `describe` groups, covering AC-1..AC-10, AC-13, and the defensive-guard cast test |
+
+#### AC → Test Evidence Table (16/16)
+
+| AC | Proving test / validation step | Result |
+|---|---|---|
+| AC-1 | 4 `it`s, "real fixtures — marker-bearing" — `valid-verdict.json`, `noisy-output.json`, `valid-verdict.ndjson`, `noisy-output.ndjson`, all asserting `"request-changes"` | pass |
+| AC-2 | 8 `it`s, "real fixtures — negative controls" — `no-verdict.json`, `auth-error.json`, `context-overflow.json`, `timeout-sigterm.json`, `no-verdict.ndjson` (corrected real-prose description), `context-overflow.ndjson`, `timeout-sigterm-partial.ndjson`, `unknown-model-stdout.txt`, all asserting `null` inside a `not.toThrow()` wrapper | pass |
+| AC-3 | 1 `it`, "synthetic fixtures" — `decoy-then-genuine.txt` asserts `"approve"`, explicitly not `"comment"`, not `null` | pass |
+| AC-4 | 1 `it`, "synthetic fixtures" — `contradiction.txt` asserts `null` | pass |
+| AC-5 | 1 `it`, "synthetic fixtures" — `ansi-wrapped-verdict.txt`: stripped result is `"approve"` AND the raw string fails the bare marker regex, both assertions in the same `it` | pass |
+| AC-6 | 2 `it`s, "case sensitivity" — `"verdict: approve"` and `"Verdict: Approve"`, both `null` | pass |
+| AC-7 | 2 `it`s, "fuzzy-match rejection" — `"VERDICT : approve"` and `"VERDICT-approve"`, both `null` | pass |
+| AC-8 | 1 `it`, "fence tolerance" — marker as the sole line inside a bare ` ``` ` fence, resolves `"approve"` | pass |
+| AC-9 | 1 `it`, "repeated-value collapse" — two identical `VERDICT: approve` lines resolve `"approve"`, not `null` | pass |
+| AC-10 | 2 `it`s, "empty / absent input" — `""` and a >2000-char marker-less string, both `null`, both inside `not.toThrow()` | pass |
+| AC-11 | Not a unit test — persistence deferral paragraph (`spec.md`, "Persistence deferral") is copy-ready for issue #27's checklist; a PR-open manual step, not this stage's to perform | noted, deferred to PR-open (as scoped) |
+| AC-12 | Not a unit test — `git status --short` / `git diff --stat` confirm ST-3 touches only the two new test files; `run-review.ts`/`index.ts`/`verdict.ts` are untouched in this stage (their comment-only diffs were already reconfirmed in ST-1) | pass |
+| AC-13 | Mechanical test, "not exported from the module's public index" — `Object.keys(runIndex)` excludes all four names — PLUS the independent `grep` re-run in Scope Notes above (belt-and-suspenders, both green) | pass |
+| AC-14 | `npm run check` (`depcruise src`) — 56 modules / 104 dependencies, 0 violations, identical to the pre-ST-3 baseline; no new cross-module import | pass |
+| AC-15 | `git status --short` / `git diff --stat` — diff touches only `src/core/run/__test__/verdict-fixture-loader.ts` and `src/core/run/__test__/builtin-verdict-extraction.test.ts`, both under the allowed `src/core/run/__test__/**` scope | pass |
+| AC-16 | Full gate — `npm run check` green, `npm test` 225/225 (200 pre-existing + 25 new), every pre-existing test still passing | pass |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** the initial draft of `builtin-verdict-extraction.test.ts` failed `npm run check`'s biome step on two purely stylistic findings (named-import ordering, and three call sites the formatter prefers collapsed to a single line under this repo's configured line width). Fixed by running `npx biome check --write` scoped to the two new files — no test logic, assertion, or fixture content changed; only import order and line-wrapping. Not a deviation from `design.md` or `plan.md` in substance, since both left formatting to the project's own tool rather than specifying it.
+- **A-level (internal, logged):** `git status --short` at stage start showed a clean tree, not the "ST-1's four modified files plus ST-2's three new fixture files, all uncommitted" state the ST-2 handoff digest described — `git log` confirms ST-1 and ST-2 were committed by a prior session (`06a6ee0`, `08ecd01`) between the ST-2 handoff and this stage's start. This is a factual correction to the handoff digest's assumption, not a scope or safety problem: ST-3's planned scope (two new test files) is unaffected either way, and this stage still made no commit of its own, per its instructions.
+- **A-level (internal, logged):** the fixture-loader's `reconstructOpenCodeText` is written exactly per `design.md`'s sketch (line-by-line JSON parse inside a `try`/`catch` that `continue`s past a malformed line) — independently verified against all 6 real `opencode/*` fixtures during this stage, including confirming `no-verdict.ndjson`'s exact 2-text-event / ~440-char shape and `context-overflow.ndjson` / `timeout-sigterm-partial.ndjson`'s zero-text-event shape, before writing the corresponding `it` blocks — no deviation.
+- **No deviation from `design.md`'s test-file layout, `describe`/`it` structure, or the fixture-loader's three-function shape.** All 16 ACs mapped 1:1 to `design.md`'s AC→test table, with the `d-design-open-questions` (b) and (c) obligations added exactly where `plan.md` and `state.yaml` place them.
+- Blockers: none. The formatting fix cycle was resolved within the stage without escalation; flagged here for transparency, matching the same pattern ST-1 used for its lint-suppression addition.
+
+#### User-Facing Summary
+
+- ST-3 is done, and it is the final stage of this change: `verdict-fixture-loader.ts` (test-only fixture reconstruction) and `builtin-verdict-extraction.test.ts` (25 tests across 8 `describe` groups) now prove all 16 spec.md ACs — either as a passing unit test (AC-1..AC-10, AC-13, the defensive-guard cast test) or as a validation step recorded above (AC-11, AC-12, AC-14, AC-15, AC-16).
+- Full gate is green: `npm run check` clean, `npm test` at 225/225 (200 pre-existing tests unchanged, 25 new), `git status --short` showing only the two new test files.
+- AC-13 is now mechanically enforced, not just source-inspected: a dedicated test imports the `index.ts` namespace and asserts none of the four internal names appear in it, and an independent `grep` re-confirms the same thing outside the test suite.
+- The `d-design-open-questions` (b) defensive non-string-input guard is now exercised by a test using an explicit `as unknown as string` cast, closing the previously-untested-branch objection.
+- One minor formatting fix cycle (biome import order / line-wrapping on the two new files) — no logic change.
+- Nothing outside the two planned test files was touched; no production file, no fixture file, in this stage's diff.
+- Next: this change is ready for `sddl-qa-review` (final mode) — all three stages complete, all 16 ACs proven, full gate green.

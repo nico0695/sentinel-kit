@@ -135,7 +135,7 @@ stages:
       executable behaviour change whose only witness is the pre-existing suite.
       ORCHESTRATOR ADDITION to ST-1's exit criteria (A-level, see d-st1-evidence-obligation).
   sddl-executor:
-    status: in_progress
+    status: completed
     started_at: "2026-08-15T16:43:12Z"
     last_updated_at: "2026-08-15T16:43:12Z"
     notes: >-
@@ -168,6 +168,27 @@ stages:
       independently by the orchestrator: npm run check green (unchanged from ST-1 baseline),
       npm test 200/200 unchanged (fixtures are inert until ST-3 imports them), diff exactly the
       4 approved paths. ST-3 (final stage) still user-gated.
+
+      ST-3 COMPLETE (status success) -- FINAL execution stage. Created
+      __test__/verdict-fixture-loader.ts (76 lines, test-only scaffolding: .result extraction
+      for Claude Code JSON, text-event concatenation for OpenCode NDJSON tolerating the
+      truncated final line, plain-text read for the synthetic fixtures and
+      unknown-model-stdout.txt) and __test__/builtin-verdict-extraction.test.ts (244 lines, 25
+      tests). All 16 ACs covered: AC-1..AC-10 and AC-13 as real unit tests (AC-13 upgraded to
+      the mechanical Object.keys(index namespace) assertion per d-design-open-questions), the
+      defensive-guard cast test proving the coercion branch is exercised (not merely present),
+      AC-2's opencode/no-verdict.ndjson test uses the CORRECTED characterization (real prose,
+      length asserted >400 chars) rather than the false "empty" description the spec
+      revalidation caught upstream, AC-3 asserts the decoy fixture resolves to "approve" AND
+      explicitly not "comment"/null, AC-5 carries both required assertions (stripped matches,
+      raw does not) in one test. AC-11/12/14/15/16 correctly left as process/inspection steps
+      per spec.md's own Validation Hint column, not forced into unit tests. Full source of both
+      files read and reviewed by the orchestrator -- matches design.md's plan, no vacuous
+      assertions found. Exit checks independently re-run: npm run check green (80 files,
+      depcruise 56/104 unchanged), npm test 225/225 (200 baseline + 25 new), diff exactly the
+      two new test files, AC-13 grep independently reproduced (exit 1, no match). No
+      deviation between spec/design/plan and actual behaviour. ALL THREE STAGES OF THIS CHANGE
+      NOW COMPLETE. Ready for sddl-qa-review (final mode).
   sddl-code-review:
     status: pending
     notes: >-
@@ -464,11 +485,12 @@ open_risks:
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
   kind: ask_user
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    ST-2 complete and independently verified (build checks reproduced, README diff clean,
-    gate unchanged). Next: stage_approval for ST-3, the final stage -- fixture-reconstruction
-    loader plus the full 16-AC test suite plus the whole-change gate. On green, this change is
-    ready for sddl-qa-review.
+    All three execution stages complete and independently verified (ST-1 parser, ST-2
+    synthetic fixtures, ST-3 loader + 25-test suite). 16/16 ACs proven, full gate green
+    (225/225), zero deviations across the whole change. Waiting on user approval to launch
+    sddl-qa-review in final mode -- the closeout review, the only stage that may mark the
+    change completed.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T17:49:03Z"
+updated_at: "2026-08-15T17:55:12Z"

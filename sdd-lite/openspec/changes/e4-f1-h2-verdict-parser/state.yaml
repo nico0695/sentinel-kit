@@ -56,8 +56,9 @@ stages:
       fixed: tail-window provenance (union of last 30 lines / last 2000 chars), fence
       tolerance, whole-window scan, empty-input tolerance, narrow ANSI-CSI stripping, exact
       case-sensitive match -- plus H1's inherited fail-closed contradiction rule, now scoped to
-      the tail window. Three synthetic fixtures specified byte-exact (decoy-then-genuine,
-      contradiction, ansi-wrapped) under fixtures/synthetic/, explicitly excluded from the
+      the tail window. Three synthetic fixtures specified structurally (decoy-then-genuine,
+      contradiction, ansi-wrapped; only the ANSI one is literally byte-exact -- the other two
+      are specified by structure plus hard size bounds) under fixtures/synthetic/, explicitly excluded from the
       >=90% real-corpus figure and made the sole mandatory evidence (AC-3/AC-4) for the
       provenance/contradiction properties -- converts the proposal's chief risk finding into a
       must-pass criterion rather than leaving it as commentary. 16 ACs total. Persistence
@@ -65,6 +66,36 @@ stages:
       verified AC-1's four expected values against source (all four real marker fixtures do
       read "request-changes") and the regex against PRD Sec9's glossary. PRD Sec4 "at the top"
       vs corpus reality flagged non-blocking in Approval Notes, per proposal.
+
+      SPEC REVALIDATION ROUND (user-requested, before the design gate). An adversarial
+      fresh-context validator (Sonnet, read-only) was run against spec.md with a mandate to
+      find false claims, vacuous-test risks, internal contradictions and dropped requirements,
+      in parallel with the orchestrator's own checks. Verdict `sound-with-fixes`: no dropped
+      requirements (all 5 binding decisions faithfully restated), but 3 MAJOR + 3 MINOR
+      findings, all confirmed against source by the orchestrator before acting and all fixed
+      in place:
+      (1) MAJOR, factual -- rule 4 cited opencode/no-verdict.ndjson as having "no text events,
+      empty reconstructed text". FALSE: it has 2 text events with ~449 chars of real prose.
+      The error originated in proposal.md's inventory table (the document the spec worker was
+      told to trust) and propagated. Both documents corrected; rule 4 now separates
+      genuinely-empty inputs from real-content-without-marker inputs and names which fixtures
+      belong to each, since they prove different properties.
+      (2) MAJOR, buildability trap -- decoy-then-genuine.txt gave a 55-line hint AND a
+      "decoy outside both windows" constraint that the hint does not imply. With short filler
+      the file falls under 2000 chars, the char-window degenerates to the whole file, wins the
+      union, readmits the decoy, trips the contradiction rule and the fixture resolves null,
+      FAILING AC-3 rather than passing it. Fixed with a mandatory dual bound (>=55 lines AND
+      >=2200 chars) plus an explicit post-build check.
+      (3) MAJOR, unhandled consequence -- fixtures/README.md frames the whole tree as "real
+      captured outputs"; adding fixtures/synthetic/ falsifies that, and AC-15's allowed-diff
+      list omitted the README, so an executor fixing the doc would trip the scope check.
+      Independently found by the orchestrator too. README provenance note added to In Scope
+      and to AC-15.
+      (4-6) MINOR -- "never the full output" corrected to "at most" (verified: valid-verdict
+      is 402 chars/4 lines, so the window IS the whole output there); routing digest said 3
+      doc-comment files where the body says 4; AC-12's hint omitted index.ts. All corrected.
+      Also corrected here: this note previously overstated the synthetic fixtures as
+      "byte-exact".
   sddl-design:
     status: pending
   sddl-plan:
@@ -100,8 +131,15 @@ checkpoints:
     question: Approve the spec and route to sddl-design?
     free_input_allowed: true
     response:
-      selected_option_id: pending
-      responded_at: ""
+      selected_option_id: approve-after-revalidation
+      free_text: >-
+        User asked to revalidate the spec first ("quiero revalidarlo por si encontramos alguna
+        diferencia o algo a corregir y si esta todo ok avanzar a design"), explicitly
+        anticipating corrections. The adversarial validation round ran, found 3 MAJOR + 3 MINOR
+        issues, all were verified against source and fixed in place, and the approval condition
+        is treated as met on the corrected spec. Advancing to sddl-design under that
+        pre-authorization rather than re-asking.
+      responded_at: "2026-08-15T16:21:23Z"
     created_at: "2026-08-15T16:09:51Z"
     resolved_at: ""
   - id: cp-h2-proposal-decisions
@@ -255,11 +293,13 @@ open_risks:
       "thinking" section, or a summary that restates it differently. Whether position or context
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
-  kind: ask_user
+  kind: continue
   target: sddl-design
   summary: >-
-    spec.md complete and independently verified by the orchestrator. Waiting on stage_approval
-    at cp-h2-spec-approval to route to sddl-design (internal function decomposition and the
-    exact test-file layout under src/core/run/__test__/).
+    spec.md revalidated adversarially and corrected (3 MAJOR + 3 MINOR findings fixed;
+    proposal.md's inventory table corrected too, since one false claim originated there).
+    Routing to sddl-design: internal function decomposition (tail-window computation, SGR
+    stripping, matching), the exact test-file layout under src/core/run/__test__/, and how the
+    12 real fixtures get their reconstructed text into the tests.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:09:51Z"
+updated_at: "2026-08-15T16:21:23Z"

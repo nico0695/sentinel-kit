@@ -97,7 +97,23 @@ stages:
       Also corrected here: this note previously overstated the synthetic fixtures as
       "byte-exact".
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T16:27:22Z"
+    completed_at: "2026-08-15T16:27:22Z"
+    notes: >-
+      design.md written by a Sonnet worker. Decomposition: extractBuiltInVerdict keeps its name
+      and signature and becomes a thin orchestrator over three file-private helpers --
+      computeTailWindow (rule 1), stripAnsiSgr (rule 5), collectDistinctVerdicts (rules 2/3/6,
+      merged with the good argument that those three rules are the ABSENCE of special-casing,
+      not separable code). Pipeline order pinned as spec fixed it (window on raw, then strip,
+      then split/trim/match/collect/decide), with the ANSI-bytes-count-toward-budget consequence
+      restated rather than reordered. New test file
+      __test__/builtin-verdict-extraction.test.ts plus a test-only
+      __test__/verdict-fixture-loader.ts for envelope reconstruction (import.meta.url path
+      resolution; verified no existing test reads fixtures from disk, so the pattern is new and
+      designed explicitly). 16/16 ACs mapped. Worker correctly flagged 3 open questions instead
+      of settling them silently; all three resolved by the orchestrator (A-level) -- see
+      d-design-open-questions.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -195,6 +211,35 @@ checkpoints:
     created_at: "2026-08-15T15:56:05Z"
     resolved_at: "2026-08-15T15:56:05Z"
 decisions:
+  - id: d-design-open-questions
+    rationale: >-
+      A-level x3, orchestrator, resolving the open questions sddl-design correctly escalated
+      rather than baking in silently.
+      (1) TAIL-WINDOW TIE-BREAK IS VACUOUS -- the design proposed keeping `tailByLines` as the
+      tie-winner and warned that an equal-length tie could select different starting content.
+      That premise is false and the concern is removed rather than carried: both candidates are
+      SUFFIXES of the same raw string (split/slice/join on "\n" round-trips exactly, and
+      slice(-N) is a suffix by definition), and two suffixes of one string with equal length are
+      necessarily identical. The `>` vs `>=` choice therefore cannot affect any input. Keep the
+      code as written, but document it as provably immaterial instead of as a conservative
+      default, so no future reader re-litigates a non-choice.
+      (2) DEFENSIVE NON-STRING GUARD: ACCEPTED, WITH A TEST. The one-line coercion stays. It is
+      not dead code in practice: extractBuiltInVerdict is the DEFAULT behind
+      `deps.parseVerdict ??`, fed by engineResult.output, and the E4.F2 adapters that will
+      produce that value parse JSON at a real JS boundary where a malformed field can yield a
+      non-string despite the port's type. The "never throws" guarantee is inherited from H1 and
+      is worth one line. Condition attached: it must be exercised by a test using an explicit
+      cast, so the change does not add an untested branch -- which was the only real objection.
+      (3) AC-13 IS AUTOMATABLE; THE DESIGN'S REASON FOR NOT AUTOMATING IT IS WRONG. The design
+      declined an automated export check on the premise that enforcement would require a
+      ts-expect-error-style negative test, which is unusual house style. It does not: a
+      positive-space assertion -- import the module namespace from ../index.js and assert
+      Object.keys() does not contain "extractBuiltInVerdict" -- is one ordinary line, matches
+      house style, and mechanically catches the real regression (a future edit re-exporting the
+      internal). Added as an obligation for the plan/executor. This upgrades AC-13 from a manual
+      inspection step to a mechanically enforced one; spec.md's Validation Hint stays valid
+      since it named source inspection as sufficient, not as maximal.
+    recorded_at: "2026-08-15T16:27:22Z"
   - id: d-synthetic-adversarial-fixtures
     checkpoint_id: cp-h2-proposal-decisions
     selected_option_id: synthetic-yes+generous-window
@@ -294,12 +339,12 @@ open_risks:
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
   kind: continue
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    spec.md revalidated adversarially and corrected (3 MAJOR + 3 MINOR findings fixed;
-    proposal.md's inventory table corrected too, since one false claim originated there).
-    Routing to sddl-design: internal function decomposition (tail-window computation, SGR
-    stripping, matching), the exact test-file layout under src/core/run/__test__/, and how the
-    12 real fixtures get their reconstructed text into the tests.
+    design.md complete; its three escalated open questions resolved A-level
+    (d-design-open-questions): tie-break proven immaterial, defensive guard kept but now owes a
+    cast-based test, AC-13 upgraded to a mechanical export assertion. Plan stage should produce
+    ~3 executor stages per d-lightweight-ceremony and carry those three obligations forward
+    explicitly so the executor does not have to re-derive them.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:21:23Z"
+updated_at: "2026-08-15T16:27:22Z"

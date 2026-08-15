@@ -46,7 +46,25 @@ stages:
       adversarial or contradiction case. Routed to the user as two B-level questions before
       spec locks the ACs.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-15T16:09:51Z"
+    completed_at: "2026-08-15T16:09:51Z"
+    notes: >-
+      spec.md complete, status success, no open questions carried forward (all 5 proposal-stage
+      decisions already fixed the scope). Parser body replaces extractBuiltInVerdict in place
+      (same file, same exported name) -- zero diff on the seam wiring line. Six testable rules
+      fixed: tail-window provenance (union of last 30 lines / last 2000 chars), fence
+      tolerance, whole-window scan, empty-input tolerance, narrow ANSI-CSI stripping, exact
+      case-sensitive match -- plus H1's inherited fail-closed contradiction rule, now scoped to
+      the tail window. Three synthetic fixtures specified byte-exact (decoy-then-genuine,
+      contradiction, ansi-wrapped) under fixtures/synthetic/, explicitly excluded from the
+      >=90% real-corpus figure and made the sole mandatory evidence (AC-3/AC-4) for the
+      provenance/contradiction properties -- converts the proposal's chief risk finding into a
+      must-pass criterion rather than leaving it as commentary. 16 ACs total. Persistence
+      deferral restated copy-ready for issue #27, naming E5.F2.H1. Orchestrator independently
+      verified AC-1's four expected values against source (all four real marker fixtures do
+      read "request-changes") and the regex against PRD Sec9's glossary. PRD Sec4 "at the top"
+      vs corpus reality flagged non-blocking in Approval Notes, per proposal.
   sddl-design:
     status: pending
   sddl-plan:
@@ -72,6 +90,20 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e4-f1-h2-verdict-parser/review-ledger.md
 checkpoints:
+  - id: cp-h2-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      spec.md complete and orchestrator-verified: 16 ACs, six-rule parsing algorithm, 3
+      byte-exact synthetic fixtures making the injection/contradiction properties mandatory
+      (AC-3/AC-4), persistence deferral restated. Route to sddl-design.
+    question: Approve the spec and route to sddl-design?
+    free_input_allowed: true
+    response:
+      selected_option_id: pending
+      responded_at: ""
+    created_at: "2026-08-15T16:09:51Z"
+    resolved_at: ""
   - id: cp-h2-proposal-decisions
     type: risk_review
     stage: orchestrator
@@ -223,19 +255,11 @@ open_risks:
       "thinking" section, or a summary that restates it differently. Whether position or context
       breaks a tie is a policy question the fixtures should answer, not the implementer.
 next_action:
-  kind: continue
-  target: sddl-spec
+  kind: ask_user
+  target: sddl-design
   summary: >-
-    Proposal complete; both B-level open questions resolved by the user (synthetic adversarial
-    fixtures added, generous tail-window sizing). Spec should now fix: the >=90% criterion
-    restated as 4/4 real + the 2-3 synthetic fixtures as separate provenance/contradiction
-    ACs, the tail-window rule (~30 lines / ~2000 chars, whichever larger), the H1-inherited
-    contradiction rule (fail-closed, more than one distinct value anywhere -> ambiguous), the
-    normalization rule list from the proposal (fence tolerance, whole-output scan,
-    empty-input tolerance, narrow ANSI-CSI stripping per PRD Sec4, no case-folding, no fuzzy
-    matching), Option B (delimiter contract) recorded as rejected/deferred, and the
-    persistence-AC deferral restated per d-persistence-ac-deferred. Flag the PRD Sec4
-    "verdict at the top" vs corpus-reality contradiction in spec's approval notes (informational,
-    non-blocking, build against fixture reality).
+    spec.md complete and independently verified by the orchestrator. Waiting on stage_approval
+    at cp-h2-spec-approval to route to sddl-design (internal function decomposition and the
+    exact test-file layout under src/core/run/__test__/).
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:05:54Z"
+updated_at: "2026-08-15T16:09:51Z"

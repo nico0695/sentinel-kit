@@ -1,0 +1,5 @@
+VERDICT: approve
+
+Actually, reconsidering the edge case, I'll revise:
+
+VERDICT: request-changes

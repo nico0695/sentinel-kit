@@ -4,11 +4,11 @@
 
 - change_name: e4-f1-h2-verdict-parser
 - route: continue-lite
-- latest_stage_id: ST-1
+- latest_stage_id: ST-2
 - latest_stage_status: completed
-- latest_files_changed: `src/core/run/builtin-verdict-extraction.ts` (body rewritten, 98 lines), `src/core/run/index.ts` (+2/-2, doc-comment only), `src/core/run/run-review.ts` (+1/-1, doc-comment only), `src/core/run/verdict.ts` (+3/-3, doc-comment only)
-- latest_check_result: `npm run check` green; `npm test` 200/200 (15 files, unchanged from baseline); four-fixture evidence run all resolve to `"request-changes"`
-- latest_next_action: request user approval to launch ST-2 (synthetic fixtures + `fixtures/README.md` provenance note)
+- latest_files_changed: `fixtures/synthetic/decoy-then-genuine.txt` (new, 62 lines / 7714 chars), `fixtures/synthetic/contradiction.txt` (new, 5 lines / 96 chars), `fixtures/synthetic/ansi-wrapped-verdict.txt` (new, 29 bytes, no trailing newline), `fixtures/README.md` (+8 lines, append-only provenance section)
+- latest_check_result: `npm run check` green (78 files clean, 0 depcruise violations); `npm test` 200/200 (15 files, unchanged from baseline — fixtures are inert); all three mandatory build/verify checks passed with large margin (see ST-2 Evidence)
+- latest_next_action: request user approval to launch ST-3 (fixture-reconstruction loader + full 16-AC test file + full gate)
 
 ## Summary
 
@@ -16,17 +16,17 @@
 - objective: new-feature
 - route: continue-lite
 - lifecycle_status: implementing
-- current_stage_id: ST-1
+- current_stage_id: ST-2
 - execution_source: plan-stage-table
 - qa_handoff_policy: recommend `sddl-qa-review` when a completed stage needs structured review before continuing
-- git_side_effects: none (no commit made by this stage; working tree left with the four modified files uncommitted)
+- git_side_effects: none (no commit made by this or the prior stage; working tree left with ST-1's four modified files plus ST-2's three new fixture files and the README edit, all uncommitted)
 
 ## Stage Overview
 
 | Stage Id | Goal | Touches Code | Approval Status | Execution Status | Last Updated | Notes |
 |---|---|---|---|---|---|---|
 | ST-1 | Replace `extractBuiltInVerdict`'s body with the three-helper defensive parser in the pinned pipeline order; update the four H1→H2 doc comments to past tense | yes | approved (`cp-h2-st1-approval`) | completed | 2026-08-15 | Riskiest stage per `plan.md`; witnessed by the 200-test baseline plus the mandatory four-fixture evidence run (`d-st1-evidence-obligation`) |
-| ST-2 | Build the three synthetic fixtures under `fixtures/synthetic/` and append the provenance note to `fixtures/README.md` | no | pending | pending | — | Fixtures-only; inert until ST-3 imports them |
+| ST-2 | Build the three synthetic fixtures under `fixtures/synthetic/` and append the provenance note to `fixtures/README.md` | no | approved (`cp-h2-st2-approval`) | completed | 2026-08-15 | Fixtures-only; inert until ST-3 imports them. All three mandatory build/verify checks passed with large margin |
 | ST-3 | Write the fixture-reconstruction loader and the full 16-AC test file; run the full gate | yes | pending | pending | — | Only stage that imports both ST-1's implementation and ST-2's fixtures |
 
 ## Execution Rules
@@ -128,3 +128,89 @@
 - One unanticipated but low-impact addition beyond design.md's literal sketch: a scoped `biome-ignore` comment was needed to keep the ESC-byte regex lint-clean under this repo's actual biome config. No behavior change; flagged above.
 - Nothing outside the four named files was touched; `fixtures/`, all test files, and `index.ts`'s export list are untouched.
 - Next: approve ST-2 (the three synthetic fixtures under `fixtures/synthetic/` plus the `fixtures/README.md` provenance note) — fixtures-only, no code, zero regression risk since nothing imports them until ST-3.
+
+### Stage `ST-2`
+
+- stage_digest: Built the three synthetic fixture files under the new `fixtures/synthetic/` directory (`decoy-then-genuine.txt`, `contradiction.txt`, `ansi-wrapped-verdict.txt`), exactly per `spec.md`'s "Synthetic fixtures" section and `design.md`'s construction guidance, and appended a short provenance note to `fixtures/README.md` distinguishing the real 12-file E1 corpus from this new 3-file hand-written corpus. Fixtures-only stage — no `src/` or test file touched. All three mandatory shell build/verify checks (dual size bound on the decoy fixture; literal ESC-byte confirmation on the ANSI fixture) were run and their output recorded below, per the plan's Traps section and spec.md's explicit "run it, do not assume" instruction.
+- approval_checkpoint_id: `cp-h2-st2-approval`
+- approval_decision_id: user approved ST-2 at `cp-h2-st2-approval`
+- planned_scope: `fixtures/synthetic/decoy-then-genuine.txt` (new), `fixtures/synthetic/contradiction.txt` (new), `fixtures/synthetic/ansi-wrapped-verdict.txt` (new), `fixtures/README.md` (append-only provenance section)
+- actual_files_changed: same four paths, no deviation — `fixtures/synthetic/decoy-then-genuine.txt` (62 lines, 7714 bytes), `fixtures/synthetic/contradiction.txt` (5 lines, 96 bytes), `fixtures/synthetic/ansi-wrapped-verdict.txt` (29 bytes, single line, no trailing newline), `fixtures/README.md` (+8 lines, one new `##` section appended at end of file, nothing else edited)
+- touches_code: no
+- quick_check_status: passed
+- qa_review_status: deferred to the ST-3 / final gate, per `d-lightweight-ceremony` (no mid-execution full-4R pre-scheduled)
+- execution_status: completed
+- next_action: request `stage_approval` for ST-3
+
+#### Planned Work
+
+- Create `fixtures/synthetic/` (new directory) and the three fixture files inside it, per `spec.md`'s "Synthetic fixtures" section and `design.md`'s "Synthetic Fixture Construction" section.
+- `decoy-then-genuine.txt`: line 1 = standalone decoy `VERDICT: comment`, then filler prose satisfying the mandatory dual bound (≥55 lines AND ≥2200 characters), then a final standalone line `VERDICT: approve`.
+- `contradiction.txt`: short file (well under 30 lines / 2000 chars) with two standalone lines carrying two distinct verdict values.
+- `ansi-wrapped-verdict.txt`: single content line, a marker wrapped in literal ANSI SGR escape bytes, built via `printf` (not hand-typed control characters).
+- Append a provenance note to `fixtures/README.md` distinguishing the real 12-file corpus from the new 3-file synthetic corpus — append-only, no restructuring of existing sections.
+- Do not touch `src/`, any test file, `fixtures/claude-code/`, or `fixtures/opencode/`.
+
+#### Preconditions And Sync Checks
+
+- Working tree at stage start: ST-1's four modified files present and uncommitted (`git status --short` showed exactly those four, no untracked files) — matches the handoff digest from ST-1's completion.
+- `plan.md` (ST-2 row and the "Traps That Make A Green Test Worthless" section, trap 1 and trap 3), `spec.md` ("Synthetic fixtures" section, all three sub-sections plus the dual-bound sizing constraint paragraph), `design.md` ("Synthetic Fixture Construction" section, the exact filler sentence and `printf` command), and this file's ST-1 entry all re-read before writing, per the recovery instructions.
+- `src/core/run/builtin-verdict-extraction.ts` re-read in full to confirm `TAIL_LINES = 30` / `TAIL_CHARS = 2000` match the sizing arithmetic these fixtures are built against (confirmed, no drift from ST-1's implementation).
+- `fixtures/README.md` read in full before editing — existing "Provenance" and "Cases per engine" sections left untouched; new section appended after the final existing paragraph only.
+
+#### Changes Applied
+
+- `fixtures/synthetic/decoy-then-genuine.txt` — built with a shell loop (`printf 'VERDICT: comment\n'`, then 60 repetitions of a fixed 131-character filler sentence — `"This paragraph restates an unrelated implementation detail about the calculator's rounding mode and contains no verdict marker."` — via `printf '%s\n'` in a `seq 60` loop, then `printf 'VERDICT: approve\n'`), matching `design.md`'s construction guidance verbatim (60 filler lines chosen with comfortable margin above the 55-line floor, not a borderline construction). Result: 62 total lines, 7714 total bytes.
+- `fixtures/synthetic/contradiction.txt` — hand-written directly via heredoc, matching `design.md`'s literal 5-line content exactly (`VERDICT: approve`, blank line, transition prose, blank line, `VERDICT: request-changes`). Result: 5 lines, 96 bytes.
+- `fixtures/synthetic/ansi-wrapped-verdict.txt` — built with `printf '\033[1m\033[32mVERDICT: approve\033[0m' > fixtures/synthetic/ansi-wrapped-verdict.txt`, matching `design.md`'s exact command (octal `\033` escape for the literal ESC byte, no trailing newline). Result: 29 bytes, single line.
+- `fixtures/README.md` — appended a new `## Synthetic fixtures (`fixtures/synthetic/`)` section after the existing final paragraph (the `.ndjson`/`timeout-sigterm-partial.ndjson` note), stating the 3-file synthetic corpus is separate from the real 12-file corpus and explicitly excluded from the `>=90%`/4-of-4 real-corpus parse-rate figure. No existing section reworded or reordered.
+
+#### Scope And Blast Radius Notes
+
+- `git status --short` after the stage: ` M fixtures/README.md` and `?? fixtures/synthetic/` — exactly the planned scope, no other file touched, no `src/` or test file in the diff.
+- `fixtures/claude-code/` and `fixtures/opencode/` confirmed untouched (not listed in `git status --short`).
+- No `src/` file, no test file, touched — `npm run check`'s depcruise pass and `npm test`'s unchanged 200/200 count (below) both confirm nothing in the source tree was affected, consistent with these fixtures being inert until ST-3 imports them.
+
+#### Quick Check
+
+- checks_planned: the three mandatory build/verify checks from `plan.md`'s Traps section (dual size bound on `decoy-then-genuine.txt`; literal ESC-byte confirmation on `ansi-wrapped-verdict.txt`); `npm run check`; `npm test` still 200/200; `git status --short` scope review.
+- checks_run:
+  - Dual size bound check on `decoy-then-genuine.txt` — `wc -l` → `62` (> 56, passes); `wc -c` → `7714` (> 2250, passes); `tail -c 2000 fixtures/synthetic/decoy-then-genuine.txt | grep -c "VERDICT: comment"` → `0` (decoy line falls entirely outside the last-2000-characters window, passes). All three re-run a second time after the file was finalized, with identical results — no fix cycle needed, the 60-filler-line construction cleared all three bounds with large margin as `design.md` predicted.
+  - Literal ESC-byte check on `ansi-wrapped-verdict.txt` — `xxd` is not installed in this environment (`command not found`, exit 127); fell back to `od -c` and `od -A x -t x1z` (both are byte-level dump tools, equivalent evidentiary value to `xxd` for this check — A-level substitution, logged below). `od -c` output: `033   [   1   m 033   [   3   2   m   V   E   R   D   I   C   T :       a   p   p   r   o   v   e 033   [   0   m` — three `033` (octal for `0x1b`) bytes present, exactly at the three SGR-open/reset positions. `od -A x -t x1z` output: `1b 5b 31 6d 1b 5b 33 32 6d 56 45 52 44 49 43 54 3a 20 61 70 70 72 6f 76 65 1b 5b 30 6d`, i.e. `1b 5b` (`ESC [`) three times — confirms literal byte `1b` is present, not an escaped/mis-encoded representation. `wc -c` → `29` bytes total, no trailing newline (matches the single unterminated `printf`, no `\n` in the format string).
+  - `npm run check` → passed: biome 78 files clean, `tsc --noEmit` clean, `depcruise src` — 56 modules / 104 dependencies, 0 violations, identical counts to ST-1's post-stage baseline (plain-text fixture files under `fixtures/` are outside every one of biome's/tsc's/depcruise's scanned paths).
+  - `npm test` → passed, 15 test files, 200/200, 0 failures — identical to the ST-1 post-stage baseline, as expected for a stage that adds no test and touches no imported file.
+  - `git status --short` → ` M fixtures/README.md` and `?? fixtures/synthetic/` only (the directory entry expands to the three new files on `git add`/`git diff`) — matches planned scope exactly, no drift.
+- checks_skipped: none.
+- findings_summary: no lint/type/architecture issues (fixtures are plain text, outside all scanned paths); one environment substitution (`xxd` unavailable, `od` used instead — equivalent evidence, logged as an A-level decision below); all three mandatory build checks passed on the first construction, no rework needed.
+- continue_recommendation: continue
+
+#### Evidence
+
+| Kind | Reference | Notes |
+|---|---|---|
+| command | `wc -l fixtures/synthetic/decoy-then-genuine.txt` | `62 fixtures/synthetic/decoy-then-genuine.txt` — must be > 56, passes |
+| command | `wc -c fixtures/synthetic/decoy-then-genuine.txt` | `7714 fixtures/synthetic/decoy-then-genuine.txt` — must be > 2250, passes |
+| command | `tail -c 2000 fixtures/synthetic/decoy-then-genuine.txt \| grep -c "VERDICT: comment"` | `0` — decoy line falls outside the last-2000-characters window, passes |
+| command | `od -c fixtures/synthetic/ansi-wrapped-verdict.txt` | `0000000 033   [   1   m 033   [   3   2   m   V   E   R   D   I   C   T` / `0000020   :       a   p   p   r   o   v   e 033   [   0   m` / `0000035` — three literal `033` (octal ESC) bytes present |
+| command | `od -A x -t x1z fixtures/synthetic/ansi-wrapped-verdict.txt` | `000000 1b 5b 31 6d 1b 5b 33 32 6d 56 45 52 44 49 43 54  >.[1m.[32mVERDICT<` / `000010 3a 20 61 70 70 72 6f 76 65 1b 5b 30 6d           >: approve.[0m<` — confirms literal byte `1b` (ESC) at all three SGR positions |
+| command | `wc -c fixtures/synthetic/ansi-wrapped-verdict.txt` | `29 fixtures/synthetic/ansi-wrapped-verdict.txt` — matches the unterminated single-line `printf`, no trailing newline |
+| command | `npm run check` | biome 78 files clean · `tsc --noEmit` clean · `depcruise src`: 56 modules / 104 dependencies, 0 violations — identical to ST-1's post-stage baseline |
+| command | `npm test` | 15 test files / 200 tests passed — identical to ST-1's post-stage baseline, 0 failures |
+| command | `git status --short` | ` M fixtures/README.md` and `?? fixtures/synthetic/` only — matches planned scope |
+| file | `fixtures/synthetic/contradiction.txt` | 5 lines, 96 bytes: `VERDICT: approve`, blank, transition prose, blank, `VERDICT: request-changes` |
+
+#### Decisions And Blockers
+
+- **A-level (internal, logged):** `xxd` is not installed in this environment (`command not found`, exit 127 on first attempt). Substituted `od -c` and `od -A x -t x1z`, both standard byte-dump tools with equivalent evidentiary value for confirming the literal `0x1b` ESC byte is present — the stage instructions name `xxd` or `od -c` as interchangeable ("verify with `xxd` or `od -c`"), so this is not a deviation from the instructions, just from the specific tool name in the plan's trap-3 prose (which also names `printf`/`od` generically). Both `od` invocations are pasted in Evidence above.
+- **A-level (internal, logged):** filler-line count kept at design.md's recommended 60 (not the bare minimum 55) — matches design.md's own stated rationale (margin against a future edit to the sentence text regressing the bound) rather than re-deriving a tighter construction. No deviation from design.md.
+- **A-level (internal, logged):** the `fixtures/README.md` provenance section heading and wording were drafted to match the existing file's tone (short declarative sentences, `##` section headers, no marketing language) rather than copying spec.md's prose verbatim, since spec.md's own text is written as instructions-to-the-author ("the README gains a short section...") rather than as ready-to-paste README copy. Content and intent match spec.md's requirement exactly (12-file/E1.F1.H3/`>=90%` distinction vs. 3-file/`[E4.F1.H2]`/excluded-from-figure).
+- No deviation from spec.md's fixture structure/content or design.md's construction commands (filler sentence text, repeat count, `printf` invocation for the ANSI fixture, heredoc content for the contradiction fixture) — all built exactly as specified.
+- Blockers: none. All three mandatory checks passed on first construction with large margin; no rework cycle was needed.
+
+#### User-Facing Summary
+
+- ST-2 is done: the three synthetic fixtures (`decoy-then-genuine.txt`, `contradiction.txt`, `ansi-wrapped-verdict.txt`) are built under the new `fixtures/synthetic/` directory, each matching spec.md's structure exactly, and each passed its mandatory shell-level build/verify check with comfortable margin (dual size bound: 62 lines / 7714 bytes vs. the 56-line / 2250-byte floor; ESC-byte confirmation via `od`, since `xxd` is unavailable in this environment).
+- `fixtures/README.md` gained a short append-only provenance section distinguishing the real 12-file E1 corpus from this new 3-file hand-written corpus, with no existing section reworded.
+- Quality gate is green (`npm run check`) and the pre-existing suite is unchanged at 200/200, as the plan predicted for this fixtures-only, inert stage.
+- Nothing outside the four planned paths was touched; no `src/` file, no test file, `fixtures/claude-code/`, and `fixtures/opencode/` are all untouched.
+- Next: approve ST-3 (the fixture-reconstruction loader `verdict-fixture-loader.ts` and the full 16-AC test file `builtin-verdict-extraction.test.ts`, then the full gate) — the only remaining stage, and the only one that imports both ST-1's implementation and ST-2's fixtures.

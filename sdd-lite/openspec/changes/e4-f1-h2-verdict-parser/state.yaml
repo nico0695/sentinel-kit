@@ -154,6 +154,20 @@ stages:
       npm run check green (78 files, depcruise 56/104 unchanged), npm test 200/200 unchanged,
       diff exactly the four approved files plus the new execution-log.md. Full source read and
       compared line-by-line against design.md's sketch -- matches. ST-2/ST-3 still user-gated.
+
+      ST-2 COMPLETE (status success). Three synthetic fixtures created under fixtures/synthetic/
+      -- decoy-then-genuine.txt (62 lines, 7714 chars: comfortably clears the mandatory dual
+      bound of >=55 lines AND >=2200 chars; orchestrator independently reproduced the wc/tail
+      checks -- the decoy line is confirmed outside the last-2000-char window), contradiction.txt
+      (5 lines, two distinct verdicts), ansi-wrapped-verdict.txt (29 bytes, orchestrator
+      independently confirmed via od that all three SGR sequences contain the literal 0x1b byte).
+      fixtures/README.md got an 8-line append-only provenance section distinguishing the real
+      corpus from the synthetic one -- orchestrator confirmed no existing section was rewritten.
+      xxd was unavailable in the executor's environment; od -c / od -A x -t x1z substituted with
+      equal evidentiary value, logged as a stated A-level substitution. Exit checks re-run
+      independently by the orchestrator: npm run check green (unchanged from ST-1 baseline),
+      npm test 200/200 unchanged (fixtures are inert until ST-3 imports them), diff exactly the
+      4 approved paths. ST-3 (final stage) still user-gated.
   sddl-code-review:
     status: pending
     notes: >-
@@ -431,9 +445,9 @@ next_action:
   kind: ask_user
   target: sddl-executor
   summary: >-
-    ST-1 complete and independently verified: check green, 200/200 unchanged, the four-fixture
-    evidence run confirmed, diff exactly the four approved files. Next: stage_approval for
-    ST-2 (the three synthetic fixtures under fixtures/synthetic/ plus the fixtures/README.md
-    provenance note -- data-only, zero regression risk, nothing imports them until ST-3).
+    ST-2 complete and independently verified (build checks reproduced, README diff clean,
+    gate unchanged). Next: stage_approval for ST-3, the final stage -- fixture-reconstruction
+    loader plus the full 16-AC test suite plus the whole-change gate. On green, this change is
+    ready for sddl-qa-review.
 created_at: "2026-08-15T15:56:05Z"
-updated_at: "2026-08-15T16:44:21Z"
+updated_at: "2026-08-15T16:47:46Z"

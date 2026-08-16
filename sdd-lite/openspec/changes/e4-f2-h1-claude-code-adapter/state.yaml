@@ -718,14 +718,15 @@ open_risks:
       before/during sddl-executor.
     severity: low
 next_action:
-  kind: run_stage
+  kind: halt
   target: orchestrator
   summary: >-
-    Final QA passed_with_notes (26/27 ACs verified, zero defects). User confirmed all CLI/
-    external-tool testing (incl. AC-24) will be done by them later, outside this session --
-    proceeding to open the PR for [E4.F2.H1] (#28) with AC-24's gap explicitly disclosed in
-    the PR body, per "continua hasta cerrar el sdd-lite, frena solo si tengo que confirmar
-    algo". state.yaml stays lifecycle_status: reviewing (not completed) until the user adds
-    AC-24's evidence to execution-log.md themselves.
+    PR #66 opened (https://github.com/nico0695/sentinel-kit/pull/66), Closes #28. AC-24's gap
+    explicitly disclosed in the PR body, not silently marked satisfied. sdd-lite flow for
+    [E4.F2.H1] is otherwise closed out: proposal/spec/design/plan/ST-1..5/final QA all
+    complete and committed. Waiting on: (1) the user running AC-24's manual verification
+    themselves and adding the evidence to execution-log.md (their own stated plan), (2) human
+    review/merge of PR #66 (CLAUDE.md: never merge PRs, never push to main). No further
+    autonomous action pending on this story.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T22:40:00Z"
+updated_at: "2026-08-15T22:45:00Z"

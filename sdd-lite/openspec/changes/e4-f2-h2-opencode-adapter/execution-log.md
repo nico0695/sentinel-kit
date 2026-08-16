@@ -47,3 +47,32 @@ Implementation matches design.md's exact snippet: `execa(binaryPath, args, { cwd
 **Judgment calls:** none of real weight — design.md's shape and the merged claude-code adapter's template were followed literally; the only addition (`env` passthrough) was explicitly specified by design.md, not a new choice.
 
 **Recommended next stage:** proceed to ST-3 (`opencode-adapter.ts` orchestration + barrel export) on user approval. Not auto-continuing.
+
+---
+
+## ST-3 — `opencode-adapter.ts` (orchestration) + barrel export
+
+**Status:** completed
+**Files:**
+- `src/adapters/driven/engines/opencode/opencode-adapter.ts` (new) — `OpenCodeAdapterOptions` (`model` required), `createOpenCodeAdapter(options)`, `PREFLIGHT_TIMEOUT_MS = 5_000` module constant, `review()`: `createDenyConfigFile()` → `try { pre-flight → real invocation → parseNdjsonLines → extractOutcome } finally { config.cleanup() }`. `OPENCODE_CONFIG` env object built once (`{ OPENCODE_CONFIG: config.path }`) and passed to BOTH the pre-flight and real `runProcess` calls, satisfying AC-7 by construction (same object reference, not two separately-built env values that could drift).
+- `src/adapters/driven/engines/index.ts` (modified) — added `createOpenCodeAdapter`/`OpenCodeAdapterOptions` exports; updated the file's header doc-comment, which still read "The opencode adapter lands in [E4.F2.H2]" — corrected to name both adapters as landed (same class of doc-staleness H1's ST-3 caught and fixed on this same file for its own claude-code line).
+
+First stage with a real cross-file import graph for this story (adapter → `errors.js`/`envelope.js`/`permission-config.js`/`process-runner.js` siblings + `core/run/index.js`). `depcruise` reports 0 violations (66 modules, 126 dependencies cruised), confirming the `adapters-isolated`/`core-no-adapters` guards hold.
+
+**End-to-end smoke verification (throwaway `vitest` test, not committed — deleted after use):**
+- Full resolve path: `createOpenCodeAdapter({ model, runProcess: stub })`, stub replays `--version` success then `valid-verdict.ndjson` → resolves with `usage.totalTokens: 4786`; asserted both calls (pre-flight and real) recorded the SAME `env.OPENCODE_CONFIG` value (proves the deny-config is shared correctly, not rebuilt inconsistently).
+- Pre-flight failure: `--version` stub returns `exitCode: 1` → `review()` rejects, and the real-invocation branch of the stub was never reached (asserted via a flag) — confirms `OpenCodeUnavailableError` short-circuits correctly.
+- In-stream error: real invocation replays `context-overflow.ndjson` → rejects with a message containing `"ContextOverflowError"` — confirms `extractOutcome`'s rejection propagates through `review()` uncaught by the `finally`/cleanup wrapping.
+
+All three outcomes matched design.md's pseudocode exactly. No implementation bug found.
+
+**Validation:**
+- `npm run check`: one mechanical `biome check --write` import-order fix needed first (no logic change), then `Checked 90 files in 117ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (66 modules, 126 dependencies cruised)`.
+- `npm test`: `Test Files 17 passed (17)` / `Tests 250 passed (250)` — unchanged (still unimported by any committed test file — the contract test lands in ST-4).
+- `git status --short` / `git diff --stat`: exactly the two expected files touched (`index.ts` modified, `opencode-adapter.ts` new) — `src/adapters/driven/engines/index.ts | 8 +++++---`.
+
+**Judgment calls:** none of real weight — design.md's pseudocode was implemented literally, including building the `env` object once and reusing it for both calls (an implicit but load-bearing detail for AC-7's "both invocations carry the SAME config path" reading).
+
+**QA review recommendation:** per the executor's QA Handoff Rules, this is the first stage with a non-trivial blast radius (real cross-module import graph, the story's core orchestration logic). Flagging `sddl-qa-review` as worth running before ST-4 writes the full test suite — a structured review now (stage mode) would catch orchestration-level issues before ~24 ACs' worth of tests get written against them. Not blocking; deferring to the user's call on timing (now vs. after ST-4's automated suite locks the same logic down anyway).
+
+**Recommended next stage:** ST-4 (test suite) on user approval, optionally preceded by `sddl-qa-review` in stage mode. Not auto-continuing.

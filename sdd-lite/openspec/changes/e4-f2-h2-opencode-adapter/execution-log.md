@@ -173,3 +173,31 @@ The first draft of the R4-002 test set `TMPDIR` to a regular file, which makes *
 **Ledger status after ST-6:** R1-001, R2-001, R3-002, R3-003, R4-002 → `fixed`, pending a scoped re-review to move them to `verified`. The remaining 7 `info` findings were deliberately NOT touched (out of ST-6's approved scope).
 
 **Recommended next stage:** a scoped re-review of the ST-6 fix delta against the ledger (protocol: re-review sees only the frozen ledger plus the immutable fix delta), then ST-5. Not auto-continuing.
+
+---
+
+## Scoped re-review (round 2) — ST-6 fix delta
+
+**Status:** completed, verdict **pass_with_warnings** (`review-ledger.md`)
+
+Independently re-verified all 5 findings closed by ST-6 against the immutable fix delta (`e9ee543..047116b`) — mechanism read directly in each source file, every new/changed test confirmed non-vacuous by reverting its fix and observing the test fail, all 3 original mutations plus 1 new one (reordering `assertCleanExit` before `extractOutcome`, testing the ordering claim directly) re-run independently and all 4 fail. No regression found. `open_severe_findings: 0`. Full account in `review-ledger.md`'s "Scoped Re-Review" section.
+
+**Recommended next stage:** ST-5. Not auto-continuing.
+
+---
+
+## ST-5 — Manual AC-24 verification + closing gate
+
+**Status:** partial — closing gate green; the manual half is EXPLICITLY left pending, per user decision.
+
+**User decision (2026-08-16):** proceed to close the story without running AC-24's manual verification against a real, authenticated `opencode` CLI. Same category of deliberate, disclosed gap as `[E4.F2.H1]`'s own AC-24 (`e4-f2-h1-claude-code-adapter/execution-log.md`'s ST-5, still pending as of this entry — see `docs/todo/E4/manual-verification.md` items 1 and 2). Not silently marked satisfied.
+
+**Closing gate (everything AC-24 does not require):**
+- `npm run check`: `Checked 91 files in 181ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (66 modules, 126 dependencies cruised)`.
+- `npm test`: `Test Files 18 passed (18)` / `Tests 284 passed (284)`.
+- `git diff --stat aa664bb...HEAD -- src/` (full story diff vs. the pre-story `main` merge-base): exactly 7 files — `errors.ts`, `envelope.ts`, `permission-config.ts`, `process-runner.ts`, `opencode-adapter.ts`, `__test__/opencode-adapter.test.ts` (all new), `engines/index.ts` (modified, barrel export). Matches plan.md's approved scope; `ReviewEngine.contract.ts` untouched (unlike H1, no exception needed).
+- `grep -rn 'from "execa"' src/adapters/driven/engines/opencode`: exactly one match, `process-runner.ts` — confirms `execa` is imported nowhere else (AC-21-equivalent).
+
+**What AC-24 still needs, unresolved:** invoke `createOpenCodeAdapter({ model })`'s default `execa`-backed path once against the real, authenticated `opencode` CLI over a genuine diff; record the exact command, exit code, and observed `VERDICT:` line here. Steps are in `docs/todo/E4/manual-verification.md` item 2. Until that entry exists, this story's AC-24 stays open — recorded honestly, not glossed over.
+
+**Story-level status:** all 25 automatable ACs (spec.md's 24 original + AC-25 from Amendment 1, minus AC-24 itself which is inherently manual) are satisfied and independently verified across ST-1 through ST-6 and the two review rounds. The 4R review's single blocking finding is fixed and verified. 7 non-blocking `info` findings remain as optional follow-up (see `review-ledger.md`), not required for closure. AC-24 is the sole open item, tracked in `docs/todo/E4/manual-verification.md`, not this story's `state.yaml` `next_action`.

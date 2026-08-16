@@ -3,41 +3,62 @@
 ## Closeout Digest
 
 - change_name: e4-f2-h2-opencode-adapter
-- mode: stage
-- target: ST-3 (`opencode-adapter.ts` orchestration + `engines/index.ts` barrel export)
-- verdict: **pass**
-- lifecycle effect: does not close the change; ST-4 (test suite) and ST-5 (manual verification + final gate) remain
+- mode: **final**
+- verdict: **pass_with_warnings**
+- lifecycle effect: does NOT close the change — `lifecycle_status` stays `reviewing`; one open item (AC-24) requires explicit user acceptance via a `final_review` checkpoint before the change can be marked `completed`
 
 ## Scope Reviewed
 
-`src/adapters/driven/engines/opencode/opencode-adapter.ts` (new) and `src/adapters/driven/engines/index.ts` (modified), against `spec.md`'s AC-1 through AC-7 and AC-19, `design.md`'s `review()` pseudocode and `OPENCODE_CONFIG` lifecycle rationale, and the merged `src/adapters/driven/engines/claude-code/claude-code-adapter.ts` as the structural sibling. AC-8 through AC-18 (envelope logic) were reviewed only at the call-site level here — their own correctness was already verified in ST-1's fixture-based scratch test and is out of this stage's scope.
+The full implemented change: `src/adapters/driven/engines/opencode/{errors,envelope,permission-config,process-runner,opencode-adapter}.ts` (all new), `__test__/opencode-adapter.test.ts` (new), `src/adapters/driven/engines/index.ts` (modified barrel). Against `spec.md`'s 25 ACs (24 original + AC-25 from Amendment 1), `design.md` (+ its Amendment 1), `plan.md` (ST-1 through ST-6), the full `execution-log.md`, and both rounds of `review-ledger.md`.
 
-## Evidence
+## Independent Verification Performed (not trusted from prior logs)
 
-- **Independent re-run**, not trusted from the executor's report alone: `npm run check` → `Checked 90 files in 85ms`, `tsc --noEmit` clean, `✔ no dependency violations found (66 modules, 126 dependencies cruised)`. `npm test` → `17 passed`, `250 passed` — unchanged from baseline.
-- `git diff --stat HEAD~1 HEAD -- src/`: exactly `index.ts` (+8/-3) and the new `opencode-adapter.ts` (+137) — matches the approved ST-3 scope, no leak.
-- `git log` on `errors.ts`/`envelope.ts`/`permission-config.ts`/`process-runner.ts`: last touched by ST-1/ST-2 commits only — ST-3 did not modify any sibling file, confirming true composition rather than incidental rework.
-- Source read directly (not paraphrased): the full 137-line `opencode-adapter.ts` was read in this review, not sampled.
+- `npm run check`: `Checked 91 files in 76ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (66 modules, 126 dependencies cruised)`.
+- `npm test`: `Test Files 18 passed (18)` / `Tests 284 passed (284)`.
+- `npx vitest run --project adapters src/adapters/driven/engines/opencode`: `34 passed (34)` in isolation.
+- `git diff --stat aa664bb...HEAD -- src/` (full story diff vs. the pre-story merge-base): exactly 7 files, 1328 insertions / 3 deletions — matches `plan.md`'s approved scope exactly. `ReviewEngine.contract.ts` untouched (confirmed by its absence from this diff) — no exception needed, unlike `[E4.F2.H1]`.
+- `git diff --stat aa664bb...HEAD -- src/core/`: empty. Core untouched, confirming issue #29's third acceptance criterion ("zero changes needed in the core to add it").
+- Import sweep of all 5 production files: only `core/run/index.js` (types), sibling files within `opencode/`, Node builtins (`node:fs/promises`, `node:os`, `node:path`), and `execa` (imported exactly once, in `process-runner.ts`). Confirms the architecture guards `depcruise` already reports clean.
+- `grep -rn "opencode" src/main/`: no matches — the adapter is genuinely not wired into the composition root, as expected (cascading resolution is `#30`, a separate story).
+
+## Review Ledger Consumption
+
+`review-ledger.md` ran a full-4r sweep (round 1) plus a scoped re-review (round 2), per its own digest:
+- Round 1: `fail` — one CRITICAL, introduced, blocking finding (R1-001: process status never consulted, so a killed/non-zero-exit run resolved as a complete review). One other CRITICAL (R1-002, worktree-config precedence) refuted. 11 `info` findings.
+- User chose to amend the spec (`dec-003`) rather than ship-as-defect. Spec Amendment 1 added AC-25; ST-6 implemented the fix plus 4 bundled conformance items (R2-001, R3-002, R3-003, R4-002).
+- Round 2 (scoped re-review, immutable fix delta only): all 5 `fixed` rows independently confirmed `verified` — mechanism read directly, all new tests confirmed non-vacuous by reverting each fix, 4 mutations (3 original + 1 new, added during re-review to test the ordering claim directly) all fail post-fix. **Verdict: `pass_with_warnings`, `open_severe_findings: 0`.**
+- 7 `info`-level findings remain, explicitly out of round-2 scope, non-blocking by the severity floor (WARNING/SUGGESTION never block). Listed in the ledger's Verdict section; not reproduced here to avoid duplicating the source of truth.
+
+No open severe ledger finding remains. The ledger's own verdict is correctly reflected in this final QA's verdict rather than re-litigated.
+
+## AC Coverage Summary
+
+| ACs | Status |
+|---|---|
+| AC-1 – AC-9 (factory shape, invocation, pre-flight, `OPENCODE_CONFIG` lifecycle) | pass — automated, contract + dedicated tests |
+| AC-10 – AC-18 (NDJSON parsing, outcome extraction) | pass — automated against all 6 real fixtures; R2-001's conformance gap closed in ST-6 |
+| AC-19 – AC-23 (timeouts, seam, contract suite, error translation) | pass — automated; R3-002/R3-003's missing assertions closed in ST-6 |
+| **AC-24** ("successful real review", manual) | **open, by explicit user decision** — cannot be automated (no authenticated `opencode` CLI in this environment); tracked at `docs/todo/E4/manual-verification.md` item 2, mirroring `[E4.F2.H1]`'s identical, still-open AC-24 gap |
+| AC-25 (Amendment 1, process-status gate) | pass — automated, 5 dedicated tests, independently mutation-verified in round-2 re-review |
+
+24 of 25 automatable-in-principle ACs are genuinely satisfied and independently re-verified. AC-24 is the sole gap, and it is a manual-by-design AC, not a missed one.
 
 ## Findings
 
-Full-file inspection targeted specifically at what the deleted throwaway smoke test could NOT have exercised:
+No new findings from this final pass — the 4R protocol already covered the code at the depth this closeout would otherwise duplicate. One `low`-severity observation, not from the ledger:
 
-| # | Check | Result |
-|---|---|---|
-| 1 | `config.cleanup()` awaited on every exit path, including both pre-flight failure branches (reject and non-zero exit) | **Confirmed.** Single outer `try { ... } finally { await config.cleanup(); }` wraps the entire body from the `env` construction through `return extractOutcome(events)`. Both pre-flight failure throws are inside the inner `try`, which is itself inside the outer `try` — `finally` fires regardless of which of the four possible throw points (pre-flight reject, pre-flight non-zero, real-invocation reject, `extractOutcome` throw) fires, or on a clean resolve. |
-| 2 | `env` object shared (not rebuilt) between the pre-flight and real-invocation calls | **Confirmed.** `const env = { OPENCODE_CONFIG: config.path };` is declared once and the identical binding is passed at both call sites (lines 106 and 126) — not two independently-constructed literals that could drift if the file were edited carelessly later. |
-| 3 | `PREFLIGHT_TIMEOUT_MS` vs `request.timeoutMs` used in the correct calls | **Confirmed.** Pre-flight call uses `PREFLIGHT_TIMEOUT_MS` exclusively; the real invocation uses `request.timeoutMs` exclusively. No cross-wiring. |
-| 4 | `createDenyConfigFile()` itself failing (e.g. `mkdtemp` ENOENT/EMFILE) — not wrapped by the `try/finally`, since `config` doesn't exist yet | **Low-severity observation, not a defect.** A creation failure propagates as a raw Node `fs` error rather than one of the three typed classes. This is outside spec.md's stated AC set (spec never defines behavior for temp-file creation failure) and still satisfies AC-23's actual requirement (`rejects.toBeInstanceOf(Error)` — a Node `fs` error is an `Error`). No cleanup is skipped incorrectly, since nothing was created to clean up. Recommend ST-4 add (or explicitly decline, with a one-line rationale in `execution-log.md`) a test for this path so it's a documented decision rather than silently untested — not a blocker. |
-| 5 | Diff surface matches AC-26-equivalent scope boundary | **Confirmed** — see Evidence above. |
-| 6 | Doc-comment / structural parity with the merged claude-code adapter (naming, factory shape, "every throw stays inside the async body" discipline) | **Confirmed.** No bare `throw` outside the `async review` function body; structure mirrors `claude-code-adapter.ts` one-for-one plus the one extra step (deny-config lifecycle) design.md called for. |
-
-No `medium` or `high` severity findings. One `low` item (#4), which is an informational note for ST-4 to consciously accept or cover, not a correction to make now.
+| Severity | Finding |
+|---|---|
+| low | `docs/todo/E4/manual-verification.md` now has two open items ([E4.F2.H1] and [E4.F2.H2]) with no target date or owner beyond "the operator" — acceptable for a lite-mode project, flagged only so it doesn't silently grow unbounded as more engine adapters land. |
 
 ## Verdict
 
-**pass.** ST-3's orchestration correctly implements spec.md's AC-1–7/AC-19 and design.md's pseudocode with no deviation found on independent, full-file inspection. The one low-severity observation (creation-failure path outside the typed-error family) does not block continuation — it's a note for ST-4's test-writing to either cover or explicitly decline.
+**pass_with_warnings.** The implementation is complete, correct, and independently verified: every automatable AC passes, the one blocking code-review finding was fixed and independently re-verified in a scoped re-review, architecture guards hold, and scope is exactly what was planned. The sole reason this is not a clean `pass` is AC-24, deliberately left open by explicit user decision ("quiero avanzar sin la validacion manual") — an honest, disclosed gap in the same category `[E4.F2.H1]` already shipped with, not a defect.
 
 ## Next Action
 
-Proceed to ST-4 (the test suite covering all 24 ACs) on user approval. Recommend ST-4 include a one-line acknowledgment (test or documented decline) of finding #4 so it isn't silently dropped. No replanning or correction stage needed.
+Per the skill's own state-sync rules, `final` + `pass_with_warnings` keeps `lifecycle_status: reviewing` and requires a `final_review` checkpoint for explicit user acceptance — it does not auto-complete the change. Recommend the user:
+1. Accept the story in its current state (AC-24 tracked externally, not blocking), which this session will record as the `final_review` decision, or
+2. Request AC-24 be run before acceptance (would need the user's own authenticated `opencode` CLI).
+
+No code, test, or spec changes are recommended before acceptance — this report found nothing to fix.

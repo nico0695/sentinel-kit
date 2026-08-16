@@ -17,8 +17,8 @@ complexity_assessment:
     permission posture (OPENCODE_CONFIG must be injected on every invocation, no exceptions).
   confidence: high
   recorded_at: "2026-08-16T00:00:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -171,6 +171,16 @@ stages:
       informational, satisfies AC-23's actual requirement (instanceof Error), recommended as a
       note for ST-4 to consciously cover or decline, not a blocker. No medium/high findings.
       qa-report.md written. Does not close the change (stage mode).
+
+      FINAL mode completed: verdict pass_with_warnings. Independently re-verified (not trusted
+      from prior logs): npm run check green, npm test 284/284, full story diff vs aa664bb exactly
+      the 7 planned files, core/** untouched, execa imported once, adapter confirmed not wired
+      into src/main/. 24 of 25 ACs automated and genuinely satisfied; the ledger's one blocking
+      finding fixed and independently re-verified. AC-24 is the sole open item, left open by
+      explicit user decision. Per the skill's own rule, final + pass_with_warnings never sets
+      lifecycle_status completed regardless of user acceptance -- lifecycle stays reviewing,
+      cp-final-review recorded as approved (user decision already given: "quiero avanzar sin la
+      validacion manual"). qa-report.md written.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -214,6 +224,23 @@ decisions:
       declared AC-15/16/17 "the ONLY three rejection paths"; adding a fourth without amending it
       would have left the code contradicting its own approved contract.
     recorded_at: "2026-08-16T02:20:00Z"
+  - id: dec-004
+    checkpoint_id: cp-final-review
+    free_text: >-
+      Close the story at final QA verdict pass_with_warnings without running AC-24's manual
+      verification (real, authenticated opencode CLI over a genuine diff).
+    author: user
+    rationale: >-
+      C-level would normally apply (closing with a known open AC touches the story's completion
+      criteria), but this is not scope expansion or a PRD contradiction -- it is accepting an
+      already-disclosed, inherently-manual gap in the exact same category [E4.F2.H1] shipped with
+      (that story's own AC-24 remains open too, tracked at docs/todo/E4/manual-verification.md
+      item 1). No environment available to this session has an authenticated opencode CLI, so the
+      only alternative to accepting the gap now was leaving the story permanently blocked pending
+      the user's own local verification. Per sddl-qa-review's own rule, final + pass_with_warnings
+      never sets lifecycle_status completed regardless of this acceptance -- it stays reviewing,
+      and AC-24 remains tracked at docs/todo/E4/manual-verification.md item 2 until closed.
+    recorded_at: "2026-08-16T03:15:00Z"
 open_risks:
   - id: risk-001
     severity: medium
@@ -257,6 +284,16 @@ open_risks:
       Belongs as a step on item 2 of docs/todo/E4/manual-verification.md. The equivalent gap is
       LARGER and untreated for the merged claude-code adapter, which passes no env at all and
       omits --setting-sources -- a worthwhile follow-up against item 1.
+  - id: risk-006
+    severity: medium
+    status: open
+    summary: >-
+      AC-24 ("successful real review" against a real, authenticated opencode CLI) is the one
+      permanently-open acceptance criterion. Same category as [E4.F2.H1]'s own still-open AC-24.
+      User explicitly accepted closing the story without it (dec-004) rather than leave the story
+      blocked pending an environment with an authenticated opencode CLI. Tracked at
+      docs/todo/E4/manual-verification.md item 2. Not a code defect -- every automatable AC is
+      satisfied; this is purely the disclosed evidence gap CI structurally cannot close.
   - id: risk-003
     severity: low
     status: open
@@ -308,26 +345,37 @@ review_summary:
   reported_at: "2026-08-16T03:00:00Z"
   report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/review-ledger.md
 qa_summary:
-  mode: stage
-  verdict: pass
+  mode: final
+  verdict: pass_with_warnings
   summary: >-
-    Stage-mode QA of ST-3 (opencode-adapter.ts orchestration): no medium/high findings, one low
-    informational note (createDenyConfigFile()'s own creation-failure path outside try/finally,
-    acceptable per AC-23). ST-4 then declined a dedicated test for that note with an in-file
-    documented rationale rather than silently skipping it.
-  reported_at: "2026-08-16T01:30:00Z"
+    Final closeout QA, independently re-verified (not trusted from prior logs): npm run check
+    green, npm test 284/284, full story diff vs pre-story merge-base (aa664bb) exactly the 7
+    planned files (1328 insertions / 3 deletions), src/core/** untouched, execa imported exactly
+    once (process-runner.ts), adapter confirmed NOT wired into src/main/ (correct -- cascading
+    resolution is #30). 24 of 25 ACs (24 original + AC-25 from Amendment 1) genuinely satisfied
+    and automated; the review-ledger's single blocking finding (R1-001) was fixed and
+    independently verified in a round-2 scoped re-review (verdict pass_with_warnings,
+    open_severe_findings: 0). AC-24 ("successful real review") is the sole gap: manual-by-design,
+    cannot be automated in this environment, and the user explicitly chose to close the story
+    without it. Same disclosed-gap pattern [E4.F2.H1] already shipped with. One low, non-blocking
+    observation: docs/todo/E4/manual-verification.md now carries two open items with no
+    target date, worth revisiting as more engine adapters land.
+  reported_at: "2026-08-16T03:15:00Z"
   report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
 next_action:
-  kind: await_user
-  target: checkpoint
+  kind: halt
+  target: orchestrator
   summary: >-
-    Scoped re-review (round 2) independently verified all 5 ST-6 fixes close their findings --
-    ledger verdict fail -> pass_with_warnings, open_severe_findings: 0. Only ST-5 remains: the
-    manual AC-24 run against the real, authenticated opencode CLI, then the final closing gate.
-    Needs cp-st5-approval and requires the user to have opencode installed and authenticated
-    (see docs/todo/E4/manual-verification.md item 2 for the exact steps). 7 info-level findings
-    from the review remain as optional, non-blocking follow-up polish -- not gating this story's
-    completion.
+    Final QA verdict pass_with_warnings, cp-final-review approved by explicit user decision
+    (dec-004): close without AC-24's manual verification. Per sddl-qa-review's own rule, this
+    does NOT set lifecycle_status completed -- it stays reviewing, with AC-24 tracked as a
+    permanently-open item at docs/todo/E4/manual-verification.md item 2 (same pattern as
+    [E4.F2.H1]'s own still-open AC-24). All 24 automatable ACs (plus AC-25 from Amendment 1)
+    satisfied and independently re-verified across 2 QA/review passes. Everything else this
+    story can do autonomously is done: ST-1 through ST-6 complete, 4R review + scoped re-review
+    both closed, final QA closed. Per CLAUDE.md: never open a PR unless the user explicitly asks.
+    Offer the PR "[E4.F2.H2] engines/opencode adapter" (Closes #29) and wait for the user's go.
+    Never merge, never push main; max 5 open PRs (currently 0).
 created_at: "2026-08-16T00:00:00Z"
 updated_at: "2026-08-16T02:10:00Z"
 artifacts:
@@ -395,7 +443,13 @@ checkpoints:
     type: stage_approval
     stage: sddl-executor
     stage_ref: ST-5
-    status: pending
+    status: skipped
+    decided_by: user
+    decided_at: "2026-08-16T03:10:00Z"
+    summary: >-
+      Superseded by cp-final-review/dec-004: user chose to close the story without ST-5's manual
+      AC-24 run. ST-5's automated closing-gate portion (npm run check/test, scope check) was still
+      run and recorded in execution-log.md; only the manual CLI invocation was skipped.
   - id: cp-review-gate-r1-001
     type: review_gate
     stage: sddl-code-review
@@ -419,3 +473,13 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-16T02:30:00Z"
+  - id: cp-final-review
+    type: final_review
+    stage: sddl-qa-review
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T03:10:00Z"
+    decision: close-without-ac24-manual-verification
+    summary: >-
+      Final QA verdict pass_with_warnings. User explicitly accepted closing without ST-5's
+      manual AC-24 run ("quiero avanzar sin la validacion manual"). Recorded as dec-004.

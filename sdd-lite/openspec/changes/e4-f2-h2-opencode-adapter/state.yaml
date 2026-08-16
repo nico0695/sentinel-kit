@@ -122,6 +122,19 @@ stages:
       writeFile and never exercised the new try/catch; rewritten with block-scoped vi.doMock and
       verified non-vacuous by reverting the fix. Five ledger rows moved open/info -> fixed.
 
+      Scoped re-review (round 2, protocol-compliant: frozen ledger + immutable fix delta only,
+      original e9ee543 diff not re-reviewed) independently confirmed all 5 fixed rows -> verified.
+      Read the mechanism directly in each of the 3 source files (not trusted from the log).
+      Independently re-ran all 3 original mutations plus one NEW mutation (reordering
+      assertCleanExit BEFORE extractOutcome, to test the "AC-16 diagnostics win" ordering claim
+      directly, not just its presence) -- all 4 fail. Independently reverted each of the 3 fixes
+      in turn and confirmed each new/changed test fails without it (non-vacuous). Regression check:
+      confirmed by grep that every pre-existing resolving-path test defaults exitCode:0/
+      timedOut:false, so AC-25's new gate never fires on them; confirmed createDenyConfigFile's
+      external contract (Promise<OpenCodePermissionConfig>) is unchanged. No new defect found.
+      Ledger verdict: fail -> pass_with_warnings (7 info findings remain, none blocking, explicitly
+      out of round-2 scope). Recommended next: ST-5.
+
       ST-4 completed: opencode-adapter.test.ts written, 25 tests across the shared contract suite
       (unmodified -- H1 already fixed the propagates-configured-usage fixture shape, confirmed
       by reading the file first) + 8 AC-specific describe blocks. Fixed one self-authored test bug
@@ -222,20 +235,17 @@ open_risks:
       evidence but are real new design work, not a copy of H1's envelope.ts. Owner: sddl-design.
   - id: risk-004
     severity: high
-    status: open
+    status: resolved
     summary: >-
-      R1-001 (4R review, CRITICAL, introduced, BLOCKING): opencode-adapter.ts:120-131 never reads
-      the real invocation's exitCode/signal/timedOut, so a run killed (SIGTERM/SIGKILL, OOM,
-      container eviction) or exiting non-zero after emitting any text event resolves as a
-      complete, successful ReviewResult -- and because opencode emits the VERDICT line in its
-      FIRST text chunk, the truncated result still carries a confident verdict with its
-      supporting findings missing. runReview then lands terminal state ok/ambiguous instead of
-      engine-error/timeout. Reproduced by the orchestrator against the real adapter. NOTE: the
-      code faithfully implements approved AC-18, which declares AC-15/16/17 the ONLY rejection
-      paths and scopes itself to "stdout handling" -- process status was never considered by any
-      AC. So this is a specification gap plus its correct implementation, not a code defect
-      against spec, and fixing it requires amending AC-18. Escalated to the user via review_gate
-      (cp-review-gate-r1-001); see review-ledger.md for the three routing options.
+      RESOLVED (ST-6, verified round 2). R1-001 (4R review, CRITICAL, introduced, was BLOCKING):
+      opencode-adapter.ts previously never read the real invocation's exitCode/signal/timedOut, so
+      a killed or non-zero-exit run that already emitted text resolved as a complete, successful
+      ReviewResult carrying a verdict. Fixed by spec Amendment 1 (new AC-25) + a private
+      assertCleanExit() gate called after extractOutcome so AC-15/16/17's stdout diagnostics are
+      never masked. Independently re-verified in the round-2 scoped re-review: mechanism read
+      directly, original reproduction now rejects, 4 mutations (including one added during
+      re-review specifically to test the ordering claim) all fail the suite, no regression on the
+      success path. See review-ledger.md's Scoped Re-Review section.
   - id: risk-005
     severity: low
     status: open
@@ -258,12 +268,15 @@ review_summary:
   mode: 4r
   tier: full-4r
   target: e9ee543e3616ae5d20ece66916c2a2c08a9d42be
-  verdict: fail (round 0; R1-001 fixed in ST-6, pending scoped re-review to lift)
+  verdict: pass_with_warnings
   counts:
     confirmed: 1
+    verified: 5
     info: 11
+    info_remaining: 7
     refuted: 1
-  open_severe_findings: 1
+  open_severe_findings: 0
+  round: 2
   summary: >-
     Full 4R sweep (1062 changed lines + permissions surface -> full-4r tier). One CRITICAL,
     introduced, blocking finding R1-001: the real invocation's exitCode/signal/timedOut are never
@@ -279,7 +292,20 @@ review_summary:
     on threat model (PRD Sec60 already executes reviewed-branch scripts by design). 11 info-level
     findings recorded, none blocking; two are mutation-proven test gaps (text ordering and
     timeout-budget assignment each survive the full 275-test suite).
-  reported_at: "2026-08-16T02:10:00Z"
+
+    ROUND 2 (scoped re-review of the ST-6 fix delta, e9ee543..047116b, per protocol: frozen
+    ledger + immutable delta only, original diff not re-reviewed): all 5 round-1 fixed rows
+    (R1-001 severe + R2-001/R3-002/R3-003/R4-002 info) independently verified -> `verified`.
+    Mechanism read directly in each source file; all 4 new/changed tests confirmed non-vacuous by
+    reverting each fix and observing the test fail; independently re-ran all 3 original mutations
+    plus one new one (reordering assertCleanExit before extractOutcome, directly testing the
+    "AC-16 diagnostics win" ordering claim) -- all 4 fail. Regression check: every pre-existing
+    resolving-path test defaults exitCode:0/timedOut:false (confirmed by grep), so AC-25 never
+    fires on them; createDenyConfigFile's external contract unchanged. No new defect in the fix.
+    Verdict fail -> pass_with_warnings. 7 info findings remain (R3-001, R4-003, R2-002, R2-003,
+    R2-004, R2-005, R4-004), none blocking, explicitly out of round-2 scope -- optional follow-up
+    polish, not silently dropped.
+  reported_at: "2026-08-16T03:00:00Z"
   report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/review-ledger.md
 qa_summary:
   mode: stage
@@ -295,15 +321,13 @@ next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    ST-6 completed: R1-001 (the only blocking 4R finding) plus four bundled conformance findings
-    are fixed and mutation-verified. npm test 284/284, npm run check green, diff confined to the
-    4 in-scope files. Two safe next steps, user picks: (a) a SCOPED RE-REVIEW of the ST-6 fix
-    delta against the frozen ledger, to move the five rows from `fixed` to `verified` and lift
-    the round-0 `fail` verdict -- recommended, and cheap since the delta is 4 files; or (b) go
-    straight to ST-5 (the manual AC-24 run against the real opencode CLI + closing gate), which
-    still needs cp-st5-approval and is blocked on the user having an authenticated opencode
-    installed. Note ST-5 was deliberately re-sequenced to depend on ST-6 so its single
-    non-repeatable manual run exercises post-fix code.
+    Scoped re-review (round 2) independently verified all 5 ST-6 fixes close their findings --
+    ledger verdict fail -> pass_with_warnings, open_severe_findings: 0. Only ST-5 remains: the
+    manual AC-24 run against the real, authenticated opencode CLI, then the final closing gate.
+    Needs cp-st5-approval and requires the user to have opencode installed and authenticated
+    (see docs/todo/E4/manual-verification.md item 2 for the exact steps). 7 info-level findings
+    from the review remain as optional, non-blocking follow-up polish -- not gating this story's
+    completion.
 created_at: "2026-08-16T00:00:00Z"
 updated_at: "2026-08-16T02:10:00Z"
 artifacts:

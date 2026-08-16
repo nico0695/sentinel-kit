@@ -1,0 +1,732 @@
+version: "0.1"
+change_name: e4-f2-h1-claude-code-adapter
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F2.H1] (issue #28): the first real ReviewEngine adapter, wrapping the canonical
+    claude-code CLI invocation the [E1.F1.H1] spike already captured with real evidence (exact
+    command, stdin path, JSON shape, all five failure signatures). Depends only on closed/merged
+    work (E1.F1.H1 spike, E1.F1.H3 fixtures, E0.F2.H2 port + contract suite + FakeEngine). Risk is
+    concentrated in two structural gaps the frozen ReviewEngine port does not cover today: an
+    isAvailable()-style pre-check (PRD Sec6.2 names it as settled, the port has only review()) and
+    a contract-test binary-mocking seam (no existing injection pattern in this repo). Both
+    escalated to spec rather than decided in proposal.
+  confidence: high
+  recorded_at: "2026-08-15T20:05:00Z"
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing to proposal. The spike doc, fixtures, port, and contract
+      suite are all merged and directly readable.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-15T19:55:00Z"
+    completed_at: "2026-08-15T20:05:00Z"
+    notes: >-
+      proposal.md written by a Sonnet worker, status ready-for-spec (with two open questions).
+      Grounded in direct inspection of review-engine.ts, run-review.ts, git-cli.ts (the only
+      existing spawn-a-binary adapter precedent), the FakeEngine contract suite, both E4.F1
+      state.yaml files' open_risks, docs/engines/claude-code.md, fixtures/README.md, and the raw
+      bytes of four fixtures (auth-error.json, timeout-sigterm.json, context-overflow.json,
+      valid-verdict.json) -- confirmed .is_error is the authoritative success flag (.subtype
+      reads "success" even on auth-error and context-overflow) and timeout-sigterm.json
+      genuinely has no .result field. Orchestrator independently re-read review-engine.ts and
+      confirmed the port is exactly one method, review(request) -> Promise<ReviewResult>, with
+      no isAvailable() surface -- the proposal's central finding is real, not a misreading.
+      Two A-level judgment calls made and ratified: (1) adapter-owned SIGTERM->SIGKILL timeout
+      enforcement is in scope now, closing r-engine-not-cancellable and
+      r-cleanup-races-abandoned-engine, both of which H1's state.yaml named "E4.F2" as owner;
+      (2) JSON envelope extraction (.result/.usage) is in scope here, restating a boundary H2's
+      own proposal already fixed, not re-litigating it. Four items escalated as B-level open
+      questions for spec to fix as firm ACs: the isAvailable() port gap, the binary-mocking seam,
+      the is_error:true non-auth classification rule, and the totalTokens computation rule.
+      "Successful real review" (issue #28 AC-2) proposed as satisfied by a manual verification
+      run recorded in execution-log.md, not an automated CI test -- mirrors H1/H2 precedent
+      (d-st1-evidence-obligation).
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-15T20:15:00Z"
+    completed_at: "2026-08-15T20:15:00Z"
+    notes: >-
+      spec.md complete, 27 ACs, status complete -- all four open_risks scoped to this stage
+      resolved as firm rules: (1) isAvailable() gap closed WITHOUT a port change (AC-5-7): an
+      internal `claude --version` pre-check runs inside review() before the real invocation;
+      auth failure is instead surfaced from the real invocation's own response shape
+      (is_error:true, api_error_status:401), never as a raw crash; (2) binary-mocking seam is an
+      injectable `runProcess: ClaudeCodeProcessRunner` factory option, default execa-backed
+      (AC-20-21); (3) is_error:true uniformly REJECTS review() regardless of cause -- auth,
+      context-overflow, or an adapter-initiated timeout kill that still flushed JSON (AC-13,
+      AC-18); (4) totalTokens = inputTokens + outputTokens only, cache fields excluded (AC-11).
+      Orchestrator independently verified: ReviewEngine.contract.ts's rejects.toBeInstanceOf(Error)
+      assertion at line 57 (AC-23's basis); execa@9.6.1 natively supports timeout/killSignal/
+      forceKillAfterDelay (AC-17's feasibility evidence); all six fixture files' is_error/subtype/
+      result/usage fields byte-for-byte.
+
+      ORCHESTRATOR CORRECTION before acceptance: the spec's Expected Behavior table and AC-11's
+      validation hint originally cited noisy-output.json's usage as output_tokens:164,
+      cache_read_input_tokens:16246, cache_creation_input_tokens:9386, totalTokens:166 (NOT
+      22794) -- none of which match the fixture. Direct re-parse found the real values are
+      output_tokens:529, cache_read_input_tokens:21886, cache_creation_input_tokens:3810, so the
+      correct totalTokens is 531, not 166. This was a spec-authoring error (not inherited from
+      proposal.md, which never cited these numbers) -- both spots corrected in place (see
+      d-noisy-output-usage-correction) before this stage was marked complete. Two narrower items
+      stay explicitly open for design, per proposal's own ratified decision: exact
+      adapter-vs-outer-race timeout precedence (r-timeout-budget-precedence, AC-19) and CLI
+      version-drift re-verification (r-claude-cli-version-drift, informational).
+  sddl-design:
+    status: completed
+    started_at: "2026-08-15T20:25:00Z"
+    completed_at: "2026-08-15T20:25:00Z"
+    notes: >-
+      design.md complete, all 27 ACs mapped. Four files under
+      src/adapters/driven/engines/claude-code/: claude-code-adapter.ts (factory + review()
+      orchestration), process-runner.ts (ClaudeCodeProcessRunner seam + execa-backed default,
+      reject:false so the seam only ever resolves except on genuine spawn failure), errors.ts
+      (3 typed classes), envelope.ts (pure JSON parsing, no execa dependency). AC-19 (the sole
+      item spec deferred) resolved: adapter's own execa `timeout` = request.timeoutMs exactly
+      (not shortened), forceKillAfterDelay explicitly lowered to 2000ms (execa default 5000ms).
+
+      AC-19 justification, orchestrator-verified against engine-timeout.ts:76-111 directly:
+      runEngineWithTimeout calls invoke() first, then schedules its own timeoutMs-delay timer
+      whose callback synchronously resolve()s -- no I/O wait -- while the adapter's own kill
+      sequence requires an OS-mediated round trip (signal delivery, process exit, stream drain)
+      that inherently settles later. So the outer race reliably wins in real execution,
+      producing the correct "timeout" terminal state, without shrinking the user's configured
+      budget. A deliberately-shortened adapter budget was considered and rejected: spec's
+      already-approved AC-13/14/18 fix the adapter's own timeout-kill rejection to
+      ClaudeCodeReviewError/ClaudeCodeInvocationError, never EngineTimeoutError, so shortening
+      would only make the adapter's OWN rejection win more often -- degrading the terminal state
+      to "engine-error" more, not less. The EngineTimeoutError "escape hatch" named in H1's
+      state.yaml was investigated and explicitly rejected: using it would contradict the already
+      -approved AC-13/14/18 mapping. Orchestrator independently confirmed engine-timeout.ts's
+      catch clause does rethrow EngineTimeoutError unwrapped (line 102-104), and confirmed
+      execa's ExecaError carries the same CommonResult fields as SuccessResult (result.d.ts),
+      supporting the reject:false seam design. Residual risk (adapter occasionally wins the
+      race, yielding "engine-error" instead of "timeout") accepted as low-severity, documented,
+      not eliminable without unfreezing core.
+
+      r-timeout-budget-precedence now RESOLVED. Two low-severity items carried to plan: AC-16/17
+      (SIGTERM->SIGKILL ordering) needs an explicit test-case strategy since the runProcess seam
+      itself carries no timing; r-claude-cli-version-drift remains informational-only.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-15T20:35:00Z"
+    completed_at: "2026-08-15T20:35:00Z"
+    notes: >-
+      plan.md complete: 5 executor stages (ST-1 errors.ts+envelope.ts, ST-2 process-runner.ts,
+      ST-3 claude-code-adapter.ts orchestration + barrel export, ST-4 the single AC-covering test
+      file, ST-5 manual AC-24 verification + closing gate). Split design.md's rough 4-bullet
+      order one level finer, separating ST-4 (automated, gates on a green vitest run) from ST-5
+      (manual, gates on a human running a real authenticated claude CLI review) since the two
+      have exit conditions different in kind.
+
+      Closed the AC-16/17 test-strategy gap design.md flagged concretely, not left to the
+      executor to interpret: (1) a vi.mock("execa") option-wiring test importing process-runner
+      .ts's factory directly, asserting execa is called with { timeout, killSignal:"SIGTERM",
+      forceKillAfterDelay:2000, reject:false } -- the actual, only-automatable proof of AC-16/17;
+      (2) two adapter-level stub tests proving classification (SIGTERM-flushed-JSON ->
+      ClaudeCodeReviewError, SIGKILL-empty-stdout -> ClaudeCodeInvocationError), not escalation.
+      Plainly documents that real OS-level signal ordering stays unprovable in CI -- accepted
+      residual gap, same class as AC-19's.
+
+      Orchestrator independently re-ran the measured baseline before accepting: npm test =
+      226/226 passing, 16 test files -- confirmed exactly matching plan.md's Budget Notes claim.
+      One executor-level naming decision flagged explicitly by the plan itself (not hidden): ST-2
+      needs a small factory (e.g. createDefaultRunProcess(binaryPath)) since design.md described
+      binaryPath as "closed over" without fixing a literal export signature -- recorded as an
+      A-level executor decision, to be logged in execution-log.md when made, not re-escalated
+      here.
+  sddl-executor:
+    status: in_progress
+    started_at: "2026-08-15T20:40:00Z"
+    last_updated_at: "2026-08-15T22:32:00Z"
+    notes: >-
+      ST-1 complete: src/adapters/driven/engines/claude-code/errors.ts (3 typed classes) and
+      envelope.ts (pure JSON-envelope parsing) created exactly per design.md's shapes.
+      Orchestrator independently re-read both files, confirmed the import path
+      (../../../../core/run/index.js) matches fake-engine.ts's own import line exactly, and
+      re-ran validation directly rather than trusting the executor's report: npm run check
+      clean (82 files, 0 dependency violations, 58 modules/106 dependencies), npm test 226/226
+      unchanged (no regression -- leaf files, nothing imports them yet), git status confirms
+      only src/adapters/driven/engines/claude-code/ is new. Two minor A-level judgment calls
+      the executor made and disclosed: literal error-message wording (design.md specifies
+      behavior, not exact strings) and treating an empty `.result` string as "absent" in
+      buildReviewErrorMessage's fallback branch -- both reversible, neither affects any ST-1
+      fixture, no escalation needed.
+
+      ST-2 complete: src/adapters/driven/engines/claude-code/process-runner.ts created --
+      ClaudeCodeProcessRunOptions/ClaudeCodeProcessResult/ClaudeCodeProcessRunner types plus
+      createDefaultRunProcess(binaryPath), matching design.md's exact execa call shape
+      (reject:false, conditional timeout/killSignal:"SIGTERM"/forceKillAfterDelay:2000 spread).
+      Factory name follows git-cli.ts's createGitCliAdapter create<Thing> convention, per
+      plan.md's own instruction that this naming choice is A-level, not a new decision to
+      escalate. Zero dependency on errors.ts/envelope.ts or src/core/** -- pure process
+      plumbing, execa the only import. Orchestrator independently re-read the file in full,
+      confirmed the execa import syntax matches git-cli.ts's own usage, and re-ran validation
+      directly: npm run check clean (83 files, 0 dependency violations, 59 modules/107
+      dependencies), npm test 226/226 unchanged, git status confirms only process-runner.ts is
+      new.
+
+      ST-3 complete: src/adapters/driven/engines/claude-code/claude-code-adapter.ts created --
+      ClaudeCodeAdapterOptions + createClaudeCodeAdapter(options?), the five-step review() body
+      (pre-flight -> real invocation -> parseEnvelope -> is_error branch -> extractSuccess)
+      exactly per design.md's pseudocode, PREFLIGHT_TIMEOUT_MS=5_000 module constant (not
+      derived from request.timeoutMs, AC-15). Barrel export added to engines/index.ts (2 lines,
+      Biome's organizeImports assist alphabetized them ahead of FakeEngine's -- content
+      unchanged, just the file's own existing lint convention firing). This is the first stage
+      with a real cross-file import graph (adapter -> errors.js/envelope.js/process-runner.js
+      siblings + core/run/index.js) -- depcruise reports 0 violations (60 modules, 113
+      dependencies cruised), confirming adapters-isolated/core-no-adapters guards hold.
+
+      ORCHESTRATOR FIX before acceptance: engines/index.ts's header doc-comment still read
+      "Public API today: the scripted FakeEngine..." after this stage added
+      createClaudeCodeAdapter to the same barrel -- stale as of this exact commit. Corrected in
+      place (now names both the landed claude-code adapter and the not-yet-built opencode
+      adapter, #29) before the stage was accepted -- same class of self-caught doc-staleness
+      as H1/H2's Copilot-flagged findings, caught here before it ever reached a PR. Orchestrator
+      independently re-read the full adapter file and the edited barrel file, and re-ran
+      validation directly (not just trusting the executor's report): npm run check clean (84
+      files, 0 dependency violations), npm test 226/226 unchanged, git diff --stat confirms only
+      the two expected files touched.
+
+      ST-4: __test__/claude-code-adapter.test.ts written -- reviewEngineContract(harness,
+      "claude-code") + 7 AC-specific describe blocks (24 tests), per plan.md's Stage 4 Test
+      Layout. AC-16/17's execa-mock test confirmed exact: vi.mock("execa"), asserts
+      {timeout:5000, killSignal:"SIGTERM", forceKillAfterDelay:2000, reject:false} when
+      timeoutMs>0, asserts those three keys absent when timeoutMs=0. noisy-output.json's
+      totalTokens re-derived programmatically from fixture bytes inside the test (not
+      hardcoded) -- confirmed 531, matching spec's corrected AC-11 figure.
+
+      GENUINE BLOCKING FINDING, escalated as C-level (reality contradicts an approved
+      assumption) rather than silently worked around: ReviewEngine.contract.ts's frozen
+      "propagates the configured usage" test called harness.resolving("OUT", {totalTokens:42})
+      and asserted result.usage deep-equals {totalTokens:42} exactly -- a shape no
+      derivation-based real engine can ever produce, since extractSuccess's already-approved
+      AC-11 rule always computes totalTokens as inputTokens+outputTokens together, never a
+      lone totalTokens. Root cause: this generic contract test was written and only ever
+      validated against FakeEngine's literal-passthrough harness (confirmed: fake-engine.test
+      .ts's own resolving() just echoes whatever usage it's given) -- never against a
+      derivation-based engine until claude-code, the first real ReviewEngine implementation,
+      tried to satisfy it. This refutes spec.md's AC-22 assumption that the shared suite
+      "passes unmodified" -- and would identically block opencode (H2, #29) later.
+
+      Presented to the user via AskUserQuestion with 3 options and a recommendation. User chose
+      (d-st4-contract-usage-fix): correct the shared contract test to use a full, realistic
+      {inputTokens, outputTokens, totalTokens} tuple instead of a lone totalTokens -- preserves
+      the test's original intent (configured usage propagates) while making it satisfiable by
+      both FakeEngine (trivial passthrough) and any derivation-based real engine. Applied to
+      ReviewEngine.contract.ts; re-ran full suite: 250/250 (226 baseline + 24 new), npm run
+      check clean. Orchestrator also caught and fixed one stale in-file comment (the test file
+      referenced "the one contract scenario this still cannot satisfy" -- no longer true after
+      the fix) before accepting the stage.
+
+      Scope note: ReviewEngine.contract.ts's modification means the diff surface now exceeds
+      AC-26's originally-stated boundary (claude-code/** + __test__/ + one barrel line) by one
+      shared file -- an explicitly user-approved, documented exception, not a silent leak.
+
+      ST-5 PARTIAL, deliberately not closed: user requested "documentala y dejala como
+      pendiente" instead of running the manual AC-24 verification. Automatable half done and
+      verified: npm run check clean (85 files, 0 dependency violations), npm test 250/250,
+      git diff --stat origin/main...HEAD confirms exactly 7 files changed (as expected, incl.
+      the one approved ReviewEngine.contract.ts exception), grep confirms execa imported only
+      in process-runner.ts (AC-25). Manual half (AC-24: real authenticated claude CLI review)
+      explicitly NOT attempted -- recorded as d-ac24-deferred-no-live-cli and open_risk
+      r-ac24-manual-verification-pending. This stage stays in_progress, not completed, until
+      that entry is added to execution-log.md. QA final mode cannot be entered while this risk
+      is open.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-15T22:40:00Z"
+    completed_at: "2026-08-15T22:40:00Z"
+    notes: >-
+      Final QA verdict: pass_with_notes. All 26 automatable ACs (AC-1..23, AC-25..27)
+      independently re-verified by the QA worker against exact source lines and exact test
+      assertion bodies -- not trusted from execution-log.md's self-report. Zero code defects,
+      zero fabricated or unverifiable claims found anywhere in the sdd-lite artifacts. Orchestrator
+      independently re-ran npm test (250/250) and spot-checked the ReviewEngine.contract.ts
+      Error-rejection assertion line the report cited -- both confirmed exact.
+
+      Contract fix soundness re-derived independently by QA (not just re-stated): confirmed the
+      original {totalTokens:42}-only fixture was genuinely unsatisfiable by any derivation-based
+      engine, confirmed the replacement {10,32,42} tuple is internally consistent
+      (10+32=42) and therefore satisfiable by extractSuccess's summation rule, confirmed
+      FakeEngine's passthrough harness is unaffected, confirmed the fix preserves the test's
+      original intent (configured usage propagates verbatim) rather than weakening it.
+
+      Two non-blocking test-coverage notes recorded (not defects): AC-9's missing/non-string
+      .result branch has no dedicated runtime test (guard is correct by direct reading);
+      AC-15's spec-suggested never-resolving pre-check stub test is absent (review() has no
+      adapter-level timeout wrapper of its own around the pre-flight call -- delegates entirely
+      to runProcess, sound documented design, but a custom runProcess ignoring timeoutMs could
+      hang review() indefinitely; the default execa-backed runner's own timeout is proven by
+      the AC-16/17 mock test).
+
+      AC-24 confirmed honestly documented as pending human verification, not glossed over, not
+      silently marked satisfied, not attempted by this QA pass. Full report:
+      sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/qa-report.md.
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    26/27 ACs genuinely satisfied and independently re-verified against source, tests, and
+    fixture bytes; zero code defects, zero fabricated claims. AC-24 ("successful real review")
+    is the sole gap -- honestly documented as pending human verification with a real
+    authenticated claude CLI (d-ac24-deferred-no-live-cli), not a code or process defect. Two
+    minor, non-blocking test-coverage notes recorded for future improvement.
+  reported_at: "2026-08-15T22:40:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/qa-report.md
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/spec.md
+  design: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/design.md
+  plan: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f2-h1-claude-code-adapter/qa-report.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      proposal.md complete for [E4.F2.H1] (#28). Central open item: the ReviewEngine port has
+      no isAvailable()-style method, yet PRD Sec6.2 and issue #28 AC-3 both expect
+      missing/unauthenticated detection before running. Orchestrator independently verified
+      this gap against review-engine.ts source. Presented to the user with a recommendation to
+      proceed to spec, where the four open questions get fixed as firm ACs.
+    question: Proceed to sddl-spec for [E4.F2.H1], or revise scope first?
+    options:
+      - id: proceed-to-spec
+        label: Proceed to spec (recommended)
+        description: >-
+          Accept the proposal's scope sketch and open-questions list; let spec fix the
+          isAvailable() mechanism, the binary-mocking seam, the is_error classification rule,
+          and totalTokens as firm acceptance criteria.
+        recommended: true
+      - id: revise-scope
+        label: Revise scope first
+        description: Send proposal.md back for rework before spec starts.
+    free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-spec
+      free_text: "si, avanza con el spec"
+      responded_at: "2026-08-15T20:10:00Z"
+    created_at: "2026-08-15T20:06:00Z"
+    resolved_at: "2026-08-15T20:10:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      spec.md complete for [E4.F2.H1] (#28), 27 ACs, all four scoped open_risks resolved as firm
+      rules. Orchestrator independently verified the contract suite's Error-rejection assertion,
+      execa's native timeout/kill support, and all six fixtures' fields -- and caught + fixed one
+      spec-authoring error (noisy-output.json usage figures) before acceptance. No open items
+      require escalation before design; the two remaining open items (timeout precedence,
+      CLI version drift) were already scoped to design/later by proposal.md itself.
+    question: Proceed to sddl-design for [E4.F2.H1], or request spec changes first?
+    options:
+      - id: proceed-to-design
+        label: Proceed to design (recommended)
+        description: >-
+          Accept spec.md's 27 ACs as the firm contract; let design fix internal file/function
+          decomposition, exact ClaudeCodeProcessRunner/ClaudeCodeProcessResult shapes, the three
+          error classes' constructors, and the AC-19 timeout-precedence ordering.
+        recommended: true
+      - id: revise-spec
+        label: Request spec changes first
+        description: Send spec.md back for rework before design starts.
+    free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-design
+      free_text: "si, avanza con el diseño"
+      responded_at: "2026-08-15T20:20:00Z"
+    created_at: "2026-08-15T20:16:00Z"
+    resolved_at: "2026-08-15T20:20:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      design.md complete for [E4.F2.H1] (#28), all 27 ACs mapped. AC-19 (the one item spec
+      deferred) resolved: adapter timeout = request.timeoutMs exactly, forceKillAfterDelay
+      lowered to 2000ms, so the outer runReview race reliably wins and reports "timeout" in
+      practice. Orchestrator independently re-read engine-timeout.ts:76-111 and confirmed the
+      race mechanics and the EngineTimeoutError rethrow-unwrapped behavior the design's
+      reasoning depends on; also confirmed execa's ExecaError field-carrying claim against
+      result.d.ts. No open items require escalation before plan.
+    question: Proceed to sddl-plan for [E4.F2.H1], or request design changes first?
+    options:
+      - id: proceed-to-plan
+        label: Proceed to plan (recommended)
+        description: >-
+          Accept design.md's file/function decomposition and AC-19 resolution; let plan sequence
+          the four source files plus the contract-test harness into ordered execution stages.
+        recommended: true
+      - id: revise-design
+        label: Request design changes first
+        description: Send design.md back for rework before plan starts.
+    free_input_allowed: true
+    response:
+      selected_option_id: proceed-to-plan
+      free_text: "si avanzar al plan"
+      responded_at: "2026-08-15T20:30:00Z"
+    created_at: "2026-08-15T20:26:00Z"
+    resolved_at: "2026-08-15T20:30:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      plan.md complete for [E4.F2.H1] (#28): 5 sequential executor stages, each requiring its own
+      approval. AC-16/17's test-strategy gap closed with two concretely-specified tests
+      (mocked-execa option wiring + adapter classification stubs), not left vague. Orchestrator
+      independently re-ran the baseline (226/226, 16 files) confirming the plan's Budget Notes
+      claim exactly. No open items require escalation before ST-1 starts.
+    question: Approve ST-1 (errors.ts + envelope.ts) to start execution, or request plan changes first?
+    options:
+      - id: approve-st1
+        label: Approve ST-1 (recommended)
+        description: >-
+          Start executor on ST-1: land the three typed error classes and the JSON-envelope
+          parsing/extraction helpers, pure and execa-free.
+        recommended: true
+      - id: revise-plan
+        label: Request plan changes first
+        description: Send plan.md back for rework before executor starts.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-st1
+      free_text: "si"
+      responded_at: "2026-08-15T20:38:00Z"
+    created_at: "2026-08-15T20:36:00Z"
+    resolved_at: "2026-08-15T20:38:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1 complete and independently verified: errors.ts + envelope.ts land exactly per
+      design.md, npm run check clean, npm test 226/226 unchanged, diff scope confirmed. Ready
+      for ST-2: the execa-backed runProcess seam (process-runner.ts).
+    question: Approve ST-2 (process-runner.ts) to start execution, or pause here?
+    options:
+      - id: approve-st2
+        label: Approve ST-2 (recommended)
+        description: >-
+          Land ClaudeCodeProcessRunOptions/ClaudeCodeProcessResult/ClaudeCodeProcessRunner types
+          and the execa-backed defaultRunProcess (reject:false), per design.md's exact snippet.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-1; resume ST-2 later.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-st2
+      free_text: "si apruebo"
+      responded_at: "2026-08-15T20:48:00Z"
+    created_at: "2026-08-15T20:45:00Z"
+    resolved_at: "2026-08-15T20:48:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2 complete and independently verified: process-runner.ts lands exactly per design.md
+      (createDefaultRunProcess factory, reject:false, AC-19's forceKillAfterDelay:2000
+      override), npm run check clean, npm test 226/226 unchanged, diff scope confirmed. Ready
+      for ST-3: claude-code-adapter.ts orchestration + the barrel export.
+    question: Approve ST-3 (claude-code-adapter.ts + barrel export) to start execution, or pause here?
+    options:
+      - id: approve-st3
+        label: Approve ST-3 (recommended)
+        description: >-
+          Land createClaudeCodeAdapter's review() orchestration (pre-flight, invocation, parse,
+          is_error branch, resolve) wiring ST-1/ST-2 together, plus the engines/index.ts export.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-2; resume ST-3 later.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-st3
+      free_text: "si"
+      responded_at: "2026-08-15T22:03:00Z"
+    created_at: "2026-08-15T22:00:00Z"
+    resolved_at: "2026-08-15T22:03:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3 complete and independently verified: claude-code-adapter.ts lands the five-step
+      review() body exactly per design.md, barrel export wired, first real cross-file import
+      graph checked clean by depcruise (0 violations). Orchestrator also caught and fixed a
+      stale doc-comment in engines/index.ts (still described FakeEngine as the sole public API
+      after this stage added createClaudeCodeAdapter to the same file) before accepting. Ready
+      for ST-4: the single test file covering all 27 ACs, including the AC-16/17 execa-option
+      test.
+    question: Approve ST-4 (the AC-covering test file) to start execution, or pause here?
+    options:
+      - id: approve-st4
+        label: Approve ST-4 (recommended)
+        description: >-
+          Write __test__/claude-code-adapter.test.ts: the shared reviewEngineContract harness
+          plus every AC-specific test, per plan.md's Stage 4 Test Layout and AC-16/AC-17 Test
+          Strategy sections.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-3; resume ST-4 later.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-st4
+      free_text: "si"
+      responded_at: "2026-08-15T22:15:00Z"
+    created_at: "2026-08-15T22:10:00Z"
+    resolved_at: "2026-08-15T22:15:00Z"
+  - id: cp-contract-usage-fix
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      ST-4 executor found ReviewEngine.contract.ts's "propagates the configured usage" test
+      unsatisfiable by any derivation-based real engine (it configures a lone totalTokens with
+      no inputTokens/outputTokens; extractSuccess's approved AC-11 rule always computes
+      totalTokens as their sum, never independently). Refutes spec.md's AC-22 assumption that
+      the shared suite "passes unmodified" -- a C-level reality-contradicts-assumption case,
+      also outside this story's originally declared file scope, and would identically block
+      opencode (#29) later.
+    question: How to resolve the ReviewEngine.contract.ts / AC-22 contradiction?
+    options:
+      - id: fix-shared-contract
+        label: Fix the shared contract test (recommended)
+        description: >-
+          Change the test's usage fixture from a lone {totalTokens:42} to a full
+          {inputTokens, outputTokens, totalTokens} tuple -- satisfiable by both FakeEngine and
+          any derivation-based real engine, preserving the test's original intent.
+        recommended: true
+      - id: document-exception
+        label: Document an AC-22 exception
+        description: Leave the shared test as-is, record a permanent documented exception in spec.md.
+      - id: escalate-c-level
+        label: Pause and escalate as C-level with no recommendation
+        description: Stop entirely, no path chosen, wait for explicit user direction.
+    free_input_allowed: true
+    response:
+      selected_option_id: fix-shared-contract
+      responded_at: "2026-08-15T22:20:00Z"
+    created_at: "2026-08-15T22:18:00Z"
+    resolved_at: "2026-08-15T22:20:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4 complete and independently verified: __test__/claude-code-adapter.test.ts (24 tests,
+      7 describe blocks + the shared contract) all pass, 250/250 full suite, check clean. The
+      blocking ReviewEngine.contract.ts contradiction was resolved per the user's chosen fix
+      (d-st4-contract-usage-fix) and re-verified green. Orchestrator also fixed a stale in-file
+      comment referencing the now-resolved contract issue. Ready for ST-5: the manual AC-24
+      verification run (real authenticated claude CLI) plus the closing gate.
+    question: Approve ST-5 (manual AC-24 verification + closing gate) to start, or pause here?
+    options:
+      - id: approve-st5
+        label: Approve ST-5 (recommended)
+        description: >-
+          Run the finished adapter once against the real, authenticated claude CLI over a
+          genuine diff; record command/exit-code/VERDICT: line in execution-log.md; then the
+          full closing gate (npm run check && npm test && git diff --stat scope check).
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-4; resume ST-5 later.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve-st5
+      free_text: "documentala y dejala como pendiente"
+      responded_at: "2026-08-15T22:30:00Z"
+    created_at: "2026-08-15T22:25:00Z"
+    resolved_at: "2026-08-15T22:30:00Z"
+decisions:
+  - id: d-user-owns-all-external-testing
+    checkpoint_id: cp-st5-approval
+    free_text: >-
+      User confirmed explicitly: all CLI/external-tool testing for this story (AC-24 included)
+      will be done by the user themselves, later, outside this session. Orchestrator authorized
+      to continue closing out the sdd-lite flow (QA review, PR) without pausing again for
+      approval except where genuinely necessary.
+    rationale: >-
+      User's own words: "no, todo testeo con el cli o con algo externo lo voy a hacer yo luego"
+      followed by "continua hasta cerrar el sdd-lite, frena solo si tengo que confirmar algo".
+      This authorizes proceeding through final QA and PR creation with AC-24 explicitly
+      disclosed as an open, user-owned follow-up -- not silently closed, not blocking the rest
+      of the story's genuine completion from being recognized and shipped for human review.
+    recorded_at: "2026-08-15T22:38:00Z"
+  - id: d-ac24-deferred-no-live-cli
+    checkpoint_id: cp-st5-approval
+    free_text: >-
+      ST-5's automatable half (closing gate: npm run check, npm test, git diff --stat scope
+      check, execa-import grep) was run and is green. The manual AC-24 verification (real
+      authenticated claude CLI review) was explicitly NOT attempted -- user chose to document
+      it as pending rather than proceed, in response to being asked whether real CLI access was
+      available in this environment.
+    rationale: >-
+      A `claude` binary exists on this session's PATH (/opt/node22/bin/claude), but invoking it
+      to run a real review would spawn a genuine, authenticated agentic session as a side effect
+      of a build task under this session's own auth/session context -- materially different and
+      riskier than a throwaway local script, and not something to do without explicit user
+      authorization. User declined to authorize it and asked for the gap to be documented
+      instead. Recorded here rather than silently closing the story or fabricating evidence.
+    recorded_at: "2026-08-15T22:32:00Z"
+  - id: d-st4-contract-usage-fix
+    checkpoint_id: cp-contract-usage-fix
+    free_text: >-
+      ReviewEngine.contract.ts's "propagates the configured usage" test changed from
+      harness.resolving("OUT", {totalTokens:42}) / expect({totalTokens:42}) to a full
+      {inputTokens:10, outputTokens:32, totalTokens:42} tuple, propagated and asserted whole.
+    rationale: >-
+      User-selected (AskUserQuestion, 3 options, this one recommended). Root cause: the test
+      was only ever exercised against FakeEngine's literal-passthrough harness (confirmed via
+      fake-engine.test.ts) -- no derivation-based engine had tried to satisfy it before
+      claude-code, the first real ReviewEngine implementation. The fix preserves the generic
+      property under test (configured usage propagates verbatim) while making it achievable by
+      any engine whose usage is derived from real parsed fields, not just a fully scripted
+      double -- and unblocks opencode (#29) from hitting the identical issue later. Re-ran full
+      suite after the fix: 250/250 (226 baseline + 24 new claude-code tests), npm run check
+      clean. This decision also means AC-26's originally-stated diff-scope boundary
+      (claude-code/** + __test__/ + one barrel line) now has one explicitly-approved exception:
+      ReviewEngine.contract.ts.
+    recorded_at: "2026-08-15T22:22:00Z"
+  - id: d-st3-index-docstring-fix
+    checkpoint_id: cp-st4-approval
+    free_text: >-
+      Corrected engines/index.ts's header doc-comment during ST-3 acceptance: it still read
+      "Public API today: the scripted FakeEngine..." after this same stage added
+      createClaudeCodeAdapter to the barrel. Now names both the landed claude-code adapter and
+      the not-yet-built opencode adapter (#29).
+    rationale: >-
+      Same class of self-caught doc-staleness this session's H1/H2 PRs had flagged by GitHub
+      Copilot's automated review after the fact -- caught here, before any PR, at zero cost.
+      Low-risk, in-scope (same file the stage already touched), reversible; not escalated.
+    recorded_at: "2026-08-15T22:12:00Z"
+  - id: d-ac19-timeout-equal-not-shortened
+    checkpoint_id: cp-design-approval
+    free_text: >-
+      Adapter's own execa timeout for the real review invocation is set to request.timeoutMs
+      exactly (not artificially shortened), paired with an explicit forceKillAfterDelay:2000
+      (execa default 5000).
+    rationale: >-
+      engine-timeout.ts:76-111 (read directly): the outer race's expiry timer resolves
+      synchronously with no I/O wait, while the adapter's own OS-mediated process kill
+      inherently settles later -- so the outer race reliably wins in real execution without
+      needing to shrink the user's configured budget. A shortened adapter budget was considered
+      and rejected: spec's approved AC-13/14/18 already fix the adapter's own timeout-kill
+      rejection to ClaudeCodeReviewError/ClaudeCodeInvocationError (never EngineTimeoutError),
+      so shortening would only make the adapter's own rejection win the race MORE often,
+      degrading the terminal state to "engine-error" more, not less -- the opposite of the
+      intended outcome. The EngineTimeoutError "escape hatch" (H1 state.yaml) was investigated
+      and rejected: using it would require the adapter to throw the core's own error type,
+      contradicting the already-approved AC-13/14/18 mapping.
+    recorded_at: "2026-08-15T20:25:00Z"
+  - id: d-noisy-output-usage-correction
+    checkpoint_id: cp-spec-approval
+    free_text: >-
+      Corrected noisy-output.json's usage figures in spec.md (Expected Behavior table + AC-11)
+      from a spec-authoring error (output_tokens:164, cache_read:16246, cache_creation:9386,
+      totalTokens:166/NOT-22794) to the fixture's real byte values (output_tokens:529,
+      cache_read:21886, cache_creation:3810, totalTokens:531/NOT-26227).
+    rationale: >-
+      Orchestrator re-verification (python3 json.load against the raw fixture file) found the
+      spec's cited numbers did not match fixture bytes. Left uncorrected, AC-11's own validation
+      hint would have told a future test-writer to assert a totalTokens value (166) that no
+      fixture actually produces -- the exact class of error this session's standing practice
+      (independently verify every subagent claim against source before accepting a stage) exists
+      to catch. Not attributable to proposal.md, which never cited these specific numbers -- a
+      spec-stage-introduced error, caught and fixed before the stage was accepted.
+    recorded_at: "2026-08-15T20:15:00Z"
+  - id: d-timeout-ownership-in-scope
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      Adapter-owned SIGTERM->SIGKILL timeout enforcement is in scope for this story, not
+      deferred again.
+    rationale: >-
+      Both e4-f1-h1-run-review/state.yaml open risks that named "E4.F2" as owner
+      (r-engine-not-cancellable, r-cleanup-races-abandoned-engine) point specifically at "the
+      E4.F2 adapters" as the place process-kill gets implemented, and claude-code is the first
+      of those adapters. Deferring again would mean no E4.F2 story ever picks it up. The exact
+      precedence rule against runReview's outer timeout race (r-timeout-budget-precedence) is
+      narrower and left open for spec/design, since the outer race's EngineTimeoutError escape
+      hatch already exists and could be the adapter's own mechanism.
+    recorded_at: "2026-08-15T20:05:00Z"
+  - id: d-json-envelope-in-scope
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      JSON envelope extraction (.result/.usage) is confirmed in scope for this adapter, not the
+      verdict parser.
+    rationale: >-
+      Not new scope -- [E4.F1.H2]'s own proposal already fixed this exact boundary ("this
+      happens before deps.parseVerdict is called ... that is the ReviewEngine adapter's job,
+      E4.F2.x, not built yet"). Restated here as confirmed, not re-litigated.
+    recorded_at: "2026-08-15T20:05:00Z"
+open_risks:
+  - id: r-ac24-manual-verification-pending
+    severity: medium
+    summary: >-
+      Issue #28's second checklist item ("Successful real review") is UNVERIFIED. ST-5's manual
+      AC-24 step (invoke createClaudeCodeAdapter() against a real, authenticated claude CLI over
+      a genuine diff; record command/exit-code/VERDICT: line in execution-log.md) was
+      deliberately not attempted -- see d-ac24-deferred-no-live-cli. Everything automatable is
+      green (250/250, check clean, scope confirmed), but this story cannot reach QA final mode /
+      lifecycle_status completed, and the PR should not claim AC-24 satisfied, until this entry
+      exists in execution-log.md.
+  - id: r-isavailable-port-gap
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-5-7): no ReviewEngine port change. review() runs an internal
+      `claude --version` pre-check before the real invocation, inside one async call --
+      "missing" is caught pre-flight, "unauthenticated" is caught from the real invocation's own
+      response shape (is_error:true, api_error_status:401), never as a raw crash.
+  - id: r-binary-mocking-seam
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-20-21): an injectable `runProcess: ClaudeCodeProcessRunner` factory
+      option is the sole mocking seam, defaulting to a real execa-backed runner. No PATH
+      shimming, no monkey-patching.
+  - id: r-is-error-classification
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-13, AC-18): is_error:true uniformly REJECTS review() regardless of
+      cause (auth, context-overflow, or an adapter-initiated timeout kill that still flushed
+      JSON) -- never resolves with error text as output.
+  - id: r-total-tokens-computation
+    severity: low
+    summary: >-
+      RESOLVED by spec.md (AC-11): totalTokens = inputTokens + outputTokens only; cache-read/
+      cache-creation fields excluded, keeping totalTokens an invariant sum of the two other
+      exposed fields.
+  - id: r-timeout-budget-precedence
+    severity: low
+    summary: >-
+      RESOLVED by design.md (AC-19): adapter's own execa timeout = request.timeoutMs exactly,
+      forceKillAfterDelay lowered to 2000ms. The outer runEngineWithTimeout race reliably wins
+      in real execution (verified against engine-timeout.ts:76-111), producing "timeout" as the
+      terminal state without shrinking the user's configured budget. Residual: the rare case
+      where the adapter's own rejection wins the race degrades to "engine-error" instead of
+      "timeout" -- accepted, low-severity, not eliminable without unfreezing core.
+  - id: r-claude-cli-version-drift
+    summary: >-
+      docs/engines/claude-code.md flags are "verified only against 2.1.226" and the spike is 7
+      days old (2026-08-08 -> today). Low material risk but not re-verified for this story.
+      Carried forward unresolved through spec and design -- informational only, to be checked
+      before/during sddl-executor.
+    severity: low
+next_action:
+  kind: halt
+  target: orchestrator
+  summary: >-
+    PR #66 opened (https://github.com/nico0695/sentinel-kit/pull/66), Closes #28. AC-24's gap
+    explicitly disclosed in the PR body, not silently marked satisfied. sdd-lite flow for
+    [E4.F2.H1] is otherwise closed out: proposal/spec/design/plan/ST-1..5/final QA all
+    complete and committed. Waiting on: (1) the user running AC-24's manual verification
+    themselves and adding the evidence to execution-log.md (their own stated plan), (2) human
+    review/merge of PR #66 (CLAUDE.md: never merge PRs, never push to main). No further
+    autonomous action pending on this story.
+created_at: "2026-08-15T19:55:00Z"
+updated_at: "2026-08-15T22:45:00Z"

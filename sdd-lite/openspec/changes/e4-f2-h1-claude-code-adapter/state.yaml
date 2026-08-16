@@ -144,7 +144,7 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-08-15T20:40:00Z"
-    last_updated_at: "2026-08-15T20:45:00Z"
+    last_updated_at: "2026-08-15T22:32:00Z"
     notes: >-
       ST-1 complete: src/adapters/driven/engines/claude-code/errors.ts (3 typed classes) and
       envelope.ts (pure JSON-envelope parsing) created exactly per design.md's shapes.
@@ -228,6 +228,17 @@ stages:
       Scope note: ReviewEngine.contract.ts's modification means the diff surface now exceeds
       AC-26's originally-stated boundary (claude-code/** + __test__/ + one barrel line) by one
       shared file -- an explicitly user-approved, documented exception, not a silent leak.
+
+      ST-5 PARTIAL, deliberately not closed: user requested "documentala y dejala como
+      pendiente" instead of running the manual AC-24 verification. Automatable half done and
+      verified: npm run check clean (85 files, 0 dependency violations), npm test 250/250,
+      git diff --stat origin/main...HEAD confirms exactly 7 files changed (as expected, incl.
+      the one approved ReviewEngine.contract.ts exception), grep confirms execa imported only
+      in process-runner.ts (AC-25). Manual half (AC-24: real authenticated claude CLI review)
+      explicitly NOT attempted -- recorded as d-ac24-deferred-no-live-cli and open_risk
+      r-ac24-manual-verification-pending. This stage stays in_progress, not completed, until
+      that entry is added to execution-log.md. QA final mode cannot be entered while this risk
+      is open.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -488,8 +499,29 @@ checkpoints:
         label: Pause here
         description: Stop after ST-4; resume ST-5 later.
     free_input_allowed: true
+    response:
+      selected_option_id: approve-st5
+      free_text: "documentala y dejala como pendiente"
+      responded_at: "2026-08-15T22:30:00Z"
     created_at: "2026-08-15T22:25:00Z"
+    resolved_at: "2026-08-15T22:30:00Z"
 decisions:
+  - id: d-ac24-deferred-no-live-cli
+    checkpoint_id: cp-st5-approval
+    free_text: >-
+      ST-5's automatable half (closing gate: npm run check, npm test, git diff --stat scope
+      check, execa-import grep) was run and is green. The manual AC-24 verification (real
+      authenticated claude CLI review) was explicitly NOT attempted -- user chose to document
+      it as pending rather than proceed, in response to being asked whether real CLI access was
+      available in this environment.
+    rationale: >-
+      A `claude` binary exists on this session's PATH (/opt/node22/bin/claude), but invoking it
+      to run a real review would spawn a genuine, authenticated agentic session as a side effect
+      of a build task under this session's own auth/session context -- materially different and
+      riskier than a throwaway local script, and not something to do without explicit user
+      authorization. User declined to authorize it and asked for the gap to be documented
+      instead. Recorded here rather than silently closing the story or fabricating evidence.
+    recorded_at: "2026-08-15T22:32:00Z"
   - id: d-st4-contract-usage-fix
     checkpoint_id: cp-contract-usage-fix
     free_text: >-
@@ -581,6 +613,16 @@ decisions:
       E4.F2.x, not built yet"). Restated here as confirmed, not re-litigated.
     recorded_at: "2026-08-15T20:05:00Z"
 open_risks:
+  - id: r-ac24-manual-verification-pending
+    severity: medium
+    summary: >-
+      Issue #28's second checklist item ("Successful real review") is UNVERIFIED. ST-5's manual
+      AC-24 step (invoke createClaudeCodeAdapter() against a real, authenticated claude CLI over
+      a genuine diff; record command/exit-code/VERDICT: line in execution-log.md) was
+      deliberately not attempted -- see d-ac24-deferred-no-live-cli. Everything automatable is
+      green (250/250, check clean, scope confirmed), but this story cannot reach QA final mode /
+      lifecycle_status completed, and the PR should not claim AC-24 satisfied, until this entry
+      exists in execution-log.md.
   - id: r-isavailable-port-gap
     severity: low
     summary: >-
@@ -623,12 +665,16 @@ open_risks:
       before/during sddl-executor.
     severity: low
 next_action:
-  kind: wait_for_approval
+  kind: ask_user
   target: sddl-executor
   summary: >-
-    ST-4 complete and verified (24 new tests, 250/250 full suite, check clean; blocking
-    ReviewEngine.contract.ts contradiction resolved per user decision d-st4-contract-usage-fix).
-    Awaiting user approval to start ST-5 for [E4.F2.H1] (#28): the manual AC-24 verification run
-    against the real authenticated claude CLI, plus the closing gate.
+    ST-5's automatable half is done and green (check clean, 250/250, scope confirmed). The
+    manual AC-24 verification (real authenticated claude CLI review) is deliberately deferred
+    per user request ("documentala y dejala como pendiente") -- see open_risk
+    r-ac24-manual-verification-pending. Resuming requires either: the user runs the manual
+    verification themselves and reports the command/exit-code/VERDICT: line back for
+    execution-log.md, or grants this session access to a real authenticated claude CLI to run
+    it directly. Until then, [E4.F2.H1] stays in_progress and cannot enter QA final mode or be
+    marked completed; issue #28's PR (if opened) must not claim AC-24 satisfied.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T22:25:00Z"
+updated_at: "2026-08-15T22:32:00Z"

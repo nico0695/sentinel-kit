@@ -78,4 +78,25 @@ Presented to the user with 3 options (fix the shared test / document a permanent
 
 **Scope note:** `ReviewEngine.contract.ts`'s modification means the diff surface exceeds AC-26's originally-stated boundary (`claude-code/**` + `__test__/` + one barrel line) by one shared file — an explicit, user-approved exception, not a silent leak.
 
-## ST-5 — pending (not yet started, includes the manual AC-24 verification run)
+## ST-5 — closing gate done; manual AC-24 verification PENDING
+
+**Status:** partial — the automatable half is done; the manual half is explicitly left pending, per user instruction ("documentala y dejala como pendiente").
+
+**Done now (no real authenticated `claude` CLI needed):**
+- `npm run check`: clean — `Checked 85 files in 149ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (60 modules, 113 dependencies cruised)`.
+- `npm test`: `Test Files 17 passed (17)` / `Tests 250 passed (250)`.
+- `git diff --stat origin/main...HEAD -- src/`: 7 files changed (the 4 new claude-code source files, the new test file, `engines/index.ts`, and `ReviewEngine.contract.ts` — the one explicitly user-approved exception to AC-26's original boundary, per `d-st4-contract-usage-fix`). No other file touched.
+- `grep -rn 'from "execa"' src/adapters/driven/engines/claude-code`: exactly one match, `process-runner.ts` — reconfirms AC-25.
+
+**Pending — AC-24 ("successful real review"), not attempted:**
+
+Per spec.md AC-24, this requires invoking `createClaudeCodeAdapter()`'s default `execa`-backed path once against the real, authenticated `claude` CLI over a genuine diff, and recording the exact command, exit code, and observed `VERDICT:` line here.
+
+A `claude` binary exists on this session's `PATH` (`/opt/node22/bin/claude`), but it was **not invoked** — using it here would mean spawning a real, authenticated agentic session as a side effect of a build task, under this session's own auth/session context, which is a materially different and riskier action than a throwaway local script running a headless CLI review. The user was asked whether real CLI access was available for this purpose and instead chose to document this step as pending rather than proceed.
+
+**What's needed to close this:** run the finished adapter once against a real, authenticated `claude` CLI, over a genuine diff in a real worktree, and record here:
+- the exact command invoked,
+- the exit code,
+- the observed `VERDICT:` line (or full relevant excerpt of `.result`).
+
+Until that entry exists, issue #28's second checklist item ("Successful real review") is unverified, and the story cannot reach QA `final` mode / `lifecycle_status: completed` (per `CLAUDE.md`'s audit rules — only final QA may mark a change completed, and issue #28's own AC is unmet without this evidence).

@@ -86,13 +86,47 @@ Story `[E4.F2.H2]` / issue #29: the second real `ReviewEngine` adapter, proving 
 | AC-15 | If ZERO lines of stdout parse as valid JSON (the entire output is non-NDJSON, e.g. a raw log dump), `review()` rejects with `OpenCodeInvocationError` — this is the "review never started" class | contract test against `fixtures/opencode/unknown-model-stdout.txt`, asserting rejection with `OpenCodeInvocationError` and a message noting the model/credential ambiguity, pointing at `opencode models` | must |
 | AC-16 | If AT LEAST ONE line parses but the stream contains a `type:"error"` event anywhere, `review()` rejects with `OpenCodeReviewError`, message built from `.error.name` + `.error.data.message` — this is the "a review session started but failed" class, distinct from AC-15 | contract test against `fixtures/opencode/context-overflow.ndjson`, asserting rejection with `OpenCodeReviewError` containing `"ContextOverflowError"` and `"Input exceeds context window"` | must |
 | AC-17 | If at least one line parses, no `error` event occurs, but the stream never reaches a `step-finish` event with `reason:"stop"` (i.e. it was cut off — killed, or genuinely malformed truncation) AND no `text` event was ever captured, `review()` rejects with `OpenCodeReviewError` with a fallback message noting no output was produced | contract test against `fixtures/opencode/timeout-sigterm-partial.ndjson` (single valid `step_start` line, nothing else) | must |
-| AC-18 | AC-15, AC-16, and AC-17 are the ONLY three rejection paths for the real invocation's stdout handling; every other observed shape (any `text` events present, regardless of whether a `step-finish reason:"stop"` was reached) resolves `review()` — partial-but-nonempty output is treated as a valid (if `no-verdict`-shaped) result, not an error, matching H1's "no `VERDICT:` interpretation at this layer" boundary | mechanical inspection + contract test covering all 6 fixtures | must |
+| AC-18 | **(AMENDED — see Amendment 1)** AC-15, AC-16, and AC-17 are the only three rejection paths derived from the real invocation's **stdout content**; within stdout handling, every other observed shape (any `text` events present, regardless of whether a `step-finish reason:"stop"` was reached) is treated as a valid (if `no-verdict`-shaped) result, not an error, matching H1's "no `VERDICT:` interpretation at this layer" boundary. Resolving `review()` additionally requires the process-status gate of AC-25 to pass — stdout shape alone is no longer sufficient | mechanical inspection + contract test covering all 6 fixtures | must |
 | AC-19 | `request.timeoutMs` bounds the real review invocation's wall-clock budget; the `--version` pre-check is bounded by the same short fixed internal budget H1 used (not `timeoutMs`) | unit test with a never-resolving pre-check stub, asserting eventual rejection | must |
 | AC-20 | On the review invocation exceeding `timeoutMs`, the adapter sends SIGTERM first, escalating to SIGKILL after a bounded grace window if the process has not exited — identical mechanism to H1's `createDefaultRunProcess` (`execa`'s `timeout`/`killSignal`/`forceKillAfterDelay`), no new timeout code | contract test asserting SIGTERM-then-SIGKILL ordering, mirroring H1's AC-16/AC-17 tests | must |
 | AC-21 | `createOpenCodeAdapter({ runProcess })` accepts an injectable `OpenCodeProcessRunner` as the SOLE binary-mocking seam — no `PATH` shimming, no monkey-patching `execa`. The default (`runProcess` unset) production path wraps `execa` directly | mechanical inspection of `<opencode>/__test__/opencode-adapter.test.ts` + the default factory | must |
 | AC-22 | `reviewEngineContract(harness, "opencode")` (from `src/adapters/driven/engines/__test__/ReviewEngine.contract.ts`, imported unmodified) passes against the opencode harness | `npx vitest run --project adapters -t "opencode"` | must |
 | AC-23 | Every raw failure (`runProcess` rejection, zero-parseable-lines, in-stream error event, no-output-produced, pre-flight failure, temp-file write failure) becomes a plain/typed `Error` instance before leaving `review()`; the function body never throws synchronously, only ever rejects its returned Promise (mirrors H1's AC-23 exactly) | contract test + mechanical inspection (no bare `throw` outside an `async` function body) | must |
 | AC-24 | "Successful real review" (issue #29 checklist item 2) is satisfied by a MANUAL verification run: invoke the finished adapter once against the real, authenticated `opencode` CLI over a genuine diff; record the exact command, exit code, and observed `VERDICT:` line in `execution-log.md` — mirrors H1's AC-24. Explicitly NOT CI-enforced | manual verification, recorded in `execution-log.md` | must |
+| AC-25 | **(NEW — Amendment 1, closes review finding R1-001)** The real invocation's process status gates resolution: after `extractOutcome` would return (i.e. none of AC-15/16/17 fired), `review()` rejects with `OpenCodeReviewError` if the process did NOT exit cleanly — that is, if `timedOut` is true, OR `signal` is set, OR `exitCode` is anything other than `0`. The message must name the terminating signal or the exit code and state that the review output is incomplete. Ordering is normative: stdout-derived rejections (AC-15/16/17) are evaluated FIRST so their specific diagnostics (`ContextOverflowError`, the `opencode models` hint) are never masked by a generic status message; the status gate only decides between "resolve" and "reject", never between two rejection messages | contract tests: `{stdout: <valid-verdict bytes>, signal:"SIGTERM", timedOut:true}` rejects; `{stdout: <valid-verdict bytes>, exitCode:1}` rejects; `{stdout: <valid-verdict bytes>, exitCode:0}` still resolves; `context-overflow.ndjson` with `exitCode:1` still rejects with the AC-16 `ContextOverflowError` message, NOT the status message | must |
+
+## Amendment 1 — process-status gate (post-implementation, review-driven)
+
+**Raised by:** 4R code review of `e9ee543`, finding **R1-001** (CRITICAL, introduced, blocking) — see `review-ledger.md`.
+**Decided by:** user, at the `review_gate` checkpoint (`cp-review-gate-r1-001`), choosing "amend the spec and fix in this story" over shipping-as-known-defect or a cross-cutting redesign.
+**Date:** 2026-08-16.
+
+### What was wrong with the original spec
+
+The original AC-18 declared AC-15/16/17 "the ONLY three rejection paths for the real invocation's stdout handling". That phrasing was accurate about *stdout*, and the implementation followed it faithfully — but **no AC in the original 24 ever addressed the process's own exit status**. `exitCode`, `signal`, and `timedOut` are produced by `OpenCodeProcessRunner` (AC-21's seam) and were simply never consumed for the real invocation. This was a gap in the specification, not a deviation by the implementation: the code did exactly what the approved contract said.
+
+### Why it matters
+
+Reproduced directly against the built adapter during review:
+
+| Simulated process outcome | Original behavior | Correct behavior (AC-25) |
+|---|---|---|
+| `{stdout: <partial>, signal:"SIGTERM", timedOut:true}` | **resolved** `{"output":"VERDICT: approve\n[SEV: minor] partial..."}` | reject |
+| `{stdout: <partial>, exitCode:1}` | **resolved** `{"output":"VERDICT: approve\ntruncated"}` | reject |
+
+`docs/engines/opencode.md` documents that a killed run leaves a "partial NDJSON stream, truncated mid-line", and `fixtures/opencode/valid-verdict.ndjson` shows the `VERDICT:` line arrives in the **first** `text` chunk. Together those mean a truncated review keeps a confident verdict and silently loses the findings that justified it — `runReview` then lands `ok`/`ambiguous` instead of `engine-error`/`timeout`.
+
+The sibling claude-code adapter is not exposed to this, but only *accidentally*: its single-JSON-document envelope fails closed when truncated. This adapter's deliberate line-level NDJSON tolerance (AC-10) removes that accidental protection, which is what makes the gap engine-specific and genuinely new.
+
+### Scope of the amendment
+
+- **AC-25 added**: the process-status gate, with normative ordering (stdout-derived rejections evaluated first).
+- **AC-18 reworded**: narrowed from "the ONLY three rejection paths" to "the only three rejection paths *derived from stdout content*", with resolution now additionally conditioned on AC-25.
+- **No other AC changes.** The remaining review findings routed into the same fix stage are *conformance* work against already-approved ACs, not amendments:
+  - R2-001 — the code requires `.error !== undefined` where AC-16 says "the stream contains a `type:"error"` event **anywhere**". Straight code-vs-spec deviation; fix the code.
+  - R3-002 — AC-11's "concatenated in stream order, compared exactly" has no asserting test (reversing the order survives the full suite). Missing test for an approved AC.
+  - R3-003 — AC-19's own stated validation (which budget goes to which invocation) has no asserting test (swapping the budgets survives the full suite). Missing test for an approved AC.
+  - R4-002 — AC-9's "removed regardless of outcome" does not hold when `createDenyConfigFile()` itself fails between `mkdtemp` and `writeFile`, orphaning the directory. Conformance with AC-9's intent.
 
 ## Risks And Trade-Offs
 

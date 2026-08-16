@@ -174,6 +174,22 @@ decisions:
       claude-code's .usage fields. Treating this as confirmed baggage for spec to validate, not a
       fresh open question to re-derive.
     recorded_at: "2026-08-16T00:00:00Z"
+  - id: dec-003
+    checkpoint_id: cp-review-gate-r1-001
+    free_text: >-
+      Amend spec.md (add AC-25, reword AC-18) and fix R1-001 inside this story, rather than
+      shipping it as a known defect or escalating to a cross-cutting redesign covering the
+      claude-code sibling.
+    author: user
+    rationale: >-
+      B-level (affects the approved acceptance contract). Presented at the review_gate with three
+      options and a recommendation; user chose option 1 ("enmendar"). Keeps the story honest and
+      self-contained -- the adapter is already exported from the barrel, so any wiring under #30
+      would make the defect live, and the fix surface is one helper plus tests. Recorded as a
+      spec AMENDMENT rather than a silent code change because the original AC-18 explicitly
+      declared AC-15/16/17 "the ONLY three rejection paths"; adding a fourth without amending it
+      would have left the code contradicting its own approved contract.
+    recorded_at: "2026-08-16T02:20:00Z"
 open_risks:
   - id: risk-001
     severity: medium
@@ -266,14 +282,14 @@ qa_summary:
   report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
 next_action:
   kind: await_user
-  target: review_gate
+  target: checkpoint
   summary: >-
-    4R review verdict FAIL: one open CRITICAL blocking finding (R1-001). The story must NOT close
-    on ST-5 until this is decided. Because fixing it contradicts approved AC-18 ("AC-15/16/17 are
-    the ONLY three rejection paths"), routing is a spec-scope decision, not an in-scope fix
-    stage. Three options in review-ledger.md; recommended is (1) amend the spec to admit a
-    process-status rejection path, then run sddl-plan for a bounded fix stage plus the missing
-    tests. User decides.
+    Review gate RESOLVED (user chose to amend). spec.md, design.md and plan.md are all amended:
+    AC-25 added, AC-18 reworded, assertCleanExit mechanism fixed, ST-6 fix stage appended with
+    ST-5 re-sequenced to run after it. Awaiting stage_approval for ST-6 (cp-st6-approval), which
+    closes R1-001 plus four bundled conformance findings. Only R1-001 blocks; the other four are
+    info-level items in the same files. Mutation re-verification of R3-002/R3-003 is a mandatory
+    exit condition of ST-6, not optional.
 created_at: "2026-08-16T00:00:00Z"
 updated_at: "2026-08-16T02:10:00Z"
 artifacts:
@@ -345,10 +361,21 @@ checkpoints:
   - id: cp-review-gate-r1-001
     type: review_gate
     stage: sddl-code-review
-    status: pending
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T02:20:00Z"
+    decision: amend-spec-and-fix-in-story
     finding_ref: R1-001
     summary: >-
       4R review returned FAIL on one CRITICAL introduced finding. Fixing it requires amending
       approved AC-18, so the route is a user decision between: (1) amend spec + bounded fix stage
       in this story (recommended), (2) ship as-is and record a known defect for a follow-up, or
       (3) escalate to a cross-cutting design decision covering the claude-code sibling too.
+      RESOLVED: user chose (1). spec.md amended (AC-25 added, AC-18 reworded), design.md amended
+      (assertCleanExit mechanism + normative ordering), plan.md gained ST-6 with ST-5
+      re-sequenced to depend on it.
+  - id: cp-st6-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-6
+    status: pending

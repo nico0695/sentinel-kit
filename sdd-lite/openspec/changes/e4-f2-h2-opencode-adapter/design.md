@@ -262,6 +262,45 @@ reviewEngineContract(harness, "opencode");
 
 Same fresh-adapter-per-scenario pattern as H1. Additional non-shared `it` blocks cover AC-3 through AC-19 individually, including one asserting the recorded `env.OPENCODE_CONFIG` resolves to a real, readable file with the exact deny-permission JSON (AC-7), and one spinning up two concurrent `review()` calls to assert distinct temp paths (AC-8).
 
+## Amendment 1 — process-status gate (design delta for spec AC-25)
+
+Driven by review finding R1-001; see `spec.md` § "Amendment 1" for provenance.
+
+**Where the check goes.** In `opencode-adapter.ts`, as a small private helper, NOT in `envelope.ts`. `envelope.ts` is documented and designed as pure, process-unaware NDJSON→`ReviewResult` transformation; giving it a `OpenCodeProcessResult` parameter would break that boundary for every one of its callers. `process-runner.ts` is equally wrong — it is pure plumbing with no typed-error construction. The gate composes process status with a typed error, which is exactly the orchestration file's job.
+
+**Ordering is the load-bearing detail.** `extractOutcome` must run FIRST and be allowed to throw:
+
+```
+const events = parseNdjsonLines(result.stdout);
+const outcome = extractOutcome(events);   // AC-15/16/17 throw here if they apply
+assertCleanExit(result);                  // NEW (AC-25): throws OpenCodeReviewError
+return outcome;
+```
+
+Rationale: `fixtures/opencode/context-overflow.ndjson` and `unknown-model-stdout.txt` both come with a non-zero exit code in real life. Gating on status *before* parsing would replace their specific, actionable diagnostics (`ContextOverflowError: Input exceeds context window`, and the `opencode models` hint) with a generic "exited with code 1" — strictly worse for the operator. Because `extractOutcome` throws rather than returning a discriminated result, reaching `assertCleanExit` already proves no stdout-derived rejection applied, so no extra bookkeeping is needed.
+
+**Helper shape:**
+
+```ts
+/** AC-25: reject a review whose process did not exit cleanly, even when its
+ *  partial stdout parsed into usable-looking output. */
+function assertCleanExit(result: OpenCodeProcessResult): void {
+  if (result.timedOut) throw new OpenCodeReviewError("opencode: review timed out; output is incomplete");
+  if (result.signal !== undefined) throw new OpenCodeReviewError(`opencode: review terminated by signal ${result.signal}; output is incomplete`);
+  if (result.exitCode !== 0) throw new OpenCodeReviewError(`opencode: review exited with code ${result.exitCode}; output is incomplete`);
+}
+```
+
+Checked in that order so the most specific cause is named first: a timeout kill sets both `timedOut` and `signal`, and a signal termination leaves `exitCode` undefined (which would otherwise fall into the third branch and print `code undefined` — the exact defect finding R3-001 reports on the pre-flight path).
+
+**Error class choice:** `OpenCodeReviewError`, not `OpenCodeInvocationError`. A killed run did start a review session — it just did not finish one. That matches the class split spec.md AC-15/AC-16 already established ("review never started" vs "session started but failed").
+
+**Conformance deltas bundled into the same fix stage** (no design change, listed so the plan can sequence them):
+
+- R2-001: drop the `.error !== undefined` guard's silent fall-through in `envelope.ts:100-107` so an `error` event without a payload still rejects, per AC-16's actual wording. Message falls back to the event type when `.error` is absent.
+- R4-002: wrap `permission-config.ts`'s `writeFile` so a failure removes the just-created `mkdtemp` directory before rethrowing — closes the leak while keeping `createDenyConfigFile`'s external contract unchanged.
+- R3-002 / R3-003: add the two missing assertions (multi-`text` concatenation order compared exactly; `timeoutMs` asserted per invocation on the recorded `runProcess` options).
+
 ## Alternatives And Trade-Offs
 
 | Option | Decision | Why |

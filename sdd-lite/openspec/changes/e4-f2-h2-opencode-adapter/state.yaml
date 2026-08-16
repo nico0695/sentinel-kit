@@ -133,7 +133,6 @@ stages:
       mechanical biome import-order fix), npm test unchanged at 250/250. Diff surface exactly the
       two expected files. QA review flagged as worth considering before ST-4 (first non-trivial
       blast-radius stage) but not blocking -- deferred to user's timing call.
-    status: pending
   sddl-qa-review:
     status: in_progress
     notes: >-
@@ -194,6 +193,33 @@ open_risks:
       line parsing with a tolerated truncated final line and a distinct "not parseable at all"
       failure class (fixtures/opencode/unknown-model-stdout.txt) are spec-able against fixture
       evidence but are real new design work, not a copy of H1's envelope.ts. Owner: sddl-design.
+  - id: risk-004
+    severity: high
+    status: open
+    summary: >-
+      R1-001 (4R review, CRITICAL, introduced, BLOCKING): opencode-adapter.ts:120-131 never reads
+      the real invocation's exitCode/signal/timedOut, so a run killed (SIGTERM/SIGKILL, OOM,
+      container eviction) or exiting non-zero after emitting any text event resolves as a
+      complete, successful ReviewResult -- and because opencode emits the VERDICT line in its
+      FIRST text chunk, the truncated result still carries a confident verdict with its
+      supporting findings missing. runReview then lands terminal state ok/ambiguous instead of
+      engine-error/timeout. Reproduced by the orchestrator against the real adapter. NOTE: the
+      code faithfully implements approved AC-18, which declares AC-15/16/17 the ONLY rejection
+      paths and scopes itself to "stdout handling" -- process status was never considered by any
+      AC. So this is a specification gap plus its correct implementation, not a code defect
+      against spec, and fixing it requires amending AC-18. Escalated to the user via review_gate
+      (cp-review-gate-r1-001); see review-ledger.md for the three routing options.
+  - id: risk-005
+    severity: low
+    status: open
+    summary: >-
+      R1-002 residual (REFUTED as a CRITICAL, recorded as a low documentation/verification gap):
+      nothing establishes the precedence between the injected OPENCODE_CONFIG and any
+      worktree-local opencode config, and the spike verified the deny posture only against a
+      benign worktree. Cannot be settled here (opencode is not installed in this environment).
+      Belongs as a step on item 2 of docs/todo/E4/manual-verification.md. The equivalent gap is
+      LARGER and untreated for the merged claude-code adapter, which passes no env at all and
+      omits --setting-sources -- a worthwhile follow-up against item 1.
   - id: risk-003
     severity: low
     status: open
@@ -201,6 +227,33 @@ open_risks:
       Flag/behavior drift: docs/engines/opencode.md is 8 days old (2026-08-08 -> 2026-08-16) as
       of this proposal. Same low-material-but-not-zero risk PRD risk #1 names for claude-code,
       one day older. Not re-verified for this story.
+review_summary:
+  mode: 4r
+  tier: full-4r
+  target: e9ee543e3616ae5d20ece66916c2a2c08a9d42be
+  verdict: fail
+  counts:
+    confirmed: 1
+    info: 11
+    refuted: 1
+  open_severe_findings: 1
+  summary: >-
+    Full 4R sweep (1062 changed lines + permissions surface -> full-4r tier). One CRITICAL,
+    introduced, blocking finding R1-001: the real invocation's exitCode/signal/timedOut are never
+    read, so a run killed or exiting non-zero after emitting any text resolves as a COMPLETE,
+    successful review carrying a verdict. Reported independently by the risk and resilience
+    lenses and reproduced directly by the orchestrator (SIGTERM+partial -> resolved with a
+    verdict; exitCode:1+partial -> same), which reclassified it from inferential to
+    deterministic. The reliability lens recorded a partial mitigation (runEngineWithTimeout wins
+    the race) that covers only the adapter's-own-timeout sub-case, not external kills or a
+    non-zero exit. One refuter pass ran over the single remaining severe inferential finding
+    (R1-002, worktree config precedence) and REFUTED it on attribution (the merged claude-code
+    sibling passes no env at all, so the exposure is strictly worse there and pre-existing) and
+    on threat model (PRD Sec60 already executes reviewed-branch scripts by design). 11 info-level
+    findings recorded, none blocking; two are mutation-proven test gaps (text ordering and
+    timeout-budget assignment each survive the full 275-test suite).
+  reported_at: "2026-08-16T02:10:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/review-ledger.md
 qa_summary:
   mode: stage
   verdict: pass
@@ -213,15 +266,16 @@ qa_summary:
   report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
 next_action:
   kind: await_user
-  target: checkpoint
+  target: review_gate
   summary: >-
-    ST-4 completed and validated: 25/25 new tests green, npm run check green, npm test 275/275
-    (250 baseline + 25 new, exact). Contract suite required zero modification (H1 already fixed
-    the shape this adapter needed). Recommend approve and continue to ST-5 (manual AC-24
-    verification against the real opencode CLI + the full closing gate) -- the final stage of
-    this story.
+    4R review verdict FAIL: one open CRITICAL blocking finding (R1-001). The story must NOT close
+    on ST-5 until this is decided. Because fixing it contradicts approved AC-18 ("AC-15/16/17 are
+    the ONLY three rejection paths"), routing is a spec-scope decision, not an in-scope fix
+    stage. Three options in review-ledger.md; recommended is (1) amend the spec to admit a
+    process-status rejection path, then run sddl-plan for a bounded fix stage plus the missing
+    tests. User decides.
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T01:45:00Z"
+updated_at: "2026-08-16T02:10:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -288,3 +342,13 @@ checkpoints:
     stage: sddl-executor
     stage_ref: ST-5
     status: pending
+  - id: cp-review-gate-r1-001
+    type: review_gate
+    stage: sddl-code-review
+    status: pending
+    finding_ref: R1-001
+    summary: >-
+      4R review returned FAIL on one CRITICAL introduced finding. Fixing it requires amending
+      approved AC-18, so the route is a user decision between: (1) amend spec + bounded fix stage
+      in this story (recommended), (2) ship as-is and record a known defect for a follow-up, or
+      (3) escalate to a cross-cutting design decision covering the claude-code sibling too.

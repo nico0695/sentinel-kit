@@ -17,8 +17,8 @@ complexity_assessment:
     permission posture (OPENCODE_CONFIG must be injected on every invocation, no exceptions).
   confidence: high
   recorded_at: "2026-08-16T00:00:00Z"
-lifecycle_status: planning
-current_stage: sddl-design
+lifecycle_status: planned
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -78,7 +78,20 @@ stages:
       (both inherited/low-severity, not design-blocking): the AC-19 residual (same as H1's
       accepted residual) and CLI version drift (informational, unchanged from spec).
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-16T00:45:00Z"
+    completed_at: "2026-08-16T00:45:00Z"
+    notes: >-
+      plan.md written, status complete, execution_ready: true. Five executor stages mirroring
+      H1's plan.md granularity exactly: ST-1 errors.ts+envelope.ts+permission-config.ts (pure,
+      grouped since permission-config.ts has the same "no execa dependency, land first" profile
+      as H1's ST-1 files), ST-2 process-runner.ts (execa seam with required env field), ST-3
+      opencode-adapter.ts orchestration + barrel export, ST-4 single test file (24 ACs), ST-5
+      manual AC-24 verification + full gate. Two test-strategy gaps closed: SIGTERM/SIGKILL
+      escalation (reused H1's mocked-execa option-wiring solution unchanged, not re-derived) and
+      OPENCODE_CONFIG lifecycle (genuinely new, three concrete tests specified: content
+      correctness, injection-on-every-call, concurrency+cleanup-on-reject). Measured baseline
+      recorded: npm test 250/250 passing 17 files, npm run check green, on the tree post-H1-merge.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -140,13 +153,12 @@ next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    design.md complete, status complete. All 24 ACs mapped to concrete file/function locations;
-    the one item spec.md deferred (timeout precedence) is resolved by direct, justified reuse of
-    H1's shipped mechanism, not re-derived. Two low-severity items carried forward informationally
-    (AC-19 residual, CLI version drift), neither design-blocking. Recommend approve and continue
-    to sddl-plan.
+    plan.md complete, execution_ready: true. Five code-touching stages, each requiring its own
+    stage_approval per CLAUDE.md (interactive/auto mode does not bypass this). Recommend approve
+    and begin sddl-executor with ST-1 (errors.ts + envelope.ts + permission-config.ts, pure/
+    execa-free files, lowest-risk stage to start with).
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T00:30:00Z"
+updated_at: "2026-08-16T00:45:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -171,4 +183,35 @@ checkpoints:
   - id: cp-design-approval
     type: stage_approval
     stage: sddl-design
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:40:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    status: pending
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-1
+    status: pending
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-2
+    status: pending
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-3
+    status: pending
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-4
+    status: pending
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-5
     status: pending

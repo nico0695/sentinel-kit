@@ -53,6 +53,29 @@ First stage with a real cross-file import graph (adapter → `errors.js`/`envelo
 
 **Judgment calls:** none of real weight — design.md's pseudocode was implemented literally.
 
-## ST-4 — pending (not yet started)
+## ST-4 — `__test__/claude-code-adapter.test.ts` (all 27 ACs)
+
+**Status:** completed
+**File created:** `src/adapters/driven/engines/claude-code/__test__/claude-code-adapter.test.ts` — 24 tests across `reviewEngineContract(harness, "claude-code")` (3) + 7 AC-specific `describe` blocks: factory defaults (AC-2), invocation shape (AC-3/4), pre-flight gate (AC-5/6/7), envelope parsing/success extraction (AC-8-12), `is_error:true` rejection (AC-13/14/18), execa option wiring (AC-16/17), error translation (AC-23).
+
+**AC-16/17 execa-mock test:** `vi.mock("execa")` at file top; imports `createDefaultRunProcess` directly; asserts `execa` is called with `{timeout:5000, killSignal:"SIGTERM", forceKillAfterDelay:2000, reject:false}` when `timeoutMs>0`, and that those three keys are absent when `timeoutMs=0`.
+
+**`noisy-output.json` totalTokens:** re-derived programmatically from fixture bytes inside the test itself (not hardcoded) — confirmed `531`, matching spec.md's corrected AC-11 figure.
+
+### Blocking finding, resolved mid-stage
+
+`ReviewEngine.contract.ts`'s frozen "propagates the configured usage" test configured a `usage` with only `totalTokens` set — a shape no derivation-based real engine can produce (`extractSuccess`'s approved AC-11 rule always computes `totalTokens = inputTokens + outputTokens` together). This refuted spec.md's AC-22 assumption that the shared suite "passes unmodified," and would identically block the future opencode adapter (#29).
+
+Presented to the user with 3 options (fix the shared test / document a permanent exception / escalate with no recommendation). User chose: **fix the shared contract test** — changed the fixture from a lone `{totalTokens:42}` to a full `{inputTokens:10, outputTokens:32, totalTokens:42}` tuple, preserving the test's original intent (configured usage propagates) while making it achievable by any engine deriving usage from real parsed fields. Recorded as `d-st4-contract-usage-fix` in `state.yaml`.
+
+**Validation after the fix (independently re-run by the orchestrator):**
+- `npx vitest run --project adapters src/adapters/driven/engines/claude-code`: `Test Files 1 passed (1)` / `Tests 24 passed (24)`.
+- `npm run check`: clean, 0 dependency violations.
+- `npm test`: `Test Files 17 passed (17)` / `Tests 250 passed (250)` (226 baseline + 24 new).
+- `git status --short`: `ReviewEngine.contract.ts` (modified, the approved exception) + the new `__test__/` directory — no other file touched.
+
+**Orchestrator fix before acceptance:** the test file's own header comment referenced "the one contract scenario this still cannot satisfy" — stale after the fix landed. Corrected in place.
+
+**Scope note:** `ReviewEngine.contract.ts`'s modification means the diff surface exceeds AC-26's originally-stated boundary (`claude-code/**` + `__test__/` + one barrel line) by one shared file — an explicit, user-approved exception, not a silent leak.
 
 ## ST-5 — pending (not yet started, includes the manual AC-24 verification run)

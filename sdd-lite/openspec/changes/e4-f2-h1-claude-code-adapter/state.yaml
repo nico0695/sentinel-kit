@@ -192,8 +192,42 @@ stages:
       independently re-read the full adapter file and the edited barrel file, and re-ran
       validation directly (not just trusting the executor's report): npm run check clean (84
       files, 0 dependency violations), npm test 226/226 unchanged, git diff --stat confirms only
-      the two expected files touched. ST-4 (the single AC-covering test file) approved to start
-      next.
+      the two expected files touched.
+
+      ST-4: __test__/claude-code-adapter.test.ts written -- reviewEngineContract(harness,
+      "claude-code") + 7 AC-specific describe blocks (24 tests), per plan.md's Stage 4 Test
+      Layout. AC-16/17's execa-mock test confirmed exact: vi.mock("execa"), asserts
+      {timeout:5000, killSignal:"SIGTERM", forceKillAfterDelay:2000, reject:false} when
+      timeoutMs>0, asserts those three keys absent when timeoutMs=0. noisy-output.json's
+      totalTokens re-derived programmatically from fixture bytes inside the test (not
+      hardcoded) -- confirmed 531, matching spec's corrected AC-11 figure.
+
+      GENUINE BLOCKING FINDING, escalated as C-level (reality contradicts an approved
+      assumption) rather than silently worked around: ReviewEngine.contract.ts's frozen
+      "propagates the configured usage" test called harness.resolving("OUT", {totalTokens:42})
+      and asserted result.usage deep-equals {totalTokens:42} exactly -- a shape no
+      derivation-based real engine can ever produce, since extractSuccess's already-approved
+      AC-11 rule always computes totalTokens as inputTokens+outputTokens together, never a
+      lone totalTokens. Root cause: this generic contract test was written and only ever
+      validated against FakeEngine's literal-passthrough harness (confirmed: fake-engine.test
+      .ts's own resolving() just echoes whatever usage it's given) -- never against a
+      derivation-based engine until claude-code, the first real ReviewEngine implementation,
+      tried to satisfy it. This refutes spec.md's AC-22 assumption that the shared suite
+      "passes unmodified" -- and would identically block opencode (H2, #29) later.
+
+      Presented to the user via AskUserQuestion with 3 options and a recommendation. User chose
+      (d-st4-contract-usage-fix): correct the shared contract test to use a full, realistic
+      {inputTokens, outputTokens, totalTokens} tuple instead of a lone totalTokens -- preserves
+      the test's original intent (configured usage propagates) while making it satisfiable by
+      both FakeEngine (trivial passthrough) and any derivation-based real engine. Applied to
+      ReviewEngine.contract.ts; re-ran full suite: 250/250 (226 baseline + 24 new), npm run
+      check clean. Orchestrator also caught and fixed one stale in-file comment (the test file
+      referenced "the one contract scenario this still cannot satisfy" -- no longer true after
+      the fix) before accepting the stage.
+
+      Scope note: ReviewEngine.contract.ts's modification means the diff surface now exceeds
+      AC-26's originally-stated boundary (claude-code/** + __test__/ + one barrel line) by one
+      shared file -- an explicitly user-approved, documented exception, not a silent leak.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -393,8 +427,88 @@ checkpoints:
         label: Pause here
         description: Stop after ST-3; resume ST-4 later.
     free_input_allowed: true
+    response:
+      selected_option_id: approve-st4
+      free_text: "si"
+      responded_at: "2026-08-15T22:15:00Z"
     created_at: "2026-08-15T22:10:00Z"
+    resolved_at: "2026-08-15T22:15:00Z"
+  - id: cp-contract-usage-fix
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      ST-4 executor found ReviewEngine.contract.ts's "propagates the configured usage" test
+      unsatisfiable by any derivation-based real engine (it configures a lone totalTokens with
+      no inputTokens/outputTokens; extractSuccess's approved AC-11 rule always computes
+      totalTokens as their sum, never independently). Refutes spec.md's AC-22 assumption that
+      the shared suite "passes unmodified" -- a C-level reality-contradicts-assumption case,
+      also outside this story's originally declared file scope, and would identically block
+      opencode (#29) later.
+    question: How to resolve the ReviewEngine.contract.ts / AC-22 contradiction?
+    options:
+      - id: fix-shared-contract
+        label: Fix the shared contract test (recommended)
+        description: >-
+          Change the test's usage fixture from a lone {totalTokens:42} to a full
+          {inputTokens, outputTokens, totalTokens} tuple -- satisfiable by both FakeEngine and
+          any derivation-based real engine, preserving the test's original intent.
+        recommended: true
+      - id: document-exception
+        label: Document an AC-22 exception
+        description: Leave the shared test as-is, record a permanent documented exception in spec.md.
+      - id: escalate-c-level
+        label: Pause and escalate as C-level with no recommendation
+        description: Stop entirely, no path chosen, wait for explicit user direction.
+    free_input_allowed: true
+    response:
+      selected_option_id: fix-shared-contract
+      responded_at: "2026-08-15T22:20:00Z"
+    created_at: "2026-08-15T22:18:00Z"
+    resolved_at: "2026-08-15T22:20:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4 complete and independently verified: __test__/claude-code-adapter.test.ts (24 tests,
+      7 describe blocks + the shared contract) all pass, 250/250 full suite, check clean. The
+      blocking ReviewEngine.contract.ts contradiction was resolved per the user's chosen fix
+      (d-st4-contract-usage-fix) and re-verified green. Orchestrator also fixed a stale in-file
+      comment referencing the now-resolved contract issue. Ready for ST-5: the manual AC-24
+      verification run (real authenticated claude CLI) plus the closing gate.
+    question: Approve ST-5 (manual AC-24 verification + closing gate) to start, or pause here?
+    options:
+      - id: approve-st5
+        label: Approve ST-5 (recommended)
+        description: >-
+          Run the finished adapter once against the real, authenticated claude CLI over a
+          genuine diff; record command/exit-code/VERDICT: line in execution-log.md; then the
+          full closing gate (npm run check && npm test && git diff --stat scope check).
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: Stop after ST-4; resume ST-5 later.
+    free_input_allowed: true
+    created_at: "2026-08-15T22:25:00Z"
 decisions:
+  - id: d-st4-contract-usage-fix
+    checkpoint_id: cp-contract-usage-fix
+    free_text: >-
+      ReviewEngine.contract.ts's "propagates the configured usage" test changed from
+      harness.resolving("OUT", {totalTokens:42}) / expect({totalTokens:42}) to a full
+      {inputTokens:10, outputTokens:32, totalTokens:42} tuple, propagated and asserted whole.
+    rationale: >-
+      User-selected (AskUserQuestion, 3 options, this one recommended). Root cause: the test
+      was only ever exercised against FakeEngine's literal-passthrough harness (confirmed via
+      fake-engine.test.ts) -- no derivation-based engine had tried to satisfy it before
+      claude-code, the first real ReviewEngine implementation. The fix preserves the generic
+      property under test (configured usage propagates verbatim) while making it achievable by
+      any engine whose usage is derived from real parsed fields, not just a fully scripted
+      double -- and unblocks opencode (#29) from hitting the identical issue later. Re-ran full
+      suite after the fix: 250/250 (226 baseline + 24 new claude-code tests), npm run check
+      clean. This decision also means AC-26's originally-stated diff-scope boundary
+      (claude-code/** + __test__/ + one barrel line) now has one explicitly-approved exception:
+      ReviewEngine.contract.ts.
+    recorded_at: "2026-08-15T22:22:00Z"
   - id: d-st3-index-docstring-fix
     checkpoint_id: cp-st4-approval
     free_text: >-
@@ -512,10 +626,9 @@ next_action:
   kind: wait_for_approval
   target: sddl-executor
   summary: >-
-    ST-3 complete and verified (claude-code-adapter.ts + barrel export, first real import graph
-    depcruise-clean, 226/226 unchanged, one stale doc-comment self-caught and fixed). Awaiting
-    user approval to start ST-4 for [E4.F2.H1] (#28): write __test__/claude-code-adapter.test.ts
-    covering all 27 ACs, exit on `npx vitest run --project adapters -t "claude-code"` green then
-    the full gate.
+    ST-4 complete and verified (24 new tests, 250/250 full suite, check clean; blocking
+    ReviewEngine.contract.ts contradiction resolved per user decision d-st4-contract-usage-fix).
+    Awaiting user approval to start ST-5 for [E4.F2.H1] (#28): the manual AC-24 verification run
+    against the real authenticated claude CLI, plus the closing gate.
 created_at: "2026-08-15T19:55:00Z"
-updated_at: "2026-08-15T22:12:00Z"
+updated_at: "2026-08-15T22:25:00Z"

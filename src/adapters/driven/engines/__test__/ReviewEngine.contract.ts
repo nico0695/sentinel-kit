@@ -41,10 +41,21 @@ export function reviewEngineContract(
     });
 
     it("propagates the configured usage", async () => {
-      const result = await harness
-        .resolving("OUT", { totalTokens: 42 })
-        .review(req);
-      expect(result.usage).toEqual({ totalTokens: 42 });
+      // A full { inputTokens, outputTokens, totalTokens } tuple, not a
+      // lone totalTokens: a derivation-based real engine (claude-code,
+      // E4.F2.H1) can only ever produce a usage object whose totalTokens
+      // is the sum of the other two fields it actually parsed -- it can
+      // never inject an independently-configured totalTokens with no
+      // corresponding input/output token count. This still proves the
+      // same generic property (configured usage is propagated verbatim)
+      // without assuming a shape only a fully scripted fake could produce.
+      const usage: ReviewUsage = {
+        inputTokens: 10,
+        outputTokens: 32,
+        totalTokens: 42,
+      };
+      const result = await harness.resolving("OUT", usage).review(req);
+      expect(result.usage).toEqual(usage);
     });
 
     it("rejects with an Error", async () => {

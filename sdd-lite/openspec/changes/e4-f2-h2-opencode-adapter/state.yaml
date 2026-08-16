@@ -111,6 +111,17 @@ stages:
       file). Zero dependency on ST-1's files or core, confirmed by grep (exactly one `from "execa"`
       match).
 
+      ST-4 completed: opencode-adapter.test.ts written, 25 tests across the shared contract suite
+      (unmodified -- H1 already fixed the propagates-configured-usage fixture shape, confirmed
+      by reading the file first) + 8 AC-specific describe blocks. Fixed one self-authored test bug
+      before acceptance (toEqual -> toMatchObject for no-verdict.ndjson's real token object, which
+      legitimately carries extra reasoning/cache/total fields). Declined a dedicated test for the
+      ST-3 QA note (createDenyConfigFile's own failure path) with an in-file documented rationale
+      (vi.mock is file-wide, not block-scoped, so isolating it would destabilize other tests; the
+      behavior is already AC-23-compliant without a special case). npx vitest 25/25, npm run check
+      green (one mechanical biome formatting fix), npm test 275/275 (250 baseline + 25 new, exact).
+      git status: only the new __test__/ directory -- ReviewEngine.contract.ts untouched.
+
       ST-3 completed: opencode-adapter.ts written per design.md's pseudocode literally
       (createDenyConfigFile -> try/finally wrapping pre-flight+real-invocation+outcome-extraction
       -> cleanup), plus the engines/index.ts barrel export update (also fixed a stale doc-comment
@@ -190,17 +201,27 @@ open_risks:
       Flag/behavior drift: docs/engines/opencode.md is 8 days old (2026-08-08 -> 2026-08-16) as
       of this proposal. Same low-material-but-not-zero risk PRD risk #1 names for claude-code,
       one day older. Not re-verified for this story.
+qa_summary:
+  mode: stage
+  verdict: pass
+  summary: >-
+    Stage-mode QA of ST-3 (opencode-adapter.ts orchestration): no medium/high findings, one low
+    informational note (createDenyConfigFile()'s own creation-failure path outside try/finally,
+    acceptable per AC-23). ST-4 then declined a dedicated test for that note with an in-file
+    documented rationale rather than silently skipping it.
+  reported_at: "2026-08-16T01:30:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
 next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    Stage-mode QA review of ST-3 completed: verdict pass, no medium/high findings, one low
-    informational note for ST-4 (createDenyConfigFile()'s own creation-failure path is outside
-    the try/finally and produces an untyped Error -- acceptable per AC-23, but ST-4 should either
-    test it or explicitly decline with a one-line rationale). Recommend approve and continue to
-    ST-4 (the single test file covering all 24 ACs).
+    ST-4 completed and validated: 25/25 new tests green, npm run check green, npm test 275/275
+    (250 baseline + 25 new, exact). Contract suite required zero modification (H1 already fixed
+    the shape this adapter needed). Recommend approve and continue to ST-5 (manual AC-24
+    verification against the real opencode CLI + the full closing gate) -- the final stage of
+    this story.
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T01:30:00Z"
+updated_at: "2026-08-16T01:45:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -259,7 +280,9 @@ checkpoints:
     type: stage_approval
     stage: sddl-executor
     stage_ref: ST-4
-    status: pending
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T01:35:00Z"
   - id: cp-st5-approval
     type: stage_approval
     stage: sddl-executor

@@ -76,3 +76,43 @@ All three outcomes matched design.md's pseudocode exactly. No implementation bug
 **QA review recommendation:** per the executor's QA Handoff Rules, this is the first stage with a non-trivial blast radius (real cross-module import graph, the story's core orchestration logic). Flagging `sddl-qa-review` as worth running before ST-4 writes the full test suite — a structured review now (stage mode) would catch orchestration-level issues before ~24 ACs' worth of tests get written against them. Not blocking; deferring to the user's call on timing (now vs. after ST-4's automated suite locks the same logic down anyway).
 
 **Recommended next stage:** ST-4 (test suite) on user approval, optionally preceded by `sddl-qa-review` in stage mode. Not auto-continuing.
+
+---
+
+## Stage QA — ST-3 (stage mode)
+
+**Status:** completed, verdict **pass**
+**Report:** `qa-report.md`
+
+Independent re-verification of ST-3's `opencode-adapter.ts`, targeted at what the deleted throwaway smoke test could not exercise: `config.cleanup()` awaited on every exit path (all four throw points plus resolve, via the single outer `try/finally`), the `env` object built once and shared by reference between both `runProcess` calls (not rebuilt), `PREFLIGHT_TIMEOUT_MS` vs `request.timeoutMs` used in the correct calls, diff scope clean (`git diff --stat` matches exactly), structural parity with the merged claude-code adapter confirmed. One low-severity, non-blocking observation: `createDenyConfigFile()`'s own creation-failure path sits outside `review()`'s `try/finally` and would surface as an untyped Node `fs` Error rather than one of the three typed classes — acceptable per AC-23 (`instanceof Error` still holds), flagged for ST-4 to consciously test or decline.
+
+No medium/high findings. Does not close the change (stage mode).
+
+---
+
+## ST-4 — `__test__/opencode-adapter.test.ts` (all 24 ACs)
+
+**Status:** completed
+**File created:** `src/adapters/driven/engines/opencode/__test__/opencode-adapter.test.ts` — 25 tests across `reviewEngineContract(harness, "opencode")` (3) + 8 `describe` blocks: factory options (AC-2), invocation shape (AC-3/4), pre-flight gate (AC-5/6), OPENCODE_CONFIG lifecycle (AC-7/8/9, 5 tests), NDJSON parsing/outcome extraction (AC-10..18, 7 tests), execa option wiring (2 tests), error translation (AC-23).
+
+**Contract suite required NO modification** — unlike H1's ST-4, which needed an approved exception to `ReviewEngine.contract.ts`'s "propagates the configured usage" fixture. That fixture was already fixed by H1 to use a full `{inputTokens, outputTokens, totalTokens}` tuple, which this derivation-based adapter satisfies unmodified. Confirmed by reading the shared file first, not assumed.
+
+**execa-mock test (timeout precedence):** `vi.mock("execa")` at file top; imports `createDefaultRunProcess` directly; asserts `execa` is called with `{timeout:5000, killSignal:"SIGTERM", forceKillAfterDelay:2000, reject:false, env:{...}}` when `timeoutMs>0`, and that the first three keys are absent (but `env`/`reject` still present) when `timeoutMs=0`.
+
+**OPENCODE_CONFIG lifecycle tests:** content correctness (temp file read back mid-flight via the stub, compared byte-exact to the deny-permission JSON), same config path on both pre-flight and real calls (AC-7), two concurrent `review()` calls get distinct paths (AC-8), cleanup directory verified gone (via `existsSync`) after both a resolving and a rejecting `review()` (AC-9).
+
+**ST-3 QA note (`createDenyConfigFile()`'s own creation-failure path) — DECLINED, not tested.** Recorded rationale directly in the test file: simulating it would require `vi.mock`/`vi.resetModules` scoped to `permission-config.js` for a single test, but `vi.mock` calls are hoisted file-wide in Vitest, not block-scoped — doing so would risk destabilizing every other test in this file that relies on the real module. The behavior is already covered by contract (any raw `Error` still satisfies `instanceof Error`, AC-23) without a dedicated test. Documented in the test file itself, not silently dropped.
+
+**Fixture re-verification (`fixtures/opencode/no-verdict.ndjson`):** independently re-derived (a from-scratch NDJSON line-parse inside the test, not a call into production `envelope.ts`) — confirms the fixture's LAST `step_finish` event carries `{input:321, output:96}`, distinct from the first (`{input:4657, output:69}`). One test-authoring correction made before acceptance: the first draft asserted `toEqual({input:321, output:96})` against the real token object, which also legitimately carries `reasoning`/`cache`/`total` fields — corrected to `toMatchObject` (structural match only), since the extra fields are real fixture data, not a bug.
+
+**Validation:**
+- `npx vitest run --project adapters src/adapters/driven/engines/opencode`: `Test Files 1 passed (1)` / `Tests 25 passed (25)` (after the `toEqual`→`toMatchObject` fix above; first run caught the one assertion issue immediately).
+- `npm run check`: one mechanical `biome check --write` formatting fix needed first (line-wrapping only, no logic change), then `Checked 91 files in 90ms. No fixes applied.` / `tsc --noEmit` clean (confirms the `@ts-expect-error` directive for AC-2's required `model` compiles as expected — a stale directive with no actual error would itself fail `tsc --noEmit`) / `✔ no dependency violations found (66 modules, 126 dependencies cruised)`.
+- `npm test`: `Test Files 18 passed (18)` / `Tests 275 passed (275)` (250 baseline + 25 new, exact — not assumed).
+- `git status --short`: only the new `__test__/` directory — `ReviewEngine.contract.ts` untouched, no other file touched.
+
+**Judgment calls:**
+- Declined a dedicated test for `createDenyConfigFile()`'s own failure path (see above) — documented in-file, not silently skipped.
+- `binaryPath` default ("opencode") proven indirectly (adapter still resolves without overriding it), same H1 precedent — not asserted via the execa mock, since that would require threading the factory's internal default through an extra code path not otherwise needed by any AC.
+
+**Recommended next stage:** ST-5 (manual AC-24 verification run + full closing gate) on user approval. Not auto-continuing.

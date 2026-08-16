@@ -102,8 +102,14 @@ stages:
       table exactly (valid-verdict totalTokens=4786 not 4965, no-verdict uses the LAST of two
       step_finish events, context-overflow/timeout-partial/unknown-model-stdout all reject as
       predicted). npm run check green (one mechanical biome --write formatting fix needed first,
-      no logic change), npm test unchanged at 250/250 baseline. ST-2 through ST-5 pending, each
-      requiring its own explicit stage_approval before starting.
+      no logic change), npm test unchanged at 250/250 baseline.
+
+      ST-2 completed: process-runner.ts written per design.md, mirroring the merged claude-code
+      adapter's process-runner.ts file-for-file with only the required `env` field added (passed
+      straight to execa's own env option, relying on extendEnv:true default rather than manually
+      spreading process.env). npm run check green, npm test unchanged at 250/250 (still a leaf
+      file). Zero dependency on ST-1's files or core, confirmed by grep (exactly one `from "execa"`
+      match). ST-3 through ST-5 pending, each requiring its own explicit stage_approval.
     status: pending
   sddl-qa-review:
     status: pending
@@ -164,13 +170,13 @@ next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    ST-1 completed and validated (npm run check green, npm test unchanged at 250/250, fixture
-    outcomes verified directly). Recommend approve and continue to ST-2 (process-runner.ts, the
-    execa seam with the required env field). No QA review needed at this checkpoint -- ST-1 is
-    pure/leaf-file, low blast radius; QA review is more useful after ST-3 (first real import
-    graph) or at the final gate.
+    ST-2 completed and validated (npm run check green, npm test unchanged at 250/250). Recommend
+    approve and continue to ST-3 (opencode-adapter.ts orchestration + barrel export -- the first
+    stage with a real cross-file import graph, since it wires ST-1's errors/envelope/
+    permission-config together with ST-2's process-runner). No QA review needed at this
+    checkpoint -- ST-2 is still leaf-file, low blast radius; QA review is more useful after ST-3.
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T01:00:00Z"
+updated_at: "2026-08-16T01:10:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -215,7 +221,9 @@ checkpoints:
     type: stage_approval
     stage: sddl-executor
     stage_ref: ST-2
-    status: pending
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T01:05:00Z"
   - id: cp-st3-approval
     type: stage_approval
     stage: sddl-executor

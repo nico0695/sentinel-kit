@@ -28,3 +28,22 @@ All 6 outcomes matched design.md's Expected Behavior table exactly. No implement
 - `isFinishEvent`/`isTextEvent` match on the event's outer `type` field (`"step_finish"`, `"text"`), which uses an underscore — confirmed directly against the raw fixture bytes this differs from the *inner* `part.type` field (`"step-finish"`, hyphenated). Both are handled: `isFinishEvent` checks both spellings defensively; `textOf`/`tokensOf` read `part` structurally (`"text" in part`, `"tokens" in part`) rather than checking `part.type`, so the hyphen/underscore distinction in `part.type` never needed to be relied on.
 
 **Recommended next stage:** proceed to ST-2 (`process-runner.ts`) on user approval. Not auto-continuing.
+
+---
+
+## ST-2 — `process-runner.ts` (execa seam)
+
+**Status:** completed
+**File created:**
+- `src/adapters/driven/engines/opencode/process-runner.ts` — `OpenCodeProcessRunOptions` (with `env: Readonly<Record<string,string>>` REQUIRED, the deliberate divergence from `ClaudeCodeProcessRunOptions` design.md calls for), `OpenCodeProcessResult`, `OpenCodeProcessRunner` types, plus `createDefaultRunProcess(binaryPath: string): OpenCodeProcessRunner`. Same factory name and shape as the merged claude-code adapter's `process-runner.ts`, read directly as the template and mirrored file-for-file, extended only with the `env` passthrough (`env` forwarded straight to execa's own `env` option, relying on execa's `extendEnv: true` default to merge onto `process.env` — no manual `...process.env` spread).
+
+Implementation matches design.md's exact snippet: `execa(binaryPath, args, { cwd, env, ...input spread, ...timeout/killSignal:"SIGTERM"/forceKillAfterDelay:2000 spread, reject: false })`, conditional `exitCode`/`signal` spreads (`exactOptionalPropertyTypes`-safe). Zero dependency on `errors.ts`/`envelope.ts`/`permission-config.ts` or `src/core/**` — pure process plumbing, `execa` the only import, confirmed with `grep -n 'from "execa"' process-runner.ts` returning exactly one match.
+
+**Validation:**
+- `npm run check`: `Checked 89 files in 173ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (65 modules, 119 dependencies cruised)`.
+- `npm test`: `Test Files 17 passed (17)` / `Tests 250 passed (250)` — unchanged (still a leaf file, `opencode-adapter.ts` doesn't exist yet to import it).
+- `git status --short`: only `process-runner.ts` is new (untracked).
+
+**Judgment calls:** none of real weight — design.md's shape and the merged claude-code adapter's template were followed literally; the only addition (`env` passthrough) was explicitly specified by design.md, not a new choice.
+
+**Recommended next stage:** proceed to ST-3 (`opencode-adapter.ts` orchestration + barrel export) on user approval. Not auto-continuing.

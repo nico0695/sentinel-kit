@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-16T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -61,7 +61,22 @@ stages:
       outer-race timeout precedence), identical deferral to H1's AC-19, not spec-blocking. No
       contradictions found.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-16T00:30:00Z"
+    completed_at: "2026-08-16T00:30:00Z"
+    notes: >-
+      design.md written, status complete. Five-file layout: opencode-adapter.ts, process-runner.ts
+      (OpenCodeProcessRunner extended with a REQUIRED env field, unlike ClaudeCodeProcessRunOptions
+      -- closes the "forgot to inject OPENCODE_CONFIG" hazard at compile time), permission-config.ts
+      (new module, no H1 analogue -- fs.mkdtemp-based temp file lifecycle for AC-7/8/9), envelope.ts
+      (parseNdjsonLines + extractOutcome, two pure functions), errors.ts (3 classes, no cause field
+      since AC-10 drops unparseable lines silently with no single exception to preserve). AC-19
+      (deferred timeout-precedence item from spec.md) resolved by directly reusing H1's mechanism
+      (execa timeout=request.timeoutMs unchanged + forceKillAfterDelay:2000) and its
+      engine-timeout.ts:76-111-grounded reasoning, confirmed engine-agnostic rather than
+      re-derived. All 24 ACs mapped to concrete code locations. Two open items carried forward
+      (both inherited/low-severity, not design-blocking): the AC-19 residual (same as H1's
+      accepted residual) and CLI version drift (informational, unchanged from spec).
   sddl-plan:
     status: pending
   sddl-executor:
@@ -125,13 +140,13 @@ next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    spec.md complete, status complete. 24 ACs, all three proposal open questions resolved as firm
-    fixture-verified rules; only one item deferred to design (timeout precedence), identical to
-    H1's own deferral, not spec-blocking. Per smart phase validation, presenting the checkpoint
-    before sddl-design since risks/open items are recorded (none above medium severity blocking
-    safe design work) -- recommend approve and continue to sddl-design.
+    design.md complete, status complete. All 24 ACs mapped to concrete file/function locations;
+    the one item spec.md deferred (timeout precedence) is resolved by direct, justified reuse of
+    H1's shipped mechanism, not re-derived. Two low-severity items carried forward informationally
+    (AC-19 residual, CLI version drift), neither design-blocking. Recommend approve and continue
+    to sddl-plan.
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T00:15:00Z"
+updated_at: "2026-08-16T00:30:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -150,4 +165,10 @@ checkpoints:
   - id: cp-spec-approval
     type: stage_approval
     stage: sddl-spec
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:20:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
     status: pending

@@ -2,6 +2,7 @@
 
 | Session | Date | Title | Scope | Entry |
 |---------|------|-------|-------|-------|
+| S20 | 2026-08-16 | [E4.F2.H1] claude-code adapter, end to end | `e4-f2-h1-claude-code-adapter` (issue #28) end to end: lite flow, ST-1..ST-5, `ReviewEngine.contract.ts` fix (unblocks future opencode adapter), QA `pass_with_notes`, PR #66 (AC-24 manual verification explicitly deferred to the user) | [entry](entries/2026-08-16-S20-e4-f2-h1-claude-code-adapter.md) |
 | S19 | 2026-08-15 | [E4.F1.H2] Verdict and ambiguity parser | `e4-f1-h2-verdict-parser` (issue #27) end to end: lite flow, adversarial spec revalidation (3 MAJOR fixes), ST-1..ST-3, QA `pass_with_notes`, PR #65 + review-driven perf/doc fixes; model-tiering experiment | [entry](entries/2026-08-15-S19-e4-f1-h2-verdict-parser.md) |
 | S18 | 2026-08-09 | E1 validation, E4 preparation, and [E4.F1.H1] complete | E1 merge validation, bootstrap refresh, `e4-f1-h1-run-review` (issue #26) end to end: lite flow, ST-1..ST-6, 4R review, QA `pass`, PR #64 + review-driven security fix | [entry](entries/2026-08-09-S18-e1-validation-e4-preparation.md) |
 | S17 | 2026-08-08 | E1 engine spikes + fixtures (H1, H2, H3) | [E1.F1.H1] [E1.F1.H2] [E1.F1.H3] (issues #7-9, one PR) | [entry](entries/2026-08-08-S17-e1-f1-h1-claude-code-spike.md) |

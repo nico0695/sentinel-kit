@@ -28,7 +28,17 @@ export interface OpenCodePermissionConfig {
 export async function createDenyConfigFile(): Promise<OpenCodePermissionConfig> {
   const dir = await mkdtemp(join(tmpdir(), "sentinel-opencode-"));
   const path = join(dir, "opencode-config.json");
-  await writeFile(path, JSON.stringify(DENY_CONFIG), "utf-8");
+  try {
+    await writeFile(path, JSON.stringify(DENY_CONFIG), "utf-8");
+  } catch (raw) {
+    // The directory already exists at this point but no `cleanup` handle
+    // has been handed out yet, so nothing downstream could ever remove it.
+    // Remove it here before rethrowing, otherwise a transient filesystem
+    // fault (ENOSPC on a full /tmp being the likeliest) leaks one directory
+    // per failed review and compounds the very condition that caused it.
+    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    throw raw;
+  }
   return {
     path,
     cleanup: async () => {

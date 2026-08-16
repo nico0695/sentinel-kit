@@ -12,7 +12,7 @@
  * block, which is the one place this adapter's own default `execa`-backed
  * runner is exercised.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -201,6 +201,34 @@ describe("invocation shape (AC-3, AC-4)", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.options.cwd).toBe("/some/worktree/path");
     expect(calls[1]?.options.cwd).toBe("/some/worktree/path");
+  });
+
+  // AC-19's own stated validation. Added by ST-6 for ledger finding R3-002's
+  // sibling R3-003: before this, swapping the two budgets left the whole
+  // suite green, so the "pre-check gets a short fixed budget, the review
+  // gets the caller's" contract was entirely unasserted.
+  it("gives the pre-flight the fixed 5s budget and the real call request.timeoutMs (AC-19)", async () => {
+    const calls: Array<{
+      args: readonly string[];
+      options: OpenCodeProcessRunOptions;
+    }> = [];
+    const runProcess: OpenCodeProcessRunner = async (args, options) => {
+      calls.push({ args, options });
+      if (args.includes("--version")) return VERSION_SUCCESS;
+      return {
+        stdout: fixture("valid-verdict.ndjson"),
+        exitCode: 0,
+        timedOut: false,
+      };
+    };
+
+    const adapter = createOpenCodeAdapter({ model: MODEL, runProcess });
+    await adapter.review(baseRequest({ timeoutMs: 987_654 }));
+
+    const preflightCall = calls.find((call) => call.args.includes("--version"));
+    const realCall = calls.find((call) => !call.args.includes("--version"));
+    expect(preflightCall?.options.timeoutMs).toBe(5_000);
+    expect(realCall?.options.timeoutMs).toBe(987_654);
   });
 
   it("issues the real call with the exact args array and the prompt as input, never argv", async () => {
@@ -414,6 +442,52 @@ describe("OPENCODE_CONFIG lifecycle (AC-7, AC-8, AC-9)", () => {
     expect(existsSync(dirname(capturedPath as string))).toBe(false);
   });
 
+  // Ledger finding R4-002 (ST-6): a `writeFile` failure used to orphan the
+  // just-created mkdtemp directory forever, because the `cleanup` handle is
+  // only returned on the success path. Exercised here against the REAL
+  // module by pointing TMPDIR at a path that cannot hold a directory, so
+  // no module mocking is needed and the rest of this file is unaffected.
+  it("does not leak the temp directory when the deny-config write fails (AC-9)", async () => {
+    // The defect is specifically: mkdtemp SUCCEEDS, then writeFile FAILS,
+    // leaving a directory nobody holds a cleanup handle for. Reproducing it
+    // therefore requires a real mkdtemp and a failing write — so this uses
+    // vi.doMock (block-scoped and NOT hoisted, unlike vi.mock) to fail only
+    // writeFile, keeping real mkdtemp/rm. vi.resetModules() plus a dynamic
+    // import confines the mock to this test; no other test in this file is
+    // affected, which is what made the file-wide vi.mock approach unusable.
+    vi.resetModules();
+    const createdDirs: string[] = [];
+    const realFs =
+      await vi.importActual<typeof import("node:fs/promises")>(
+        "node:fs/promises",
+      );
+    vi.doMock("node:fs/promises", () => ({
+      ...realFs,
+      mkdtemp: async (prefix: string) => {
+        const dir = await realFs.mkdtemp(prefix);
+        createdDirs.push(dir);
+        return dir;
+      },
+      writeFile: async () => {
+        throw new Error("ENOSPC: simulated full disk");
+      },
+    }));
+
+    try {
+      const { createDenyConfigFile } = await import("../permission-config.js");
+      await expect(createDenyConfigFile()).rejects.toThrow(/ENOSPC/);
+
+      // The real assertion: a directory WAS created, and it is gone.
+      expect(createdDirs).toHaveLength(1);
+      expect(existsSync(createdDirs[0] as string)).toBe(false);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+      for (const dir of createdDirs)
+        rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // Declined, not tested: createDenyConfigFile()'s OWN creation failure
   // (e.g. mkdtemp ENOENT/EMFILE) sits outside review()'s try/finally by
   // construction (per ST-3's QA review, low severity, accepted). Simulating
@@ -469,6 +543,41 @@ describe("NDJSON parsing and outcome extraction (AC-10..AC-18)", () => {
     expect(result.usage?.totalTokens).toBe(417);
   });
 
+  // AC-11's own stated validation ("concatenated text compared exactly").
+  // Added by ST-6 for ledger finding R3-002: before this, reversing the
+  // concatenation order in envelope.ts left the whole suite green, because
+  // no test compared a multi-text-event stream's output exactly.
+  it("concatenates ALL text events in stream order, compared exactly (AC-11)", async () => {
+    const raw = fixture("no-verdict.ndjson");
+    // Re-derive the expected string from the fixture bytes with a
+    // from-scratch parse, so this asserts against ground truth rather than
+    // against the production module it is meant to police.
+    const expected = raw
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .map(
+        (line) =>
+          JSON.parse(line) as { type?: string; part?: { text?: string } },
+      )
+      .filter((event) => event.type === "text")
+      .map((event) => event.part?.text ?? "")
+      .join("");
+
+    // Guard the guard: the fixture must genuinely have >1 text event, or
+    // this test could not detect an ordering regression at all.
+    const textEventCount = raw
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .filter(
+        (l) => (JSON.parse(l) as { type?: string }).type === "text",
+      ).length;
+    expect(textEventCount).toBeGreaterThan(1);
+
+    const adapter = adapterReplaying(raw);
+    const result = await adapter.review(baseRequest());
+    expect(result.output).toBe(expected);
+  });
+
   it("resolves noisy-output.ndjson with verbatim concatenated text and derived usage", async () => {
     const raw = fixture("noisy-output.ndjson");
     const tokens = lastStepFinishTokens(raw);
@@ -508,6 +617,93 @@ describe("NDJSON parsing and outcome extraction (AC-10..AC-18)", () => {
     const adapter = adapterReplaying(raw);
     const result = await adapter.review(baseRequest());
     expect(result.output).toContain("VERDICT: request-changes");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// process-status gate (AC-25 — spec Amendment 1, closes ledger finding R1-001)
+// ---------------------------------------------------------------------------
+describe("process-status gate (AC-25)", () => {
+  function adapterWithStatus(
+    stdout: string,
+    status: { exitCode?: number; signal?: string; timedOut?: boolean },
+  ): ReturnType<typeof createOpenCodeAdapter> {
+    const runProcess: OpenCodeProcessRunner = async (args) => {
+      if (args.includes("--version")) return VERSION_SUCCESS;
+      return { stdout, timedOut: false, ...status };
+    };
+    return createOpenCodeAdapter({ model: MODEL, runProcess });
+  }
+
+  it("rejects a SIGTERM-killed run even though its partial output parsed fine", async () => {
+    // This is the exact reproduction from the 4R review that proved R1-001:
+    // before the fix it RESOLVED with a truncated review carrying a verdict.
+    const adapter = adapterWithStatus(fixture("valid-verdict.ndjson"), {
+      signal: "SIGTERM",
+      timedOut: true,
+    });
+    const rejection = adapter.review(baseRequest());
+    await expect(rejection).rejects.toBeInstanceOf(OpenCodeReviewError);
+    await expect(rejection).rejects.toThrow(/incomplete/);
+  });
+
+  it("names the signal, not an undefined exit code, when terminated without timing out", async () => {
+    const adapter = adapterWithStatus(fixture("valid-verdict.ndjson"), {
+      signal: "SIGKILL",
+    });
+    await expect(adapter.review(baseRequest())).rejects.toThrow(/SIGKILL/);
+  });
+
+  it("rejects a non-zero exit even though its partial output parsed fine", async () => {
+    const adapter = adapterWithStatus(fixture("valid-verdict.ndjson"), {
+      exitCode: 1,
+    });
+    const rejection = adapter.review(baseRequest());
+    await expect(rejection).rejects.toBeInstanceOf(OpenCodeReviewError);
+    await expect(rejection).rejects.toThrow(/exited with code 1/);
+  });
+
+  it("still resolves a clean exit-0 run (the gate does not over-reject)", async () => {
+    const adapter = adapterWithStatus(fixture("valid-verdict.ndjson"), {
+      exitCode: 0,
+    });
+    const result = await adapter.review(baseRequest());
+    expect(result.output).toContain("VERDICT: request-changes");
+  });
+
+  it("lets AC-16's specific diagnostic win over the generic status message (ordering is normative)", async () => {
+    // context-overflow.ndjson really does come with exitCode 1 in the wild.
+    // Gating on status BEFORE parsing would replace the actionable
+    // ContextOverflowError text with "exited with code 1".
+    const adapter = adapterWithStatus(fixture("context-overflow.ndjson"), {
+      exitCode: 1,
+    });
+    const rejection = adapter.review(baseRequest());
+    await expect(rejection).rejects.toThrow(/ContextOverflowError/);
+    await expect(rejection).rejects.not.toThrow(/exited with code/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// error-event tolerance (AC-16 conformance — ledger finding R2-001)
+// ---------------------------------------------------------------------------
+describe("error-event tolerance (AC-16)", () => {
+  it("rejects an error event that carries no readable .error payload", async () => {
+    // AC-16 triggers on the PRESENCE of a type:"error" event. Before the
+    // fix, the `.error !== undefined` guard let a payload-less error event
+    // fall through to the success path whenever any text preceded it.
+    const stream = [
+      JSON.stringify({ type: "text", part: { type: "text", text: "partial" } }),
+      JSON.stringify({ type: "error" }),
+    ].join("\n");
+    const runProcess: OpenCodeProcessRunner = async (args) => {
+      if (args.includes("--version")) return VERSION_SUCCESS;
+      return { stdout: stream, exitCode: 0, timedOut: false };
+    };
+    const adapter = createOpenCodeAdapter({ model: MODEL, runProcess });
+    await expect(adapter.review(baseRequest())).rejects.toBeInstanceOf(
+      OpenCodeReviewError,
+    );
   });
 });
 

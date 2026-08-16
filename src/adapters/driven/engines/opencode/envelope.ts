@@ -83,12 +83,28 @@ function tokensOf(
   return undefined;
 }
 
+/** Message for an `error` event, tolerating an absent/renamed payload. */
+function buildErrorEventMessage(
+  name: string | undefined,
+  message: string | undefined,
+): string {
+  if (name === undefined) {
+    return "opencode: review failed with an unrecognized error event";
+  }
+  return message !== undefined ? `${name}: ${message}` : name;
+}
+
 /**
  * Implements AC-15..AC-18's outcome rules over an already-parsed event
  * list. Exactly three `throw` statements, no others:
  * - `events.length === 0`        -> `OpenCodeInvocationError` (AC-15)
- * - any `event.type === "error"` -> `OpenCodeReviewError` (AC-16)
+ * - any `event.type === "error"` -> `OpenCodeReviewError` (AC-16), whether
+ *   or not it carries a readable `.error` payload
  * - concatenated output `""`     -> `OpenCodeReviewError`, fallback (AC-17)
+ *
+ * Process status is NOT considered here — `extractOutcome` stays pure and
+ * process-unaware. AC-25's exit-status gate lives in the adapter and runs
+ * after this function, so these stdout-derived diagnostics win.
  */
 export function extractOutcome(events: readonly OpenCodeEvent[]): ReviewResult {
   if (events.length === 0) {
@@ -98,12 +114,14 @@ export function extractOutcome(events: readonly OpenCodeEvent[]): ReviewResult {
   }
 
   const errorEvent = events.find((event) => event.type === "error");
-  if (errorEvent?.error !== undefined) {
-    const name = errorEvent.error.name;
-    const message = errorEvent.error.data?.message;
-    throw new OpenCodeReviewError(
-      message !== undefined ? `${name}: ${message}` : name,
-    );
+  if (errorEvent !== undefined) {
+    // AC-16 triggers on the PRESENCE of an `error` event, not on its
+    // payload: the NDJSON schema is undocumented (docs/engines/opencode.md),
+    // so an error event whose `.error` field is absent or renamed must
+    // still fail the review rather than fall through to the success path.
+    const name = errorEvent.error?.name;
+    const message = errorEvent.error?.data?.message;
+    throw new OpenCodeReviewError(buildErrorEventMessage(name, message));
   }
 
   const output = events.filter(isTextEvent).map(textOf).join("");

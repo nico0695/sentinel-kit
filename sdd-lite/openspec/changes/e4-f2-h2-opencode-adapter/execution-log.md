@@ -116,3 +116,60 @@ No medium/high findings. Does not close the change (stage mode).
 - `binaryPath` default ("opencode") proven indirectly (adapter still resolves without overriding it), same H1 precedent — not asserted via the execa mock, since that would require threading the factory's internal default through an extra code path not otherwise needed by any AC.
 
 **Recommended next stage:** ST-5 (manual AC-24 verification run + full closing gate) on user approval. Not auto-continuing.
+
+---
+
+## 4R code review — full-4r sweep of `e9ee543`
+
+**Status:** completed, verdict **fail** (1 blocking finding)
+**Ledger:** `review-ledger.md`
+
+Tier `full-4r` on two independent triggers (1062 changed lines; permissions surface). Four parallel read-only lens workers + one refuter pass. One CRITICAL blocking finding (**R1-001**), one CRITICAL **refuted** (R1-002, worktree config precedence — refuted on attribution, since the merged claude-code sibling passes no `env` at all and is strictly more exposed, and on threat model, since PRD §60 already executes reviewed-branch scripts by design), and 11 `info` findings.
+
+R1-001 was raised independently by the `risk` and `resilience` lenses and **reproduced directly by the orchestrator**, which reclassified it from `inferential` to `deterministic` and therefore excluded it from refutation. The `reliability` lens recorded it only as an observation, arguing `runEngineWithTimeout` wins the race — that mitigation covers the adapter's-own-timeout sub-case only, not an external kill or a non-zero exit, both of which the reproduction exercised with no timer involved.
+
+Routed to the user as `review_gate` (`cp-review-gate-r1-001`) rather than a direct fix, because closing it contradicts approved AC-18. **User chose to amend** (`dec-003`); spec.md, design.md and plan.md were amended accordingly and ST-6 was appended with ST-5 re-sequenced to depend on it.
+
+---
+
+## ST-6 — Fix stage (review-driven, Amendment 1)
+
+**Status:** completed
+**Approval:** `cp-st6-approval` (user: "ok avanza")
+
+**Files changed (4 — exactly the approved scope; `process-runner.ts` and `engines/index.ts` deliberately untouched):**
+
+| File | Ledger id | Change |
+|---|---|---|
+| `opencode-adapter.ts` | **R1-001** | New private `assertCleanExit(result)` + call site after `extractOutcome`. Checks `timedOut` → `signal` → `exitCode !== 0`, in that normative order, throwing `OpenCodeReviewError`. Header doc-comment updated to AC-25 and the `review()` walkthrough gained step 5 for the gate. |
+| `envelope.ts` | **R2-001** | `if (errorEvent?.error !== undefined)` → `if (errorEvent !== undefined)`, so an `error` event always rejects per AC-16's actual wording; new `buildErrorEventMessage` helper degrades gracefully when `.error` is absent or renamed. `extractOutcome`'s doc-comment corrected and given an explicit note that process status is NOT its concern (AC-25 lives in the adapter). |
+| `permission-config.ts` | **R4-002** | `writeFile` wrapped so a failure removes the just-created `mkdtemp` directory before rethrowing. External contract (`{path, cleanup}`) unchanged. |
+| `__test__/opencode-adapter.test.ts` | R1-001, R2-001, R3-002, R3-003, R4-002 | 9 new tests (see below). |
+
+**New tests (9):** 5 for AC-25's process-status gate (SIGTERM-killed rejects; signal named rather than `code undefined`; non-zero exit rejects; clean exit-0 still resolves; **AC-16's `ContextOverflowError` diagnostic still wins over the generic status message**, proving the ordering is normative and not incidental), 1 for R2-001 (payload-less `error` event rejects), 1 for R4-002 (no temp-directory leak on write failure), 1 for R3-002 (exact stream-order concatenation), 1 for R3-003 (per-invocation timeout budgets).
+
+### Mutation re-verification (mandatory exit condition, all three PASSED)
+
+A test that does not catch its own mutation is not a fix. Each mutation was applied, the suite run, and the mutation reverted:
+
+| # | Mutation | Before ST-6 | After ST-6 |
+|---|---|---|---|
+| a | `envelope.ts`: `...map(textOf).reverse().join("")` | survived — 275/275 green | **FAILS** — `concatenates ALL text events in stream order` ✗ (1 failed / 33 passed) |
+| b | `opencode-adapter.ts`: swap `PREFLIGHT_TIMEOUT_MS` ↔ `request.timeoutMs` | survived — 275/275 green | **FAILS** — `gives the pre-flight the fixed 5s budget…` ✗ (1 failed / 33 passed) |
+| c | `opencode-adapter.ts`: comment out `assertCleanExit(result)` | n/a (gate did not exist) | **FAILS** — 3 AC-25 tests ✗ (3 failed / 31 passed) |
+
+### Self-caught defect during this stage
+
+The first draft of the R4-002 test set `TMPDIR` to a regular file, which makes **`mkdtemp` fail, not `writeFile`** — so it proved only that the function rejects, never exercising the new try/catch. That is a vanity test of exactly the kind the 4R review itself flagged elsewhere. Rewritten to use `vi.doMock` (block-scoped, unlike the file-wide hoisted `vi.mock` that ST-4 correctly declined) with a real `mkdtemp` and a failing `writeFile`, asserting the created directory is gone afterward. Verified non-vacuous by reverting the `permission-config.ts` fix and confirming the test then fails.
+
+**R1-001 direct re-verification:** the review's own reproduction (`{stdout: <valid-verdict bytes>, signal:"SIGTERM", timedOut:true}`) now **rejects** with `OpenCodeReviewError` where it previously resolved with a truncated review carrying `VERDICT: approve`.
+
+**Validation:**
+- `npx vitest run --project adapters src/adapters/driven/engines/opencode`: `34 passed (34)` (25 pre-existing + 9 new).
+- `npm run check`: two mechanical `biome --write` passes (line wrapping, then unused imports left over from the rewritten test), then `Checked 91 files`, `tsc --noEmit` clean, `✔ no dependency violations found (66 modules, 126 dependencies cruised)`.
+- `npm test`: **`Tests 284 passed (284)`**, 18 files — 275 baseline + 9 new, counted, not assumed.
+- `git diff --stat`: exactly the 4 in-scope files (+284/−15). `process-runner.ts` and `engines/index.ts` untouched, as required.
+
+**Ledger status after ST-6:** R1-001, R2-001, R3-002, R3-003, R4-002 → `fixed`, pending a scoped re-review to move them to `verified`. The remaining 7 `info` findings were deliberately NOT touched (out of ST-6's approved scope).
+
+**Recommended next stage:** a scoped re-review of the ST-6 fix delta against the ledger (protocol: re-review sees only the frozen ledger plus the immutable fix delta), then ST-5. Not auto-continuing.

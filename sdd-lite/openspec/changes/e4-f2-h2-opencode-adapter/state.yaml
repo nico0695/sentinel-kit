@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-16T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -40,7 +40,26 @@ stages:
       error classes for unparseable-stdout vs in-stream error event, OPENCODE_CONFIG injection
       mechanism). No contradictions found (unlike H1, which found a real PRD-vs-port gap).
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-16T00:15:00Z"
+    completed_at: "2026-08-16T00:15:00Z"
+    notes: >-
+      spec.md written, status complete. All three proposal open questions resolved as firm ACs:
+      NDJSON parse-tolerance (AC-10: split-and-drop-unparseable-lines), one-vs-two error classes
+      (AC-15/AC-16/AC-17: OpenCodeInvocationError for zero-parseable-lines vs OpenCodeReviewError
+      for an in-stream error event or no-output-produced), OPENCODE_CONFIG mechanism (AC-7/AC-8/
+      AC-9: fs.mkdtemp-based temp file per review() call, env-injected on every invocation, removed
+      in a finally block). Verified against raw parsed structure of all 6 fixtures/opencode/*
+      files directly (python3 json.loads, not paraphrased): confirmed no-verdict.ndjson has TWO
+      step_finish events with materially different token counts (falsifies a naive
+      first-step_finish implementation, AC-12); confirmed tokens.total always includes reasoning
+      and must not be reused for totalTokens (AC-13); confirmed context-overflow.ndjson has two
+      step_start/error pairs, not one (AC-16 robust to this); confirmed unknown-model-stdout.txt
+      is invalid JSON from line 1 (unquoted keys, trailing commas). One divergence from H1 flagged
+      explicitly: model is a REQUIRED option here (AC-2), not optional-with-default, per the
+      spike's own "no safe engine-wide default" finding. One item deferred to design (adapter-vs-
+      outer-race timeout precedence), identical deferral to H1's AC-19, not spec-blocking. No
+      contradictions found.
   sddl-design:
     status: pending
   sddl-plan:
@@ -106,14 +125,13 @@ next_action:
   kind: await_user
   target: checkpoint
   summary: >-
-    proposal.md complete, status ready-for-spec. No blocking ambiguity: the three open questions
-    are narrower/lower-stakes than H1's (which required a real B-level escalation over the
-    isAvailable() port gap) and no contradiction was found between the backlog/PRD and the
-    current port/codebase state. Per smart phase validation, presenting the checkpoint before
-    sddl-spec since open questions exist, even though none rise to a material ambiguity blocking
-    safe spec work.
+    spec.md complete, status complete. 24 ACs, all three proposal open questions resolved as firm
+    fixture-verified rules; only one item deferred to design (timeout precedence), identical to
+    H1's own deferral, not spec-blocking. Per smart phase validation, presenting the checkpoint
+    before sddl-design since risks/open items are recorded (none above medium severity blocking
+    safe design work) -- recommend approve and continue to sddl-design.
 created_at: "2026-08-16T00:00:00Z"
-updated_at: "2026-08-16T00:00:00Z"
+updated_at: "2026-08-16T00:15:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
@@ -126,4 +144,10 @@ checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
     stage: sddl-proposal
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:10:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
     status: pending

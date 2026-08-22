@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -47,37 +47,65 @@ stages:
       shape of "engine used" on the result, and whether H2 needs to be
       merged first (currently PR #67, open) or resolution can proceed
       against the port alone.
-decisions: []
-open_risks:
-  - id: risk-001
-    severity: low
-    status: open
-    summary: >-
-      [E4.F2.H2] (the opencode adapter) is only PR'd (#67), not yet merged,
-      as of this proposal, even though the backlog lists it as a hard
-      dependency for [E4.F2.H3]. Resolution logic itself only needs the
-      ReviewEngine port (already merged, E0.F2.H1) and the two engine names
-      as strings/enum values, not the concrete adapters, so this is unlikely
-      to block spec/design/plan. Flagged as an open question rather than a
-      blocker; worth a conscious call at spec time.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-22T01:00:00Z"
+    completed_at: "2026-08-22T01:00:00Z"
+    notes: >-
+      spec.md written, status complete. All 3 proposal open questions
+      resolved as firm decisions: (1) per-run override enters the core via a
+      new, separate pure function resolveEngine (run module), not a new
+      runReview internal step -- keeps run-review.ts's pipeline untouched
+      beyond a 2-field echo-through; (2) "engine used" recorded via a
+      symmetrical optional engineName field on RunReviewRequest/
+      RunReviewResult (AC-7/AC-8), since no RunStore exists yet; (3) H2-merge
+      question resolved by fact -- PR #67 merged to main 2026-08-22, both
+      E4.F2.H1 and E4.F2.H2 fully merged, no blocker remains. New design
+      decision made in spec (not in the original proposal): extract a single
+      shared EngineNameSchema in repos/ports/config-schemas.ts, reused by
+      GlobalConfigSchema.defaultEngine, RepoEntrySchema.defaultEngine, and
+      resolveEngine, so the known-engine set has exactly one definition
+      (AC-6) -- a small, non-breaking refactor of an existing repos-module
+      file (z.infer'd types unchanged). 9 ACs total. No adapter or CLI files
+      touched; core-only change.
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      Approve proposal.md as written and advance directly into spec without
+      a separate proposal-stage checkpoint round-trip.
+    author: user
+    rationale: >-
+      User's own initiative ("quiero continuar con el sdd" after confirming
+      PR #67 merged) -- implicit advancement per this skill's own phase
+      validation rule (user already indicated advancement).
+    recorded_at: "2026-08-22T01:00:00Z"
+open_risks: []
 review_summary: null
 qa_summary: null
 next_action:
   kind: continue
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    proposal.md complete, no blocking ambiguity identified. Recommend
-    proceeding to sddl-spec to firm up scope boundaries and acceptance
-    criteria, resolving the three open questions (per-run override entry
-    point, "engine used" result shape, H2-merge-before-start question) as
-    firm decisions rather than leaving them open into spec.
+    spec.md complete, all proposal open questions resolved as firm
+    decisions, no open risk or ambiguity remaining. Recommend proceeding to
+    sddl-design to map the 9 ACs to concrete file locations (resolve-engine.ts
+    new file, config-schemas.ts refactor, run-review.ts 2-field diff) before
+    planning executor stages.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T00:00:00Z"
+updated_at: "2026-08-22T01:00:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/spec.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
     stage: sddl-proposal
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:00:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
     status: pending

@@ -1,0 +1,134 @@
+version: "0.1"
+change_name: e5-f1-h1-process-runner
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F1.H1] (issue #31), third story of the E5 milestone: introduce ProcessRunner, the
+    second driven port of src/core/run and the last unimplemented port of the PRD 4.3 MVP
+    catalog, plus its execa-backed adapter in the currently-empty src/adapters/driven/exec/.
+    Mechanically low-risk: two structurally identical private precedents already exist in-repo
+    (ClaudeCodeProcessRunner and OpenCodeProcessRunner), execa is already a runtime dependency,
+    and the contract-suite convention is established by four prior suites. Risk is concentrated
+    in two non-mechanical places: proving the timeout genuinely reaps a child that ignores
+    SIGTERM (not merely that the promise settles), and deciding where the "only declared scripts
+    executable" guarantee of the dependent story [E5.F1.H2] is enforced -- in this port, or in a
+    caller that does not exist yet.
+  confidence: high
+  recorded_at: "2026-08-22T23:10:00Z"
+lifecycle_status: draft
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. A medium-breadth read-only exploration at proposal stage was
+      sufficient: both engine process-runner.ts seams, git-cli.ts, package.json, src/core/run/
+      ports/, the four existing contract suites, and docs/setup-tecnico-sentinel.md section 4
+      are all directly readable and jointly determine the adapter's shape.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T23:00:00Z"
+    completed_at: "2026-08-22T23:10:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/run/index.ts (which names
+      this story as ProcessRunner's landing point), src/adapters/driven/exec/index.ts (an empty
+      placeholder naming the same story), both engines' process-runner.ts seams (the proven
+      execa option bag and resolve-not-reject contract), src/adapters/driven/git/git-cli.ts
+      (error-translation and isAbsolute pre-spawn guard precedent), the GitPort/ReviewEngine/
+      RunStore contract suites (shared-suite convention), and docs/backlog-mvp-sentinel.md
+      lines 269-279. Four open questions recorded, two B-level.
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f1-h1-process-runner/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f1-h1-process-runner/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f1-h1-process-runner/spec.md
+  design: sdd-lite/openspec/changes/e5-f1-h1-process-runner/design.md
+  plan: sdd-lite/openspec/changes/e5-f1-h1-process-runner/plan.md
+  execution_log: sdd-lite/openspec/changes/e5-f1-h1-process-runner/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e5-f1-h1-process-runner/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e5-f1-h1-process-runner/review-ledger.md
+checkpoints:
+  - id: cp-story-selection
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      Which remaining required E5 story to run next, after [E5.F2.H2] merged as PR #70 and left
+      #31 (ProcessRunner) and #32 (declared validations) as the only required E5 stories open.
+    question: "Which E5 story do we continue with?"
+    options:
+      - id: opt-31
+        label: "#31 ProcessRunner"
+        description: >-
+          [E5.F1.H1] ProcessRunner port + exec adapter -- safe execution of declared processes
+          with timeout, capture and cwd in the worktree.
+      - id: opt-32
+        label: "#32 Declared validations"
+        description: >-
+          [E5.F1.H2] Declared validations in the review flow -- repo scripts feed the review
+          context.
+    free_input_allowed: true
+    response:
+      selected_option_id: opt-31
+      responded_at: "2026-08-22T23:00:00Z"
+    created_at: "2026-08-22T22:55:00Z"
+    resolved_at: "2026-08-22T23:00:00Z"
+decisions:
+  - id: dec-story-selection
+    checkpoint_id: cp-story-selection
+    selected_option_id: opt-31
+    rationale: >-
+      User selected #31. It is also the dependency-correct order: the backlog marks [E5.F1.H2]
+      as depending on [E5.F1.H1], so running #32 first would require inventing the port anyway.
+    recorded_at: "2026-08-22T23:00:00Z"
+open_risks:
+  - id: risk-001
+    summary: >-
+      A port exposing run(command, args) is the largest execution surface added to this codebase
+      so far. The "only declared scripts executable" guarantee belongs to [E5.F1.H2], which does
+      not exist yet -- so unless this port constrains its input structurally, the story ships an
+      unconstrained execution primitive with no enforcing caller. Spec must resolve where the
+      guarantee lives.
+    severity: high
+  - id: risk-002
+    summary: >-
+      Acceptance criterion 1 ("timeout kills the process") is provable only by a test whose child
+      deliberately ignores SIGTERM, so that forceKillAfterDelay's SIGKILL is what actually reaps
+      it, plus a post-hoc liveness assertion. A test asserting only timedOut === true would pass
+      against an adapter that leaks orphaned processes.
+    severity: medium
+  - id: risk-003
+    summary: >-
+      Captured stdout/stderr feeds a prompt in [E5.F1.H2]. Without a truncation policy, a single
+      verbose npm test run can produce megabytes of prompt input, and execa's maxBuffer becomes
+      an unhandled failure mode. Whether truncation lives in this port (with a truncated flag,
+      mirroring [E2.F3.H2]'s diff size policy) or in the caller is undecided.
+    severity: medium
+  - id: risk-004
+    summary: >-
+      The two existing engine process-runner.ts seams are near-duplicates of this port's job.
+      Retrofitting them (and git-cli.ts, which has no timeout at all) onto ProcessRunner is
+      explicitly out of scope here, but leaving three parallel execution paths in the codebase is
+      a real duplication debt worth a follow-up backlog item.
+    severity: low
+next_action:
+  kind: wait_for_approval
+  target: sddl-spec
+  summary: >-
+    Proposal complete. Awaiting user approval to run sddl-spec, which must resolve the two
+    B-level open questions (where the declared-scripts guarantee is enforced, and the env
+    contract) as firm acceptance criteria.
+created_at: "2026-08-22T23:00:00Z"
+updated_at: "2026-08-22T23:10:00Z"

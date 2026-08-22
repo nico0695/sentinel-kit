@@ -1,0 +1,485 @@
+version: "0.1"
+change_name: e4-f2-h2-opencode-adapter
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F2.H2] (issue #29): the second real ReviewEngine adapter, wrapping the canonical
+    OpenCode CLI invocation the [E1.F1.H2] spike already captured with real evidence (invocation,
+    NDJSON event shape, mandatory OPENCODE_CONFIG deny injection, failure signatures). Depends
+    only on closed/merged work (E1.F1.H2 spike, E1.F1.H3 fixtures, E0.F2.H2 port, and the just-
+    merged E4.F2.H1 claude-code adapter, whose file layout, injectable-runner seam, and pre-flight
+    pattern this story reuses directly). Risk is lower than H1's: the structural unknowns H1 had
+    to escalate to spec (isAvailable() mechanism, binary-mocking seam, timeout ownership) are all
+    pre-resolved by the merged reference implementation. The genuinely new design surface is
+    NDJSON line-by-line parsing (tolerating a truncated final line) and the default-write
+    permission posture (OPENCODE_CONFIG must be injected on every invocation, no exceptions).
+  confidence: high
+  recorded_at: "2026-08-16T00:00:00Z"
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing to proposal. The spike doc, fixtures, port, and the
+      merged claude-code adapter reference implementation are all directly readable.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-16T00:00:00Z"
+    completed_at: "2026-08-16T00:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of docs/engines/opencode.md,
+      fixtures/opencode/* (6 files, including the OpenCode-specific unknown-model-stdout.txt log
+      dump), fixtures/README.md's per-engine case matrix, and the merged claude-code-adapter.ts /
+      process-runner.ts / index.ts (the direct file-layout and seam-shape template). Confirmed via
+      docs/backlog-mvp-sentinel.md that H2's third acceptance criterion is explicitly "zero
+      changes needed in the core to add it" -- the port stays frozen. Three open questions
+      recorded for spec, all narrower than H1's (NDJSON parse-tolerance strategy, one-vs-two
+      error classes for unparseable-stdout vs in-stream error event, OPENCODE_CONFIG injection
+      mechanism). No contradictions found (unlike H1, which found a real PRD-vs-port gap).
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-16T00:15:00Z"
+    completed_at: "2026-08-16T00:15:00Z"
+    notes: >-
+      spec.md written, status complete. All three proposal open questions resolved as firm ACs:
+      NDJSON parse-tolerance (AC-10: split-and-drop-unparseable-lines), one-vs-two error classes
+      (AC-15/AC-16/AC-17: OpenCodeInvocationError for zero-parseable-lines vs OpenCodeReviewError
+      for an in-stream error event or no-output-produced), OPENCODE_CONFIG mechanism (AC-7/AC-8/
+      AC-9: fs.mkdtemp-based temp file per review() call, env-injected on every invocation, removed
+      in a finally block). Verified against raw parsed structure of all 6 fixtures/opencode/*
+      files directly (python3 json.loads, not paraphrased): confirmed no-verdict.ndjson has TWO
+      step_finish events with materially different token counts (falsifies a naive
+      first-step_finish implementation, AC-12); confirmed tokens.total always includes reasoning
+      and must not be reused for totalTokens (AC-13); confirmed context-overflow.ndjson has two
+      step_start/error pairs, not one (AC-16 robust to this); confirmed unknown-model-stdout.txt
+      is invalid JSON from line 1 (unquoted keys, trailing commas). One divergence from H1 flagged
+      explicitly: model is a REQUIRED option here (AC-2), not optional-with-default, per the
+      spike's own "no safe engine-wide default" finding. One item deferred to design (adapter-vs-
+      outer-race timeout precedence), identical deferral to H1's AC-19, not spec-blocking. No
+      contradictions found.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-16T00:30:00Z"
+    completed_at: "2026-08-16T00:30:00Z"
+    notes: >-
+      design.md written, status complete. Five-file layout: opencode-adapter.ts, process-runner.ts
+      (OpenCodeProcessRunner extended with a REQUIRED env field, unlike ClaudeCodeProcessRunOptions
+      -- closes the "forgot to inject OPENCODE_CONFIG" hazard at compile time), permission-config.ts
+      (new module, no H1 analogue -- fs.mkdtemp-based temp file lifecycle for AC-7/8/9), envelope.ts
+      (parseNdjsonLines + extractOutcome, two pure functions), errors.ts (3 classes, no cause field
+      since AC-10 drops unparseable lines silently with no single exception to preserve). AC-19
+      (deferred timeout-precedence item from spec.md) resolved by directly reusing H1's mechanism
+      (execa timeout=request.timeoutMs unchanged + forceKillAfterDelay:2000) and its
+      engine-timeout.ts:76-111-grounded reasoning, confirmed engine-agnostic rather than
+      re-derived. All 24 ACs mapped to concrete code locations. Two open items carried forward
+      (both inherited/low-severity, not design-blocking): the AC-19 residual (same as H1's
+      accepted residual) and CLI version drift (informational, unchanged from spec).
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-16T00:45:00Z"
+    completed_at: "2026-08-16T00:45:00Z"
+    notes: >-
+      plan.md written, status complete, execution_ready: true. Five executor stages mirroring
+      H1's plan.md granularity exactly: ST-1 errors.ts+envelope.ts+permission-config.ts (pure,
+      grouped since permission-config.ts has the same "no execa dependency, land first" profile
+      as H1's ST-1 files), ST-2 process-runner.ts (execa seam with required env field), ST-3
+      opencode-adapter.ts orchestration + barrel export, ST-4 single test file (24 ACs), ST-5
+      manual AC-24 verification + full gate. Two test-strategy gaps closed: SIGTERM/SIGKILL
+      escalation (reused H1's mocked-execa option-wiring solution unchanged, not re-derived) and
+      OPENCODE_CONFIG lifecycle (genuinely new, three concrete tests specified: content
+      correctness, injection-on-every-call, concurrency+cleanup-on-reject). Measured baseline
+      recorded: npm test 250/250 passing 17 files, npm run check green, on the tree post-H1-merge.
+  sddl-executor:
+    status: in_progress
+    started_at: "2026-08-16T01:00:00Z"
+    notes: >-
+      ST-1 completed: errors.ts, envelope.ts, permission-config.ts written per design.md, verified
+      with a throwaway (deleted, not committed) vitest scratch test against all 6
+      fixtures/opencode/* files directly -- all 6 outcomes matched design.md's Expected Behavior
+      table exactly (valid-verdict totalTokens=4786 not 4965, no-verdict uses the LAST of two
+      step_finish events, context-overflow/timeout-partial/unknown-model-stdout all reject as
+      predicted). npm run check green (one mechanical biome --write formatting fix needed first,
+      no logic change), npm test unchanged at 250/250 baseline.
+
+      ST-2 completed: process-runner.ts written per design.md, mirroring the merged claude-code
+      adapter's process-runner.ts file-for-file with only the required `env` field added (passed
+      straight to execa's own env option, relying on extendEnv:true default rather than manually
+      spreading process.env). npm run check green, npm test unchanged at 250/250 (still a leaf
+      file). Zero dependency on ST-1's files or core, confirmed by grep (exactly one `from "execa"`
+      match).
+
+      ST-6 completed (review-driven fix stage, Amendment 1): assertCleanExit() added to
+      opencode-adapter.ts closing the R1-001 blocker, plus four bundled conformance fixes
+      (R2-001 error-event tolerance in envelope.ts, R4-002 temp-dir leak in permission-config.ts,
+      R3-002/R3-003 missing assertions). 9 new tests; npm test 284/284 (275 + 9, counted);
+      npm run check green; diff confined to the 4 in-scope files (process-runner.ts and
+      engines/index.ts untouched). All THREE mutations now FAIL the suite where two previously
+      survived it: text-order reverse, timeout-budget swap, and removing the gate itself.
+      Self-caught a vanity test mid-stage -- the first R4-002 draft failed mkdtemp instead of
+      writeFile and never exercised the new try/catch; rewritten with block-scoped vi.doMock and
+      verified non-vacuous by reverting the fix. Five ledger rows moved open/info -> fixed.
+
+      Scoped re-review (round 2, protocol-compliant: frozen ledger + immutable fix delta only,
+      original e9ee543 diff not re-reviewed) independently confirmed all 5 fixed rows -> verified.
+      Read the mechanism directly in each of the 3 source files (not trusted from the log).
+      Independently re-ran all 3 original mutations plus one NEW mutation (reordering
+      assertCleanExit BEFORE extractOutcome, to test the "AC-16 diagnostics win" ordering claim
+      directly, not just its presence) -- all 4 fail. Independently reverted each of the 3 fixes
+      in turn and confirmed each new/changed test fails without it (non-vacuous). Regression check:
+      confirmed by grep that every pre-existing resolving-path test defaults exitCode:0/
+      timedOut:false, so AC-25's new gate never fires on them; confirmed createDenyConfigFile's
+      external contract (Promise<OpenCodePermissionConfig>) is unchanged. No new defect found.
+      Ledger verdict: fail -> pass_with_warnings (7 info findings remain, none blocking, explicitly
+      out of round-2 scope). Recommended next: ST-5.
+
+      ST-4 completed: opencode-adapter.test.ts written, 25 tests across the shared contract suite
+      (unmodified -- H1 already fixed the propagates-configured-usage fixture shape, confirmed
+      by reading the file first) + 8 AC-specific describe blocks. Fixed one self-authored test bug
+      before acceptance (toEqual -> toMatchObject for no-verdict.ndjson's real token object, which
+      legitimately carries extra reasoning/cache/total fields). Declined a dedicated test for the
+      ST-3 QA note (createDenyConfigFile's own failure path) with an in-file documented rationale
+      (vi.mock is file-wide, not block-scoped, so isolating it would destabilize other tests; the
+      behavior is already AC-23-compliant without a special case). npx vitest 25/25, npm run check
+      green (one mechanical biome formatting fix), npm test 275/275 (250 baseline + 25 new, exact).
+      git status: only the new __test__/ directory -- ReviewEngine.contract.ts untouched.
+
+      ST-3 completed: opencode-adapter.ts written per design.md's pseudocode literally
+      (createDenyConfigFile -> try/finally wrapping pre-flight+real-invocation+outcome-extraction
+      -> cleanup), plus the engines/index.ts barrel export update (also fixed a stale doc-comment
+      still claiming the opencode adapter "lands in E4.F2.H2" past tense now that it has). First
+      real cross-file import graph for this story -- depcruise 0 violations, 66 modules/126 deps.
+      End-to-end smoke-verified (throwaway, deleted vitest test): full resolve path, pre-flight
+      short-circuit, in-stream-error rejection all matched design.md exactly; confirmed both
+      runProcess calls share the same OPENCODE_CONFIG env value. npm run check green (one
+      mechanical biome import-order fix), npm test unchanged at 250/250. Diff surface exactly the
+      two expected files. QA review flagged as worth considering before ST-4 (first non-trivial
+      blast-radius stage) but not blocking -- deferred to user's timing call.
+  sddl-qa-review:
+    status: in_progress
+    notes: >-
+      Stage-mode QA review of ST-3 completed: verdict pass. Independent re-run of npm run check
+      (green) and npm test (unchanged 250/250), diff-stat and git log confirmed against sibling
+      files untouched. Six targeted checks against what the deleted smoke test could not exercise
+      -- cleanup() awaited on every exit path (all four throw points + resolve), env object
+      shared by reference between both runProcess calls (not rebuilt), PREFLIGHT_TIMEOUT_MS vs
+      request.timeoutMs used correctly, diff scope clean, structural parity with H1's reference
+      confirmed. One low-severity observation (createDenyConfigFile() failure itself is outside
+      the try/finally and produces an untyped Error, not one of the three typed classes) --
+      informational, satisfies AC-23's actual requirement (instanceof Error), recommended as a
+      note for ST-4 to consciously cover or decline, not a blocker. No medium/high findings.
+      qa-report.md written. Does not close the change (stage mode).
+
+      FINAL mode completed: verdict pass_with_warnings. Independently re-verified (not trusted
+      from prior logs): npm run check green, npm test 284/284, full story diff vs aa664bb exactly
+      the 7 planned files, core/** untouched, execa imported once, adapter confirmed not wired
+      into src/main/. 24 of 25 ACs automated and genuinely satisfied; the ledger's one blocking
+      finding fixed and independently re-verified. AC-24 is the sole open item, left open by
+      explicit user decision. Per the skill's own rule, final + pass_with_warnings never sets
+      lifecycle_status completed regardless of user acceptance -- lifecycle stays reviewing,
+      cp-final-review recorded as approved (user decision already given: "quiero avanzar sin la
+      validacion manual"). qa-report.md written.
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      Reuse H1's resolved isAvailable() mechanism (internal pre-flight inside review(), no port
+      change) without re-litigating it for this story.
+    author: claude
+    rationale: >-
+      A-level (reversible, PRD-aligned, already precedented by merged code). The merged claude-
+      code adapter already established this pattern and it works; issue #29's own "zero changes
+      needed in the core" acceptance criterion argues for reusing the existing structural answer
+      rather than inventing a new one. Re-opening it here would be scope creep against a story
+      whose explicit goal is proving the port needs no further change.
+    recorded_at: "2026-08-16T00:00:00Z"
+  - id: dec-002
+    checkpoint_id: cp-proposal-approval
+    free_text: >-
+      Reuse H1's totalTokens computation rule (input + output tokens, cache fields excluded) for
+      OpenCode's step_finish.part.tokens shape, for consistency across both adapters at the
+      ReviewUsage boundary.
+    author: claude
+    rationale: >-
+      A-level. OpenCode's token fields (input/output/reasoning/cache.read/cache.write) are named
+      explicitly in the spike doc and map cleanly onto the same rule H1 already applied to
+      claude-code's .usage fields. Treating this as confirmed baggage for spec to validate, not a
+      fresh open question to re-derive.
+    recorded_at: "2026-08-16T00:00:00Z"
+  - id: dec-003
+    checkpoint_id: cp-review-gate-r1-001
+    free_text: >-
+      Amend spec.md (add AC-25, reword AC-18) and fix R1-001 inside this story, rather than
+      shipping it as a known defect or escalating to a cross-cutting redesign covering the
+      claude-code sibling.
+    author: user
+    rationale: >-
+      B-level (affects the approved acceptance contract). Presented at the review_gate with three
+      options and a recommendation; user chose option 1 ("enmendar"). Keeps the story honest and
+      self-contained -- the adapter is already exported from the barrel, so any wiring under #30
+      would make the defect live, and the fix surface is one helper plus tests. Recorded as a
+      spec AMENDMENT rather than a silent code change because the original AC-18 explicitly
+      declared AC-15/16/17 "the ONLY three rejection paths"; adding a fourth without amending it
+      would have left the code contradicting its own approved contract.
+    recorded_at: "2026-08-16T02:20:00Z"
+  - id: dec-004
+    checkpoint_id: cp-final-review
+    free_text: >-
+      Close the story at final QA verdict pass_with_warnings without running AC-24's manual
+      verification (real, authenticated opencode CLI over a genuine diff).
+    author: user
+    rationale: >-
+      C-level would normally apply (closing with a known open AC touches the story's completion
+      criteria), but this is not scope expansion or a PRD contradiction -- it is accepting an
+      already-disclosed, inherently-manual gap in the exact same category [E4.F2.H1] shipped with
+      (that story's own AC-24 remains open too, tracked at docs/todo/E4/manual-verification.md
+      item 1). No environment available to this session has an authenticated opencode CLI, so the
+      only alternative to accepting the gap now was leaving the story permanently blocked pending
+      the user's own local verification. Per sddl-qa-review's own rule, final + pass_with_warnings
+      never sets lifecycle_status completed regardless of this acceptance -- it stays reviewing,
+      and AC-24 remains tracked at docs/todo/E4/manual-verification.md item 2 until closed.
+    recorded_at: "2026-08-16T03:15:00Z"
+open_risks:
+  - id: risk-001
+    severity: medium
+    status: open
+    summary: >-
+      Default-write permission posture: OpenCode's `opencode run` writes files unless
+      OPENCODE_CONFIG injects a permission-deny config. Correctness of the adapter depends on
+      this env var being set on every single invocation with no code path that skips it. No
+      analogue in the merged claude-code adapter (whose -p flag is read-only by construction).
+      Needs an explicit acceptance criterion and a contract-suite assertion, not just a doc note.
+      Owner: sddl-spec / sddl-design for this story.
+  - id: risk-002
+    severity: low
+    status: open
+    summary: >-
+      NDJSON parsing is genuinely new relative to H1 (which parsed one JSON document). Line-by-
+      line parsing with a tolerated truncated final line and a distinct "not parseable at all"
+      failure class (fixtures/opencode/unknown-model-stdout.txt) are spec-able against fixture
+      evidence but are real new design work, not a copy of H1's envelope.ts. Owner: sddl-design.
+  - id: risk-004
+    severity: high
+    status: resolved
+    summary: >-
+      RESOLVED (ST-6, verified round 2). R1-001 (4R review, CRITICAL, introduced, was BLOCKING):
+      opencode-adapter.ts previously never read the real invocation's exitCode/signal/timedOut, so
+      a killed or non-zero-exit run that already emitted text resolved as a complete, successful
+      ReviewResult carrying a verdict. Fixed by spec Amendment 1 (new AC-25) + a private
+      assertCleanExit() gate called after extractOutcome so AC-15/16/17's stdout diagnostics are
+      never masked. Independently re-verified in the round-2 scoped re-review: mechanism read
+      directly, original reproduction now rejects, 4 mutations (including one added during
+      re-review specifically to test the ordering claim) all fail the suite, no regression on the
+      success path. See review-ledger.md's Scoped Re-Review section.
+  - id: risk-005
+    severity: low
+    status: open
+    summary: >-
+      R1-002 residual (REFUTED as a CRITICAL, recorded as a low documentation/verification gap):
+      nothing establishes the precedence between the injected OPENCODE_CONFIG and any
+      worktree-local opencode config, and the spike verified the deny posture only against a
+      benign worktree. Cannot be settled here (opencode is not installed in this environment).
+      Belongs as a step on item 2 of docs/todo/E4/manual-verification.md. The equivalent gap is
+      LARGER and untreated for the merged claude-code adapter, which passes no env at all and
+      omits --setting-sources -- a worthwhile follow-up against item 1.
+  - id: risk-006
+    severity: medium
+    status: open
+    summary: >-
+      AC-24 ("successful real review" against a real, authenticated opencode CLI) is the one
+      permanently-open acceptance criterion. Same category as [E4.F2.H1]'s own still-open AC-24.
+      User explicitly accepted closing the story without it (dec-004) rather than leave the story
+      blocked pending an environment with an authenticated opencode CLI. Tracked at
+      docs/todo/E4/manual-verification.md item 2. Not a code defect -- every automatable AC is
+      satisfied; this is purely the disclosed evidence gap CI structurally cannot close.
+  - id: risk-003
+    severity: low
+    status: open
+    summary: >-
+      Flag/behavior drift: docs/engines/opencode.md is 8 days old (2026-08-08 -> 2026-08-16) as
+      of this proposal. Same low-material-but-not-zero risk PRD risk #1 names for claude-code,
+      one day older. Not re-verified for this story.
+review_summary:
+  mode: 4r
+  tier: full-4r
+  target: e9ee543e3616ae5d20ece66916c2a2c08a9d42be
+  verdict: pass_with_warnings
+  counts:
+    confirmed: 1
+    verified: 5
+    info: 11
+    info_remaining: 7
+    refuted: 1
+  open_severe_findings: 0
+  round: 2
+  summary: >-
+    Full 4R sweep (1062 changed lines + permissions surface -> full-4r tier). One CRITICAL,
+    introduced, blocking finding R1-001: the real invocation's exitCode/signal/timedOut are never
+    read, so a run killed or exiting non-zero after emitting any text resolves as a COMPLETE,
+    successful review carrying a verdict. Reported independently by the risk and resilience
+    lenses and reproduced directly by the orchestrator (SIGTERM+partial -> resolved with a
+    verdict; exitCode:1+partial -> same), which reclassified it from inferential to
+    deterministic. The reliability lens recorded a partial mitigation (runEngineWithTimeout wins
+    the race) that covers only the adapter's-own-timeout sub-case, not external kills or a
+    non-zero exit. One refuter pass ran over the single remaining severe inferential finding
+    (R1-002, worktree config precedence) and REFUTED it on attribution (the merged claude-code
+    sibling passes no env at all, so the exposure is strictly worse there and pre-existing) and
+    on threat model (PRD Sec60 already executes reviewed-branch scripts by design). 11 info-level
+    findings recorded, none blocking; two are mutation-proven test gaps (text ordering and
+    timeout-budget assignment each survive the full 275-test suite).
+
+    ROUND 2 (scoped re-review of the ST-6 fix delta, e9ee543..047116b, per protocol: frozen
+    ledger + immutable delta only, original diff not re-reviewed): all 5 round-1 fixed rows
+    (R1-001 severe + R2-001/R3-002/R3-003/R4-002 info) independently verified -> `verified`.
+    Mechanism read directly in each source file; all 4 new/changed tests confirmed non-vacuous by
+    reverting each fix and observing the test fail; independently re-ran all 3 original mutations
+    plus one new one (reordering assertCleanExit before extractOutcome, directly testing the
+    "AC-16 diagnostics win" ordering claim) -- all 4 fail. Regression check: every pre-existing
+    resolving-path test defaults exitCode:0/timedOut:false (confirmed by grep), so AC-25 never
+    fires on them; createDenyConfigFile's external contract unchanged. No new defect in the fix.
+    Verdict fail -> pass_with_warnings. 7 info findings remain (R3-001, R4-003, R2-002, R2-003,
+    R2-004, R2-005, R4-004), none blocking, explicitly out of round-2 scope -- optional follow-up
+    polish, not silently dropped.
+  reported_at: "2026-08-16T03:00:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/review-ledger.md
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    Final closeout QA, independently re-verified (not trusted from prior logs): npm run check
+    green, npm test 284/284, full story diff vs pre-story merge-base (aa664bb) exactly the 7
+    planned files (1328 insertions / 3 deletions), src/core/** untouched, execa imported exactly
+    once (process-runner.ts), adapter confirmed NOT wired into src/main/ (correct -- cascading
+    resolution is #30). 24 of 25 ACs (24 original + AC-25 from Amendment 1) genuinely satisfied
+    and automated; the review-ledger's single blocking finding (R1-001) was fixed and
+    independently verified in a round-2 scoped re-review (verdict pass_with_warnings,
+    open_severe_findings: 0). AC-24 ("successful real review") is the sole gap: manual-by-design,
+    cannot be automated in this environment, and the user explicitly chose to close the story
+    without it. Same disclosed-gap pattern [E4.F2.H1] already shipped with. One low, non-blocking
+    observation: docs/todo/E4/manual-verification.md now carries two open items with no
+    target date, worth revisiting as more engine adapters land.
+  reported_at: "2026-08-16T03:15:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
+next_action:
+  kind: halt
+  target: orchestrator
+  summary: >-
+    Final QA verdict pass_with_warnings, cp-final-review approved by explicit user decision
+    (dec-004): close without AC-24's manual verification. Per sddl-qa-review's own rule, this
+    does NOT set lifecycle_status completed -- it stays reviewing, with AC-24 tracked as a
+    permanently-open item at docs/todo/E4/manual-verification.md item 2 (same pattern as
+    [E4.F2.H1]'s own still-open AC-24). All 24 automatable ACs (plus AC-25 from Amendment 1)
+    satisfied and independently re-verified across 2 QA/review passes. Everything else this
+    story can do autonomously is done: ST-1 through ST-6 complete, 4R review + scoped re-review
+    both closed, final QA closed. Per CLAUDE.md: never open a PR unless the user explicitly asks.
+    Offer the PR "[E4.F2.H2] engines/opencode adapter" (Closes #29) and wait for the user's go.
+    Never merge, never push main; max 5 open PRs (currently 0).
+created_at: "2026-08-16T00:00:00Z"
+updated_at: "2026-08-16T02:10:00Z"
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/proposal.md
+  spec: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/spec.md
+  design: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/design.md
+  plan: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f2-h2-opencode-adapter/qa-report.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:10:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:20:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:40:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:50:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-1
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T00:50:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-2
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T01:05:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-3
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T01:15:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-4
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T01:35:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-5
+    status: skipped
+    decided_by: user
+    decided_at: "2026-08-16T03:10:00Z"
+    summary: >-
+      Superseded by cp-final-review/dec-004: user chose to close the story without ST-5's manual
+      AC-24 run. ST-5's automated closing-gate portion (npm run check/test, scope check) was still
+      run and recorded in execution-log.md; only the manual CLI invocation was skipped.
+  - id: cp-review-gate-r1-001
+    type: review_gate
+    stage: sddl-code-review
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T02:20:00Z"
+    decision: amend-spec-and-fix-in-story
+    finding_ref: R1-001
+    summary: >-
+      4R review returned FAIL on one CRITICAL introduced finding. Fixing it requires amending
+      approved AC-18, so the route is a user decision between: (1) amend spec + bounded fix stage
+      in this story (recommended), (2) ship as-is and record a known defect for a follow-up, or
+      (3) escalate to a cross-cutting design decision covering the claude-code sibling too.
+      RESOLVED: user chose (1). spec.md amended (AC-25 added, AC-18 reworded), design.md amended
+      (assertCleanExit mechanism + normative ordering), plan.md gained ST-6 with ST-5
+      re-sequenced to depend on it.
+  - id: cp-st6-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-6
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T02:30:00Z"
+  - id: cp-final-review
+    type: final_review
+    stage: sddl-qa-review
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-16T03:10:00Z"
+    decision: close-without-ac24-manual-verification
+    summary: >-
+      Final QA verdict pass_with_warnings. User explicitly accepted closing without ST-5's
+      manual AC-24 run ("quiero avanzar sin la validacion manual"). Recorded as dec-004.

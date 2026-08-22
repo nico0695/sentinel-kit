@@ -18,8 +18,8 @@ complexity_assessment:
     made atomic with partial runs identifiable.
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
-lifecycle_status: draft
-current_stage: sddl-proposal
+lifecycle_status: planning
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -43,7 +43,25 @@ stages:
       spec, three of them B-level. E5.F2.H3 (cost/tokens) treated as out of scope per workflow
       contract rule 7 (optional stories skipped unless requested).
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T13:15:00Z"
+    completed_at: "2026-08-22T13:35:00Z"
+    notes: >-
+      spec.md written, status complete, 18 acceptance criteria. All six proposal open questions
+      resolved (D1..D6); the three B-level ones carry recommendations pending ratification at
+      cp-spec-approval. Grounded in direct verification rather than assumption: confirmed
+      RepoRegistrySchema is z.record(z.string(), RepoEntrySchema) so repos are keyed by NAME,
+      which settles the <repo> path segment (D5); confirmed src/core/workspace/helpers.ts
+      (repoBasename, sanitizeBranchLabel, deriveWorktreePath) is NOT exported from the workspace
+      barrel, so history cannot reuse it and must validate its own path segment; confirmed
+      ReviewUsage fields are inputTokens/outputTokens/totalTokens, TerminalState is the five-value
+      union, and Verdict is approve|request-changes|comment, so the metadata.json contract in the
+      spec quotes real field names rather than plausible ones; confirmed RunStage IS exported from
+      run/index.ts, which let AC-13 tighten failure.stage from a loose string to the pipeline's own
+      union. Also confirmed no atomic-write precedent exists in the repo (config-store-yaml writes
+      directly) while mkdtemp is precedented in the opencode permission-config adapter -- hence D3
+      stages inside the runs root rather than in os.tmpdir(), since rename across filesystems
+      fails with EXDEV.
   sddl-design:
     status: pending
   sddl-plan:
@@ -76,34 +94,86 @@ checkpoints:
       Approve the proposal and proceed to sddl-spec for [E5.F2.H1] RunStore full persistence?
     free_input_allowed: true
     created_at: "2026-08-22T13:10:00Z"
-decisions: []
+    response:
+      free_text: "si, avanza con el spec"
+      responded_at: "2026-08-22T13:15:00Z"
+    resolved_at: "2026-08-22T13:15:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete with 18 acceptance criteria. Three B-level decisions (D1 metadata source,
+      D2 the store's caller, D3 atomicity strategy) are resolved with recommendations and need
+      ratification, because D1 in particular determines whether this story touches src/core/run at
+      all.
+    question: >-
+      Ratify D1 (the caller composes a RunRecord; runReview stays byte-identical), D2 (port and
+      adapter ship with no caller, wiring deferred to E6.F1) and D3 (staging directory inside the
+      runs root plus a single rename, no completion marker), and proceed to sddl-design?
+    options:
+      - id: opt-ratify-all
+        label: Ratify all three and proceed to design
+        description: >-
+          Accept D1/D2/D3 as specified. This story stays entirely inside src/core/history and
+          src/adapters/driven/storage, with an empty diff over src/core/run.
+        recommended: true
+      - id: opt-d1-grow-result
+        label: Reject D1 -- grow RunReviewResult instead
+        description: >-
+          Have runReview carry harness, branch and duration on its result the way [E4.F2.H3] did
+          for engineName. Requires amending the scope boundary, AC-2 and AC-3 before design, and
+          makes runReview responsible for measuring wall-clock duration.
+      - id: opt-d3-marker
+        label: Reject D3 -- ordered write plus completion marker
+        description: >-
+          Write files in a fixed order into the final directory with a marker file written last.
+          Simpler to implement, but every reader must then know the marker rule, and a partial run
+          occupies the real run path rather than an obviously-partial one.
+    free_input_allowed: true
+    created_at: "2026-08-22T13:35:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-approval
+    free_text: "si, avanza con el spec"
+    rationale: >-
+      User approved the proposal and directed the spec stage to run. Authorship: claude->user.
+    recorded_at: "2026-08-22T13:15:00Z"
 open_risks:
   - id: risk-001
     summary: >-
-      The backlog requires engine/harness/branch/state/duration in the persisted metadata, but
-      RunReviewResult carries only state and engineName. Sourcing the remaining three determines
-      the port signature and how much of the run module this story must touch; choosing wrong
-      would force a runReview pipeline change this story has no mandate to make.
-    severity: medium
+      RESOLVED by D1 pending ratification. The caller composes the RunRecord, so runReview needs no
+      change; AC-3 pins its diff as empty. Reopens only if cp-spec-approval selects opt-d1-grow-result.
+    severity: low
   - id: risk-002
     summary: >-
-      Atomicity is required over a directory of four files, not a single file, so the standard
-      write-tmp-then-rename idiom does not transfer unexamined. AC-3 ("partial run identifiable")
-      is satisfiable by a staging dir plus one rename or by an ordered write with a completion
-      marker written last, and the two differ in what a reader must know.
-    severity: medium
+      RESOLVED by D3 pending ratification. Staging inside the runs root plus one rename; AC-11 pins
+      the same-filesystem requirement that makes rename safe, which an os.tmpdir() staging area
+      would violate with EXDEV.
+    severity: low
   - id: risk-003
     summary: >-
       "Nothing sensitive persisted" needs a decidable, testable definition. The prompt legitimately
-      contains the repo's own diff; the real hazards are narrower -- failure.error is typed unknown
-      and may be a raw exception carrying a command line or environment in its message or stack.
-      Without a precise rule and a test pinning it, this AC degrades into an untested assertion.
-    severity: medium
+      contains the repo's own diff, which is the point rather than a leak; the real hazard is
+      narrower -- RunReviewResult.failure.error is typed unknown and may be a raw exception whose
+      message or stack carries a command line or environment. Largely addressed by D4 plus AC-13
+      (RunRecord.failure is a typed { stage: RunStage; message: string }, so a raw exception cannot
+      structurally reach the store) and by AC-15 (a decoy-token test). Residual risk is that AC-15
+      must be written to actually discriminate -- asserting the token is absent from metadata.json
+      while present in the files whose contract is to carry it verbatim -- rather than merely to pass.
+    severity: low
+  - id: risk-004
+    summary: >-
+      With a write-only port (D6), RunStore.contract.ts can only assert what is observable through
+      save, so the on-disk assertions live in the non-portable fs-adapter test. The shared suite is
+      therefore thin by deliberate choice; [E5.F2.H2] is where it thickens. Recorded so a later
+      reviewer does not read the thinness as an oversight rather than a stated trade-off.
+    severity: low
 next_action:
   kind: wait_for_approval
-  target: cp-proposal-approval
+  target: cp-spec-approval
   summary: >-
-    Await user approval of proposal.md before running sddl-spec, which must resolve the metadata
-    source, the store's caller, and the atomicity strategy as firm acceptance criteria.
+    Await ratification of the three B-level decisions before running sddl-design. D1 is the
+    consequential one: if the caller does not compose the RunRecord, the scope boundary, AC-2 and
+    AC-3 all change and spec must be amended first.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T13:10:00Z"
+updated_at: "2026-08-22T13:35:00Z"

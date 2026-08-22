@@ -120,7 +120,7 @@ stages:
       the execution log instead of silently omitting evidence.
     last_updated_at: "2026-08-22T15:00:00Z"
   sddl-executor:
-    status: in_progress
+    status: completed
     started_at: "2026-08-22T15:05:00Z"
     notes: >-
       ST-1 (core port surface) completed. RunStore/RunRecord/RunDiffSummary/RunFailureRecord,
@@ -145,9 +145,23 @@ stages:
       in RunPersistenceError too, matching AC-20's "every raw fs failure" scope. Non-vacuity
       proven by mutation: disabled the collision pre-check, the AC-13 test still failed but
       instructively (rename's ENOTEMPTY backstop engaged, surfacing RunPersistenceError instead
-      of RunAlreadyExistsError -- risk-005 observed live). Reverted, re-verified clean. ST-4
-      remains pending.
-    last_updated_at: "2026-08-22T15:55:00Z"
+      of RunAlreadyExistsError -- risk-005 observed live). Reverted, re-verified clean.
+      ST-4 (fs-specific tests + closing gate) completed: extended run-store-fs.test.ts
+      (+224/-7, 8 new tests, no production file changed), npm run check green (depcruise: 72
+      modules, 142 deps, unchanged from ST-3), npm test 326/326 (318+8). Three targeted
+      mutations: (1) removed staging cleanup on failure -- secondary assertion caught it,
+      load-bearing assertion correctly unaffected; (2) made the adapter read Date.now()
+      instead of record.startedAtEpochMs -- determinism test failed immediately with the
+      exact fake-timer values, proving real clock independence; (3) a red-herring mutation
+      (stray post-rename directory) hit an unreachable path for the failure-injection test --
+      recognized and discarded rather than counted as a pass. All reverted, suite re-verified
+      clean. AC-17 inspection: grep for process.env across all new/edited files -- zero
+      matches. CLOSING GATE: git diff --stat -- src/core/run empty (AC-3 holds across the
+      whole story); full 10-file story diff confined to src/core/history/** and
+      src/adapters/driven/storage/** exactly, matching plan.md plus the two flagged
+      deviations; depcruise confirms AC-21's guards. All 21 ACs from spec.md revision 2 now
+      covered. plan.md's ST-1..ST-4 fully executed.
+    last_updated_at: "2026-08-22T16:15:00Z"
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -303,6 +317,24 @@ checkpoints:
       free_text: "si, arranca con ST-3"
       responded_at: "2026-08-22T15:45:00Z"
     resolved_at: "2026-08-22T15:55:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4 (fs-specific tests + closing gate) approved to start by "si, arranca con ST-4",
+      and completed cleanly: npm run check and npm test both green (326/326), three targeted
+      mutations prove non-vacuity, AC-17 verified by inspection with zero process.env hits.
+      Closing gate confirms AC-3 (empty src/core/run diff) and AC-21 (architecture guards)
+      across the full 10-file story diff. All 21 ACs covered.
+    question: >-
+      plan.md's ST-1..ST-4 are complete. Proceed to sddl-code-review (4R protocol) before
+      sddl-qa-review?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:55:00Z"
+    response:
+      free_text: "si, arranca con ST-4"
+      responded_at: "2026-08-22T15:55:00Z"
+    resolved_at: "2026-08-22T16:15:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -366,10 +398,10 @@ open_risks:
     severity: low
 next_action:
   kind: ask_user
-  target: ST-4
+  target: sddl-code-review
   summary: >-
-    ST-3 complete and validated. Await approval to start ST-4 (fs-specific atomicity and
-    determinism tests appended to run-store-fs.test.ts, and the story's closing gate
-    re-verifying AC-3's empty diff over src/core/run and the architecture guards).
+    plan.md's ST-1..ST-4 are all complete and validated; all 21 ACs covered. Recommended next
+    stage is sddl-code-review (4R protocol) before sddl-qa-review, per execution-log.md's
+    ST-4 recommendation.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T15:55:00Z"
+updated_at: "2026-08-22T16:15:00Z"

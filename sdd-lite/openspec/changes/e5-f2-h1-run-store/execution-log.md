@@ -137,3 +137,67 @@
   and determinism halves are ST-4's job (they need fs-level assertions this stage's contract suite
   deliberately does not make, per `risk-004`).
 - **Status**: completed.
+
+## Stage ST-4 — fs-specific tests and closing gate
+
+- **Goal**: on-disk file set/omissions, byte-for-byte content, zero-padded validation logs,
+  atomicity via mid-staging failure injection, clockless determinism, the
+  pre-existing-directory-unmodified half of AC-13, the decoy-token test observed on disk; the
+  story's closing gate.
+- **Files touched**: `src/adapters/driven/storage/__test__/run-store-fs.test.ts` (edit — extended,
+  not created, per the ST-3 deviation note above; +224/-7 lines, 8 new tests across 3 new
+  `describe` blocks). No production file changed.
+- **Non-vacuity proof (mutation), three separate mutations, each targeted so it would only be
+  caught by the specific test it was meant to stress**:
+  1. **AC-11 (atomicity)**: removed the best-effort staging-directory cleanup from the failure
+     `catch` block. The atomicity test's load-bearing assertion (`finalDir` absent) still passed —
+     correctly, since that assertion doesn't depend on cleanup — but its secondary assertion
+     (`stagingDir` absent) failed with a clear diff (`expected true to be false`), proving that
+     assertion is live, not vacuous. Reverted.
+  2. **AC-14 (clockless)**: changed `formatRunTimestamp(record.startedAtEpochMs)` to
+     `formatRunTimestamp(Date.now())` — i.e. made the adapter read the wall clock. The determinism
+     test failed immediately: `expected .../20991231T235959999Z to be .../20200101T000000000Z` —
+     the exact two fake-timer values from the test, proving the assertion genuinely exercises
+     clock independence rather than passing by coincidence. Reverted.
+  3. A red herring worth recording rather than hiding: an initial mutation attempt (leaving a
+     stray directory behind after a *successful* rename) did not fail any test, because the
+     mutated code path is unreachable from the atomicity test's *failure*-injection scenario.
+     Recognized this as testing the wrong path, discarded it, and moved to mutation #1 above
+     instead of counting the non-result as a pass.
+  - All three reverted; `git diff -- src/adapters/driven/storage/run-store-fs.ts` empty after each
+    revert; full suite re-verified clean (326/326) after the final revert.
+- **AC-17 inspection** (no automated test, per design.md's explicit deferral — an absence isn't
+  observable through the port): `grep -rn "process\.env" src/core/history
+  src/adapters/driven/storage/run-store-fs.ts src/adapters/driven/storage/run-layout.ts
+  src/adapters/driven/storage/index.ts` — **zero matches**. Recorded here as the evidence, not
+  merely asserted.
+- **Validation**:
+  - `npm run check`: biome clean (101 files) after one mechanical reformat / `tsc --noEmit` clean /
+    `depcruise src`: "no dependency violations found (72 modules, 142 dependencies cruised)" —
+    unchanged from ST-3, confirming ST-4 added no new import edge.
+  - `npm test`: 326/326 (318 + 8 new).
+  - **Closing gate**:
+    - `git diff --stat -- src/core/run`: empty. **AC-3 holds across the entire story.**
+    - Full story diff (`git diff 628e72b~1..HEAD -- src/` plus the ST-4 working-tree delta):
+      10 files — exactly `src/core/history/index.ts` (edit) + 3 new files under
+      `src/core/history/ports/` + `src/adapters/driven/storage/index.ts` (edit) + 2 new files under
+      `src/adapters/driven/storage/` + 3 new files under `src/adapters/driven/storage/__test__/`.
+      No file outside `src/core/history/**` and `src/adapters/driven/storage/**`. No adapter other
+      than `storage`. No `src/main/` file. Matches plan.md's ST-1..ST-4 file lists plus the two
+      explicitly flagged deviations (ST-1's biome reorder, ST-3's driver-file creation), and
+      nothing else.
+    - `depcruise src` (rerun standalone above): confirms `src/core/history/**` imports nothing from
+      `src/adapters/**`/`src/main/**`, and `src/adapters/driven/storage/**` imports no other
+      adapter (`adapters-isolated` guard) — **AC-21 holds.**
+- **AC coverage this stage**: AC-4 (on-disk field presence, cross-checked against ST-2's
+  string-level proof), AC-5/AC-6 (byte-for-byte `result.md`/`prompt.md`), AC-7 (zero-padded
+  `validations/NNN.log`, in order), AC-8 (omission of each optional artifact), AC-11/AC-12
+  (atomicity, mutation-proven), AC-13's pre-existing-directory-unmodified half (implicit in the
+  contract suite's ST-3 test, re-confirmed here at the fs level), AC-14 (clockless determinism,
+  mutation-proven, plus the same-timestamp stale-staging-remnant retry clause), AC-17 (inspection,
+  zero `process.env` hits), AC-18 (decoy token confirmed on disk: present in `prompt.md`/
+  `result.md`/`validations/001.log`, absent from `metadata.json`), AC-21 (architecture guards,
+  depcruise). **All 21 acceptance criteria from spec.md revision 2 are now covered by this
+  story.**
+- **Status**: completed. This is the story's closing gate; `sddl-executor`'s plan.md is fully
+  executed. Recommended next: `sddl-code-review` (4R protocol) before `sddl-qa-review`.

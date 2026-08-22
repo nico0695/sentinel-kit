@@ -141,3 +141,34 @@ None.
 ### Next action
 
 `sddl-code-review` (4R protocol) over the whole-story diff, then `sddl-qa-review` in final mode.
+
+## ST-5 — Fix stage (review-ledger.md R3-001, R4-001)
+
+- **Approval reference**: `cp-review-gate` (user: "Sí, arreglá ambos (recomendado)") authorized this fix stage; `cp-st5-approval` records the same response as this stage's own `stage_approval`.
+- **Planned scope**: `src/adapters/driven/storage/run-store-fs.ts` (edit), `src/adapters/driven/storage/__test__/run-store-fs.test.ts` (edit).
+- **Actual changed files**: exactly the planned set. No deviation.
+
+### What was implemented
+
+- **R3-001 fix**: `get()`'s `metadata === "missing"` branch now checks `exists(finalDir)` before falling back to the staging-sibling check. A final directory that exists but has lost its `metadata.json` now throws `RunCorruptedError`, matching `list()`'s classification of the identical on-disk state, instead of `RunNotFoundError`. `RunNotFoundError` is now reserved for the case where `finalDir` genuinely doesn't exist (and no `.partial-<id>` staging remnant exists either).
+- **R4-001 fix**: `list()`'s per-entry `readMetadata` call now catches ANY failure (not just the ones `readMetadata` itself classifies) and degrades that one entry to `status: "corrupt"` rather than rethrowing out of the `for` loop. **A-level decision, recorded here**: this resolves the tension the review identified between spec.md's AC-7 ("one corrupt or partial entry never prevents other entries... from being returned correctly") and AC-14 ("every raw fs or JSON failure... surfaces as a typed error") in favor of AC-7's graceful-degradation intent, since a caller that specifically needs to know about a raw fs failure on one run still gets it distinctly through `get(repoName, id)` on that same id (unaffected by this change — `get()`'s own raw-error path still throws `RunPersistenceError`). Judged technical, reversible, and within the already-authorized fix scope (the review's own finding named this exact resolution as the fix), so no separate consultation was raised beyond the blanket fix authorization already given.
+
+### Quick checks
+
+- `npm run check`: green (one mechanical biome `--write` for a line-wrap format nit; `tsc --noEmit` clean; `depcruise`: 76 modules, 152 deps, 0 violations — unchanged).
+- `npm test`: 362/362 (360 + 2 new regression tests).
+- `git diff --stat -- src/core/run`: empty.
+- **Non-vacuity proof (mutation), R3-001**: reverted the `finalDirExists` check (restored the pre-fix logic). The new "rejects a final dir that exists but has no metadata.json..." test failed for the right reason (`RunNotFoundError` received where `RunCorruptedError` was expected). Reverted the mutation, re-verified clean.
+- **Non-vacuity proof (mutation), R4-001**: reverted the per-entry catch to rethrow as `RunPersistenceError` (pre-fix logic). The new "a raw non-ENOENT failure reading ONE entry's metadata..." test failed for the right reason (the whole `list()` call rejected with `RunPersistenceError` instead of returning both entries with the bad one marked `corrupt`). Reverted the mutation, re-verified clean (362/362, `npm run check` green).
+
+### Scoped re-review outcome
+
+Both fix deltas resolve their findings exactly as authorized, touch nothing else, and are independently verified above by mutation (not merely by re-reading the code). Recorded in `review-ledger.md`'s Fix Rounds table; both findings' `Status` updated `open` → `fixed`.
+
+### Blockers
+
+None.
+
+### Next action
+
+`sddl-qa-review` in final mode (the 4R review's remaining `info` findings — R2-001, R2-002, R3-002, R3-003 — are non-blocking and not part of this fix stage's scope; they were surfaced to the user as optional follow-up, not required for this story).

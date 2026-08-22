@@ -307,14 +307,17 @@ export function createRunStoreFsAdapter(runsRoot: string): RunStore {
           continue;
         }
 
+        /* A raw (non-ENOENT) failure reading THIS entry's metadata — e.g.
+         * EACCES, EMFILE — degrades only this entry to `corrupt` rather
+         * than aborting the whole list() call: one bad entry must never
+         * take every other already-classified run down with it (AC-7). A
+         * caller that needs to know about the raw failure specifically
+         * still gets it from `get()`, which is unaffected by this change. */
         let metadata: MetadataReadResult;
         try {
           metadata = await readMetadata(join(repoDir, classified.id));
-        } catch (err: unknown) {
-          throw new RunPersistenceError(
-            `Failed to read metadata for run ${repoName}/${classified.id}`,
-            { cause: err },
-          );
+        } catch {
+          metadata = "corrupt";
         }
 
         finals.set(
@@ -373,6 +376,24 @@ export function createRunStoreFsAdapter(runsRoot: string): RunStore {
         throw new RunCorruptedError(repoName, id);
       }
       if (metadata === "missing") {
+        /* readMetadata's ENOENT alone can't tell "finalDir doesn't exist"
+         * apart from "finalDir exists but metadata.json is gone" — both
+         * fail readFile the same way. Check finalDir itself first so this
+         * matches list()'s classification of the identical on-disk state
+         * (a present-but-metadata-less dir is corrupt, not not-found). */
+        let finalDirExists: boolean;
+        try {
+          finalDirExists = await exists(finalDir);
+        } catch (err: unknown) {
+          throw new RunPersistenceError(
+            `Failed to check for run directory at ${finalDir}`,
+            { cause: err },
+          );
+        }
+        if (finalDirExists) {
+          throw new RunCorruptedError(repoName, id);
+        }
+
         let partialExists: boolean;
         try {
           partialExists = await exists(stagingDir);

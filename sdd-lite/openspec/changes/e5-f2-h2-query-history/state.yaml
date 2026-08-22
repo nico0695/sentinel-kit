@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-22T18:00:00Z"
 lifecycle_status: reviewing
-current_stage: sddl-plan
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -181,7 +181,17 @@ stages:
       mechanism is an implementation detail within the already-authorized fix scope. ST-1..ST-4
       statuses corrected from pending to completed in plan.md's table (plan-authoring artifact,
       not a re-open -- all four were already done).
-    last_updated_at: "2026-08-22T22:35:00Z"
+      ST-5 (fix stage) completed at 2026-08-22T22:50:00Z. R3-001 fix: get()'s missing branch
+      checks exists(finalDir) first. R4-001 fix: list()'s per-entry catch degrades that one
+      entry to corrupt instead of rethrowing (A-level decision resolving the AC-7/AC-14 tension
+      in favor of AC-7, per the review's own recommendation). npm run check green (depcruise: 76
+      modules, 152 deps, unchanged), npm test 362/362 (360+2 new regression tests). Exactly the
+      2 planned files touched, no deviation. Non-vacuity proven by mutation for BOTH fixes
+      independently: reverting each one made its dedicated regression test fail for the exact
+      claimed reason, re-applying restored a clean suite. git diff --stat -- src/core/run empty.
+      review-ledger.md updated: both findings open -> fixed, verdict fail -> pass_with_warnings,
+      0 open severe findings, 4 info rows remain (non-blocking).
+    last_updated_at: "2026-08-22T22:50:00Z"
   sddl-qa-review:
     status: pending
 artifacts:
@@ -491,46 +501,44 @@ open_risks:
     severity: low
   - id: risk-004
     summary: >-
-      OPEN. review-ledger.md R3-001 (mapped from CRITICAL): get() misreports a corrupted run
-      (final dir exists, metadata.json absent, no .partial- sibling) as RunNotFoundError instead
-      of RunCorruptedError, contradicting list()'s classification of the identical state.
-      Independently re-verified by the orchestrator via direct code read, not merely trusted
-      from the lens. Requires a fix stage; awaiting review_gate authorization (cp-review-gate).
-    severity: high
+      CLOSED by ST-5. review-ledger.md R3-001: get() misreported a corrupted run (final dir
+      exists, metadata.json absent, no .partial- sibling) as RunNotFoundError instead of
+      RunCorruptedError. Fixed: get() now checks exists(finalDir) before the staging-sibling
+      fallback. Non-vacuity proven by mutation (revert -> dedicated regression test fails for
+      the exact reason -> re-apply -> clean).
+    severity: low
   - id: risk-005
     summary: >-
-      OPEN. review-ledger.md R4-001 (mapped from CRITICAL): list() aborts the entire listing
-      when ONE entry hits a raw non-ENOENT fs error while reading its metadata.json, instead of
-      degrading just that entry -- contradicting AC-7's "none affecting the others" intent.
-      Independently re-verified by the orchestrator via direct code read. Requires a fix stage;
-      awaiting review_gate authorization (cp-review-gate).
-    severity: high
+      CLOSED by ST-5. review-ledger.md R4-001: list() aborted the entire listing when ONE entry
+      hit a raw non-ENOENT fs error reading its metadata.json. Fixed: that one entry now
+      degrades to status corrupt instead of aborting the call (A-level decision resolving the
+      AC-7/AC-14 tension in favor of AC-7's graceful-degradation intent). Non-vacuity proven by
+      mutation.
+    severity: low
 review_summary:
   mode: 4r
-  verdict: fail
+  verdict: pass_with_warnings
   round: 1
   counts:
-    confirmed: 2
+    confirmed: 0
     suspect: 0
     escalated: 0
     info: 4
   summary: >-
-    full-4r tier (1296 changed lines). 4 lens sweeps: R1 clean (specifically probed
-    path-traversal and unsafe deserialization, both correctly guarded and tested); R2 found 2
-    info-tier decomposition suggestions; R3 found 1 CRITICAL (get()/list() classification
-    mismatch for a corrupted-but-present run) plus 2 WARNING robustness gaps in validation-log
-    reading; R4 found 1 CRITICAL (list() aborts entirely on one entry's raw fs error instead of
-    degrading that entry). 0 refuter passes -- both CRITICALs are deterministic, independently
-    re-verified by the orchestrator through direct code reading before merging. 2 open severe
-    findings, both real correctness defects this story introduced.
-  reported_at: "2026-08-22T22:20:00Z"
+    full-4r tier (1296 changed lines). 4 lens sweeps: R1 clean; R2 found 2 info-tier
+    decomposition suggestions; R3 found 1 CRITICAL (get()/list() classification mismatch) plus 2
+    WARNING robustness gaps in validation-log reading; R4 found 1 CRITICAL (list() aborts
+    entirely on one entry's raw fs error). 0 refuter passes -- both CRITICALs deterministic,
+    independently re-verified by the orchestrator before merging. Both CRITICALs fixed in ST-5
+    (user-authorized at cp-review-gate), each fix independently proven by mutation. 0 open
+    severe findings remain; 4 info rows (non-blocking) carried forward as optional follow-up.
+  reported_at: "2026-08-22T22:50:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    ST-5 (fix stage) authorized and appended to plan.md. Proceeding with sddl-executor to
-    implement the R3-001/R4-001 fixes, then a scoped re-review against the frozen ledger, then
-    final QA.
+    ST-5 fix stage complete, both CRITICAL findings fixed and verified. review-ledger.md verdict
+    pass_with_warnings, 0 open severe findings. Proceeding to sddl-qa-review in final mode.
 created_at: "2026-08-22T17:50:00Z"
 updated_at: "2026-08-22T21:50:00Z"

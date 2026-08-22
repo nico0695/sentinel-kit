@@ -435,6 +435,30 @@ describe("createRunStoreFsAdapter — get() on partial/corrupt (AC-11)", () => {
       RunCorruptedError,
     );
   });
+
+  it("rejects a final dir that exists but has no metadata.json and no .partial- sibling with RunCorruptedError, not RunNotFoundError (review-ledger R3-001)", async () => {
+    runsRoot = mkdtempSync(join(tmpdir(), "sentinel-runstore-get-"));
+    mkdirSync(join(runsRoot, "sentinel-kit", TS), { recursive: true });
+    const adapter = createRunStoreFsAdapter(runsRoot);
+
+    // list() already classifies this exact state as corrupt — get() must agree.
+    const runs = await adapter.list("sentinel-kit");
+    expect(runs).toEqual([
+      {
+        id: TS,
+        repoName: "sentinel-kit",
+        startedAtEpochMs: 1787404200123,
+        status: "corrupt",
+      },
+    ]);
+
+    await expect(adapter.get("sentinel-kit", TS)).rejects.toBeInstanceOf(
+      RunCorruptedError,
+    );
+    await expect(adapter.get("sentinel-kit", TS)).rejects.not.toBeInstanceOf(
+      RunNotFoundError,
+    );
+  });
 });
 
 describe("createRunStoreFsAdapter — query input validation (AC-13)", () => {
@@ -514,6 +538,50 @@ describe("createRunStoreFsAdapter — raw fs failure translation on read (AC-14)
       await expect(adapter.list("sentinel-kit")).rejects.toBeInstanceOf(
         RunPersistenceError,
       );
+    } finally {
+      rmSync(runsRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("a raw non-ENOENT failure reading ONE entry's metadata degrades only that entry to corrupt — the whole list() call never aborts (review-ledger R4-001)", async () => {
+    vi.resetModules();
+    const runsRoot = mkdtempSync(join(tmpdir(), "sentinel-runstore-fail-"));
+    const repoDir = join(runsRoot, "sentinel-kit");
+    const goodTs = "20260822T131000000Z";
+    const badTs = "20260822T131000001Z";
+    writeRawMetadata(join(repoDir, goodTs), VALID_METADATA_JSON);
+    mkdirSync(join(repoDir, badTs), { recursive: true });
+    const realFs =
+      await vi.importActual<typeof import("node:fs/promises")>(
+        "node:fs/promises",
+      );
+    vi.doMock("node:fs/promises", () => ({
+      ...realFs,
+      readFile: async (
+        ...args: Parameters<typeof realFs.readFile>
+      ): ReturnType<typeof realFs.readFile> => {
+        const [path] = args;
+        if (typeof path === "string" && path.includes(badTs)) {
+          throw Object.assign(new Error("EACCES: simulated"), {
+            code: "EACCES",
+          });
+        }
+        return realFs.readFile(...args);
+      },
+    }));
+
+    try {
+      const { createRunStoreFsAdapter: createAdapterMocked } = await import(
+        "../run-store-fs.js"
+      );
+      const adapter = createAdapterMocked(runsRoot);
+
+      const runs = await adapter.list("sentinel-kit");
+
+      expect(runs).toHaveLength(2);
+      const byId = new Map(runs.map((r) => [r.id, r.status]));
+      expect(byId.get(goodTs)).toBe("ok");
+      expect(byId.get(badTs)).toBe("corrupt");
     } finally {
       rmSync(runsRoot, { recursive: true, force: true });
     }

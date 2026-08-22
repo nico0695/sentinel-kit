@@ -16,7 +16,7 @@ complexity_assessment:
     this story's acceptance criterion asks for.
   confidence: medium-high
   recorded_at: "2026-08-22T18:00:00Z"
-lifecycle_status: implementing
+lifecycle_status: reviewing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -152,7 +152,24 @@ stages:
       deferred to ST-4 as originally planned, not silently discovered there. Sort call kept
       (still correct/defensive). Attempt 2 (usage.inputTokens reconstruction) succeeded as a
       real non-vacuity proof.
-    last_updated_at: "2026-08-22T21:20:00Z"
+      ST-4 (planted-state tests + closing gate) completed: 14 new tests across 5 describe blocks,
+      all planting real on-disk state directly (mkdirSync/writeFileSync) rather than only via
+      save(). Covers AC-4 (partial inclusion + final-wins dedupe), AC-6 (all 4 corrupt cases:
+      missing/invalid-json/missing-field/wrong-version), AC-7 (mixed listing), AC-11 (get() on
+      partial/corrupt), AC-12 (stray entries ignored), AC-13 (path-traversal rejection, no-fs-
+      access proof), AC-14 (raw fs failure translation via vi.doMock), and AC-2's real proof
+      (mocked readdir returning reverse order, list() still ascending -- the test ST-3's
+      attempt-1 mutation showed was missing). npm run check green (depcruise: 76 modules, 152
+      deps, unchanged), npm test 360/360 (346+14). AC-17 verified: grep for process.env across
+      all production files in src/core/history and src/adapters/driven/storage, zero matches.
+      Non-vacuity proven by mutation: swapped the list() merge order so partial would win over
+      final, the new coexistence test failed for the right reason, reverted, re-verified clean.
+      CLOSING GATE: git diff --stat -- src/core/run empty against origin/main (AC-15 holds for
+      the whole story); full story diff exactly the 14 code files plan.md's ST-1..ST-4 named
+      collectively, confined to src/core/history/** and src/adapters/driven/storage/**;
+      depcruise confirms all 4 architecture guards. All 15 ACs from spec.md revision 2 covered.
+      plan.md's ST-1..ST-4 fully executed.
+    last_updated_at: "2026-08-22T21:50:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -304,6 +321,24 @@ checkpoints:
       free_text: "ejecutar todo modo auto"
       responded_at: "2026-08-22T20:10:00Z"
     resolved_at: "2026-08-22T21:20:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4 (planted-state tests + closing gate) approved to start by the same blanket auto-mode
+      authorization, and completed cleanly: npm run check and npm test both green (360/360),
+      non-vacuity proven by mutation, AC-17 verified by inspection with zero process.env hits.
+      Closing gate confirms AC-15 (empty src/core/run diff) and all 4 architecture guards across
+      the full 14-file story diff. All 15 ACs covered.
+    question: >-
+      plan.md's ST-1..ST-4 are complete. Proceed to sddl-code-review (4R protocol) before
+      sddl-qa-review?
+    free_input_allowed: true
+    created_at: "2026-08-22T21:50:00Z"
+    response:
+      free_text: "ejecutar todo modo auto"
+      responded_at: "2026-08-22T20:10:00Z"
+    resolved_at: "2026-08-22T21:50:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -362,18 +397,16 @@ open_risks:
     severity: low
   - id: risk-003
     summary: >-
-      OPEN, tracked for ST-4. list()'s explicit .sort() is unproven by the portable contract
-      suite on this environment's filesystem (readdir happened to already return ascending
-      order for the test fixture). AC-2 requires proof via a mocked readdir returning entries
-      out of order -- design's own validation hint, deferred to ST-4 as planned. Not a code
-      defect (the sort call is present and correct); a test-coverage gap that ST-4 is scoped to
-      close.
+      CLOSED by ST-4. list()'s explicit .sort() was unproven by the portable contract suite on
+      this environment's filesystem (readdir happened to already return ascending order for the
+      test fixture). ST-4 added the real proof design's AC-2 validation hint called for: a
+      mocked readdir forced to return entries in reverse chronological order, asserting list()
+      still returns them ascending.
     severity: low
 next_action:
   kind: user_checkpoint
   summary: >-
-    ST-3 complete (impure list()/get() + contract thickening). Awaiting approval to proceed to
-    ST-4 (fs-specific planted-state tests + closing gate), already covered by the blanket
-    auto-mode authorization.
+    plan.md's ST-1..ST-4 all complete. Awaiting approval to proceed to sddl-code-review (4R
+    protocol) before sddl-qa-review, already covered by the blanket auto-mode authorization.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T21:20:00Z"
+updated_at: "2026-08-22T21:50:00Z"

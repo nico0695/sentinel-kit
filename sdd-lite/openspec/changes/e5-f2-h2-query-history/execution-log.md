@@ -7,7 +7,7 @@
 | ST-1 | Core surface: port extension, RunMetadataSchema, errors, use cases, barrel | completed |
 | ST-2 | Pure adapter functions: parseRunTimestamp, classifyRunDirEntry | completed |
 | ST-3 | Impure list()/get() flows + RunStore.contract.ts thickening | completed |
-| ST-4 | Planted-state tests + closing gate | pending |
+| ST-4 | Planted-state tests + closing gate | completed |
 
 ## ST-1 — Core surface
 
@@ -103,3 +103,41 @@ None.
 ### Next action
 
 ST-4: fs-specific planted-state tests (partial/corrupt/stray-entry/dedupe/injection, including the readdir-order-independence proof AC-2 actually needs — see the attempt-1 finding above) and the story's closing gate, pending its own stage_approval (already covered by the blanket auto-mode authorization).
+
+## ST-4 — Planted-state tests + closing gate
+
+- **Approval reference**: blanket auto-mode authorization, same as ST-1/ST-2/ST-3.
+- **Planned scope**: `src/adapters/driven/storage/__test__/run-store-fs.test.ts` (edit).
+- **Actual changed files**: exactly the planned set. No deviation.
+
+### What was implemented
+
+14 new tests, added as 5 new `describe` blocks, all planting real on-disk state (via `mkdirSync`/`writeFileSync`) rather than only going through `save()`:
+
+- **`list()` partial/corrupt classification (AC-4..AC-8)**: a lone `.partial-<ts>` → `partial`; same-id `<ts>` + `.partial-<ts>` coexistence → final wins, single `ok` entry (AC-4); missing `metadata.json`, invalid JSON, a required field dropped, and `version: 2` → `corrupt` (AC-6, all 4 cases design named); one `list()` call with an `ok` + a `partial` + a `corrupt` entry together, none affecting the others (AC-7); a stray file (`.DS_Store`) and a non-ts-named directory → silently ignored, not listed (AC-12).
+- **`get()` on partial/corrupt (AC-11)**: a `.partial-<ts>` id and a corrupt-metadata id both reject with `RunCorruptedError`.
+- **Query input validation (AC-13)**: path-traversal-shaped `repoName`/`id` (`"../etc"`, `"a/b"`, `"../../x"`, `"."`) reject with `InvalidRunQueryError` for both `list()` and `get()`, proven pre-fs by asserting `runsRoot` has zero entries afterward (no directory was ever created or read). A well-formed-but-non-ts `id` correctly resolves to `RunNotFoundError` instead (design's D5 distinction, not a query error).
+- **Raw fs failure translation (AC-14)**: `vi.doMock("node:fs/promises")` forcing `readdir` to throw `EACCES` — `list()` surfaces `RunPersistenceError`, not a raw exception. Same injection technique `[E5.F2.H1]`'s ST-4 precedented.
+- **`readdir`-order independence (AC-2)**: the proof ST-3's attempt-1 mutation discovered was needed. Planted 3 valid runs, then mocked `readdir` to return them in the exact reverse of chronological order; asserted `list()`'s result is still ascending. This is the test that actually proves AC-2's claim — the earlier contract-suite attempt could not, because the real filesystem in this environment already returns entries pre-sorted.
+
+### Quick checks
+
+- `npm run check`: green (one mechanical biome `--write` for import order and a manual `_args` rename for an unused mock parameter biome flagged as unsafe-fixable; `tsc --noEmit` clean; `depcruise`: 76 modules, 152 deps, 0 violations — unchanged from ST-3, no new production import).
+- `npm test`: 360/360 (346 + 14 new).
+- **AC-17 (no `process.env` reads)**: `grep -rn "process\.env" src/core/history src/adapters/driven/storage --include="*.ts" | grep -v "__test__"` → zero matches across every production file this story touched.
+- **Non-vacuity proof (mutation)**: swapped the merge order in `list()`'s dedupe (`[...finals, ...partials]` instead of `[...partials, ...finals]`, making partial win over final). The new "resolves a same-id final+.partial- coexistence to the final entry only" test failed for the right reason (`expected 'partial' to be 'ok'`). Reverted, re-ran full suite (360/360) and `npm run check` (green).
+
+### Closing gate
+
+- `git diff --stat -- src/core/run` (against `origin/main`, the story's base): **empty**. AC-15 holds across the entire story.
+- Full story diff (`git diff --stat origin/main...HEAD`, code only): exactly the 14 files plan.md's ST-1..ST-4 named collectively — `run-store.ts`, `run-metadata-schemas.ts`, `run-store-errors.ts`, `run-store-schemas.ts`, `list-runs.ts`, `get-run.ts`, `index.ts`, `list-runs.test.ts`, `get-run.test.ts` (ST-1); `run-layout.ts`, `run-layout.test.ts` (ST-2); `run-store-fs.ts`, `RunStore.contract.ts` (ST-3); `run-store-fs.test.ts` (ST-4). No file outside `src/core/history/**` and `src/adapters/driven/storage/**`; no `src/main/` file; no adapter other than `storage`.
+- `depcruise src`: 0 violations — `core-no-io-libs`, `core-modules-via-index`, `adapters-isolated`, `adapter-instantiation-in-main` all hold (AC-15).
+- All 15 ACs from `spec.md` revision 2 now covered. `plan.md`'s ST-1..ST-4 fully executed.
+
+### Blockers
+
+None.
+
+### Next action
+
+`sddl-code-review` (4R protocol) over the whole-story diff, then `sddl-qa-review` in final mode.

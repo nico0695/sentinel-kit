@@ -152,6 +152,32 @@ stages:
       files touched, confirming the story stayed core-only as scoped. All 9
       spec ACs implemented and independently verified. Story implementation
       complete; recommend sddl-qa-review (final mode) before closing.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-22T02:00:00Z"
+    completed_at: "2026-08-22T02:00:00Z"
+    notes: >-
+      FINAL mode completed: verdict pass_with_warnings. Independently
+      re-verified (not trusted from execution-log.md): npm run check green,
+      npm test 293/293, story diff exactly 8 core-only files, AC-6
+      exhaustively grep-verified (one z.enum engine list in all of src/),
+      AC-9 confirmed by direct diff read of run-review.ts. Test non-vacuity
+      proven by three independent mutations (precedence swap, validation
+      removal, echo-spread deletion) -- all fail the suite; tree restored
+      and re-verified clean. Also confirmed by probe that the engineName
+      echo is correct on non-ok terminal states, not just the happy path.
+      One medium finding (QA-1): spec AC-1 says the run override wins
+      "whenever it is provided and non-empty" and the In Scope clause says
+      "the first non-empty one in precedence order", but resolveEngine
+      branches on !== undefined, so runOverride: "" wins precedence and then
+      throws UnknownEngineError instead of falling through. Reproduced
+      directly at both the run and repo levels; no test pins either
+      behavior. Not reachable from any production caller today (no --engine
+      flag until E6.F1; RepoEntrySchema rejects "" upstream) and the
+      implemented behavior is arguably safer, but it is a literal mismatch
+      with an approved AC. Two low findings (echo tested only on the ok
+      path though verified correct elsewhere; no code-review pass ran for
+      this change). qa-report.md written. Does not close the change.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -164,20 +190,76 @@ decisions:
       PR #67 merged) -- implicit advancement per this skill's own phase
       validation rule (user already indicated advancement).
     recorded_at: "2026-08-22T01:00:00Z"
-open_risks: []
+open_risks:
+  - id: risk-002
+    severity: medium
+    status: open
+    summary: >-
+      QA-1 (final QA, medium, OPEN — needs a B-level decision): spec.md's
+      AC-1 requires the run override to win "whenever it is provided and
+      non-empty" and its In Scope clause defines the validated value as
+      "the first non-empty one in precedence order", but resolveEngine
+      branches on `!== undefined`. An empty-string override therefore wins
+      precedence and is then rejected with UnknownEngineError instead of
+      falling through to the next cascade level. Reproduced directly at
+      both the run and repo levels. No test pins either behavior, so the
+      293-test suite is blind to it. Not reachable from any production
+      caller today (the --engine flag lands in E6.F1; RepoEntrySchema
+      rejects "" before it could reach resolveEngine from repos.yaml), and
+      the implemented behavior is arguably the safer one -- but it is a
+      literal contradiction between working code and its own approved
+      acceptance criterion. Three routes offered in qa-report.md's Next
+      Action; recommendation is option 1 (amend the spec wording to match
+      the implemented behavior, plus one pinning test).
+  - id: risk-003
+    severity: low
+    status: open
+    summary: >-
+      QA-2/QA-3 (final QA, low, non-blocking): the engineName echo is
+      exercised by tests only on the ok path (independently verified
+      correct on validation-failed too, so a coverage gap rather than a
+      defect), and no sddl-code-review pass ran for this change, making the
+      final QA report the sole review over the diff. Both proportionate to
+      the change's size (203 insertions, 8 files, pure functions and
+      data-shape additions); recorded so neither is a silent omission.
 review_summary: null
-qa_summary: null
-next_action:
-  kind: continue
-  target: sddl-qa-review
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
   summary: >-
-    ST-1, ST-2, ST-3 all completed; 9/9 spec ACs implemented; npm run check
-    and npm test (293/293) green throughout; closing-gate diff/grep checks
-    passed (AC-6, AC-9); story stayed core-only, exactly 8 files touched, no
-    adapter/src/main/ file in the diff. Recommend sddl-qa-review (final
-    mode) before offering a PR.
+    Final closeout QA, independently re-verified rather than trusted from
+    prior logs: npm run check green, npm test 293/293, story diff exactly 8
+    files all under src/core/ (no adapter or src/main/ file), AC-6
+    exhaustively grep-verified as a single engine-name definition, AC-9
+    confirmed by direct diff read. Test non-vacuity proven by three
+    independent mutations, all of which fail the suite. All 9 spec ACs are
+    implemented and the resolution logic itself is correct. Verdict is not a
+    clean pass solely because of QA-1 (medium): AC-1's "non-empty" clause is
+    not implemented -- an empty-string override wins precedence and throws
+    instead of falling through -- with no test pinning either reading. Not
+    reachable from production today and arguably the safer behavior, but a
+    literal mismatch with an approved AC that needs an explicit decision
+    (three routes in qa-report.md; recommendation: amend the spec wording
+    plus add one pinning test). Two low findings, non-blocking.
+  reported_at: "2026-08-22T02:00:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/qa-report.md
+next_action:
+  kind: halt
+  target: orchestrator
+  summary: >-
+    Final QA verdict pass_with_warnings. Per sddl-qa-review's own rule this
+    does NOT set lifecycle_status completed -- it stays reviewing, gated on
+    the cp-final-review checkpoint, which is PENDING a real user decision on
+    QA-1 (risk-002): amend the spec's "non-empty" wording to match the
+    implemented behavior plus a pinning test (recommended), fix the code to
+    fall through on an empty override, or accept the discrepancy as
+    disclosed (not recommended). Everything else is done: ST-1..ST-3
+    complete, 9/9 ACs implemented, all checks green and independently
+    re-verified. Per CLAUDE.md, never open a PR unless the user explicitly
+    asks -- resolve QA-1 first, then offer the PR "[E4.F2.H3] Cascading
+    engine resolution" (Closes #30). Never merge, never push main.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:50:00Z"
+updated_at: "2026-08-22T02:00:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
@@ -185,6 +267,7 @@ artifacts:
   design: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/design.md
   plan: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/plan.md
   execution_log: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/qa-report.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -231,3 +314,22 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-22T01:50:00Z"
+  - id: cp-final-review
+    type: final_review
+    stage: sddl-qa-review
+    status: pending
+    finding_ref: QA-1
+    summary: >-
+      Final QA returned pass_with_warnings on one medium finding (QA-1,
+      risk-002): spec.md's AC-1 requires the run override to win "whenever
+      it is provided and non-empty", but resolveEngine branches on
+      `!== undefined`, so an empty-string override wins precedence and then
+      throws instead of falling through. Reproduced directly; no test pins
+      either behavior. B-level decision required between: (1) amend the
+      spec wording to match the implemented behavior + add one pinning test
+      (RECOMMENDED -- the implemented behavior is the safer one, so the
+      wording is what is wrong, and this is the smaller delta), (2) fix the
+      code to treat "" as absent + add a test, or (3) accept the
+      discrepancy as disclosed (not recommended -- leaves an approved AC
+      contradicted by its own implementation, the exact failure mode
+      [E4.F2.H2]'s Amendment 1 was raised to avoid).

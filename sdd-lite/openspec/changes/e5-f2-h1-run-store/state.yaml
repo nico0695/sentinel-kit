@@ -1,0 +1,109 @@
+version: "0.1"
+change_name: e5-f2-h1-run-store
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F2.H1] (issue #33), first story of the E5 milestone: give the history core module
+    its first real content -- the RunStore driven port (PRD 4.3) plus a filesystem-backed adapter
+    under src/adapters/driven/storage/ -- so a completed run persists as runs/<repo>/<ts>/ in
+    plain files (md result, prompt used, json metadata, validation logs). Its only declared
+    dependency, [E4.F1.H1] (#26, runReview), is merged. The port/adapter/contract-suite pattern is
+    heavily precedented (ConfigStore + config-store-yaml + ConfigStore.contract is a direct
+    structural template) and RunReviewResult already carries the md result and the prompt. Risk is
+    concentrated in three B-level design forks rather than in mechanics: where the metadata fields
+    the backlog names (harness, branch, duration) come from given RunReviewResult carries neither,
+    who calls the store when no composition root exists, and how a multi-file directory write is
+    made atomic with partial runs identifiable.
+  confidence: medium-high
+  recorded_at: "2026-08-22T13:10:00Z"
+lifecycle_status: draft
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. The port catalog (PRD 4.3), the empty history/index.ts placeholder that
+      names this story, the runReview result shape, and both existing storage adapters are all
+      directly readable; lightweight proposal-stage exploration was sufficient.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T13:00:00Z"
+    completed_at: "2026-08-22T13:10:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/history/index.ts (a three-line
+      placeholder that explicitly names E5.F2.x as its arrival), src/core/run/run-review.ts
+      (RunReviewRequest/RunReviewResult field-by-field), src/core/repos/ports/config-store.ts and
+      src/adapters/driven/storage/config-store-yaml.ts (the structural template), PRD 3.1-F, PRD
+      4.3, the PRD glossary's definition of Run as "fully persisted", PRD risk 6 (engine auth
+      "never persisted in runs/logs"), and docs/backlog-mvp-sentinel.md E5.F2.H1. Established that
+      the backlog names five metadata fields and RunReviewResult carries two of them, which is the
+      story's first real design problem rather than a detail. Six open questions recorded for
+      spec, three of them B-level. E5.F2.H3 (cost/tokens) treated as out of scope per workflow
+      contract rule 7 (optional stories skipped unless requested).
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f2-h1-run-store/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f2-h1-run-store/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f2-h1-run-store/spec.md
+  design: sdd-lite/openspec/changes/e5-f2-h1-run-store/design.md
+  plan: sdd-lite/openspec/changes/e5-f2-h1-run-store/plan.md
+  execution_log: sdd-lite/openspec/changes/e5-f2-h1-run-store/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e5-f2-h1-run-store/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e5-f2-h1-run-store/review-ledger.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is complete and ready for sddl-spec. Three B-level questions are recorded for
+      spec to resolve as firm acceptance criteria before any design work.
+    question: >-
+      Approve the proposal and proceed to sddl-spec for [E5.F2.H1] RunStore full persistence?
+    free_input_allowed: true
+    created_at: "2026-08-22T13:10:00Z"
+decisions: []
+open_risks:
+  - id: risk-001
+    summary: >-
+      The backlog requires engine/harness/branch/state/duration in the persisted metadata, but
+      RunReviewResult carries only state and engineName. Sourcing the remaining three determines
+      the port signature and how much of the run module this story must touch; choosing wrong
+      would force a runReview pipeline change this story has no mandate to make.
+    severity: medium
+  - id: risk-002
+    summary: >-
+      Atomicity is required over a directory of four files, not a single file, so the standard
+      write-tmp-then-rename idiom does not transfer unexamined. AC-3 ("partial run identifiable")
+      is satisfiable by a staging dir plus one rename or by an ordered write with a completion
+      marker written last, and the two differ in what a reader must know.
+    severity: medium
+  - id: risk-003
+    summary: >-
+      "Nothing sensitive persisted" needs a decidable, testable definition. The prompt legitimately
+      contains the repo's own diff; the real hazards are narrower -- failure.error is typed unknown
+      and may be a raw exception carrying a command line or environment in its message or stack.
+      Without a precise rule and a test pinning it, this AC degrades into an untested assertion.
+    severity: medium
+next_action:
+  kind: wait_for_approval
+  target: cp-proposal-approval
+  summary: >-
+    Await user approval of proposal.md before running sddl-spec, which must resolve the metadata
+    source, the store's caller, and the atomicity strategy as firm acceptance criteria.
+created_at: "2026-08-22T13:00:00Z"
+updated_at: "2026-08-22T13:10:00Z"

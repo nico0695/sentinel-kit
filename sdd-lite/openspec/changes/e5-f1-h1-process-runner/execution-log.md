@@ -15,3 +15,18 @@
   - Diff scope: `git status --porcelain` confirmed exactly the 5 named files touched (plus this change's own `state.yaml`, which the orchestrator owns) — independently verified, not trusted from the executor's self-report.
 - **Test coverage proof for D-2**: `process-run-request.test.ts` includes an explicit case, `"does NOT reject a relative cwd (D-2: absoluteness is the adapter's job)"`, proving the omission was deliberate rather than an oversight — exactly the proof plan.md's Validation Strategy asked for.
 - **Deviations**: none. One cosmetic note from the executor: biome's `useExportType`/`organizeImports` rules required the port-type export block in `index.ts` to use a grouped `export type { ProcessRunner, ProcessRunRequest, ProcessRunResult }` form (alphabetized) rather than individually-prefixed type exports — no scope or behavior change.
+
+## ST-2 — The pure classifier: `classifyExecaResult`
+
+- **Status**: completed
+- **Scope**: `src/adapters/driven/exec/classify-execa-result.ts` (new), `src/adapters/driven/exec/__test__/classify-execa-result.test.ts` (new)
+- **What landed**: `classifyExecaResult(result, budget, timeoutMs, elapsedMs)`, a pure function with no `execa`/`child_process`/I/O import, implementing design.md's four rules in the required priority order: (1) never-ran detection via `exitCode`/`signal` both absent, checked first, throwing `ProcessSpawnError` with `cause: result` (AC-14); (2) `timedOut` derived from `signal !== undefined && elapsedMs >= timeoutMs`, never from an execa-style `timedOut` field (D-4, fixes R5's overflow-then-hang misreport, AC-17); (3) per-stream truncation by length-vs-budget comparison against `isMaxBuffer`, never a single shared flag (D-6, AC-6/AC-7); (4) `exitCode`/`signal` via `exactOptionalPropertyTypes`-safe conditional spreads (AC-9). The `ExecaLikeResult` input type is self-contained (no execa import), which keeps the test file execa-free too.
+- **Validation**:
+  - `npm run check`: green — 111 files (biome), `tsc --noEmit` clean, `depcruise src` 0 violations (79 modules, 158 dependencies) — independently re-run by the orchestrator.
+  - `npm test`: `classify-execa-result.test.ts` 11/11 passing, independently re-run in isolation. Full suite: 386 tests green.
+  - Diff scope: confirmed via `git status --porcelain` — exactly the 2 named files (plus this change's own `state.yaml`) — independently verified.
+- **Mutation proofs** (performed by the executor, each reverted afterward, diff confirmed byte-identical to the correct version):
+  1. Never-ran via a `failed`-style heuristic — not runtime-testable, since `ExecaLikeResult` has no `failed` field at all: a classifier keyed on one would fail to compile. Recorded as a stronger (compile-time) guarantee than a runtime mutation, not skipped.
+  2. Both truncation flags derived from a single `isMaxBuffer` value instead of per-stream length comparison — mutated, the stdout-only and stderr-only tests failed exactly as predicted (`false` expected, `true` observed), reverted.
+  3. `timedOut` derivation with the `elapsedMs >= timeoutMs` condition dropped (simulating a naive passthrough of an execa-style `timedOut` field) — mutated, the AC-17 overflow-then-hang test failed exactly as predicted (`true` expected, `false` observed), reverted.
+- **Deviations**: none.

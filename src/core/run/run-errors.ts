@@ -74,3 +74,23 @@ export class EngineTimeoutError extends RunError {
     this.timeoutMs = timeoutMs;
   }
 }
+
+/** The cascade level a rejected `resolveEngine` value came from (PRD §3.1-D). */
+export type EngineResolutionLevel = "run" | "repo" | "global";
+
+/**
+ * Raised by `resolveEngine` when the precedence-resolved value (whichever of
+ * run/repo/global override actually won) is not a recognized engine name. A
+ * deterministic input-shape failure, not a wrapped exception: `cause` is
+ * intentionally not populated, mirroring `InvalidRunRequestError`.
+ */
+export class UnknownEngineError extends RunError {
+  readonly value: string;
+  readonly level: EngineResolutionLevel;
+  constructor(value: string, level: EngineResolutionLevel) {
+    super(`Unknown engine "${value}" from ${level} override`);
+    this.name = "UnknownEngineError";
+    this.value = value;
+    this.level = level;
+  }
+}

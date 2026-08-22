@@ -649,4 +649,21 @@ describe("runReview", () => {
       expect(result.failure?.error).toBe(adapterTimeout);
     });
   });
+
+  describe("engineName echo (AC-7, AC-8, [E4.F2.H3] #30)", () => {
+    it("echoes request.engineName verbatim on the result when supplied", async () => {
+      const result = await runReview(
+        buildRequest({ engineName: "opencode" }),
+        buildDeps(),
+      );
+
+      expect(result.engineName).toBe("opencode");
+    });
+
+    it("omits the engineName key from the result when the request has none", async () => {
+      const result = await runReview(buildRequest(), buildDeps());
+
+      expect("engineName" in result).toBe(false);
+    });
+  });
 });

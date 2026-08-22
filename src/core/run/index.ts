@@ -2,10 +2,11 @@
  * Core module: run — review orchestration, states, verdict (PRD §4.2).
  *
  * Public API: the `ReviewEngine` driven port and its invocation types, the
- * run-domain `TerminalState` model, the `WorktreeRef` boundary value, and the
+ * run-domain `TerminalState` model, the `WorktreeRef` boundary value, the
  * `runReview` use case with its request/deps/result shapes, its error family
- * and its two injectable seams (`VerdictParser`, `TimeoutScheduler`). The
- * module's second driven port, ProcessRunner, lands in E5.F1.x.
+ * and its two injectable seams (`VerdictParser`, `TimeoutScheduler`), and the
+ * `resolveEngine` cascade function (`[E4.F2.H3]`, #30) with its own error.
+ * The module's second driven port, ProcessRunner, lands in E5.F1.x.
  *
  * Deliberately NOT public (AC-16): the built-in verdict extraction, the
  * default timeout scheduler, the engine race helper and the failure
@@ -21,12 +22,15 @@ export type {
   ReviewResult,
   ReviewUsage,
 } from "./ports/review-engine.js";
+export { type ResolveEngineInput, resolveEngine } from "./resolve-engine.js";
 export {
   EngineInvocationError,
+  type EngineResolutionLevel,
   EngineTimeoutError,
   InvalidRunRequestError,
   RunError,
   type RunErrorOptions,
+  UnknownEngineError,
 } from "./run-errors.js";
 export {
   type RunCleanupOutcome,

@@ -6,13 +6,22 @@
  */
 import { z } from "zod";
 
+/**
+ * Single source of truth for known engine names (PRD §3.1-D cascade). Reused
+ * by both cascade levels modeled here and by `run/resolve-engine.ts`'s
+ * per-run override validation — never redeclared as a second literal list.
+ */
+export const EngineNameSchema = z.enum(["claude-code", "opencode"]);
+
+export type EngineName = z.infer<typeof EngineNameSchema>;
+
 export const DiffLimitsSchema = z.object({
   maxLines: z.number(),
   maxTokens: z.number(),
 });
 
 export const GlobalConfigSchema = z.object({
-  defaultEngine: z.enum(["claude-code", "opencode"]).default("claude-code"),
+  defaultEngine: EngineNameSchema.default("claude-code"),
   defaultBaseBranch: z.string().default("main"),
   diffLimits: DiffLimitsSchema.optional(),
 });
@@ -24,7 +33,7 @@ export const RepoEntrySchema = z.object({
   localPath: z.string().optional(),
   baseBranch: z.string().optional(),
   defaultHarness: z.string().optional(),
-  defaultEngine: z.enum(["claude-code", "opencode"]).optional(),
+  defaultEngine: EngineNameSchema.optional(),
   extraSkills: z.array(z.string()).optional(),
   validations: z.array(z.string()).optional(),
 });

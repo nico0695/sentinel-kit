@@ -17,8 +17,8 @@ complexity_assessment:
     caller that does not exist yet.
   confidence: high
   recorded_at: "2026-08-22T23:10:00Z"
-lifecycle_status: draft
-current_stage: sddl-proposal
+lifecycle_status: planning
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -40,7 +40,23 @@ stages:
       RunStore contract suites (shared-suite convention), and docs/backlog-mvp-sentinel.md
       lines 269-279. Four open questions recorded, two B-level.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T23:10:00Z"
+    completed_at: "2026-08-22T23:40:00Z"
+    notes: >-
+      spec.md written, then re-derived as revision 2. Revision 1 specified the execa option bag
+      from the two in-repo engine seams and execa's README; revision 2 re-verified every claim by
+      running live probes against the installed execa 9.6.1 and reading its lib/. Four
+      assumptions were wrong and one was inherited from a false comment in already-merged code:
+      (R1) reject:false means nothing rejects at all, so a nonexistent binary would have silently
+      resolved as an empty result -- and both engine seams' doc comments assert the opposite;
+      (R2) maxBuffer counts characters, not bytes; (R3) isMaxBuffer is global, not per-stream;
+      (R4) stripFinalNewline defaults true and silently eats the trailing newline of every
+      capture; (R5) a child that both overflows the budget and hangs reports timedOut:false, the
+      most likely real hung-validation shape, which no revision-1 AC covered; (R6) AC-1/AC-9's
+      test hints referenced a pid the port does not expose. 15 ACs became 17 (new AC-16, AC-17)
+      and a third B-level decision (D3) was added. Downstream constraints for [E5.F1.H2] recorded
+      explicitly rather than left to rediscovery.
   sddl-design:
     status: pending
   sddl-plan:
@@ -123,12 +139,24 @@ open_risks:
       explicitly out of scope here, but leaving three parallel execution paths in the codebase is
       a real duplication debt worth a follow-up backlog item.
     severity: low
+  - id: risk-005
+    summary: >-
+      Both merged engine process-runner.ts seams carry a doc comment asserting "Only a genuine
+      spawn failure (ENOENT, permission denied) REJECTS". Verified false for execa 9 under
+      reject:false -- nothing rejects. The comment is wrong in already-merged code, which means
+      the claude-code and opencode adapters' preflight "rejection -> EngineUnavailableError"
+      paths may be unreachable, and a missing engine binary may surface as a confusing parse
+      error instead. Out of scope for this story (AC-15 pins both adapters untouched), but it is
+      a real latent defect in E4 code and should become its own backlog item rather than being
+      silently absorbed into risk-004's retrofit.
+    severity: medium
 next_action:
   kind: wait_for_approval
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Proposal complete. Awaiting user approval to run sddl-spec, which must resolve the two
-    B-level open questions (where the declared-scripts guarantee is enforced, and the env
-    contract) as firm acceptance criteria.
+    Spec complete at revision 2 with 17 acceptance criteria. Awaiting user ratification of the
+    three B-level decisions (D1 the declared-scripts guarantee lives in [E5.F1.H2] not this port,
+    D2 env inherits with an overlay, D3 the adapter classifies execa's resolved result itself)
+    before running sddl-design.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-22T23:10:00Z"
+updated_at: "2026-08-22T23:40:00Z"

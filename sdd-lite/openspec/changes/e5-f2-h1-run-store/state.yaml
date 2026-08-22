@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
 lifecycle_status: implementing
-current_stage: sddl-plan
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -120,7 +120,18 @@ stages:
       the execution log instead of silently omitting evidence.
     last_updated_at: "2026-08-22T15:00:00Z"
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-22T15:05:00Z"
+    notes: >-
+      ST-1 (core port surface) completed. RunStore/RunRecord/RunDiffSummary/RunFailureRecord,
+      RunRecordPathFieldsSchema, the HistoryError family, and the real history/index.ts barrel.
+      npm run check green (depcruise: 70 modules, 134 dependencies, no violations) and npm test
+      295/295 unchanged (ST-1 adds no test file by design). git diff --stat -- src/core/run is
+      empty, confirming AC-3 holds. One mechanical deviation: biome's organizeImports reordered
+      history/index.ts's three export blocks alphabetically after --write, same fix H3's ST-2
+      needed for the same reason -- no logic change. ST-2..ST-4 remain pending, each requiring
+      its own stage_approval before touching code.
+    last_updated_at: "2026-08-22T15:20:00Z"
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -222,6 +233,25 @@ checkpoints:
       each of ST-1 through ST-4 touches code?
     free_input_allowed: true
     created_at: "2026-08-22T15:00:00Z"
+    response:
+      free_text: "si, arranca con ST-1"
+      responded_at: "2026-08-22T15:05:00Z"
+    resolved_at: "2026-08-22T15:05:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1 (core port surface) approved to start by the same "si, arranca con ST-1" instruction
+      that approved plan.md, and completed cleanly: npm run check and npm test both green, diff
+      scoped to exactly the 4 files plan.md named, src/core/run untouched.
+    question: >-
+      ST-1 complete. Proceed to ST-2 (pure run-layout.ts with its unit tests)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:05:00Z"
+    response:
+      free_text: "si, arranca con ST-1"
+      responded_at: "2026-08-22T15:05:00Z"
+    resolved_at: "2026-08-22T15:20:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -284,11 +314,11 @@ open_risks:
       property that matters. Surfaced by design, recorded rather than hidden.
     severity: low
 next_action:
-  kind: wait_for_approval
-  target: cp-plan-approval
+  kind: ask_user
+  target: ST-2
   summary: >-
-    Await approval of plan.md before running sddl-executor. Executor still requests a separate
-    stage_approval before each of ST-1 through ST-4 touches code -- plan approval does not
-    pre-authorize execution.
+    ST-1 complete and validated. Await approval to start ST-2 (pure run-layout.ts: timestamp
+    formatting, path derivation, the hand-written metadata serializer, with unit tests proving
+    AC-4/AC-9/AC-10/AC-18's guarantees before any fs I/O exists).
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T15:00:00Z"
+updated_at: "2026-08-22T15:20:00Z"

@@ -18,8 +18,8 @@ complexity_assessment:
     made atomic with partial runs identifiable.
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
-lifecycle_status: planning
-current_stage: sddl-spec
+lifecycle_status: planned
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -77,7 +77,29 @@ stages:
       leading dot in repoName so skip-dot-entries is the single scanning rule at both levels.
     last_updated_at: "2026-08-22T14:05:00Z"
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T14:15:00Z"
+    completed_at: "2026-08-22T14:40:00Z"
+    notes: >-
+      design.md written: 6 new files, 2 modified, 7 design decisions (D-1..D-7), 0 blocking open
+      questions. Two repo facts checked rather than assumed, each of which would have produced a
+      wrong design: (1) .dependency-cruiser.cjs's core-no-io-libs rule bans ALL Node builtins in
+      src/core (bare and node:-prefixed) with zod as the sole whitelist, so no node:path in core;
+      (2) ConfigStore validates at the adapter boundary using a zod schema exported from core
+      (GlobalConfigSchema.safeParse inside config-store-yaml.ts), which is the precedent D-1
+      reuses so AC-19 binds every future RunStore rather than one adapter. Adapter splits into a
+      pure run-layout.ts (timestamp formatting, path derivation, hand-written field-by-field
+      metadata serializer) and an impure run-store-fs.ts, concentrating AC-4/AC-10/AC-18 in one
+      pure directly-testable function; a denylist serializer was rejected because it fails open
+      when RunRecord later grows a field, whereas the allowlist fails closed. RunDiffSummary is a
+      new port shape rather than ReviewDiff so D8 becomes structural -- with no diff bodies in the
+      input, no serializer bug can write them. Verified with node that the compact-ISO timestamp
+      sorts lexicographically as chronologically, and corrected a wrong epoch example in the
+      artifact (1755868200123 is 2025, not 2026). Verified no import cycle: nothing in src/core
+      imports history. AC-11's mid-staging failure injection reuses the vi.doMock(node:fs/promises)
+      technique already precedented in opencode-adapter.test.ts; AC-14's clockless proof uses fake
+      timers across two far-apart system times rather than grepping the source for Date.now(.
+    last_updated_at: "2026-08-22T14:40:00Z"
   sddl-plan:
     status: pending
   sddl-executor:
@@ -147,6 +169,25 @@ checkpoints:
           occupies the real run path rather than an obviously-partial one.
     free_input_allowed: true
     created_at: "2026-08-22T13:35:00Z"
+    response:
+      selected_option_id: opt-ratify-all
+      free_text: "ratifico las tres, avanza con el design"
+      responded_at: "2026-08-22T14:15:00Z"
+    resolved_at: "2026-08-22T14:15:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      design.md is complete: 6 new files, 2 modified, 7 design decisions, 0 blocking open
+      questions. All 21 ACs are covered; AC-17 (no process.env reads) is the one criterion
+      verified by inspection rather than an automated test, stated explicitly rather than left
+      for QA to discover.
+    question: >-
+      Approve design.md -- including D-3's relocation of the error module to
+      ports/run-store-errors.ts, a refinement of the path spec.md sketched -- and proceed to
+      sddl-plan?
+    free_input_allowed: true
+    created_at: "2026-08-22T14:40:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -154,17 +195,30 @@ decisions:
     rationale: >-
       User approved the proposal and directed the spec stage to run. Authorship: claude->user.
     recorded_at: "2026-08-22T13:15:00Z"
+  - id: dec-002
+    checkpoint_id: cp-spec-approval
+    selected_option_id: opt-ratify-all
+    free_text: "ratifico las tres, avanza con el design"
+    rationale: >-
+      User ratified all three B-level decisions as recommended: D1 (the caller composes the
+      RunRecord, so runReview stays byte-identical and AC-3 pins its diff as empty), D2 (port and
+      adapter ship with no caller; wiring deferred to E6.F1, precedent set by resolveEngine in
+      [E4.F2.H3]) and D3 (staging directory inside the runs root plus a single rename, no
+      completion marker). The A-level D7 (clockless adapter) and D8 (diff summary only) added by
+      spec revision 2 were ratified implicitly with the same approval. Authorship: claude->user.
+    recorded_at: "2026-08-22T14:15:00Z"
 open_risks:
   - id: risk-001
     summary: >-
-      RESOLVED by D1 pending ratification. The caller composes the RunRecord, so runReview needs no
-      change; AC-3 pins its diff as empty. Reopens only if cp-spec-approval selects opt-d1-grow-result.
+      CLOSED by D1, ratified at cp-spec-approval (dec-002). The caller composes the RunRecord, so
+      runReview needs no change; AC-3 pins its diff over src/core/run as empty and QA verifies it.
     severity: low
   - id: risk-002
     summary: >-
-      RESOLVED by D3 pending ratification. Staging inside the runs root plus one rename; AC-11 pins
-      the same-filesystem requirement that makes rename safe, which an os.tmpdir() staging area
-      would violate with EXDEV.
+      CLOSED by D3, ratified at cp-spec-approval (dec-002). Staging inside the runs root plus one
+      rename; AC-12 pins the same-filesystem requirement that makes rename safe, which an
+      os.tmpdir() staging area would violate with EXDEV. Residual concurrency exposure is tracked
+      separately as risk-005.
     severity: low
   - id: risk-003
     summary: >-
@@ -186,12 +240,22 @@ open_risks:
       therefore thin by deliberate choice; [E5.F2.H2] is where it thickens. Recorded so a later
       reviewer does not read the thinness as an oversight rather than a stated trade-off.
     severity: low
+  - id: risk-005
+    summary: >-
+      TOCTOU window between the step-4 collision pre-check and the step-9 rename: two concurrent
+      saves of the SAME run can both pass the pre-check. On POSIX the loser's rename fails with
+      ENOTEMPTY, so it is caught, but it surfaces as RunPersistenceError rather than the more
+      precise RunAlreadyExistsError. Accepted, not solved -- Node offers no portable atomic
+      create-exclusive on a directory. Neither ordering corrupts or merges a run, which is the
+      property that matters. Surfaced by design, recorded rather than hidden.
+    severity: low
 next_action:
   kind: wait_for_approval
-  target: cp-spec-approval
+  target: cp-design-approval
   summary: >-
-    Await ratification of the three B-level decisions before running sddl-design. D1 is the
-    consequential one: if the caller does not compose the RunRecord, the scope boundary, AC-2 and
-    AC-3 all change and spec must be amended first.
+    Await approval of design.md before running sddl-plan. One spec detail was refined rather
+    than silently applied (D-3 relocates the error module to ports/run-store-errors.ts to match
+    the port-error convention repos already follows); one new risk was surfaced (risk-005, the
+    TOCTOU window between the collision pre-check and the rename).
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T14:05:00Z"
+updated_at: "2026-08-22T14:40:00Z"

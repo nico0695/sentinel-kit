@@ -4,3 +4,4 @@
  */
 export { createConfigStoreAdapter } from "./config-store-yaml.js";
 export { createHarnessLoaderAdapter } from "./harness-loader-fs.js";
+export { createRunStoreFsAdapter } from "./run-store-fs.js";

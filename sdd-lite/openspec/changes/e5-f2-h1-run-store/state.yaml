@@ -135,8 +135,19 @@ stages:
       (depcruise: 71 modules, 136 deps), npm test 309/309 (295+14). Non-vacuity proven by
       mutation: injected a _leak field spreading record.prompt into serializeRunMetadata's
       output, ran only the AC-18 decoy test, confirmed it failed for the right reason, reverted,
-      re-verified clean. git diff --stat -- src/core/run still empty. ST-3..ST-4 remain pending.
-    last_updated_at: "2026-08-22T15:40:00Z"
+      re-verified clean. git diff --stat -- src/core/run still empty. ST-3 (impure
+      run-store-fs.ts + RunStore.contract.ts + storage barrel export) completed: 10-step
+      save() flow wired verbatim, 9 contract tests, npm run check green (depcruise: 72 modules,
+      142 deps), npm test 318/318 (309+9). One flagged plan deviation: created
+      run-store-fs.test.ts now as the contract-suite driver (nothing runs a parameterized
+      describe block without one) -- same filename ST-4 already targeted, so ST-4 extends it
+      rather than creating a new file. One design refinement: wrapped the step-4 stat failure
+      in RunPersistenceError too, matching AC-20's "every raw fs failure" scope. Non-vacuity
+      proven by mutation: disabled the collision pre-check, the AC-13 test still failed but
+      instructively (rename's ENOTEMPTY backstop engaged, surfacing RunPersistenceError instead
+      of RunAlreadyExistsError -- risk-005 observed live). Reverted, re-verified clean. ST-4
+      remains pending.
+    last_updated_at: "2026-08-22T15:55:00Z"
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -274,6 +285,24 @@ checkpoints:
       free_text: "si, arranca con ST-2"
       responded_at: "2026-08-22T15:25:00Z"
     resolved_at: "2026-08-22T15:40:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3 (impure run-store-fs.ts + RunStore.contract.ts) approved to start by the same
+      "si, arranca con ST-3" instruction, and completed cleanly: npm run check and npm test
+      both green (318/318), diff matches plan.md's ST-3 list plus one flagged driver-file
+      deviation, non-vacuity proven by mutation on the collision pre-check, src/core/run
+      untouched.
+    question: >-
+      ST-3 complete. Proceed to ST-4 (fs-specific atomicity/determinism tests, extending
+      run-store-fs.test.ts, and the story's closing gate re-verifying AC-3)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:45:00Z"
+    response:
+      free_text: "si, arranca con ST-3"
+      responded_at: "2026-08-22T15:45:00Z"
+    resolved_at: "2026-08-22T15:55:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -337,10 +366,10 @@ open_risks:
     severity: low
 next_action:
   kind: ask_user
-  target: ST-3
+  target: ST-4
   summary: >-
-    ST-2 complete and validated. Await approval to start ST-3 (impure run-store-fs.ts wiring
-    design's 10-step save() flow, plus the portable RunStore.contract.ts and the storage
-    barrel export).
+    ST-3 complete and validated. Await approval to start ST-4 (fs-specific atomicity and
+    determinism tests appended to run-store-fs.test.ts, and the story's closing gate
+    re-verifying AC-3's empty diff over src/core/run and the architecture guards).
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T15:40:00Z"
+updated_at: "2026-08-22T15:55:00Z"

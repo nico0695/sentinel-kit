@@ -87,3 +87,53 @@
   decoy set, per the AC's own carved-out exception, so a reader doesn't mistake the omission for
   an oversight).
 - **Status**: completed.
+
+## Stage ST-3 — Impure fs adapter and portable contract suite
+
+- **Goal**: `createRunStoreFsAdapter(runsRoot): RunStore` wiring design.md's 10-step `save()` flow
+  verbatim; the portable `RunStore.contract.ts`; the storage barrel export.
+- **Files touched**:
+  - `src/adapters/driven/storage/run-store-fs.ts` (new).
+  - `src/adapters/driven/storage/__test__/RunStore.contract.ts` (new, 9 tests).
+  - `src/adapters/driven/storage/__test__/run-store-fs.test.ts` (new — see deviation below).
+  - `src/adapters/driven/storage/index.ts` (edit, one export line).
+- **Deviation from plan.md, flagged rather than silent**: plan.md's ST-3 file list named
+  `RunStore.contract.ts` but not a driver file to actually execute it (the contract suite is a
+  parameterized `describe` block — nothing runs it without a harness wiring a concrete adapter,
+  same as `ConfigStore.contract.ts` needs `config-store-yaml.test.ts`). Without one, ST-3's own
+  validation bar ("`RunStore.contract.ts` covers: ...") could not be checked. Created
+  `run-store-fs.test.ts` now as that driver, reusing the exact filename plan.md's ST-4 already
+  targeted for fs-specific tests — ST-4 extends this same file rather than creating a new one, so
+  no file is created twice and no filename changes.
+- **Design refinement caught during implementation, not silent**: design.md's step-4 pseudocode
+  didn't address a `stat` failure for a reason other than "not found" (e.g. `EACCES`) during the
+  collision pre-check. Wrapped that path in `RunPersistenceError` too, consistent with AC-20
+  ("every raw fs failure is translated") — the pre-check is fs I/O like any other step.
+- **Non-vacuity proof (mutation)**: disabled the step-4 collision check (`if (false && ...)`), ran
+  only the AC-13 "rejects a second save" test — it still failed, but instructively: with the
+  pre-check bypassed, the second `save()` reaches the `rename` step, which fails with `ENOTEMPTY`
+  against the real already-populated `finalDir` and surfaces as `RunPersistenceError` — not
+  `RunAlreadyExistsError`. The test caught this precisely (`toBeInstanceOf(RunAlreadyExistsError)`
+  failed against the wrong error class), which is itself a live demonstration of `risk-005` (the
+  TOCTOU backstop engaging exactly as design.md described). Reverted;
+  `git diff -- src/adapters/driven/storage/run-store-fs.ts` empty afterward; full suite
+  re-verified clean (318/318).
+- **Validation**:
+  - `npm run check`: biome clean (101 files) after mechanical reformats / `tsc --noEmit` clean /
+    `depcruise src`: "no dependency violations found (72 modules, 142 dependencies cruised)" —
+    confirms `run-store-fs.ts` imports `node:fs/promises`, `node:path`, `zod` (type-only), the
+    `history` barrel and `./run-layout.js` only — no other adapter (`adapters-isolated` guard).
+  - `npm test`: 318/318 (309 + 9 new, all in the contract suite via its driver).
+  - `git status --short`: the 4 files above, matching plan.md's ST-3 list plus the flagged
+    driver-file deviation.
+  - `git diff --stat -- src/core/run`: empty. AC-3 still holds after ST-3.
+- **AC coverage this stage**: AC-1 (`save` resolves with the created path), AC-13 (`RunAlreadyExistsError`
+  on a genuine collision; the rename-failure backstop path proven live by the mutation above),
+  AC-15 (first save into an empty `runsRoot` succeeds via the contract suite's setup), AC-19
+  (schema rejection wired end-to-end: empty/separator/leading-dot `repoName`, non-integer/
+  negative/non-finite `startedAtEpochMs`, all rejecting before any directory is created), AC-20
+  (every fs failure — including the collision pre-check itself — translated to `RunPersistenceError`
+  with `cause` preserved). AC-2/AC-5/AC-6/AC-7/AC-8/AC-11/AC-12/AC-14/AC-16/AC-17/AC-18's on-disk
+  and determinism halves are ST-4's job (they need fs-level assertions this stage's contract suite
+  deliberately does not make, per `risk-004`).
+- **Status**: completed.

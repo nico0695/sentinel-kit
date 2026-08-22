@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -68,6 +68,30 @@ stages:
       (AC-6) -- a small, non-breaking refactor of an existing repos-module
       file (z.infer'd types unchanged). 9 ACs total. No adapter or CLI files
       touched; core-only change.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-22T01:10:00Z"
+    completed_at: "2026-08-22T01:10:00Z"
+    notes: >-
+      design.md written, status complete. Two independent pieces: (1)
+      EngineNameSchema extraction in repos/ports/config-schemas.ts, reused by
+      GlobalConfigSchema.defaultEngine and RepoEntrySchema.defaultEngine
+      (pure refactor, z.infer types unchanged, confirmed safe against
+      existing ConfigStore.contract.ts and repos unit tests which assert on
+      values not literal shape); (2) resolveEngine (new file,
+      run/resolve-engine.ts) as a pure function with no deps parameter --
+      globalDefault typed as EngineName (already schema-validated upstream,
+      not re-validated), repoOverride/runOverride typed as raw string
+      (unparsed, validated only if they win precedence). UnknownEngineError
+      added to run-errors.ts following the existing RunError subclass
+      pattern, deliberately NOT wired into run-review.ts's classifyFailure
+      (resolveEngine is called before runReview starts, no pipeline stage
+      owns it). RunReviewRequest/RunReviewResult's engineName echo field
+      typed as plain string (not EngineName) to avoid a needless
+      run-to-repos coupling for a field runReview only copies, never
+      inspects. All 9 spec ACs mapped to concrete file locations. No new
+      open technical question -- both pieces are direct applications of
+      patterns already present in the codebase.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -85,19 +109,19 @@ review_summary: null
 qa_summary: null
 next_action:
   kind: continue
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    spec.md complete, all proposal open questions resolved as firm
-    decisions, no open risk or ambiguity remaining. Recommend proceeding to
-    sddl-design to map the 9 ACs to concrete file locations (resolve-engine.ts
-    new file, config-schemas.ts refactor, run-review.ts 2-field diff) before
-    planning executor stages.
+    design.md complete, all affected areas mapped to concrete file
+    locations, no open technical question remaining. Recommend proceeding to
+    sddl-plan to sequence executor stages (schema refactor, resolve-engine.ts
+    + its error class, run-review.ts echo field, tests).
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:00:00Z"
+updated_at: "2026-08-22T01:10:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
   spec: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/spec.md
+  design: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/design.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -108,4 +132,10 @@ checkpoints:
   - id: cp-spec-approval
     type: stage_approval
     stage: sddl-spec
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:05:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
     status: pending

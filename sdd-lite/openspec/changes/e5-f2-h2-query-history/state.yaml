@@ -16,8 +16,8 @@ complexity_assessment:
     this story's acceptance criterion asks for.
   confidence: medium-high
   recorded_at: "2026-08-22T18:00:00Z"
-lifecycle_status: planning
-current_stage: sddl-design
+lifecycle_status: planned
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -92,11 +92,28 @@ stages:
       one function testable without a filesystem. Use cases stay listRepos-thin; all validation
       lives behind the port so every future RunStore is equally bound.
     last_updated_at: "2026-08-22T19:35:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-22T19:45:00Z"
+    completed_at: "2026-08-22T20:05:00Z"
+    notes: >-
+      plan.md written: 4 executor stages, sequenced exactly per design.md's own recommendation
+      (core-first, then pure adapter functions, then fs read flows plus contract thickening, then
+      planted-state tests as the closing gate). ST-1 core surface (port extension, RunMetadataSchema
+      with drift guards, 3 new errors plus broadened RunPersistenceError, 2 use cases, barrel);
+      ST-2 pure parseRunTimestamp/classifyRunDirEntry with fs-free unit tests proving D8/D9 before
+      any I/O exists; ST-3 impure list()/get() flows plus RunStore.contract.ts thickening (closing
+      [E5.F2.H1]'s risk-004); ST-4 fs-specific planted-state tests (partial/corrupt/stray/dedupe/
+      injection) and the story's closing gate, re-verifying AC-15's empty src/core/run diff and
+      all four architecture guards. 9 files total across the 4 stages. No manual verification
+      stage -- pure fs I/O against a temp dir plus pure functions, fully testable in CI.
+    last_updated_at: "2026-08-22T20:05:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
   spec: sdd-lite/openspec/changes/e5-f2-h2-query-history/spec.md
   design: sdd-lite/openspec/changes/e5-f2-h2-query-history/design.md
+  plan: sdd-lite/openspec/changes/e5-f2-h2-query-history/plan.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -167,6 +184,23 @@ checkpoints:
       RunPersistenceError scope -- and proceed to sddl-plan?
     free_input_allowed: true
     created_at: "2026-08-22T19:35:00Z"
+    response:
+      free_text: "si, avanza con el plan"
+      responded_at: "2026-08-22T19:45:00Z"
+    resolved_at: "2026-08-22T19:45:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    summary: >-
+      plan.md is complete: 4 executor stages (ST-1..ST-4), each with its own stage_approval gate
+      to come during sddl-executor. Sequencing matches design.md's own recommendation with no
+      deviation. ST-4 is the closing gate and the only stage that re-verifies AC-15 (empty diff
+      over src/core/run).
+    question: >-
+      Approve plan.md and proceed to sddl-executor, which will request separate approval before
+      each of ST-1 through ST-4 touches code?
+    free_input_allowed: true
+    created_at: "2026-08-22T20:05:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -187,6 +221,14 @@ decisions:
       RunRecord). The A-level D5..D9 closures added by revision 2 were ratified implicitly with
       the same approval. Authorship: claude->user.
     recorded_at: "2026-08-22T19:10:00Z"
+  - id: dec-003
+    checkpoint_id: cp-design-approval
+    free_text: "si, avanza con el plan"
+    rationale: >-
+      User approved design.md (including the InvalidRunQueryError addition and the broadened
+      RunPersistenceError scope, both flagged explicitly at the checkpoint) and directed the plan
+      stage to run. Authorship: claude->user.
+    recorded_at: "2026-08-22T19:45:00Z"
 open_risks:
   - id: risk-001
     summary: >-
@@ -198,7 +240,8 @@ open_risks:
 next_action:
   kind: user_checkpoint
   summary: >-
-    design.md ready: 6 design decisions, full AC coverage map, 0 blocking questions. Awaiting
-    approval to proceed to sddl-plan.
+    plan.md ready: 4 executor stages (ST-1..ST-4), execution_ready true. Awaiting approval to
+    proceed to sddl-executor, which requests separate stage_approval before each stage touches
+    code.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T19:35:00Z"
+updated_at: "2026-08-22T20:05:00Z"

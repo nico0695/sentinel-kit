@@ -137,7 +137,22 @@ stages:
       the .partial- branch condition, only the partial-classification test failed (for the
       right reason), the other 4 classifyRunDirEntry tests stayed green, reverted and
       re-verified clean. git diff --stat -- src/core/run empty.
-    last_updated_at: "2026-08-22T20:55:00Z"
+      ST-3 (impure list()/get() flows + RunStore.contract.ts thickening) completed. list()
+      scans+classifies+validates+merges (final wins)+sorts; get() validates, resolves via the
+      shared readMetadata helper, distinguishes RunNotFoundError vs RunCorruptedError via the
+      sibling .partial-<id> check, reads optional bodies, defaults diff.warnings to []. npm run
+      check green (depcruise: 76 modules, 152 deps), npm test 346/346 (339+7). No deviation
+      beyond one exactOptionalPropertyTypes fix (explicit per-field usage reconstruction instead
+      of a direct zod-inferred assignment) -- mechanical, no behavior change. git diff --stat --
+      src/core/run empty.
+      IMPORTANT finding from mutation attempt 1: removing list()'s explicit .sort() did NOT fail
+      any contract test -- the real fs happened to return readdir entries already in ascending
+      order for this fixture, so the contract suite cannot prove AC-2's readdir-order-independence
+      claim; that proof needs a mocked readdir (design's own AC-2 validation hint) and is
+      deferred to ST-4 as originally planned, not silently discovered there. Sort call kept
+      (still correct/defensive). Attempt 2 (usage.inputTokens reconstruction) succeeded as a
+      real non-vacuity proof.
+    last_updated_at: "2026-08-22T21:20:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -269,6 +284,26 @@ checkpoints:
       free_text: "ejecutar todo modo auto"
       responded_at: "2026-08-22T20:10:00Z"
     resolved_at: "2026-08-22T20:55:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3 (impure list()/get() flows + contract thickening) approved to start by the same
+      blanket auto-mode authorization, and completed cleanly: npm run check and npm test both
+      green (346/346), no deviation beyond one exactOptionalPropertyTypes mechanical fix,
+      src/core/run untouched. Mutation testing surfaced a real finding (not silently passed
+      over): the contract suite cannot prove AC-2's readdir-order-independence on this
+      environment's filesystem behavior -- that proof is confirmed deferred to ST-4's mocked
+      readdir test, per design's own validation hint.
+    question: >-
+      ST-3 complete. Proceed to ST-4 (fs-specific planted-state tests, including the
+      readdir-order-independence proof, and the story's closing gate)?
+    free_input_allowed: true
+    created_at: "2026-08-22T21:20:00Z"
+    response:
+      free_text: "ejecutar todo modo auto"
+      responded_at: "2026-08-22T20:10:00Z"
+    resolved_at: "2026-08-22T21:20:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -319,16 +354,26 @@ open_risks:
     severity: low
   - id: risk-002
     summary: >-
-      ST-1 added throwing list()/get() stubs to createRunStoreFsAdapter (unplanned for ST-1,
-      required to keep tsc green against the extended RunStore interface). Any caller of
-      RunStore.list/get would currently throw -- but no caller of RunStore exists anywhere in
-      the repo yet (composition-root wiring is E6.F1), so nothing in this codebase can currently
-      trigger it. Will be closed by ST-3 replacing the stub bodies with the real implementation.
+      CLOSED by ST-3. ST-1 added throwing list()/get() stubs to createRunStoreFsAdapter
+      (unplanned for ST-1, required to keep tsc green against the extended RunStore interface).
+      ST-3 replaced both stub bodies with the real implementation, so the exposure no longer
+      exists — confirmed no caller of RunStore existed anywhere in the repo during the window
+      the stubs were live.
+    severity: low
+  - id: risk-003
+    summary: >-
+      OPEN, tracked for ST-4. list()'s explicit .sort() is unproven by the portable contract
+      suite on this environment's filesystem (readdir happened to already return ascending
+      order for the test fixture). AC-2 requires proof via a mocked readdir returning entries
+      out of order -- design's own validation hint, deferred to ST-4 as planned. Not a code
+      defect (the sort call is present and correct); a test-coverage gap that ST-4 is scoped to
+      close.
     severity: low
 next_action:
   kind: user_checkpoint
   summary: >-
-    ST-2 complete (pure adapter functions). Awaiting approval to proceed to ST-3 (impure
-    list()/get() flows), already covered by the blanket auto-mode authorization.
+    ST-3 complete (impure list()/get() + contract thickening). Awaiting approval to proceed to
+    ST-4 (fs-specific planted-state tests + closing gate), already covered by the blanket
+    auto-mode authorization.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T20:55:00Z"
+updated_at: "2026-08-22T21:20:00Z"

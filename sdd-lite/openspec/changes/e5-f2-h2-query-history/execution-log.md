@@ -6,7 +6,7 @@
 |---|---|---|
 | ST-1 | Core surface: port extension, RunMetadataSchema, errors, use cases, barrel | completed |
 | ST-2 | Pure adapter functions: parseRunTimestamp, classifyRunDirEntry | completed |
-| ST-3 | Impure list()/get() flows + RunStore.contract.ts thickening | pending |
+| ST-3 | Impure list()/get() flows + RunStore.contract.ts thickening | completed |
 | ST-4 | Planted-state tests + closing gate | pending |
 
 ## ST-1 — Core surface
@@ -71,3 +71,35 @@ None.
 ### Next action
 
 ST-3 (impure `list()`/`get()` flows in `run-store-fs.ts`, replacing ST-1's stubs, plus `RunStore.contract.ts` thickening), pending its own stage_approval (already covered by the blanket auto-mode authorization).
+
+## ST-3 — Impure list()/get() flows + contract thickening
+
+- **Approval reference**: blanket auto-mode authorization, same as ST-1/ST-2.
+- **Planned scope**: `src/adapters/driven/storage/run-store-fs.ts` (edit — replacing ST-1's stubs), `src/adapters/driven/storage/__test__/RunStore.contract.ts` (edit).
+- **Actual changed files**: exactly the planned set. No deviation.
+
+### What was implemented
+
+- `list(repoName)`: validates `repoName` via `RunQueryFieldsSchema.pick({ repoName: true })`; `readdir(repoDir, { withFileTypes: true })`, `ENOENT` → `[]`; classifies every entry via `classifyRunDirEntry`; a `final` entry's `metadata.json` is read+parsed+`RunMetadataSchema`-validated (helper `readMetadata`, shared with `get()`), `"missing"`/`"corrupt"` both become a minimal `corrupt` summary, success becomes a full `ok` summary; partials and finals merge into one `Map` (finals inserted after partials, so a same-id collision resolves final-wins per AC-4); sorted ascending by `startedAtEpochMs`. Any raw fs error beyond `ENOENT` on the top-level `readdir`, or beyond the classified missing/corrupt cases while reading one entry's metadata, surfaces as `RunPersistenceError` (AC-14).
+- `get(repoName, id)`: validates both fields via `RunQueryFieldsSchema`; `parseRunTimestamp(id) === null` → `RunNotFoundError` pre-fs (D5); reads `metadata.json` at the resolved `finalDir` via the same `readMetadata` helper — `"corrupt"` → `RunCorruptedError`; `"missing"` → checks the sibling `.partial-<id>` staging dir (`exists()`, already used by `save()`) to decide `RunCorruptedError` vs `RunNotFoundError`; on success, reads `result.md`/`prompt.md`/`validations/*.log` (sorted by filename) via `readOptionalFile`/`readOptionalValidationLogs`, each `ENOENT` → omitted; composes the full `RunRecord`, defaulting `diff.warnings` to `[]` when the persisted document omitted it (AC-9).
+- `RunStore.contract.ts` thickened: `list()` empty-repo (AC-3), `list()` ascending order across out-of-order saves (AC-1), `list()` field mapping for an `ok` entry (AC-8), `get()` full round-trip including `diff`/`usage`/`prompt`/`engineOutput`/`validationOutput` (AC-9), `get()` round-trip with no optional fields — omitted keys, not invented empty values (AC-9), `get()` `diff.warnings` defaulting to `[]` (AC-9), `get()` unknown id → `RunNotFoundError` (AC-10).
+
+### Deviation: `exactOptionalPropertyTypes` forced explicit per-field `usage` reconstruction
+
+Directly assigning `metadata.usage` (zod's inferred type carries an explicit `| undefined` per optional field) to `RunRecord.usage: ReviewUsage` failed `tsc` under the project's `exactOptionalPropertyTypes`. Fixed by reconstructing `usage` field-by-field with the same conditional-spread idiom already used for the record's other optional fields, rather than assigning the zod-inferred object directly — mechanical, no behavior change (a fully-populated `usage` round-trips identically; a partially-populated one now round-trips without leaking spurious `undefined` values, since the file-wide idiom is stricter than a raw assignment would have been).
+
+### Quick checks
+
+- `npm run check`: green (one mechanical biome `--write` for import order, `tsc --noEmit` clean including the `exactOptionalPropertyTypes` fix above, `depcruise`: 76 modules, 152 deps, 0 violations).
+- `npm test`: 346/346 (339 + 7 new contract tests).
+- `git diff --stat -- src/core/run`: empty.
+- **Non-vacuity proof (mutation), attempt 1 — discovered a real gap, not silently passed over**: removed the `.sort()` call from `list()`'s return, expecting the "ascending order" contract test to fail. It did NOT fail — all 16 contract tests stayed green. Root cause: the fixture's real filesystem (`readdir` on a fresh temp directory in this environment) happened to already return entries in an order consistent with ascending `startedAtEpochMs`, so the contract-level test cannot distinguish "sorts explicitly" from "got lucky with readdir order" — it is filesystem-behavior-dependent, not a property of the code. This is exactly what design's own AC-2 validation hint anticipated: *"Unit test with a fake/mocked `readdir` returning entries out of chronological order"* — that proof requires controlling `readdir`'s return order directly, which belongs to the fs-specific test (ST-4), not the portable contract suite. Reverted the mutation; the `.sort()` call stays (it is still correct, defensive code — AC-2 explicitly forbids relying on `readdir` order even where a given filesystem happens to cooperate). Flagging this now rather than letting ST-4 silently discover it undocumented.
+- **Non-vacuity proof (mutation), attempt 2 — succeeded**: neutralized `usage.inputTokens`'s conditional spread in `get()`'s reconstruction (made it always contribute `{}`). The "get() round-trips a full record" contract test failed for the right reason (`inputTokens: 4800` missing from the received object, all other fields matched). Reverted, re-ran full suite (346/346) and `npm run check` (green).
+
+### Blockers
+
+None.
+
+### Next action
+
+ST-4: fs-specific planted-state tests (partial/corrupt/stray-entry/dedupe/injection, including the readdir-order-independence proof AC-2 actually needs — see the attempt-1 finding above) and the story's closing gate, pending its own stage_approval (already covered by the blanket auto-mode authorization).

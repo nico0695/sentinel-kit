@@ -43,21 +43,34 @@ stages:
   sddl-spec:
     status: completed
     started_at: "2026-08-22T18:10:00Z"
-    completed_at: "2026-08-22T18:35:00Z"
+    completed_at: "2026-08-22T19:00:00Z"
     notes: >-
-      spec.md written, 12 acceptance criteria. All four proposal open questions resolved with
-      recommendations: D1 (both .partial-<ts> staging leftovers AND corrupt-metadata final
+      spec.md written, 12 acceptance criteria at rev 1. All four proposal open questions resolved
+      with recommendations: D1 (both .partial-<ts> staging leftovers AND corrupt-metadata final
       directories are surfaced via RunSummary.status, deliberately diverging from [E5.F2.H1]'s
       AC-19 scan which skips dot-prefixed entries for its narrower collision-check purpose); D2
       (list() returns a distinct, mostly-optional RunSummary rather than RunRecord[], because a
       partial/corrupt entry cannot supply a full RunRecord); D3 (getRun returns file bodies, not
       paths, symmetric with what save() accepted); D4 (empty repo -> [], not an error, closed
-      A-level). Grounded in direct inspection of RunStore.contract.ts (confirmed its own doc
-      comment names this story as where the thin contract "thickens"), run-store-errors.ts (the
-      HistoryError hierarchy pattern the two new errors extend), terminal-state.ts and verdict.ts
-      (exact field types for RunSummary), and list-branches-errors.ts (the error-class shape
-      convention). D1 and D2 are B-level and need ratification before design.
-    last_updated_at: "2026-08-22T18:35:00Z"
+      A-level). Grounded in direct inspection of RunStore.contract.ts, run-store-errors.ts,
+      terminal-state.ts, verdict.ts, and list-branches-errors.ts.
+      REVISION 2 (user-directed second iteration before ratification): D1..D4 survived unchanged;
+      five rev-1 gaps fixed, now 15 ACs. (1) Rev 1's AC-6 named a nonexistent validation target
+      ("RunRecord-shape validation") -- metadata.json is a distinct document (version, repo, ISO
+      startedAt) with no schema anywhere; new D6/D7 introduce RunMetadataSchema with a
+      compile-time satisfies drift guard against the run unions, since AC-15 pins src/core/run
+      untouched. (2) No path-traversal validation existed on read inputs -- list/get turn caller
+      strings into path segments; new AC-13 mirrors save()'s RunRecordPathFieldsSchema
+      discipline and requires rejection BEFORE any fs access. (3) No raw-error translation AC for
+      read paths (no analogue of H1's AC-20); new AC-14. (4) Rev 1's scan was implicitly two-way,
+      so a stray .DS_Store would have been listed as a corrupt run; new D9/AC-12 make the
+      classification three-way (ts-dir -> run, .partial-<ts> -> partial, anything else silently
+      ignored), plus unknown metadata version -> corrupt (AC-6) and tampering-induced final+
+      partial coexistence -> final wins (AC-4). (5) Under-specified data sourcing pinned: id
+      semantics (D5), startedAtEpochMs uniformly from the directory name (D8), diff.warnings
+      defaulting to [] on round-trip, validations/*.log read order sorted by filename (AC-9).
+      Timestamp inverse-parse round-trip verified with node before writing AC-2.
+    last_updated_at: "2026-08-22T19:00:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -82,8 +95,12 @@ checkpoints:
     type: stage_approval
     stage: sddl-spec
     summary: >-
-      spec.md is complete with 12 acceptance criteria. Two B-level decisions (D1 corrupt/partial
-      definition, D2 read-method shape) are recommended and need ratification before sddl-design.
+      spec.md is complete at revision 2 with 15 acceptance criteria (a user-directed second
+      iteration fixed five rev-1 gaps -- see the spec's Revision Notes -- and added A-level
+      D5..D9 covering id semantics, RunMetadataSchema, the satisfies drift guard, uniform
+      timestamp sourcing, and the three-way scan classification). Two B-level decisions (D1
+      corrupt/partial definition, D2 read-method shape) are recommended and need ratification
+      before sddl-design.
     question: >-
       Ratify D1 (list() surfaces both .partial-<ts> leftovers and corrupt-metadata final
       directories via RunSummary.status) and D2 (list() returns a distinct RunSummary, not
@@ -127,7 +144,7 @@ open_risks:
 next_action:
   kind: user_checkpoint
   summary: >-
-    spec.md ready, 12 ACs. Awaiting ratification of D1 (corrupt/partial marker scope) and D2
-    (RunSummary vs RunRecord[] for list()) before proceeding to sddl-design.
+    spec.md ready at revision 2, 15 ACs. Awaiting ratification of D1 (corrupt/partial marker
+    scope) and D2 (RunSummary vs RunRecord[] for list()) before proceeding to sddl-design.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T18:35:00Z"
+updated_at: "2026-08-22T19:00:00Z"

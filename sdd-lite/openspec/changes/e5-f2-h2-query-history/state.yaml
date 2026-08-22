@@ -14,10 +14,10 @@ complexity_assessment:
     marker" means precisely, given that [E5.F2.H1]'s own AC-19 scanning convention already skips
     dot-prefixed .partial-<ts> entries rather than surfacing them -- the literal opposite of what
     this story's acceptance criterion asks for.
-  confidence: medium-high
+  confidence: medium
   recorded_at: "2026-08-22T18:00:00Z"
 lifecycle_status: reviewing
-current_stage: sddl-code-review
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -169,7 +169,21 @@ stages:
       collectively, confined to src/core/history/** and src/adapters/driven/storage/**;
       depcruise confirms all 4 architecture guards. All 15 ACs from spec.md revision 2 covered.
       plan.md's ST-1..ST-4 fully executed.
-    last_updated_at: "2026-08-22T21:50:00Z"
+      FIX ROUND 1 (2026-08-22T22:35:00Z): ST-5 appended per fix-stage-request rules (append one
+      bounded stage, do not rebuild the plan): scope is exactly review-ledger.md's R3-001 and
+      R4-001, one atomic work unit per id. R3-001 fix: get()'s "missing" branch now also checks
+      exists(finalDir) before the staging-sibling fallback, so a final dir that exists but lost
+      metadata.json throws RunCorruptedError (matching list()'s classification) instead of
+      RunNotFoundError. R4-001 fix: list()'s per-entry readMetadata catch now classifies that
+      one entry as corrupt instead of rethrowing out of the loop, resolving the AC-7/AC-14
+      tension in favor of AC-7's "none affecting the others" per the review's own finding --
+      recorded as an A-level decision (technical, reversible, no scope change) since the exact
+      mechanism is an implementation detail within the already-authorized fix scope. ST-1..ST-4
+      statuses corrected from pending to completed in plan.md's table (plan-authoring artifact,
+      not a re-open -- all four were already done).
+    last_updated_at: "2026-08-22T22:35:00Z"
+  sddl-qa-review:
+    status: pending
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -178,6 +192,7 @@ artifacts:
   plan: sdd-lite/openspec/changes/e5-f2-h2-query-history/plan.md
   execution_log: sdd-lite/openspec/changes/e5-f2-h2-query-history/execution-log.md
   review_ledger: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
+  qa_report: sdd-lite/openspec/changes/e5-f2-h2-query-history/qa-report.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -378,6 +393,28 @@ checkpoints:
           with one bad entry losing its entire run history listing).
     free_input_allowed: true
     created_at: "2026-08-22T22:20:00Z"
+    response:
+      selected_option_id: opt-fix-both
+      free_text: "Sí, arreglá ambos (recomendado)"
+      responded_at: "2026-08-22T22:30:00Z"
+    resolved_at: "2026-08-22T22:30:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-5 (fix stage for R3-001, R4-001) appended to plan.md's Stage Plan per the fix-routing
+      protocol, authorized by the user's "Sí, arreglá ambos" at cp-review-gate. This single
+      response covers both the fix-stage-insertion decision and this stage's own stage_approval,
+      since the user's choice was already specific to authorizing exactly this fix work.
+    question: >-
+      Start ST-5: fix R3-001 (get()'s missing-metadata misclassification) and R4-001 (list()
+      aborting on one entry's raw fs error), with new regression tests for both?
+    free_input_allowed: true
+    created_at: "2026-08-22T22:35:00Z"
+    response:
+      free_text: "Sí, arreglá ambos (recomendado)"
+      responded_at: "2026-08-22T22:30:00Z"
+    resolved_at: "2026-08-22T22:35:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -417,6 +454,16 @@ decisions:
       completes. Orchestrator will still stop and surface any blocked/partial result or a
       medium+ severity risk rather than pushing through silently. Authorship: claude->user.
     recorded_at: "2026-08-22T20:10:00Z"
+  - id: dec-005
+    checkpoint_id: cp-review-gate
+    selected_option_id: opt-fix-both
+    free_text: "Sí, arreglá ambos (recomendado)"
+    rationale: >-
+      User authorized a bounded fix stage for both confirmed CRITICAL findings (R3-001, R4-001)
+      per the recommended option. Route: rerun sddl-plan to insert one fix stage, gated by its
+      own stage_approval, then sddl-executor, then a scoped re-review against the frozen ledger.
+      Authorship: claude->user.
+    recorded_at: "2026-08-22T22:30:00Z"
 open_risks:
   - id: risk-001
     summary: >-
@@ -479,11 +526,11 @@ review_summary:
   reported_at: "2026-08-22T22:20:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
 next_action:
-  kind: user_checkpoint
+  kind: run_stage
+  target: sddl-executor
   summary: >-
-    Full-4r review complete, verdict fail. 2 confirmed CRITICAL findings (R3-001, R4-001) need a
-    fix stage before final QA. Awaiting review_gate authorization (cp-review-gate) to insert a
-    bounded fix stage via sddl-plan -> stage_approval -> sddl-executor. The blanket auto-mode
-    authorization does not cover this new fix work.
+    ST-5 (fix stage) authorized and appended to plan.md. Proceeding with sddl-executor to
+    implement the R3-001/R4-001 fixes, then a scoped re-review against the frozen ledger, then
+    final QA.
 created_at: "2026-08-22T17:50:00Z"
 updated_at: "2026-08-22T21:50:00Z"

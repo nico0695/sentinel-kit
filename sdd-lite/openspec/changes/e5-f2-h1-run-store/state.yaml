@@ -130,8 +130,13 @@ stages:
       empty, confirming AC-3 holds. One mechanical deviation: biome's organizeImports reordered
       history/index.ts's three export blocks alphabetically after --write, same fix H3's ST-2
       needed for the same reason -- no logic change. ST-2..ST-4 remain pending, each requiring
-      its own stage_approval before touching code.
-    last_updated_at: "2026-08-22T15:20:00Z"
+      its own stage_approval before touching code. ST-2 (pure run-layout.ts) completed:
+      formatRunTimestamp/deriveRunPaths/serializeRunMetadata, 14 unit tests, npm run check green
+      (depcruise: 71 modules, 136 deps), npm test 309/309 (295+14). Non-vacuity proven by
+      mutation: injected a _leak field spreading record.prompt into serializeRunMetadata's
+      output, ran only the AC-18 decoy test, confirmed it failed for the right reason, reverted,
+      re-verified clean. git diff --stat -- src/core/run still empty. ST-3..ST-4 remain pending.
+    last_updated_at: "2026-08-22T15:40:00Z"
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -252,6 +257,23 @@ checkpoints:
       free_text: "si, arranca con ST-1"
       responded_at: "2026-08-22T15:05:00Z"
     resolved_at: "2026-08-22T15:20:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2 (pure run-layout.ts) approved to start by the same "si, arranca con ST-2"
+      instruction, and completed cleanly: npm run check and npm test both green (309/309), diff
+      scoped to exactly the 2 files plan.md named, non-vacuity proven by mutation on the AC-18
+      decoy test, src/core/run untouched.
+    question: >-
+      ST-2 complete. Proceed to ST-3 (impure run-store-fs.ts wiring the 10-step save() flow, plus
+      the portable RunStore.contract.ts)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:25:00Z"
+    response:
+      free_text: "si, arranca con ST-2"
+      responded_at: "2026-08-22T15:25:00Z"
+    resolved_at: "2026-08-22T15:40:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -315,10 +337,10 @@ open_risks:
     severity: low
 next_action:
   kind: ask_user
-  target: ST-2
+  target: ST-3
   summary: >-
-    ST-1 complete and validated. Await approval to start ST-2 (pure run-layout.ts: timestamp
-    formatting, path derivation, the hand-written metadata serializer, with unit tests proving
-    AC-4/AC-9/AC-10/AC-18's guarantees before any fs I/O exists).
+    ST-2 complete and validated. Await approval to start ST-3 (impure run-store-fs.ts wiring
+    design's 10-step save() flow, plus the portable RunStore.contract.ts and the storage
+    barrel export).
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T15:20:00Z"
+updated_at: "2026-08-22T15:40:00Z"

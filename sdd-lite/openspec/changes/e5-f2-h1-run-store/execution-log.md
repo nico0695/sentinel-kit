@@ -50,3 +50,40 @@
   producing the declared JSON shape) is proven in ST-2/ST-3/ST-4, not here — this stage proves the
   shapes compile and import cleanly.
 - **Status**: completed.
+
+## Stage ST-2 — Pure layout module
+
+- **Goal**: `formatRunTimestamp`, `deriveRunPaths`, `serializeRunMetadata` in a pure module with no
+  fs dependency, proving AC-4/AC-9/AC-10/AC-14 (timestamp half)/AC-18 before any I/O exists to
+  obscure them.
+- **Files touched**:
+  - `src/adapters/driven/storage/run-layout.ts` (new).
+  - `src/adapters/driven/storage/__test__/run-layout.test.ts` (new, 14 tests).
+- **Deviation from plan.md, none material**: same mechanical biome long-line reformat (`--write`)
+  as ST-1 and as `[E4.F2.H3]`'s ST-2 needed — no logic change.
+- **Non-vacuity proof (mutation)**: added `_leak: record.prompt` into `serializeRunMetadata`'s
+  returned object, ran only the AC-18 decoy test — it failed for the right reason (`serialized`
+  contained the decoy token via the injected leak field, visible in the diff output). Reverted;
+  `git diff -- src/adapters/driven/storage/run-layout.ts` empty afterward; full suite re-verified
+  clean (309/309).
+- **Validation**:
+  - `npm run check`: biome clean (98 files) after one mechanical reformat / `tsc --noEmit` clean /
+    `depcruise src`: "no dependency violations found (71 modules, 136 dependencies cruised)" —
+    confirms `run-layout.ts` imports only `node:path` (adapter layer, permitted) and
+    `../../../core/history/index.js`, nothing from other adapters (`adapters-isolated` guard).
+  - `npm test`: 309/309 (295 + 14 new). All 14 new tests are in `run-layout.test.ts`; no existing
+    test file changed.
+  - `git status --short`: exactly the 2 files plan.md named for ST-2.
+  - `git diff --stat -- src/core/run`: empty. AC-3 still holds after ST-2.
+- **AC coverage this stage**: AC-4 (exact field set, verified by `Object.keys` equality and by
+  three omitted-vs-present cases), AC-9 (lexicographic-equals-chronological, verified across a
+  millisecond/day/month/year boundary, not just two adjacent timestamps), AC-10 (`RunDiffSummary`
+  serializes to exactly its five fields — a structural proof, since the serializer's parameter
+  type has no per-file `content` field to leak, not merely a content check), AC-14's determinism
+  half (`formatRunTimestamp` proven pure; `deriveRunPaths` proven to name the same staging
+  directory for the same `ts`, which is what makes ST-3's same-timestamp retry-clearing safe),
+  AC-18 (decoy token in `prompt`/`engineOutput`/`validationOutput` never appears in serialized
+  output; a parallel test documents that `failure.message` is deliberately excluded from the
+  decoy set, per the AC's own carved-out exception, so a reader doesn't mistake the omission for
+  an oversight).
+- **Status**: completed.

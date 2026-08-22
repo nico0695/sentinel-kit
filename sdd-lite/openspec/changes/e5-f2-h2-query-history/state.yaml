@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: medium-high
   recorded_at: "2026-08-22T18:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -71,10 +71,32 @@ stages:
       defaulting to [] on round-trip, validations/*.log read order sorted by filename (AC-9).
       Timestamp inverse-parse round-trip verified with node before writing AC-2.
     last_updated_at: "2026-08-22T19:00:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-22T19:10:00Z"
+    completed_at: "2026-08-22T19:35:00Z"
+    notes: >-
+      design.md written: 5 new files, 6 modified, 6 design decisions (D-1..D-6), 0 blocking open
+      questions, full AC-to-test-file coverage map for all 15 ACs. Key choices: RunMetadataSchema
+      mirrors the persisted document with version z.literal(1) and unknown-key strip (additive
+      version-1 fields stay readable; breaking changes must bump version, which the literal turns
+      into corrupt); the TerminalState/Verdict/RunStage literal arrays carry a two-direction
+      compile-time drift guard (satisfies for rogue values, Expect<Exclude<...>> for
+      exhaustiveness) because AC-15 forbids relocating the unions into src/core/run; a new
+      InvalidRunQueryError instead of overloading InvalidRunRecordError (a query is not a
+      record); RunPersistenceError broadened to cover raw fs failures on reads rather than
+      minting a fourth translation class; the id's ts-format check lives in the adapter's
+      parseRunTimestamp pre-fs (a core-schema regex would leak the adapter's layout format into
+      the port contract -- core validates segment-safety only); and a pure classifyRunDirEntry
+      in run-layout.ts concentrates D9's three-way classification and D8's timestamp sourcing in
+      one function testable without a filesystem. Use cases stay listRepos-thin; all validation
+      lives behind the port so every future RunStore is equally bound.
+    last_updated_at: "2026-08-22T19:35:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
   spec: sdd-lite/openspec/changes/e5-f2-h2-query-history/spec.md
+  design: sdd-lite/openspec/changes/e5-f2-h2-query-history/design.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -126,6 +148,25 @@ checkpoints:
           which has no honest value to use.
     free_input_allowed: true
     created_at: "2026-08-22T18:35:00Z"
+    response:
+      selected_option_id: opt-ratify-both
+      free_text: "ratifico las dos, avanza con el design"
+      responded_at: "2026-08-22T19:10:00Z"
+    resolved_at: "2026-08-22T19:10:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      design.md is complete: 5 new files, 6 modified, 6 design decisions, 0 blocking open
+      questions, and an explicit AC-to-test-file coverage map for all 15 ACs. Notable A-level
+      refinements over the spec sketch: a new InvalidRunQueryError (rather than overloading
+      InvalidRunRecordError), RunPersistenceError broadened to read-path raw failures, and the
+      id ts-format check placed in the adapter's parseRunTimestamp rather than a core schema.
+    question: >-
+      Approve design.md -- including the InvalidRunQueryError addition and the broadened
+      RunPersistenceError scope -- and proceed to sddl-plan?
+    free_input_allowed: true
+    created_at: "2026-08-22T19:35:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -133,6 +174,19 @@ decisions:
     rationale: >-
       User approved the proposal and directed the spec stage to run. Authorship: claude->user.
     recorded_at: "2026-08-22T18:05:00Z"
+  - id: dec-002
+    checkpoint_id: cp-spec-approval
+    selected_option_id: opt-ratify-both
+    free_text: "ratifico las dos, avanza con el design"
+    rationale: >-
+      User ratified both B-level decisions as recommended, against spec revision 2 (which the
+      user had directed as a second re-analysis iteration before ratifying): D1 (list() surfaces
+      both .partial-<ts> staging leftovers and corrupt-metadata final directories via
+      RunSummary.status, diverging deliberately from [E5.F2.H1]'s AC-19 collision-check scan)
+      and D2 (list() returns a distinct mostly-optional RunSummary; get() returns the full
+      RunRecord). The A-level D5..D9 closures added by revision 2 were ratified implicitly with
+      the same approval. Authorship: claude->user.
+    recorded_at: "2026-08-22T19:10:00Z"
 open_risks:
   - id: risk-001
     summary: >-
@@ -144,7 +198,7 @@ open_risks:
 next_action:
   kind: user_checkpoint
   summary: >-
-    spec.md ready at revision 2, 15 ACs. Awaiting ratification of D1 (corrupt/partial marker
-    scope) and D2 (RunSummary vs RunRecord[] for list()) before proceeding to sddl-design.
+    design.md ready: 6 design decisions, full AC coverage map, 0 blocking questions. Awaiting
+    approval to proceed to sddl-plan.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T19:00:00Z"
+updated_at: "2026-08-22T19:35:00Z"

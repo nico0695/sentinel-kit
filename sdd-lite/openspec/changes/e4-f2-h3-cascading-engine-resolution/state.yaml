@@ -16,8 +16,8 @@ complexity_assessment:
     (E6.F1 territory) in scope.
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: executing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -108,6 +108,21 @@ stages:
       larger single-file surface). No manual/human verification needed
       anywhere in this plan -- everything is a pure function or data-shape
       change, fully testable in CI, unlike H1/H2's permanently-open AC-24.
+  sddl-executor:
+    status: in_progress
+    started_at: "2026-08-22T01:30:00Z"
+    notes: >-
+      ST-1 completed: EngineNameSchema/EngineName extracted in
+      repos/ports/config-schemas.ts, referenced by both
+      GlobalConfigSchema.defaultEngine and RepoEntrySchema.defaultEngine
+      (replacing their inline z.enum literals), re-exported from
+      repos/index.ts. Exactly the 2 planned files changed (git diff --stat
+      confirmed). npm run check green (biome + tsc + depcruise, 0
+      violations). npm test 284/284 -- identical to the pre-stage baseline,
+      no existing test file touched, confirming the refactor is
+      behavior-preserving (regression proof plan.md specified for AC-6).
+      QA review not requested: trivial, low-blast-radius, type-preserving
+      refactor with zero new runtime behavior.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -127,18 +142,19 @@ next_action:
   kind: continue
   target: sddl-executor
   summary: >-
-    plan.md complete, execution_ready: true, 3 stages (ST-1 schema refactor,
-    ST-2 resolveEngine + error, ST-3 run-review.ts echo field). Recommend
-    proceeding to sddl-executor for ST-1, gated by its own stage_approval
-    checkpoint per the workflow contract.
+    ST-1 completed and independently green (npm run check + npm test
+    284/284, diff scope exactly the 2 planned files). Recommend proceeding
+    to ST-2 (resolveEngine + UnknownEngineError), pending its own
+    stage_approval.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:20:00Z"
+updated_at: "2026-08-22T01:30:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
   spec: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/spec.md
   design: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/design.md
   plan: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/plan.md
+  execution_log: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/execution-log.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -164,3 +180,10 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-22T01:20:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-1
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:30:00Z"

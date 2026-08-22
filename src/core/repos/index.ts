@@ -24,6 +24,8 @@ export {
 } from "./list-repos.js";
 export {
   DiffLimitsSchema,
+  type EngineName,
+  EngineNameSchema,
   type GlobalConfig,
   GlobalConfigSchema,
   type RepoEntry,

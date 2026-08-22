@@ -6,7 +6,9 @@
  * `runReview` use case with its request/deps/result shapes, its error family
  * and its two injectable seams (`VerdictParser`, `TimeoutScheduler`), and the
  * `resolveEngine` cascade function (`[E4.F2.H3]`, #30) with its own error.
- * The module's second driven port, ProcessRunner, lands in E5.F1.x.
+ * The module's second driven port, `ProcessRunner` (`[E5.F1.H1]`, #31), and
+ * its request pre-flight `validateProcessRunRequest` — no caller yet, an
+ * execa adapter lands the same story.
  *
  * Deliberately NOT public (AC-16): the built-in verdict extraction, the
  * default timeout scheduler, the engine race helper and the failure
@@ -17,17 +19,25 @@
 
 export type { TimeoutScheduler } from "./engine-timeout.js";
 export type {
+  ProcessRunner,
+  ProcessRunRequest,
+  ProcessRunResult,
+} from "./ports/process-runner.js";
+export type {
   ReviewEngine,
   ReviewRequest,
   ReviewResult,
   ReviewUsage,
 } from "./ports/review-engine.js";
+export { validateProcessRunRequest } from "./process-run-request.js";
 export { type ResolveEngineInput, resolveEngine } from "./resolve-engine.js";
 export {
   EngineInvocationError,
   type EngineResolutionLevel,
   EngineTimeoutError,
+  InvalidProcessRequestError,
   InvalidRunRequestError,
+  ProcessSpawnError,
   RunError,
   type RunErrorOptions,
   UnknownEngineError,

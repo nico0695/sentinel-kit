@@ -47,7 +47,7 @@ stages:
     started_at: "2026-08-22T13:15:00Z"
     completed_at: "2026-08-22T13:35:00Z"
     notes: >-
-      spec.md written, status complete, 18 acceptance criteria. All six proposal open questions
+      spec.md written, status complete at revision 2, 21 acceptance criteria. All six proposal open questions
       resolved (D1..D6); the three B-level ones carry recommendations pending ratification at
       cp-spec-approval. Grounded in direct verification rather than assumption: confirmed
       RepoRegistrySchema is z.record(z.string(), RepoEntrySchema) so repos are keyed by NAME,
@@ -62,6 +62,20 @@ stages:
       directly) while mkdtemp is precedented in the opencode permission-config adapter -- hence D3
       stages inside the runs root rather than in os.tmpdir(), since rename across filesystems
       fails with EXDEV.
+      REVISION 2 (user-directed re-analysis before design): D1..D6 survived unchanged; five
+      rev-1 specification gaps fixed, one a self-contradictory AC. (1) The decoy-token AC demanded
+      absence from metadata.json while planting the decoy in every optional string field -- but
+      failure.message's contract is to be written INTO metadata.json; rewritten as AC-18 with
+      failure.message excluded. (2) <ts> sourcing was unspecified; new D7 makes the adapter
+      clockless -- <ts> derives from record.startedAtEpochMs, honoring the injectable-clock
+      convention and making paths deterministic (AC-14). (3) startedAt's record type fixed as
+      epoch-ms number, one source rendered three ways (record / ISO metadata / compact path). (4)
+      ReviewDiff.files[].content carries full per-file diff text, so persisting record.diff
+      wholesale would duplicate the entire diff inside metadata.json; new D8 persists a summary
+      only, pinned by AC-10's marker test. (5) First-save recursive directory creation and
+      same-timestamp stale-staging retry specified (AC-15, AC-14). AC-19 additionally forbids a
+      leading dot in repoName so skip-dot-entries is the single scanning rule at both levels.
+    last_updated_at: "2026-08-22T14:05:00Z"
   sddl-design:
     status: pending
   sddl-plan:
@@ -102,7 +116,9 @@ checkpoints:
     type: stage_approval
     stage: sddl-spec
     summary: >-
-      spec.md is complete with 18 acceptance criteria. Three B-level decisions (D1 metadata source,
+      spec.md is complete at revision 2 with 21 acceptance criteria (a user-directed re-analysis Three B-level decisions (D1 metadata source,
+      fixed five rev-1 gaps, including one self-contradictory AC -- see the spec's Revision
+      Notes -- and added A-level D7 clockless-adapter and D8 diff-summary-only decisions).
       D2 the store's caller, D3 atomicity strategy) are resolved with recommendations and need
       ratification, because D1 in particular determines whether this story touches src/core/run at
       all.
@@ -157,9 +173,11 @@ open_risks:
       narrower -- RunReviewResult.failure.error is typed unknown and may be a raw exception whose
       message or stack carries a command line or environment. Largely addressed by D4 plus AC-13
       (RunRecord.failure is a typed { stage: RunStage; message: string }, so a raw exception cannot
-      structurally reach the store) and by AC-15 (a decoy-token test). Residual risk is that AC-15
-      must be written to actually discriminate -- asserting the token is absent from metadata.json
-      while present in the files whose contract is to carry it verbatim -- rather than merely to pass.
+      structurally reach the store) and by AC-18 (a decoy-token test). Rev 2 of the spec fixed
+      rev 1's version of that test, which was self-contradictory: it planted the decoy in every
+      optional string field including failure.message, whose contract is to be written INTO
+      metadata.json. The decoy set is now prompt/engineOutput/validationOutput with
+      failure.message explicitly excluded and the rationale stated in the AC itself.
     severity: low
   - id: risk-004
     summary: >-
@@ -176,4 +194,4 @@ next_action:
     consequential one: if the caller does not compose the RunRecord, the scope boundary, AC-2 and
     AC-3 all change and spec must be amended first.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T13:35:00Z"
+updated_at: "2026-08-22T14:05:00Z"

@@ -10,17 +10,34 @@
  */
 import { z } from "zod";
 
+/** Shared by every schema below: a string safe to use as one path segment. */
+const PathSegmentSchema = z
+  .string()
+  .min(1)
+  .refine((v) => !v.includes("/") && !v.includes("\\"), {
+    message: "must not contain path separators",
+  })
+  .refine((v) => !v.startsWith("."), {
+    message: "must not start with '.'",
+  });
+
 export const RunRecordPathFieldsSchema = z.object({
-  repoName: z
-    .string()
-    .min(1)
-    .refine((v) => !v.includes("/") && !v.includes("\\"), {
-      message: "repoName must not contain path separators",
-    })
-    .refine((v) => !v.startsWith("."), {
-      message: "repoName must not start with '.'",
-    }),
+  repoName: PathSegmentSchema,
   startedAtEpochMs: z.number().int().nonnegative().finite(),
 });
 
 export type RunRecordPathFields = z.infer<typeof RunRecordPathFieldsSchema>;
+
+/**
+ * Validates `list`/`get`'s inputs before any fs access (`[E5.F2.H2]` AC-13).
+ * `id`'s ts-FORMAT is deliberately NOT checked here — that is the adapter's
+ * `parseRunTimestamp` (D5), so the on-disk layout's format stays out of the
+ * port contract. This schema only guarantees `id` is safe to use as a path
+ * segment, same as `repoName`.
+ */
+export const RunQueryFieldsSchema = z.object({
+  repoName: PathSegmentSchema,
+  id: PathSegmentSchema,
+});
+
+export type RunQueryFields = z.infer<typeof RunQueryFieldsSchema>;

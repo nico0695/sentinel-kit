@@ -20,6 +20,7 @@ import {
   type RunRecord,
   RunRecordPathFieldsSchema,
   type RunStore,
+  type RunSummary,
 } from "../../../core/history/index.js";
 import {
   deriveRunPaths,
@@ -147,6 +148,16 @@ export function createRunStoreFsAdapter(runsRoot: string): RunStore {
       }
 
       return finalDir;
+    },
+
+    /* --- list/get: stubbed in ST-1 so RunStore's extended interface
+     * typechecks against this existing implementor; wired for real in
+     * [E5.F2.H2] ST-3. --- */
+    list(_repoName: string): Promise<readonly RunSummary[]> {
+      throw new Error("RunStore.list is not implemented yet");
+    },
+    get(_repoName: string, _id: string): Promise<RunRecord> {
+      throw new Error("RunStore.get is not implemented yet");
     },
   };
 }

@@ -41,3 +41,23 @@
   - `npm test`: `process-runner-exec.test.ts` (driving the contract suite against real `node -e` children) 4/4 passing, independently re-run in isolation. Full suite: 390 tests green.
   - Diff scope: confirmed via `git status --porcelain` — exactly the 4 named files (plus this change's own `state.yaml`/`execution-log.md`) — independently verified. Source of `process-runner-exec.ts` read in full and confirmed to match spec.md's pinned option bag and design.md's flow verbatim.
 - **Deviations (ST-3)**: none. `DEFAULT_MAX_OUTPUT_CHARS` (1,000,000) and `FORCE_KILL_AFTER_DELAY_MS` (2000, reused from the `claude-code` engine seam) are new adapter-owned numeric choices, explicitly anticipated and licensed by design.md D-7 ("the adapter owns the two numeric defaults as module constants") — not a scope deviation.
+
+## ST-4 — Real-child test suite, closing gate
+
+- **Status**: completed
+- **Scope**: `src/adapters/driven/exec/__test__/process-runner-exec.test.ts` (edit only — appended `describe` blocks to the existing thin driver; no new production code)
+- **What landed**: 8 real-process test groups (14 tests) using `createExecProcessRunner()` directly against real `node -e` children, deliberately not repeating anything `ProcessRunner.contract.ts` already covers:
+  1. **AC-1, the load-bearing reaping proof**: a `SIGTERM`-trapping child prints its own pid as stdout's first line (the port exposes no pid field), is run with a short `timeoutMs`; asserts `signal: "SIGKILL"`, then polls (`waitUntil`, 20×50ms) for `process.kill(pid, 0)` to throw `ESRCH` rather than asserting liveness once.
+  2. AC-2/AC-3: cooperative child → `timedOut: false`; a hanging child → `timedOut: true`.
+  3. AC-4: `"a\n\n"` captured byte-exactly — the direct regression test for spec's R4 finding (`stripFinalNewline: false`).
+  4. AC-5: stdout/stderr captured independently, cross-checked for no bleed.
+  5. AC-11: `cwd` honored against a fresh `mkdtemp` dir, both sides `realpathSync`-normalized.
+  6. AC-12: an arg containing `; touch <marker>` arrives verbatim in the child's `argv` and creates no file — the direct regression test for the no-shell invariant.
+  7. AC-14, the two real spawn-failure shapes the contract suite does not cover: a `chmod 600` non-executable file (EACCES) and an absolute `cwd` that does not exist on disk — both `ProcessSpawnError` with `cause` populated.
+  8. AC-17 real corroboration: a child flooding stdout past a 4096-char budget while ignoring `EPIPE` and never exiting — asserts `timedOut: true` **and** a truncation flag `true` together, the real-process counterpart to ST-2's hand-built unit test.
+- **Validation**:
+  - `npm run check`: green — 114 files (biome), `tsc --noEmit` clean, `depcruise src` 0 violations (80 modules, 164 dependencies) — independently re-run.
+  - `npm test`: `process-runner-exec.test.ts` 14/14 passing (up from ST-3's 4, all real children), independently re-run in isolation.
+  - **AC-15 closing-gate check**: `git diff --stat 8c080cb..HEAD -- src/core/run/run-review.ts src/adapters/driven/git src/adapters/driven/engines` is empty — independently re-run against the correct merge-base with `origin/main` (`8c080cb`, the post-[E5.F2.H2]-merge commit; the executor worker's own diff computation used a stale pre-merge base and was re-derived correctly here). `grep -rn "execa" src/core/` returns only two doc-comment mentions of the word, zero import statements — confirmed no `execa` import anywhere under `src/core/**`.
+  - **Full-story diff**: `git diff --stat 8c080cb..HEAD -- src/` shows exactly 11 files (680 insertions, 3 deletions) — the 5 ST-1 files, 2 ST-2 files, 3 new + 1 edited ST-3 files, 1 edited ST-4 file — matching plan.md's stage plan file-for-file, nothing from `src/main/` or any adapter other than `exec`.
+- **Deviations (ST-4)**: none in test content. One process correction made by the orchestrator (not the executor): the executor's own AC-15/full-story-diff computation used `main` as the comparison base, which predates the `[E5.F2.H2]` merge (`8c080cb`) and so spuriously included that already-merged story's files in the reported diff; the orchestrator re-ran both checks against the correct merge-base (`origin/main` at `8c080cb`) and confirmed the true scope is exactly this story's 11 files.

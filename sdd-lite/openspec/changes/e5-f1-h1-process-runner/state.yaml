@@ -89,9 +89,9 @@ stages:
     status: in_progress
     started_at: "2026-08-23T00:15:00Z"
     notes: >-
-      ST-1 and ST-2 completed and independently re-verified (npm run check + npm test re-run
+      ST-1, ST-2, ST-3 completed and independently re-verified (npm run check + npm test re-run
       fresh, diff-scope confirmed via git status, source read directly, not merely trusted from
-      the executor workers' self-reports). ST-3, ST-4 pending.
+      the executor workers' self-reports). ST-4 (real-child suite, closing gate) pending.
   sddl-code-review:
     status: pending
   sddl-qa-review:
@@ -168,7 +168,23 @@ checkpoints:
       responded_at: "2026-08-23T00:35:00Z"
     created_at: "2026-08-23T00:32:00Z"
     resolved_at: "2026-08-23T00:35:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: Approval to execute ST-3 — the impure adapter shell + ProcessRunner.contract.ts.
+    question: "Proceed with ST-3?"
+    free_input_allowed: true
+    response:
+      free_text: "si, avanza con ST-3"
+      responded_at: "2026-08-23T01:00:00Z"
+    created_at: "2026-08-23T00:55:00Z"
+    resolved_at: "2026-08-23T01:00:00Z"
 decisions:
+  - id: dec-st3-approval
+    checkpoint_id: cp-st3-approval
+    free_text: "si, avanza con ST-3"
+    rationale: User approved ST-3 execution as planned, no changes to scope.
+    recorded_at: "2026-08-23T01:00:00Z"
   - id: dec-st2-approval
     checkpoint_id: cp-st2-approval
     free_text: "si, avanza con ST-2"
@@ -252,8 +268,7 @@ next_action:
   kind: ask_user
   target: sddl-executor
   summary: >-
-    ST-2 complete and independently re-verified. Awaiting stage_approval for ST-3 (the impure
-    adapter shell wiring the pinned execa option bag to the classifier, plus the sixth
-    ProcessRunner.contract.ts).
+    ST-3 complete and independently re-verified. Awaiting stage_approval for ST-4 (real-child
+    test suite, the story's closing gate, re-verifying AC-15).
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-23T00:50:00Z"
+updated_at: "2026-08-23T01:15:00Z"

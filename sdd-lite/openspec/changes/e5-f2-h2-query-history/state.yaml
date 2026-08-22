@@ -16,8 +16,8 @@ complexity_assessment:
     this story's acceptance criterion asks for.
   confidence: medium-high
   recorded_at: "2026-08-22T18:00:00Z"
-lifecycle_status: draft
-current_stage: sddl-proposal
+lifecycle_status: planning
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -40,9 +40,28 @@ stages:
       .partial-<ts> entries during scanning, and the shape of RunStore's new read method(s).
       [E5.F2.H3] (cost/tokens) treated as out of scope per workflow contract rule 7.
     last_updated_at: "2026-08-22T18:00:00Z"
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-22T18:10:00Z"
+    completed_at: "2026-08-22T18:35:00Z"
+    notes: >-
+      spec.md written, 12 acceptance criteria. All four proposal open questions resolved with
+      recommendations: D1 (both .partial-<ts> staging leftovers AND corrupt-metadata final
+      directories are surfaced via RunSummary.status, deliberately diverging from [E5.F2.H1]'s
+      AC-19 scan which skips dot-prefixed entries for its narrower collision-check purpose); D2
+      (list() returns a distinct, mostly-optional RunSummary rather than RunRecord[], because a
+      partial/corrupt entry cannot supply a full RunRecord); D3 (getRun returns file bodies, not
+      paths, symmetric with what save() accepted); D4 (empty repo -> [], not an error, closed
+      A-level). Grounded in direct inspection of RunStore.contract.ts (confirmed its own doc
+      comment names this story as where the thin contract "thickens"), run-store-errors.ts (the
+      HistoryError hierarchy pattern the two new errors extend), terminal-state.ts and verdict.ts
+      (exact field types for RunSummary), and list-branches-errors.ts (the error-class shape
+      convention). D1 and D2 are B-level and need ratification before design.
+    last_updated_at: "2026-08-22T18:35:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f2-h2-query-history/spec.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -55,20 +74,60 @@ checkpoints:
       Approve the proposal and proceed to sddl-spec for [E5.F2.H2] Query history?
     free_input_allowed: true
     created_at: "2026-08-22T18:00:00Z"
-decisions: []
+    response:
+      free_text: "si, avanza con el spec"
+      responded_at: "2026-08-22T18:05:00Z"
+    resolved_at: "2026-08-22T18:05:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete with 12 acceptance criteria. Two B-level decisions (D1 corrupt/partial
+      definition, D2 read-method shape) are recommended and need ratification before sddl-design.
+    question: >-
+      Ratify D1 (list() surfaces both .partial-<ts> leftovers and corrupt-metadata final
+      directories via RunSummary.status) and D2 (list() returns a distinct RunSummary, not
+      RunRecord[]; get() returns the full RunRecord), and proceed to sddl-design?
+    options:
+      - id: opt-ratify-both
+        label: Ratify D1 and D2 and proceed to design
+        description: >-
+          Accept both as specified. list()/get() ship with the RunSummary/RunRecord split and the
+          dual partial+corrupt marker.
+        recommended: true
+      - id: opt-d1-partial-only
+        label: Reject D1 partially -- only surface .partial-<ts>, not corrupt metadata
+        description: >-
+          Narrower scope: treat metadata parse/validation failure as an unexpected error instead
+          of a listed status. Simpler, but AC-6/AC-7 would need to change to "list() may throw on
+          a corrupt entry," which is closer to the failure mode the AC explicitly warns against.
+      - id: opt-d2-full-record
+        label: Reject D2 -- list() returns RunRecord[] instead of RunSummary[]
+        description: >-
+          Keeps one type instead of two, but forces partial/corrupt entries to fabricate
+          placeholder values for RunRecord's required fields (harness, baseRef, targetRef, state),
+          which has no honest value to use.
+    free_input_allowed: true
+    created_at: "2026-08-22T18:35:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-approval
+    free_text: "si, avanza con el spec"
+    rationale: >-
+      User approved the proposal and directed the spec stage to run. Authorship: claude->user.
+    recorded_at: "2026-08-22T18:05:00Z"
 open_risks:
   - id: risk-001
     summary: >-
-      Issue #34's "corrupt/partial runs listed with a marker" reads, on a literal interpretation
-      of "partial," in tension with [E5.F2.H1]'s own AC-19 convention of skipping dot-prefixed
-      .partial-<ts> staging directories during any scan. Spec must decide explicitly whether this
-      story's scan treats .partial-<ts> entries differently than [E5.F2.H1]'s did, and state the
-      rationale.
-    severity: medium
+      RESOLVED by D1 in spec.md, pending ratification at cp-spec-approval. list() surfaces both
+      .partial-<ts> staging leftovers and corrupt-metadata final directories via
+      RunSummary.status, deliberately diverging from [E5.F2.H1]'s AC-19 scan (which skips
+      dot-prefixed entries for its own narrower collision-check purpose).
+    severity: low
 next_action:
   kind: user_checkpoint
   summary: >-
-    proposal.md ready. Awaiting approval to proceed to sddl-spec, which must resolve the
-    corrupt/partial definition and the RunStore read-method shape as firm acceptance criteria.
+    spec.md ready, 12 ACs. Awaiting ratification of D1 (corrupt/partial marker scope) and D2
+    (RunSummary vs RunRecord[] for list()) before proceeding to sddl-design.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T18:00:00Z"
+updated_at: "2026-08-22T18:35:00Z"

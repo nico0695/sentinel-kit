@@ -81,6 +81,14 @@ export interface RunReviewRequest {
    * validations of its own and imports nothing from E5.
    */
   readonly validationOutput?: readonly string[];
+  /**
+   * Opaque echo, not inspected or validated by `runReview` — a caller that
+   * already resolved which engine `deps.engine` implements (`resolveEngine`,
+   * `[E4.F2.H3]`, #30) may carry that fact through the run so a result
+   * consumer can see it without a `RunStore` (`docs/backlog-mvp-sentinel.md`
+   * §E4.F2.H3's "engine used recorded in run metadata").
+   */
+  readonly engineName?: string;
 }
 
 export interface RunReviewDeps {
@@ -176,6 +184,8 @@ export interface RunReviewResult {
   readonly failure?: RunFailure;
   /** Always present. Never influences `state`. */
   readonly cleanup: RunCleanupOutcome;
+  /** Echoes `request.engineName` verbatim when the caller supplied one. */
+  readonly engineName?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -256,6 +266,9 @@ export async function runReview(
     ...(draft.usage !== undefined ? { usage: draft.usage } : {}),
     ...(outcome.failure !== undefined ? { failure: outcome.failure } : {}),
     cleanup,
+    ...(request.engineName !== undefined
+      ? { engineName: request.engineName }
+      : {}),
   };
 }
 

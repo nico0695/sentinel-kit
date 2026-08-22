@@ -16,7 +16,7 @@ complexity_assessment:
     (E6.F1 territory) in scope.
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
-lifecycle_status: executing
+lifecycle_status: reviewing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -136,6 +136,22 @@ stages:
       291/291 (284 baseline + 7 new, exact). QA review not requested --
       resolveEngine is pure/dependency-free with full test coverage; ST-3
       (the story's closing gate) is the natural review point.
+
+      ST-3 completed: engineName?: string added to RunReviewRequest and
+      RunReviewResult in run-review.ts, one conditional spread in the return
+      construction. Confirmed by direct diff read that RunStage,
+      classifyFailure, executePipeline's stages, and performCleanup are
+      byte-for-byte unchanged (AC-9). 2 new tests (echo present, echo absent
+      via "engineName" in result). Exactly the 2 planned files changed.
+      npm run check green, npm test 293/293 (291 + 2, exact). Closing gate:
+      grep confirms EngineNameSchema has exactly one definition in src/
+      (AC-6); full-story diff (scoped to this story's own commit range,
+      651fecb~1..working-tree, since the pre-H2 merge-base aa664bb is now
+      stale post-merge) is exactly 8 files -- the 6 from ST-1/ST-2 plus
+      run-review.ts/run-review.test.ts -- with zero adapter or src/main/
+      files touched, confirming the story stayed core-only as scoped. All 9
+      spec ACs implemented and independently verified. Story implementation
+      complete; recommend sddl-qa-review (final mode) before closing.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -153,14 +169,15 @@ review_summary: null
 qa_summary: null
 next_action:
   kind: continue
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    ST-2 completed and independently green (npm run check + npm test
-    291/291, diff scope exactly the 4 planned files). Recommend proceeding
-    to ST-3 (run-review.ts engineName echo field + closing gate), pending
-    its own stage_approval.
+    ST-1, ST-2, ST-3 all completed; 9/9 spec ACs implemented; npm run check
+    and npm test (293/293) green throughout; closing-gate diff/grep checks
+    passed (AC-6, AC-9); story stayed core-only, exactly 8 files touched, no
+    adapter/src/main/ file in the diff. Recommend sddl-qa-review (final
+    mode) before offering a PR.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:40:00Z"
+updated_at: "2026-08-22T01:50:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
@@ -207,3 +224,10 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-22T01:40:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-3
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:50:00Z"

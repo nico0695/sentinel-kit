@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-code-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -163,7 +163,25 @@ stages:
       covered. plan.md's ST-1..ST-4 fully executed.
     last_updated_at: "2026-08-22T16:15:00Z"
   sddl-code-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T16:20:00Z"
+    completed_at: "2026-08-22T16:45:00Z"
+    notes: >-
+      full-4r tier (1016 changed lines, over the 400-line threshold outright; grepped for
+      auth/security/payments/sensitive-data/migration markers, none genuine). 4 lens sweeps: R2
+      readability clean; R1 risk and R3 reliability independently converged on the SAME defect
+      (concurrent save() of the identical record races on the shared deterministic stagingDir),
+      merged by location+claim into one CRITICAL row per protocol; R4 resilience found a
+      distinct WARNING (best-effort staging cleanup on failure silently swallows its OWN
+      failure, masking a secondary error while the original cause is still preserved). Refuter
+      pass on the merged CRITICAL: traced save()'s actual await-interleaving semantics
+      step-by-step and showed that in every constructible interleaving, exactly one concurrent
+      caller's rename targets an already-consumed stagingDir or an existing finalDir and is
+      GUARANTEED to throw, refuting the claim's load-bearing clause ("no error surfaced to
+      either caller"). Verdict: pass_with_warnings, 0 open severe findings, 1 info row.
+      Residual nuance from the refuter's own trace (content-mixing possible in the WINNING
+      caller's directory before the loser's rename fails) recorded as a refinement to risk-005
+      below rather than a new finding, per the protocol rule that refuters may not add findings.
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
@@ -389,19 +407,45 @@ open_risks:
     severity: low
   - id: risk-005
     summary: >-
-      TOCTOU window between the step-4 collision pre-check and the step-9 rename: two concurrent
-      saves of the SAME run can both pass the pre-check. On POSIX the loser's rename fails with
-      ENOTEMPTY, so it is caught, but it surfaces as RunPersistenceError rather than the more
-      precise RunAlreadyExistsError. Accepted, not solved -- Node offers no portable atomic
-      create-exclusive on a directory. Neither ordering corrupts or merges a run, which is the
-      property that matters. Surfaced by design, recorded rather than hidden.
+      TOCTOU window between the step-4 collision pre-check and the step-9 rename: two
+      concurrent saves of the SAME run (identical repoName+startedAtEpochMs) can both pass the
+      pre-check. REFINED by the sddl-code-review full-4r refuter pass (2026-08-22): traced the
+      exact interleaving through save()'s await boundaries. In every constructible ordering,
+      exactly one caller's rename targets an already-consumed stagingDir or an existing
+      finalDir and is GUARANTEED to throw -- caught and surfaced as RunPersistenceError, never
+      silent. The refuter's trace also confirmed a narrower nuance: before the losing rename
     severity: low
+      fails, the WINNING caller's finalDir can contain an interleave of both callers' staged
+      files (its rm+mkdir at step 6 has no lock), so the winner's resolved path is not
+      guaranteed to contain only its own record's data under true concurrency. Still accepted,
+      not solved -- Node offers no portable atomic create-exclusive on a directory, and no
+      caller of RunStore.save() exists yet in this story (E6.F1 wires the composition root) so
+      no code path in this repo can currently trigger it. Neither ordering ever produces a
+      SILENT success on both sides, which is the property review-ledger.md's R1/R3-001 refuter
+      pass specifically disproved.
+    severity: low
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 1
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 1
+  summary: >-
+    full-4r tier (1016 changed lines). R2 clean; R1+R3 converged on one CRITICAL finding
+    (concurrent save() of the identical record racing on the shared stagingDir), refuted by a
+    step-by-step await-interleaving trace proving the losing caller always errors; R4 found one
+    WARNING (info) about masked secondary cleanup-failure diagnostics. 0 open severe findings.
+  reported_at: "2026-08-22T16:45:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f2-h1-run-store/review-ledger.md
+
 next_action:
   kind: ask_user
-  target: sddl-code-review
+  target: sddl-qa-review
   summary: >-
-    plan.md's ST-1..ST-4 are all complete and validated; all 21 ACs covered. Recommended next
-    stage is sddl-code-review (4R protocol) before sddl-qa-review, per execution-log.md's
-    ST-4 recommendation.
+    4R review complete: pass_with_warnings, 0 open severe findings, nothing requires a fix
+    stage. Recommended next is sddl-qa-review (final mode) for lifecycle closeout.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T16:15:00Z"
+updated_at: "2026-08-22T16:45:00Z"

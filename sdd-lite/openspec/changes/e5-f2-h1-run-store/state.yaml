@@ -18,8 +18,8 @@ complexity_assessment:
     made atomic with partial runs identifiable.
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
-lifecycle_status: implementing
-current_stage: sddl-code-review
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -185,7 +185,21 @@ stages:
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T16:50:00Z"
+    completed_at: "2026-08-22T17:05:00Z"
+    notes: >-
+      final mode, verdict pass. Independently re-verified rather than trusting execution-log.md:
+      fresh npm run check (green) and npm test (326/326); AC-3 via a fresh git diff --stat over
+      src/core/run (empty); the full 10-file story diff scope; AC-17 by re-running the process.env
+      grep scoped to production files only (a first unscoped attempt hit a comment documenting the
+      grep command itself as text -- recognized as a false positive, re-scoped, confirmed clean);
+      AC-14 by grepping for Date.now/bare new Date() (zero hits, both real new Date() calls take
+      an explicit epoch argument); AC-2 and AC-16 by direct read of RunRecord/RunFailureRecord
+      against spec.md's field list; AC-21 via depcruise. Consumed review-ledger.md's
+      pass_with_warnings verdict (0 open severe, 1 info) without re-deriving it. 21 of 21 ACs
+      pass. No amendment cycle needed, unlike [E4.F2.H3] -- the gap-closing work here happened at
+      spec revision 2, before any code was written.
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h1-run-store/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h1-run-store/proposal.md
@@ -441,11 +455,23 @@ review_summary:
   reported_at: "2026-08-22T16:45:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f2-h1-run-store/review-ledger.md
 
-next_action:
-  kind: ask_user
-  target: sddl-qa-review
+qa_summary:
+  mode: final
+  verdict: pass
   summary: >-
-    4R review complete: pass_with_warnings, 0 open severe findings, nothing requires a fix
-    stage. Recommended next is sddl-qa-review (final mode) for lifecycle closeout.
+    21 of 21 ACs pass, independently re-verified (not merely trusted from execution-log.md).
+    npm run check and npm test both fresh-green (326/326). AC-3 confirmed via a fresh git diff
+    over src/core/run (empty). review-ledger.md's pass_with_warnings consumed as evidence (0
+    open severe findings). No amendment cycle needed -- clean pass on the first final attempt.
+  reported_at: "2026-08-22T17:05:00Z"
+  report_path: sdd-lite/openspec/changes/e5-f2-h1-run-store/qa-report.md
+
+next_action:
+  kind: complete
+  summary: >-
+    final QA pass, change completed. Remaining work outside this change: write the mandatory
+    history-log entry before closing the session; offer the PR only if the user asks
+    ([E5.F2.H1] RunStore: full persistence, Closes #33); [E5.F2.H2] (listRuns/getRun, #34) is now
+    unblocked.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T16:45:00Z"
+updated_at: "2026-08-22T17:05:00Z"

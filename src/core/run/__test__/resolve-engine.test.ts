@@ -84,6 +84,38 @@ describe("resolveEngine", () => {
       }
     });
 
+    it("rejects an empty run override instead of cascading past it (AC-10)", () => {
+      // An empty string is PRESENT, not absent: it wins precedence and is
+      // then rejected, rather than silently falling through to the valid
+      // repoOverride below it. Substituting a different engine than the
+      // caller explicitly asked for would be the more surprising outcome.
+      try {
+        resolveEngine({
+          globalDefault: "claude-code",
+          repoOverride: "opencode",
+          runOverride: "",
+        });
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnknownEngineError);
+        const unknownEngineError = error as UnknownEngineError;
+        expect(unknownEngineError.value).toBe("");
+        expect(unknownEngineError.level).toBe("run");
+      }
+    });
+
+    it("rejects an empty repo override instead of cascading past it (AC-10)", () => {
+      try {
+        resolveEngine({ globalDefault: "claude-code", repoOverride: "" });
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(UnknownEngineError);
+        const unknownEngineError = error as UnknownEngineError;
+        expect(unknownEngineError.value).toBe("");
+        expect(unknownEngineError.level).toBe("repo");
+      }
+    });
+
     it("does not validate a repo override shadowed by a valid run override", () => {
       // The invalid repoOverride is never inspected: runOverride wins
       // precedence outright, so resolution never touches the repo level.

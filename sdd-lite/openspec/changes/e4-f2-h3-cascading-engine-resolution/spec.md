@@ -43,9 +43,10 @@
   carries one via its zod `.default()`), so there is no "all three absent"
   case to design for.
 - `UnknownEngineError` (new, `run` module, extends the module's existing
-  error family) thrown when the resolved value — the first non-empty one in
-  precedence order — is not a recognized engine name. The message names both
-  the offending value and which cascade level it came from.
+  error family) thrown when the resolved value — the first *present* one in
+  precedence order (see Amendment 1) — is not a recognized engine name. The
+  message names both the offending value and which cascade level it came
+  from.
 - Extract `EngineNameSchema = z.enum(["claude-code", "opencode"])` in
   `src/core/repos/ports/config-schemas.ts`, and reuse it from
   `GlobalConfigSchema.defaultEngine` and `RepoEntrySchema.defaultEngine`
@@ -98,6 +99,7 @@
 | `runOverride` set, `repoOverride` also set | Resolves to `runOverride` | Run wins over repo (and transitively over global) |
 | `runOverride` is an unrecognized string (e.g. `"codex"`) | Throws `UnknownEngineError` naming `"codex"` and `"run"` as the source | Validation applies to whichever level wins, not just the global default |
 | `repoOverride` unrecognized but shadowed by a valid `runOverride` | Resolves to `runOverride`; the invalid `repoOverride` is never validated or reported | Validation only ever inspects the winning value — an overridden invalid value is not an error |
+| `runOverride` is `""` (empty string), with a valid `repoOverride` present | Throws `UnknownEngineError` naming `""` and `"run"` — it does NOT fall through to `repoOverride` | **Amendment 1.** An explicitly-passed empty value is a malformed input, not an absent one; erroring beats silently ignoring what the caller wrote |
 | `runReview` called with `request.engineName` set | `result.engineName` echoes the same value | No dependency on `resolveEngine` inside `run-review.ts` |
 | `runReview` called without `request.engineName` | `result.engineName` is absent (key not present) | Symmetrical with existing optional-field omission pattern |
 
@@ -105,7 +107,7 @@
 
 | Criteria Id | Acceptance Criteria | Validation Hint | Priority |
 |---|---|---|---|
-| AC-1 | `resolveEngine` returns `runOverride` whenever it is provided and non-empty, regardless of `repoOverride`/`globalDefault` | Unit test, run-wins case | must |
+| AC-1 | `resolveEngine` returns `runOverride` whenever it is present (not `undefined`), regardless of `repoOverride`/`globalDefault`. Reworded by Amendment 1 — was "provided and non-empty" | Unit test, run-wins case | must |
 | AC-2 | `resolveEngine` returns `repoOverride` whenever `runOverride` is absent and `repoOverride` is provided | Unit test, repo-wins case | must |
 | AC-3 | `resolveEngine` returns `globalDefault` whenever both `runOverride` and `repoOverride` are absent | Unit test, global-fallback case | must |
 | AC-4 | `resolveEngine` throws `UnknownEngineError` when the winning (precedence-resolved) value is not in `EngineNameSchema`'s enum | Unit test, one case per cascade level winning with an invalid value | must |
@@ -114,6 +116,7 @@
 | AC-7 | `RunReviewRequest.engineName` and `RunReviewResult.engineName` are both optional; when the request sets it, the result echoes the identical value | Unit test on `runReview` (fake engine + fake git, minimal happy path) | must |
 | AC-8 | When `request.engineName` is absent, `result.engineName` is absent (the key is not present on the result object, not `undefined`-valued) | Unit test using `"engineName" in result` or `Object.hasOwn` | must |
 | AC-9 | `run-review.ts`'s pipeline stages, `RunStage` union, and `classifyFailure` are unchanged by this story — the only diff to that file is the two-field echo-through | Diff review at QA: `git diff` scoped to `run-review.ts` shows no stage/control-flow changes | must |
+| AC-10 | **(Amendment 1)** An empty-string override is *present*, not absent: `resolveEngine` selects it by precedence and then rejects it with `UnknownEngineError`, rather than cascading down to the next level | Unit test, one case per overridable level (`run`, `repo`) asserting the throw and the reported `level` | must |
 
 ## Risks And Trade-Offs
 
@@ -130,6 +133,46 @@
 | Should H2 (opencode adapter) be merged before this story starts? | Proposal's open question 3 | spec | **resolved**: PR #67 merged to `main` 2026-08-22; both `[E4.F2.H1]` and `[E4.F2.H2]` are now fully merged, no blocker |
 | Where does the per-run override enter the core? | Proposal's open question 1 | spec | **resolved**: a separate `resolveEngine` function, not a new `runReview` internal step (see Scope Boundary / Non-Goals) |
 | Exact shape of "engine used" in run metadata | Proposal's open question 2 | spec | **resolved**: symmetrical optional `engineName` echo field on `RunReviewRequest`/`RunReviewResult`, since no `RunStore` exists yet (AC-7/AC-8) |
+
+## Amendment 1 — empty-string overrides (2026-08-22)
+
+**Trigger.** Final QA (`qa-report.md`, QA-1, `medium`) and, independently, the
+`reliability` lens of the 4R review (`review-ledger.md`, R3-001, `WARNING`,
+`deterministic`, `introduced`) both reported the same contract mismatch from
+fresh contexts: this spec required the run override to win *"whenever it is
+provided **and non-empty**"* and defined the validated value as *"the first
+**non-empty** one in precedence order"*, but `resolveEngine` branches on
+`!== undefined`. An empty-string override therefore wins precedence and is
+then rejected, instead of cascading to the next level. Reproduced directly:
+`resolveEngine({ globalDefault: "claude-code", repoOverride: "opencode",
+runOverride: "" })` throws `UnknownEngineError: Unknown engine "" from run
+override`. Critically, **no test pinned either reading**, so the suite was
+blind to the discrepancy in both directions.
+
+**Decision (`dec-002`, user, B-level).** Amend the spec to match the
+implemented behavior, rather than change working resolution logic.
+
+**Rationale.** The implemented behavior is the better of the two readings: an
+explicitly-passed `--engine ""` is a malformed input, and erroring on it is
+safer than silently ignoring what the operator wrote and falling back to a
+different engine than they asked for. Silently substituting an engine is
+precisely the kind of surprise this cascade exists to make predictable. So
+the *wording* was wrong, not the code — and amending it is a smaller,
+lower-risk delta than rewriting a function that two independent review passes
+found otherwise correct.
+
+**Changes.** AC-1 reworded ("present (not `undefined`)" replaces "provided and
+non-empty"); the Scope Boundary's "first non-empty one" becomes "first
+*present* one"; **AC-10 added**, pinning the empty-string rejection at both
+overridable levels; one Expected Behavior row added for the `""` case. The
+new AC closes R3-001's second half — the missing test coverage — so the
+behavior can no longer drift silently in either direction.
+
+**Not changed.** `resolve-engine.ts` itself is untouched by this amendment;
+its behavior was already what the amended spec now describes. `design.md`
+needed no amendment either — its pseudocode already showed `!== undefined`
+and was consistent with the code all along. This amendment therefore adds
+test coverage and corrects prose; it does not alter any runtime behavior.
 
 ## Approval Notes
 

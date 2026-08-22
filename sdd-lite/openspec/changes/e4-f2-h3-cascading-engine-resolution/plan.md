@@ -40,7 +40,22 @@
 |---|---|---|---|---|---|---|---|
 | ST-1 | Extract `EngineNameSchema`/`EngineName` in `repos/ports/config-schemas.ts`; reference it from `GlobalConfigSchema.defaultEngine` and `RepoEntrySchema.defaultEngine`; re-export from `repos/index.ts` | — | `src/core/repos/ports/config-schemas.ts` (edit), `src/core/repos/index.ts` (edit) | `npm run check` + `npm test` green; existing `ConfigStore.contract.ts` and `repos/__test__/*` unmodified and passing (regression proof the refactor is behavior-preserving, AC-6) | yes | yes | pending |
 | ST-2 | Add `resolveEngine` (pure function) and `UnknownEngineError` implementing the run > repo > global precedence and unknown-name validation | ST-1 | `src/core/run/resolve-engine.ts` (new), `src/core/run/run-errors.ts` (edit), `src/core/run/index.ts` (edit), `src/core/run/__test__/resolve-engine.test.ts` (new) | `npm run check` + `npm test` green; new test file covers AC-1..AC-5 (precedence matrix incl. shadowed-invalid-value case, unknown-name at each level, error message content) | yes | yes | pending |
-| ST-3 | Add `engineName?: string` to `RunReviewRequest`/`RunReviewResult`; one conditional spread in `runReview`'s return construction; closing gate | ST-1 (independent of ST-2, sequenced last) | `src/core/run/run-review.ts` (edit), `src/core/run/__test__/run-review.test.ts` (edit) | `npm run check` + `npm test` green; new cases for AC-7/AC-8 (echo present, echo absent via `"engineName" in result`); `git diff -- src/core/run/run-review.ts` reviewed to confirm only the 2-field diff (AC-9); full-story diff confined to the 6 files listed across ST-1..ST-3 | yes | yes | pending |
+| ST-3 | Add `engineName?: string` to `RunReviewRequest`/`RunReviewResult`; one conditional spread in `runReview`'s return construction; closing gate | ST-1 (independent of ST-2, sequenced last) | `src/core/run/run-review.ts` (edit), `src/core/run/__test__/run-review.test.ts` (edit) | `npm run check` + `npm test` green; new cases for AC-7/AC-8 (echo present, echo absent via `"engineName" in result`); `git diff -- src/core/run/run-review.ts` reviewed to confirm only the 2-field diff (AC-9); full-story diff confined to the 6 files listed across ST-1..ST-3 | yes | yes | completed |
+| ST-4 | **(Amendment 1 fix stage)** Pin the empty-string override behavior with tests, closing R3-001 / QA-1 | ST-2 | `src/core/run/__test__/resolve-engine.test.ts` (edit) — **test-only; no production file changes** | `npm run check` + `npm test` green; new cases cover AC-10 at both overridable levels (`run`, `repo`), asserting the throw, the reported `level`, and that `""` does NOT cascade; each new test confirmed non-vacuous by mutating `resolve-engine.ts` to cascade on `""` and observing the test fail, then reverting | yes | yes | pending |
+
+### ST-4 Fix Stage Scope
+
+Appended after the fact, per Amendment 1 in `spec.md`. Bounded to exactly one
+ledger id and one file:
+
+| Ledger Id | Severity | What ST-4 does |
+|---|---|---|
+| R3-001 / QA-1 | `WARNING` / `medium` (non-blocking, `info`) | Adds the tests that pin AC-10's empty-string rejection. **No production code changes** — the spec was amended to match the already-correct implementation, so the only gap left to close was the missing coverage both review passes flagged. |
+
+Note on routing: R3-001 is an `info` row and never entered the code-review
+fix loop (that loop only accepts `open` severe findings). ST-4 exists because
+of the `cp-final-review` QA decision, not because of a code-review fix round —
+the ledger's Fix Rounds table stays empty by design.
 
 ## Validation Strategy
 

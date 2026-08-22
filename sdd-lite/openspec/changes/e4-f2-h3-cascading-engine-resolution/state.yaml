@@ -152,6 +152,19 @@ stages:
       files touched, confirming the story stayed core-only as scoped. All 9
       spec ACs implemented and independently verified. Story implementation
       complete; recommend sddl-qa-review (final mode) before closing.
+
+      ST-4 completed (Amendment 1 fix stage): two tests added to
+      resolve-engine.test.ts pinning AC-10's empty-string rejection at both
+      overridable levels. TEST-ONLY -- zero production files changed,
+      confirmed by git diff --stat (resolve-engine.ts untouched), because
+      the spec was amended to match the already-correct implementation.
+      npm run check green, npm test 295/295 (293 + 2, exact). Non-vacuity
+      mutation-verified per ST-4's own mandatory exit condition: mutating
+      resolve-engine.ts to cascade past "" made exactly the two new tests
+      fail while the other 7 passed (right reason, not collateral), and
+      reverting restored 9/9. R3-001 / QA-1 now closed in both halves --
+      the spec says what the code does, and the behavior is pinned in both
+      directions.
   sddl-qa-review:
     status: completed
     started_at: "2026-08-22T02:00:00Z"
@@ -190,10 +203,35 @@ decisions:
       PR #67 merged) -- implicit advancement per this skill's own phase
       validation rule (user already indicated advancement).
     recorded_at: "2026-08-22T01:00:00Z"
+  - id: dec-002
+    checkpoint_id: cp-final-review
+    free_text: >-
+      Amend spec.md (reword AC-1, add AC-10) to match the implemented
+      empty-string behavior, rather than change resolveEngine's logic or
+      accept the discrepancy as disclosed.
+    author: user
+    rationale: >-
+      B-level (affects the approved acceptance contract). Presented at
+      cp-final-review with three options and a recommendation, twice: first
+      from final QA (QA-1, medium) and again after the 4R review
+      independently confirmed the same defect (R3-001, WARNING). User chose
+      option 1 ("1. enmendar el spec"). The implemented behavior is the
+      better of the two readings -- an explicitly-passed `--engine ""` is
+      malformed input, and erroring beats silently substituting a different
+      engine than the operator asked for, which is exactly the surprise the
+      cascade exists to prevent. So the wording was wrong, not the code, and
+      amending it is a smaller, lower-risk delta than rewriting a function
+      two independent review passes found otherwise correct. Recorded as a
+      spec AMENDMENT rather than a silent prose edit because AC-1 and the
+      Scope Boundary both explicitly said "non-empty"; changing behavior
+      expectations without amending them would have left the same
+      contradiction the amendment exists to close. AC-10 additionally closes
+      R3-001's second half (no test pinned either reading).
+    recorded_at: "2026-08-22T02:40:00Z"
 open_risks:
   - id: risk-002
     severity: medium
-    status: open
+    status: resolved
     summary: >-
       QA-1 (final QA, medium, OPEN — needs a B-level decision): spec.md's
       AC-1 requires the run override to win "whenever it is provided and
@@ -222,6 +260,17 @@ open_risks:
       The review additionally sharpened option 3's cost: both passes noted
       independently that no test pins EITHER reading, so accepting as-is
       leaves the approved AC both contradicted and unpinned.
+
+      RESOLVED (ST-4, Amendment 1, dec-002): user chose to amend the spec.
+      AC-1 reworded to "present (not undefined)", the Scope Boundary's
+      "first non-empty one" became "first present one", AC-10 added pinning
+      the empty-string rejection, and one Expected Behavior row added. Two
+      new tests cover AC-10 at both overridable levels, mutation-verified
+      non-vacuous: mutating resolve-engine.ts to cascade past "" made
+      EXACTLY those two tests fail (7 others still passing, so they fail for
+      the right reason), and reverting restored 9/9. Zero production files
+      changed -- the code was already what the amended spec describes.
+      npm run check green, npm test 295/295 (293 + 2, exact).
   - id: risk-003
     severity: low
     status: open
@@ -303,22 +352,21 @@ qa_summary:
   reported_at: "2026-08-22T02:00:00Z"
   report_path: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/qa-report.md
 next_action:
-  kind: halt
-  target: orchestrator
+  kind: continue
+  target: sddl-qa-review
   summary: >-
-    Final QA verdict pass_with_warnings. Per sddl-qa-review's own rule this
-    does NOT set lifecycle_status completed -- it stays reviewing, gated on
-    the cp-final-review checkpoint, which is PENDING a real user decision on
-    QA-1 (risk-002): amend the spec's "non-empty" wording to match the
-    implemented behavior plus a pinning test (recommended), fix the code to
-    fall through on an empty override, or accept the discrepancy as
-    disclosed (not recommended). Everything else is done: ST-1..ST-3
-    complete, 9/9 ACs implemented, all checks green and independently
-    re-verified. Per CLAUDE.md, never open a PR unless the user explicitly
-    asks -- resolve QA-1 first, then offer the PR "[E4.F2.H3] Cascading
-    engine resolution" (Closes #30). Never merge, never push main.
+    cp-final-review RESOLVED (dec-002): spec amended, ST-4 executed, R3-001
+    / QA-1 closed in both halves. The change now has a 10-AC spec whose
+    every AC is implemented and test-pinned; npm run check green, npm test
+    295/295. The previous final QA verdict (pass_with_warnings) was issued
+    against the OLD 9-AC spec and its sole warning no longer applies, so it
+    is stale -- re-run sddl-qa-review in final mode against the amended
+    spec to issue a fresh verdict before offering a PR. Per CLAUDE.md,
+    never open a PR unless the user explicitly asks; then offer
+    "[E4.F2.H3] Cascading engine resolution" (Closes #30). Never merge,
+    never push main.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T02:00:00Z"
+updated_at: "2026-08-22T02:40:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
@@ -374,10 +422,25 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-22T01:50:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-4
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T02:40:00Z"
+    summary: >-
+      Approved as part of the option-1 package the user selected verbatim
+      ("1. enmendar el spec"), which was presented as "drop 'non-empty' from
+      AC-1 and the Scope Boundary, and add one test pinning that "" rejects"
+      -- the test addition was inside the approved scope, not a separate ask.
   - id: cp-final-review
     type: final_review
     stage: sddl-qa-review
-    status: pending
+    status: resolved
+    decided_by: user
+    decided_at: "2026-08-22T02:40:00Z"
+    decision: amend-spec-to-match-implementation
     finding_ref: QA-1
     summary: >-
       Final QA returned pass_with_warnings on one medium finding (QA-1,
@@ -393,3 +456,10 @@ checkpoints:
       discrepancy as disclosed (not recommended -- leaves an approved AC
       contradicted by its own implementation, the exact failure mode
       [E4.F2.H2]'s Amendment 1 was raised to avoid).
+
+      RESOLVED: user chose option 1. spec.md amended (AC-1 reworded,
+      AC-10 added, Scope Boundary corrected, Expected Behavior row added,
+      Amendment 1 section recording the whole decision), plan.md gained
+      ST-4 with its own bounded scope table. design.md deliberately NOT
+      amended -- its pseudocode already matched the shipped code.
+      Recorded as dec-002.

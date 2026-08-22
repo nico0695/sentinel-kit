@@ -7,6 +7,7 @@
 | ST-1 | Extract `EngineNameSchema`/`EngineName`, reference from both cascade schemas, re-export | completed |
 | ST-2 | `resolveEngine` + `UnknownEngineError` | completed |
 | ST-3 | `run-review.ts` `engineName` echo field + closing gate | completed |
+| ST-4 | (Amendment 1) Pin empty-string override behavior with tests | completed |
 
 ## ST-1
 
@@ -56,3 +57,19 @@
     - Full-story diff (`git diff --stat 651fecb~1 -- src/`, scoped to this story's own commit range rather than the stale pre-H2 merge-base): exactly 8 files — the 6 from ST-1/ST-2 plus `run-review.ts` and `run-review.test.ts` from this stage. No `src/adapters/**` or `src/main/**` file appears — confirms the story stayed core-only as scoped (spec.md's Out Of Scope).
 - **Blockers**: none.
 - **Next action**: story implementation complete (ST-1, ST-2, ST-3 all done, 9/9 spec ACs covered). Recommend `sddl-qa-review` (final mode) before closing the change — first time the full diff is reviewed as a whole, and per CLAUDE.md's workflow contract a PR should not be offered before at least a QA pass.
+
+## ST-4 (Amendment 1 fix stage)
+
+- **Approval reference**: user, "1. enmendar el spec" — chose option 1 at the `cp-final-review` checkpoint, from the three routes offered in `qa-report.md` and re-offered after the 4R review. The approved package was explicitly "drop 'non-empty' from AC-1 and the Scope Boundary, and add one test pinning that `""` rejects".
+- **Planned scope**: `src/core/run/__test__/resolve-engine.test.ts` (edit) — test-only, plus the `spec.md`/`plan.md` artifact amendments.
+- **Artifact amendments** (not code):
+  - `spec.md`: AC-1 reworded to "present (not `undefined`)"; Scope Boundary's "first non-empty one" → "first *present* one"; **AC-10 added**; one Expected Behavior row added for the `""` case; new "Amendment 1" section recording the trigger, decision, rationale, and what was deliberately NOT changed.
+  - `plan.md`: ST-4 appended with its own scope table; ST-3's status corrected to `completed`.
+  - `design.md`: **deliberately not amended** — its pseudocode already showed `!== undefined` and was consistent with the shipped code all along, so there was nothing to correct.
+- **Actual changed files** (`git status --short`): `src/core/run/__test__/resolve-engine.test.ts` only. **Zero production files changed** — confirmed by `git diff --stat`, `resolve-engine.ts` untouched.
+- **Quick checks**:
+  - `npm run check`: green on first pass (biome + `tsc --noEmit` + depcruise, 0 violations, 67 modules/129 deps — unchanged, as expected for a test-only stage).
+  - `npm test`: `Tests 295 passed (295)` — exactly 293 (ST-3) + 2 new.
+  - **Non-vacuity, mutation-verified** (ST-4's own mandatory exit condition): mutated `resolve-engine.ts` to treat `""` as absent (`!== undefined && !== ""` at both levels), re-ran the suite → **exactly the two new AC-10 tests failed**, 7 others passed, confirming they fail for the right reason rather than collaterally. Reverted; `git diff --stat` on `resolve-engine.ts` shows no change; suite back to 9/9 on that file.
+- **Blockers**: none.
+- **Next action**: R3-001 / QA-1 is now closed — the spec says what the code does, and the behavior is pinned by two mutation-verified tests in both directions. Recommend re-running `sddl-qa-review` (final mode) to re-verify against the amended 10-AC spec and issue a fresh verdict.

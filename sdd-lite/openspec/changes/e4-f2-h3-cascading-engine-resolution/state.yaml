@@ -123,6 +123,19 @@ stages:
       behavior-preserving (regression proof plan.md specified for AC-6).
       QA review not requested: trivial, low-blast-radius, type-preserving
       refactor with zero new runtime behavior.
+
+      ST-2 completed: resolve-engine.ts written (pure function, no deps
+      parameter), UnknownEngineError + EngineResolutionLevel added to
+      run-errors.ts following the existing RunError subclass pattern,
+      run/index.ts barrel updated. Exactly the 4 planned files changed (git
+      status confirmed) -- no drift. 7 new tests: precedence matrix
+      (AC-1/AC-2/AC-3), unknown-name rejection at run and repo levels with
+      message-content assertions (AC-4/AC-5), shadowed-invalid-repo-override
+      not validated (spec.md's Expected Behavior table). npm run check green
+      (one mechanical biome import-order fix, no logic change). npm test
+      291/291 (284 baseline + 7 new, exact). QA review not requested --
+      resolveEngine is pure/dependency-free with full test coverage; ST-3
+      (the story's closing gate) is the natural review point.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -142,12 +155,12 @@ next_action:
   kind: continue
   target: sddl-executor
   summary: >-
-    ST-1 completed and independently green (npm run check + npm test
-    284/284, diff scope exactly the 2 planned files). Recommend proceeding
-    to ST-2 (resolveEngine + UnknownEngineError), pending its own
-    stage_approval.
+    ST-2 completed and independently green (npm run check + npm test
+    291/291, diff scope exactly the 4 planned files). Recommend proceeding
+    to ST-3 (run-review.ts engineName echo field + closing gate), pending
+    its own stage_approval.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:30:00Z"
+updated_at: "2026-08-22T01:40:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
@@ -187,3 +200,10 @@ checkpoints:
     status: approved
     decided_by: user
     decided_at: "2026-08-22T01:30:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    stage_ref: ST-2
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:40:00Z"

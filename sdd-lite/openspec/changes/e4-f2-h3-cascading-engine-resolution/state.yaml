@@ -16,8 +16,8 @@ complexity_assessment:
     (E6.F1 territory) in scope.
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
-lifecycle_status: reviewing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -191,6 +191,21 @@ stages:
       with an approved AC. Two low findings (echo tested only on the ok
       path though verified correct elsewhere; no code-review pass ran for
       this change). qa-report.md written. Does not close the change.
+
+      FINAL RE-RUN (seq 2, after Amendment 1 + ST-4): verdict `pass`, zero
+      findings, change CLOSED. Established production code is byte-identical
+      to seq 1's target (git diff 30c90aa..HEAD -- src/ returns only the
+      test file) so those verifications still hold and were NOT re-run
+      theatrically on identical bytes; gathered new evidence instead --
+      npm run check green, npm test 295/295, a NOVEL level-mislabel
+      mutation proving the AC-10 tests pin `level` rather than merely that
+      something throws, an amendment-coherence grep confirming no LIVE
+      requirement still says "non-empty", and a spec internal-coherence
+      read. All three seq-1 findings and both ledger info rows now closed
+      or contextualized. qa-report.md rewritten with a Review History table
+      preserving seq 1 rather than overwriting it; review-ledger.md
+      deliberately left frozen to its own target to preserve the audit
+      trail.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -273,7 +288,7 @@ open_risks:
       npm run check green, npm test 295/295 (293 + 2, exact).
   - id: risk-003
     severity: low
-    status: open
+    status: resolved
     summary: >-
       QA-2/QA-3 (final QA, low, non-blocking): the engineName echo is
       exercised by tests only on the ok path (independently verified
@@ -282,6 +297,13 @@ open_risks:
       final QA report the sole review over the diff. Both proportionate to
       the change's size (203 insertions, 8 files, pure functions and
       data-shape additions); recorded so neither is a silent omission.
+
+      RESOLVED (QA seq 2): QA-2 closed as not-a-defect -- the echo was
+      independently verified correct on validation-failed in seq 1, and the
+      single unconditional spread makes it uniform across all five terminal
+      states by construction. QA-3 closed by fact -- a standard-tier 4R
+      review has since run (review-ledger.md), which is what produced
+      R3-001/R3-002.
 review_summary:
   mode: 4r
   tier: standard
@@ -333,38 +355,52 @@ review_summary:
   report_path: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/review-ledger.md
 qa_summary:
   mode: final
-  verdict: pass_with_warnings
+  verdict: pass
+  review_seq: 2
   summary: >-
-    Final closeout QA, independently re-verified rather than trusted from
-    prior logs: npm run check green, npm test 293/293, story diff exactly 8
-    files all under src/core/ (no adapter or src/main/ file), AC-6
-    exhaustively grep-verified as a single engine-name definition, AC-9
-    confirmed by direct diff read. Test non-vacuity proven by three
-    independent mutations, all of which fail the suite. All 9 spec ACs are
-    implemented and the resolution logic itself is correct. Verdict is not a
-    clean pass solely because of QA-1 (medium): AC-1's "non-empty" clause is
-    not implemented -- an empty-string override wins precedence and throws
-    instead of falling through -- with no test pinning either reading. Not
-    reachable from production today and arguably the safer behavior, but a
-    literal mismatch with an approved AC that needs an explicit decision
-    (three routes in qa-report.md; recommendation: amend the spec wording
-    plus add one pinning test). Two low findings, non-blocking.
-  reported_at: "2026-08-22T02:00:00Z"
+    RE-RUN (seq 2) against the amended 10-AC spec, after Amendment 1
+    (dec-002) + ST-4 closed seq 1's sole warning. Verdict: clean pass;
+    ZERO findings, none outstanding from seq 1 or the review ledger.
+
+    Established that production code is byte-identical to seq 1's target
+    (git diff 30c90aa..HEAD -- src/ returns only the test file, +32), so
+    seq 1's production-code verifications still hold and were NOT
+    theatrically re-run on identical bytes. New evidence gathered instead:
+    npm run check green; npm test 295/295; a NOVEL mutation (mislabelling
+    the reported cascade level, deliberately different from ST-4's own
+    cascade-past-empty mutation) fails both the AC-5 and the new AC-10
+    test, proving the AC-10 tests pin `level` and not merely that
+    something throws; an amendment-coherence grep confirming no LIVE
+    requirement anywhere still says "non-empty" (surviving hits are AC-1's
+    own provenance note, the Amendment narrative, and historical records);
+    and a spec internal-coherence read confirming AC-1's amended wording
+    makes AC-2/AC-3's "absent" unambiguous with no new contradiction.
+
+    10/10 ACs implemented and test-pinned. No manual-only AC -- unlike
+    [E4.F2.H1]/[E4.F2.H2], this story ships with no permanently-open
+    verification gap. review-ledger.md deliberately NOT amended: it is
+    frozen to target 30c90aa where the old wording genuinely applied, and
+    rewriting it would destroy the audit trail.
+  reported_at: "2026-08-22T02:55:00Z"
   report_path: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/qa-report.md
 next_action:
-  kind: continue
-  target: sddl-qa-review
+  kind: complete
+  target: orchestrator
   summary: >-
-    cp-final-review RESOLVED (dec-002): spec amended, ST-4 executed, R3-001
-    / QA-1 closed in both halves. The change now has a 10-AC spec whose
-    every AC is implemented and test-pinned; npm run check green, npm test
-    295/295. The previous final QA verdict (pass_with_warnings) was issued
-    against the OLD 9-AC spec and its sole warning no longer applies, so it
-    is stale -- re-run sddl-qa-review in final mode against the amended
-    spec to issue a fresh verdict before offering a PR. Per CLAUDE.md,
-    never open a PR unless the user explicitly asks; then offer
-    "[E4.F2.H3] Cascading engine resolution" (Closes #30). Never merge,
-    never push main.
+    CHANGE COMPLETE. Final QA re-run (seq 2) against the amended 10-AC spec
+    returned a clean `pass` with ZERO findings; lifecycle_status set to
+    completed per the final+pass rule. All checkpoints resolved, all risks
+    resolved, 10/10 ACs implemented and test-pinned, no manual-only AC and
+    therefore no permanently-open verification gap (unlike [E4.F2.H1] and
+    [E4.F2.H2]). npm run check green, npm test 295/295.
+
+    Remaining work is OUTSIDE this change: (1) offer the PR
+    "[E4.F2.H3] Cascading engine resolution" (Closes #30) -- per CLAUDE.md
+    never open one unless the user explicitly asks, never merge, never push
+    main; (2) the mandatory history-log session entry. Downstream, E6.F1
+    wires resolveEngine into the composition root and its author should
+    read review-ledger.md's R3-002 first (the conditional-spread call shape
+    is required by this codebase's exactOptionalPropertyTypes convention).
 created_at: "2026-08-22T00:00:00Z"
 updated_at: "2026-08-22T02:40:00Z"
 artifacts:

@@ -3,62 +3,82 @@
 ## Closeout Digest
 
 - change_name: e4-f2-h3-cascading-engine-resolution
-- mode: **final**
-- verdict: **pass_with_warnings**
-- lifecycle effect: does NOT close the change — `lifecycle_status` stays `reviewing`; one `medium` finding (a literal mismatch between AC-1's "non-empty" wording and the implementation) requires an explicit user decision via a `final_review` checkpoint before completion
+- mode: **final** (re-run, review seq 2)
+- verdict: **pass**
+- lifecycle effect: **closes the change** — `lifecycle_status: completed`. The sole warning from review seq 1 (QA-1) was resolved by Amendment 1 + ST-4; no finding remains open, and no `final_review` decision is outstanding.
+
+## Review History
+
+| Seq | Mode | Reviewed Against | Verdict | Reported At | Outcome |
+|---|---|---|---|---|---|
+| 1 | final | 9-AC spec, target `30c90aa` | pass_with_warnings | 2026-08-22T02:00:00Z | One `medium` finding (QA-1) raised at `cp-final-review`; two `low` observations. Superseded by seq 2, not deleted — its findings drove Amendment 1. |
+| 2 | final | 10-AC amended spec, current tree | **pass** | 2026-08-22T02:55:00Z | QA-1 closed; no new findings. |
+
+Seq 1's full findings text is preserved in git history (`30c90aa`) and its substance is carried forward in the AC table and Findings section below. This report describes the current state of the change.
 
 ## Scope Reviewed
 
-The full implemented change across ST-1..ST-3: `src/core/repos/ports/config-schemas.ts` + `src/core/repos/index.ts` (schema extraction), `src/core/run/resolve-engine.ts` (new) + `run-errors.ts` + `run/index.ts` (resolution function and its error), `src/core/run/run-review.ts` (echo field), and the two test files. Against `spec.md`'s 9 ACs, `design.md`, `plan.md`'s 3-stage plan, and the full `execution-log.md`.
+The full implemented change across ST-1..ST-4, against `spec.md` **as amended** (10 ACs: the original 9 plus AC-10 from Amendment 1), `design.md`, `plan.md` (now 4 stages), the full `execution-log.md`, and `review-ledger.md`.
 
-## Independent Verification Performed (not trusted from prior logs)
+## What This Re-Run Verified Independently
 
-- `npm run check`: `Checked 93 files in 80ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (67 modules, 129 dependencies cruised)`.
-- `npm test`: `Test Files 19 passed (19)` / `Tests 293 passed (293)`.
-- **Non-vacuity, by mutation** — three mutations independently introduced and reverted, each confirmed to fail the suite:
-  - swapping the precedence order (repo evaluated before run) → 3 failed / 4 passed
-  - removing the `EngineNameSchema` validation (never throw) → 2 failed / 5 passed
-  - deleting the `engineName` echo spread from `runReview`'s return → 1 failed / 38 passed
-  The tests genuinely pin the behavior; none is a vanity assertion. Working tree restored and re-verified clean afterward.
-- **AC-6, exhaustive grep** (`grep -rn '"claude-code"' src/ --include=*.ts` and the `"opencode"` equivalent, excluding `__test__/`): exactly one `z.enum([...])` engine list in the codebase (`config-schemas.ts:14`). The remaining hits are `EngineNameSchema.default("claude-code")` (a default value, not a second list) and the opencode adapter's own `DEFAULT_BINARY_PATH = "opencode"` (adapter identity, an explicit non-goal in `spec.md`). AC-6 genuinely satisfied.
-- **AC-9, direct diff read** of `src/core/run/run-review.ts`: the diff is exactly the two `engineName?: string` field additions plus one conditional spread. `RunStage`, `classifyFailure`, `executePipeline`'s stages and `performCleanup` are untouched.
-- **Echo across terminal states** (probe, deleted after use): a run forced to `validation-failed` still returns `engineName: "opencode"` — the echo is correct on non-`ok` paths too, not only the happy path the suite covers.
-- Story-scoped diff: exactly 8 files, all under `src/core/`; no `src/adapters/**` or `src/main/**` file appears — the change stayed core-only as scoped.
-- `tsconfig.json` confirmed `strict: true` + `exactOptionalPropertyTypes: true`, so the conditional-spread pattern (rather than assigning `undefined`) is the required form for AC-8's "key absent, not `undefined`-valued".
+**Production code is byte-identical to review seq 1's target.** `git diff --stat 30c90aa..HEAD -- src/` returns exactly one file — `__test__/resolve-engine.test.ts`, +32 lines. Every production-code verification from seq 1 (the three mutations on precedence/validation/echo, the exhaustive AC-6 grep, the AC-9 direct diff read, the echo-across-terminal-states probe) therefore still holds without re-execution. This is stated rather than quietly re-run: re-performing identical checks on identical bytes would manufacture the appearance of independence without adding evidence.
+
+New checks run for this seq:
+
+- `npm run check`: `Checked 93 files in 79ms. No fixes applied.` / `tsc --noEmit` clean / `✔ no dependency violations found (67 modules, 129 dependencies cruised)`.
+- `npm test`: `Test Files 19 passed (19)` / `Tests 295 passed (295)` (293 + AC-10's 2).
+- **A novel mutation, deliberately different from the one ST-4 already ran** (which mutated the empty-string branch): mislabelled the reported cascade level (`"run"` → `"repo"` in the run branch). Result: **2 failed / 7 passed** — the AC-5 test *and* the new AC-10 run-level test both fail. This proves the AC-10 tests pin the reported `level`, not merely that *something* throws, which ST-4's own mutation did not establish. Reverted; `git diff` on `resolve-engine.ts` empty.
+- **Amendment coherence audit**: `grep -rn "non-empty"` across the change directory. Every surviving hit in `spec.md` is either AC-1's own explicit `was "provided and non-empty"` provenance note or the Amendment 1 narrative describing what it replaced. **No live requirement anywhere still asserts "non-empty".** Remaining hits in `qa-report.md` (seq 1), `review-ledger.md`, `execution-log.md`, and `state.yaml` are historical records, correct to retain verbatim.
+- **Spec internal coherence**: read the amended Expected Behavior table and AC-1..AC-3 together. AC-1's "present (not `undefined`)" makes AC-2/AC-3's "absent" unambiguous, and the new `""` row agrees with both AC-1 and AC-10. No contradiction introduced by the amendment.
+- Final story diff: 8 files, 235 insertions / 5 deletions, all under `src/core/` — no adapter, no `src/main/`.
 
 ## Review Ledger Consumption
 
-No `review-ledger.md` exists for this change — no `sddl-code-review` or `sddl-judgment-day` protocol was run. This final QA is the first and only review pass over the diff. That is a deliberate proportionality call given the change's size (203 insertions, 8 files, all pure functions and data-shape additions) versus `[E4.F2.H2]`'s 1328-line adapter, which did warrant a full 4R sweep — but it does mean this report is the sole review evidence, which the verdict reflects.
+`review-ledger.md` (standard tier, one `reliability` lens, target `30c90aa`): verdict `pass_with_warnings`, **`open_severe_findings: 0`**, 2 `info` rows, 0 fix rounds.
+
+- **R3-001** (`WARNING`, `info`) — the empty-string contract mismatch. **Addressed by Amendment 1 + ST-4**, in both halves the lens identified: the spec now says what the code does, and the behavior is pinned by tests in both directions.
+- **R3-002** (`SUGGESTION`, `info`) — the `exactOptionalPropertyTypes` call-site friction. Confirmed during seq 1 as **convention-consistent, not a defect** (zero optional props in `src/core/**` use explicit `| undefined`; 14 conditional-spread call sites already exist). No action needed.
+
+The ledger itself is deliberately **not** amended. It is frozen to target `30c90aa`, where the old spec wording genuinely was in effect, so its claim text remains accurate for its target. Rewriting a frozen ledger to reflect later fixes would destroy the audit trail it exists to provide.
 
 ## AC Coverage Summary
 
 | ACs | Status |
 |---|---|
-| AC-2, AC-3 (repo-wins, global-fallback) | pass — automated, mutation-verified |
-| **AC-1** (run override wins "whenever it is provided **and non-empty**") | **pass with a caveat** — the run-wins precedence is correct and mutation-verified, but the "non-empty" clause is not implemented; see finding QA-1 |
-| AC-4, AC-5 (unknown-name rejection, message content) | pass — automated at both the run and repo levels, incl. the shadowed-invalid-value case |
-| AC-6 (single `EngineNameSchema` definition) | pass — exhaustively grep-verified above |
-| AC-7, AC-8 (echo present / key absent) | pass — automated; independently confirmed correct on non-`ok` states too |
-| AC-9 (`run-review.ts` pipeline unchanged) | pass — direct diff read |
+| AC-1 (run override wins when **present**) | pass — as amended; precedence mutation-verified in seq 1 |
+| AC-2, AC-3 (repo-wins, global-fallback) | pass — mutation-verified |
+| AC-4, AC-5 (unknown-name rejection, message + `level`) | pass — the novel level-mislabel mutation in this seq strengthens AC-5's evidence specifically |
+| AC-6 (single `EngineNameSchema` definition) | pass — exhaustively grep-verified in seq 1; unchanged since |
+| AC-7, AC-8 (echo present / key absent) | pass — verified in seq 1 across all terminal states, not just the happy path |
+| AC-9 (`run-review.ts` pipeline unchanged) | pass — direct diff read in seq 1; file untouched since |
+| **AC-10** (Amendment 1: empty override rejected, not cascaded) | **pass** — 2 dedicated tests at both overridable levels, non-vacuity established by two *different* mutations (ST-4's cascade-past-empty, and this seq's level-mislabel) |
+
+10 of 10 ACs implemented and test-pinned. No AC is manual-only — unlike `[E4.F2.H1]`/`[E4.F2.H2]`, this story has no permanently-open manual-verification gap.
 
 ## Findings
 
-| Id | Severity | Finding |
-|---|---|---|
-| QA-1 | medium | **`spec.md` says "non-empty", the code says "not `undefined`".** AC-1 requires the run override to win "whenever it is provided **and non-empty**", and the In Scope section defines the validated value as "the first **non-empty** one in precedence order". `resolveEngine` branches on `!== undefined`, so an empty-string override wins precedence and is then rejected. Directly reproduced: `resolveEngine({ globalDefault: "claude-code", repoOverride: "opencode", runOverride: "" })` throws `UnknownEngineError: Unknown engine "" from run override` instead of falling through to `"opencode"`. The same applies at the repo level. **No test pins either behavior**, so the suite is blind to it. Mitigating context: no production caller can currently reach it (the `--engine` flag does not exist yet — that is `E6.F1`; and `RepoEntrySchema.defaultEngine` is `EngineNameSchema.optional()`, so `""` is rejected by the schema before it could ever reach `resolveEngine` from `repos.yaml`). The implemented behavior is also arguably the safer of the two — erroring on an explicit `--engine ""` beats silently falling back. But it is a literal mismatch with an approved AC, and it should be closed by an explicit decision rather than left to drift. |
-| QA-2 | low | The `engineName` echo is exercised by tests only on the `ok` path. Verified independently that it is correct on `validation-failed` as well (single unconditional spread in `runReview`'s only return statement), so this is a coverage gap, not a defect. |
-| QA-3 | low | No `sddl-code-review` pass ran for this change, so this report is the only review over the diff. Proportionate to the change's size, but noted so the absence is a recorded decision rather than an oversight. |
+**None.** No new finding surfaced in this re-run, and no finding from seq 1 or the review ledger remains open:
+
+| Prior Finding | Status |
+|---|---|
+| QA-1 (seq 1, `medium`) | **closed** — Amendment 1 (`dec-002`) reworded AC-1 and the Scope Boundary; AC-10 + 2 tests closed the coverage half |
+| QA-2 (seq 1, `low`) — echo tested only on the `ok` path | **closed as not-a-defect** — verified in seq 1 that the echo is correct on `validation-failed` too; the single unconditional spread makes it uniform by construction |
+| QA-3 (seq 1, `low`) — no code review had run | **closed** — a standard-tier 4R review has since run (`review-ledger.md`), which is what produced R3-001/R3-002 |
+| R3-001, R3-002 (ledger, `info`) | addressed / contextualized as above; neither was ever blocking |
 
 ## Verdict
 
-**pass_with_warnings.** The implementation is correct, well-scoped, and genuinely verified: all 9 ACs are implemented, every behavioral claim was re-checked independently rather than trusted from `execution-log.md`, the new tests survive mutation testing, architecture guards hold, and the diff is exactly the 8 planned core-only files. It is not a clean `pass` solely because of **QA-1**: an approved acceptance criterion says "non-empty" and the code does not implement that clause, with no test pinning either reading. That is a small, unreachable-today discrepancy, but closing it needs a decision, not silence.
+**pass.** The change is complete and honest: 10 of 10 ACs implemented and pinned by tests, all quality gates green (`npm run check`, `npm test` 295/295), the diff exactly 8 core-only files with zero adapter or composition-root spill, architecture guards clean at 67 modules / 129 dependencies, and the one contract discrepancy two independent review passes found has been closed at its root — the spec and the code now agree, and a test prevents either from drifting again.
+
+Worth recording plainly: this reached a clean `pass` on the second attempt, not the first. Seq 1's `pass_with_warnings` was correct at the time and did real work — it, and the 4R review that independently confirmed it, are why AC-10 exists at all.
 
 ## Next Action
 
-Per the skill's state-sync rules, `final` + `pass_with_warnings` keeps `lifecycle_status: reviewing` and requires a `final_review` checkpoint. QA-1 is a **B-level decision** (it affects the approved acceptance contract) with three viable routes:
+`final` + `pass` → the change closes: `lifecycle_status: completed`, `next_action.kind: complete`. No `final_review` checkpoint is outstanding (`cp-final-review` was resolved by `dec-002`).
 
-1. **Amend the spec** — reword AC-1 and the In Scope clause to drop "non-empty", matching the implemented (and defensible) behavior, and add one test pinning that `""` rejects. Smallest change; makes the contract honest.
-2. **Fix the code** — treat `""` as absent so it falls through the cascade, matching the spec as written, plus a test. Slightly more code; honors the approved wording literally.
-3. **Accept as-is** — record QA-1 as a known, disclosed discrepancy and close. Not recommended: it leaves an approved AC contradicted by its own implementation with no test either way, the exact failure mode `[E4.F2.H2]`'s Amendment 1 was raised to avoid.
+Remaining work is outside this change:
 
-**Recommendation: option 1.** The implemented behavior is the better of the two (an explicit empty `--engine` should be an error, not a silent fallback), so the spec wording is what is wrong, and amending it plus adding the pinning test is a smaller, lower-risk delta than changing working resolution logic. QA-2 and QA-3 are non-blocking and need no action before closeout.
+1. **Offer the PR** — `[E4.F2.H3] Cascading engine resolution`, `Closes #30`. Per CLAUDE.md, do not open it unless the user explicitly asks; never merge, never push `main`.
+2. **`history-log`** — the mandatory session audit entry must be written before closing the session (CLAUDE.md, Audit history).
+3. **Downstream, not now** — `resolveEngine` is intentionally not wired into any composition root; that is `E6.F1`, which depends on this story. The `E6.F1` author should read `review-ledger.md`'s R3-002 first: the conditional-spread call shape is required by this codebase's `exactOptionalPropertyTypes` convention.

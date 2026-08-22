@@ -58,7 +58,20 @@ stages:
       and a third B-level decision (D3) was added. Downstream constraints for [E5.F1.H2] recorded
       explicitly rather than left to rediscovery.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T23:45:00Z"
+    completed_at: "2026-08-22T23:55:00Z"
+    notes: >-
+      design.md written after the user ratified D1/D2/D3. Central choice: concentrate every
+      revision-2 empirical finding into ONE pure exported function (classifyExecaResult) that
+      turns execa's single resolved value into either a ProcessRunResult or a ProcessSpawnError,
+      leaving the impure adapter trivial. This makes the awkward cases (overflow-then-hang,
+      EACCES, signal-without-exit-code) unit-testable with zero child processes, while the
+      real-child suite is reserved for what only a real process can prove -- above all AC-1's
+      reaping of a SIGTERM-trapping child. Request validation is split: plain guard clauses in
+      core (matching runReview's existing style; run has never imported zod), with cwd
+      absoluteness delegated to the adapter's node:path isAbsolute, following the precedent
+      run-review.ts:59-62 already documents for the identical reason.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -101,6 +114,22 @@ checkpoints:
       responded_at: "2026-08-22T23:00:00Z"
     created_at: "2026-08-22T22:55:00Z"
     resolved_at: "2026-08-22T23:00:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      Ratification of the spec's three B-level decisions after revision 2, whose empirical
+      re-derivation against execa 9.6.1 invalidated four revision-1 assumptions and added D3.
+    question: >-
+      Ratify D1 (the "only declared scripts" guarantee lives in [E5.F1.H2], not in this port),
+      D2 (env inherits the parent environment with an optional overlay) and D3 (the adapter
+      classifies execa's resolved result itself, since reject:false means nothing rejects)?
+    free_input_allowed: true
+    response:
+      free_text: "ratifico las tres, avanza con el design"
+      responded_at: "2026-08-22T23:45:00Z"
+    created_at: "2026-08-22T23:40:00Z"
+    resolved_at: "2026-08-22T23:45:00Z"
 decisions:
   - id: dec-story-selection
     checkpoint_id: cp-story-selection
@@ -109,6 +138,17 @@ decisions:
       User selected #31. It is also the dependency-correct order: the backlog marks [E5.F1.H2]
       as depending on [E5.F1.H1], so running #32 first would require inventing the port anyway.
     recorded_at: "2026-08-22T23:00:00Z"
+  - id: dec-spec-b-level
+    checkpoint_id: cp-spec-approval
+    free_text: "ratifico las tres"
+    rationale: >-
+      User ratified all three B-level decisions verbatim. D1 rests on a fact discovered during
+      spec work: repos' config already declares validations as string[], so provenance is not
+      something this port could verify even in principle. D2 follows both engine seams, which
+      already overlay rather than replace the environment. D3 was forced by empirical evidence
+      that reject:false makes execa resolve every failure, so the resolve-vs-throw judgment
+      cannot be delegated to the library.
+    recorded_at: "2026-08-22T23:45:00Z"
 open_risks:
   - id: risk-001
     summary: >-
@@ -150,13 +190,22 @@ open_risks:
       a real latent defect in E4 code and should become its own backlog item rather than being
       silently absorbed into risk-004's retrofit.
     severity: medium
+  - id: risk-006
+    summary: >-
+      timedOut is derived as "terminated by a signal AND elapsed >= timeoutMs" because execa's
+      own result.timedOut is false when output truncation preceded the kill (spec revision 2,
+      R5). Boundary condition: a child signalled by something other than the timeout at almost
+      exactly the budget instant is reported timedOut:true. The window is a scheduling tick and
+      the misreport is benign (the run did consume its whole budget), whereas trusting
+      result.timedOut is wrong in a case that actually occurs. Accepted deliberately, recorded
+      rather than hidden.
+    severity: low
 next_action:
   kind: wait_for_approval
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Spec complete at revision 2 with 17 acceptance criteria. Awaiting user ratification of the
-    three B-level decisions (D1 the declared-scripts guarantee lives in [E5.F1.H2] not this port,
-    D2 env inherits with an overlay, D3 the adapter classifies execa's resolved result itself)
-    before running sddl-design.
+    Design complete, 0 blocking open questions. Awaiting user approval to run sddl-plan, which
+    should stage the work so the pure classifier and its childless unit tests land before the
+    real-child suite that depends on them.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-22T23:40:00Z"
+updated_at: "2026-08-22T23:55:00Z"

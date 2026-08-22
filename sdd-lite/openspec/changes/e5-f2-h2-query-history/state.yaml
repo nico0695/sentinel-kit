@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: medium-high
   recorded_at: "2026-08-22T18:00:00Z"
 lifecycle_status: reviewing
-current_stage: sddl-executor
+current_stage: sddl-code-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -177,6 +177,7 @@ artifacts:
   design: sdd-lite/openspec/changes/e5-f2-h2-query-history/design.md
   plan: sdd-lite/openspec/changes/e5-f2-h2-query-history/plan.md
   execution_log: sdd-lite/openspec/changes/e5-f2-h2-query-history/execution-log.md
+  review_ledger: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -339,6 +340,44 @@ checkpoints:
       free_text: "ejecutar todo modo auto"
       responded_at: "2026-08-22T20:10:00Z"
     resolved_at: "2026-08-22T21:50:00Z"
+  - id: cp-review-gate
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      full-4r review complete over the whole 14-file story diff (1296 changed lines). 4 lens
+      sweeps, 0 refuter passes needed (both severe findings are deterministic, independently
+      re-verified by the orchestrator through direct code reading before merging). Verdict: fail
+      -- 2 confirmed open CRITICAL findings, both real correctness defects introduced by this
+      story: R3-001 (get() misreports a corrupted run -- final dir exists, metadata.json absent,
+      no .partial- sibling -- as RunNotFoundError instead of RunCorruptedError, contradicting
+      list()'s classification of the identical on-disk state) and R4-001 (list() aborts the
+      ENTIRE listing when ONE entry hits a raw non-ENOENT fs error while reading its
+      metadata.json, instead of degrading just that entry -- contradicting AC-7's "none
+      affecting the others" intent). 4 additional WARNING/SUGGESTION findings recorded as info,
+      non-blocking (get()/list() closure decomposition, unfiltered stray files in validations/,
+      lexicographic vs numeric sort past 999 validation-log entries).
+    question: >-
+      Both confirmed findings are inside this change's approved scope (real defects in code this
+      story wrote, not a scope-exceeding discovery). Suggested route per fix-routing protocol:
+      rerun sddl-plan to insert one bounded fix stage covering exactly R3-001 and R4-001, then
+      stage_approval, then sddl-executor. The blanket "ejecutar todo modo auto" authorization
+      covered the already-approved ST-1..ST-4 plan, not a new fix stage -- authorize this fix
+      round?
+    options:
+      - id: opt-fix-both
+        label: Authorize a fix stage for R3-001 and R4-001
+        description: >-
+          Insert one bounded ST-5 into plan.md fixing both confirmed findings, gated by its own
+          stage_approval, then a scoped re-review against this frozen ledger.
+        recommended: true
+      - id: opt-defer
+        label: Defer the fix -- proceed to final QA with findings still open
+        description: >-
+          Not recommended: both findings are real, deterministic correctness defects with
+          concrete user-facing consequences (a corrupted run reported as nonexistent; a repo
+          with one bad entry losing its entire run history listing).
+    free_input_allowed: true
+    created_at: "2026-08-22T22:20:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -403,10 +442,48 @@ open_risks:
       mocked readdir forced to return entries in reverse chronological order, asserting list()
       still returns them ascending.
     severity: low
+  - id: risk-004
+    summary: >-
+      OPEN. review-ledger.md R3-001 (mapped from CRITICAL): get() misreports a corrupted run
+      (final dir exists, metadata.json absent, no .partial- sibling) as RunNotFoundError instead
+      of RunCorruptedError, contradicting list()'s classification of the identical state.
+      Independently re-verified by the orchestrator via direct code read, not merely trusted
+      from the lens. Requires a fix stage; awaiting review_gate authorization (cp-review-gate).
+    severity: high
+  - id: risk-005
+    summary: >-
+      OPEN. review-ledger.md R4-001 (mapped from CRITICAL): list() aborts the entire listing
+      when ONE entry hits a raw non-ENOENT fs error while reading its metadata.json, instead of
+      degrading just that entry -- contradicting AC-7's "none affecting the others" intent.
+      Independently re-verified by the orchestrator via direct code read. Requires a fix stage;
+      awaiting review_gate authorization (cp-review-gate).
+    severity: high
+review_summary:
+  mode: 4r
+  verdict: fail
+  round: 1
+  counts:
+    confirmed: 2
+    suspect: 0
+    escalated: 0
+    info: 4
+  summary: >-
+    full-4r tier (1296 changed lines). 4 lens sweeps: R1 clean (specifically probed
+    path-traversal and unsafe deserialization, both correctly guarded and tested); R2 found 2
+    info-tier decomposition suggestions; R3 found 1 CRITICAL (get()/list() classification
+    mismatch for a corrupted-but-present run) plus 2 WARNING robustness gaps in validation-log
+    reading; R4 found 1 CRITICAL (list() aborts entirely on one entry's raw fs error instead of
+    degrading that entry). 0 refuter passes -- both CRITICALs are deterministic, independently
+    re-verified by the orchestrator through direct code reading before merging. 2 open severe
+    findings, both real correctness defects this story introduced.
+  reported_at: "2026-08-22T22:20:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
 next_action:
   kind: user_checkpoint
   summary: >-
-    plan.md's ST-1..ST-4 all complete. Awaiting approval to proceed to sddl-code-review (4R
-    protocol) before sddl-qa-review, already covered by the blanket auto-mode authorization.
+    Full-4r review complete, verdict fail. 2 confirmed CRITICAL findings (R3-001, R4-001) need a
+    fix stage before final QA. Awaiting review_gate authorization (cp-review-gate) to insert a
+    bounded fix stage via sddl-plan -> stage_approval -> sddl-executor. The blanket auto-mode
+    authorization does not cover this new fix work.
 created_at: "2026-08-22T17:50:00Z"
 updated_at: "2026-08-22T21:50:00Z"

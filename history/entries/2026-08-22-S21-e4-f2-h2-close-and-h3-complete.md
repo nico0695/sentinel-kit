@@ -35,14 +35,15 @@ Validate project status and close `[E4.F2.H2]` with a PR; then implement `[E4.F2
   - Artifacts: `651fecb` proposal · `c34beb3` spec (9 ACs) · `5c3daa3` design · `c774501` plan (3 stages)
   - Implementation: `e269e40` ST-1 (shared `EngineNameSchema`) · `3369c00` ST-2 (`resolveEngine` + `UnknownEngineError`, 7 tests) · `f5205eb` ST-3 (`engineName` echo + closing gate, 2 tests)
   - Review & closeout: `30c90aa` QA seq 1 (`pass_with_warnings`) · `1d304fa` 4R review (`standard` tier, `pass_with_warnings`, 0 open severe) · `58262a2` ST-4 (Amendment 1: AC-10 + 2 tests, **test-only, zero production changes**) · `bd3194c` QA seq 2 (**clean `pass`**, change `completed`)
+  - Opened [PR #68](https://github.com/nico0695/sentinel-kit/pull/68) (`Closes #30`), after confirming 0 open PRs. Body documents the echo-field scope rationale, Amendment 1, and the `exactOptionalPropertyTypes` call-site note for the `E6.F1` author.
 - **Validations**: `npm run check` (biome + `tsc --noEmit` + depcruise) green at every stage; `npm test` 284 → 291 → 293 → 295, each delta exact. Final diff: 8 files, 235 insertions, **all under `src/core/`** — zero adapter or `src/main/` spill.
 - **Verification method** (beyond running the suite): every new test proven non-vacuous by mutation — precedence swap, validation removal, echo-spread deletion, cascade-past-empty, and a level-mislabel mutation added during QA seq 2 specifically to prove the AC-10 tests pin the reported `level` and not merely that something throws. Tree restored and re-verified clean after each.
 
 ## Pending and next steps
 
-- **Claude (next, this session)**: open the PR for `[E4.F2.H3]` — `Closes #30`.
+- **User**: review and merge PR #68 (`[E4.F2.H3]`). Per the workflow contract Claude never merges.
 - **User**: run AC-24 manual verification for `[E4.F2.H1]` (#28) and `[E4.F2.H2]` (#29) against real authenticated engine CLIs — `docs/todo/E4/manual-verification.md` items 1–2. Not automatable here. **`[E4.F2.H3]` adds nothing to this list**: it has no manual-only AC.
-- **User**: decide whether to `subscribe_pr_activity` on the open PRs (offered for #67, not answered).
+- **User**: decide whether to `subscribe_pr_activity` on PR #68 to watch CI and review comments (the same offer for #67 went unanswered before it was merged).
 - **Downstream**: `resolveEngine` is deliberately not wired into any composition root — that is `E6.F1`, which depends on this story. Its author should read `review-ledger.md`'s R3-002 first: the conditional-spread call shape is required by this codebase's `exactOptionalPropertyTypes` convention (0 optional props use explicit `| undefined`; 14 conditional-spread call sites already exist).
 - 7 non-blocking `info` findings from `[E4.F2.H2]`'s 4R review remain optional polish — not requested.
 

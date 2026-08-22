@@ -1,0 +1,477 @@
+version: "0.1"
+change_name: e5-f2-h1-run-store
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F2.H1] (issue #33), first story of the E5 milestone: give the history core module
+    its first real content -- the RunStore driven port (PRD 4.3) plus a filesystem-backed adapter
+    under src/adapters/driven/storage/ -- so a completed run persists as runs/<repo>/<ts>/ in
+    plain files (md result, prompt used, json metadata, validation logs). Its only declared
+    dependency, [E4.F1.H1] (#26, runReview), is merged. The port/adapter/contract-suite pattern is
+    heavily precedented (ConfigStore + config-store-yaml + ConfigStore.contract is a direct
+    structural template) and RunReviewResult already carries the md result and the prompt. Risk is
+    concentrated in three B-level design forks rather than in mechanics: where the metadata fields
+    the backlog names (harness, branch, duration) come from given RunReviewResult carries neither,
+    who calls the store when no composition root exists, and how a multi-file directory write is
+    made atomic with partial runs identifiable.
+  confidence: medium-high
+  recorded_at: "2026-08-22T13:10:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. The port catalog (PRD 4.3), the empty history/index.ts placeholder that
+      names this story, the runReview result shape, and both existing storage adapters are all
+      directly readable; lightweight proposal-stage exploration was sufficient.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T13:00:00Z"
+    completed_at: "2026-08-22T13:10:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/history/index.ts (a three-line
+      placeholder that explicitly names E5.F2.x as its arrival), src/core/run/run-review.ts
+      (RunReviewRequest/RunReviewResult field-by-field), src/core/repos/ports/config-store.ts and
+      src/adapters/driven/storage/config-store-yaml.ts (the structural template), PRD 3.1-F, PRD
+      4.3, the PRD glossary's definition of Run as "fully persisted", PRD risk 6 (engine auth
+      "never persisted in runs/logs"), and docs/backlog-mvp-sentinel.md E5.F2.H1. Established that
+      the backlog names five metadata fields and RunReviewResult carries two of them, which is the
+      story's first real design problem rather than a detail. Six open questions recorded for
+      spec, three of them B-level. E5.F2.H3 (cost/tokens) treated as out of scope per workflow
+      contract rule 7 (optional stories skipped unless requested).
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-22T13:15:00Z"
+    completed_at: "2026-08-22T13:35:00Z"
+    notes: >-
+      spec.md written, status complete at revision 2, 21 acceptance criteria. All six proposal open questions
+      resolved (D1..D6); the three B-level ones carry recommendations pending ratification at
+      cp-spec-approval. Grounded in direct verification rather than assumption: confirmed
+      RepoRegistrySchema is z.record(z.string(), RepoEntrySchema) so repos are keyed by NAME,
+      which settles the <repo> path segment (D5); confirmed src/core/workspace/helpers.ts
+      (repoBasename, sanitizeBranchLabel, deriveWorktreePath) is NOT exported from the workspace
+      barrel, so history cannot reuse it and must validate its own path segment; confirmed
+      ReviewUsage fields are inputTokens/outputTokens/totalTokens, TerminalState is the five-value
+      union, and Verdict is approve|request-changes|comment, so the metadata.json contract in the
+      spec quotes real field names rather than plausible ones; confirmed RunStage IS exported from
+      run/index.ts, which let AC-13 tighten failure.stage from a loose string to the pipeline's own
+      union. Also confirmed no atomic-write precedent exists in the repo (config-store-yaml writes
+      directly) while mkdtemp is precedented in the opencode permission-config adapter -- hence D3
+      stages inside the runs root rather than in os.tmpdir(), since rename across filesystems
+      fails with EXDEV.
+      REVISION 2 (user-directed re-analysis before design): D1..D6 survived unchanged; five
+      rev-1 specification gaps fixed, one a self-contradictory AC. (1) The decoy-token AC demanded
+      absence from metadata.json while planting the decoy in every optional string field -- but
+      failure.message's contract is to be written INTO metadata.json; rewritten as AC-18 with
+      failure.message excluded. (2) <ts> sourcing was unspecified; new D7 makes the adapter
+      clockless -- <ts> derives from record.startedAtEpochMs, honoring the injectable-clock
+      convention and making paths deterministic (AC-14). (3) startedAt's record type fixed as
+      epoch-ms number, one source rendered three ways (record / ISO metadata / compact path). (4)
+      ReviewDiff.files[].content carries full per-file diff text, so persisting record.diff
+      wholesale would duplicate the entire diff inside metadata.json; new D8 persists a summary
+      only, pinned by AC-10's marker test. (5) First-save recursive directory creation and
+      same-timestamp stale-staging retry specified (AC-15, AC-14). AC-19 additionally forbids a
+      leading dot in repoName so skip-dot-entries is the single scanning rule at both levels.
+    last_updated_at: "2026-08-22T14:05:00Z"
+  sddl-design:
+    status: completed
+    started_at: "2026-08-22T14:15:00Z"
+    completed_at: "2026-08-22T14:40:00Z"
+    notes: >-
+      design.md written: 6 new files, 2 modified, 7 design decisions (D-1..D-7), 0 blocking open
+      questions. Two repo facts checked rather than assumed, each of which would have produced a
+      wrong design: (1) .dependency-cruiser.cjs's core-no-io-libs rule bans ALL Node builtins in
+      src/core (bare and node:-prefixed) with zod as the sole whitelist, so no node:path in core;
+      (2) ConfigStore validates at the adapter boundary using a zod schema exported from core
+      (GlobalConfigSchema.safeParse inside config-store-yaml.ts), which is the precedent D-1
+      reuses so AC-19 binds every future RunStore rather than one adapter. Adapter splits into a
+      pure run-layout.ts (timestamp formatting, path derivation, hand-written field-by-field
+      metadata serializer) and an impure run-store-fs.ts, concentrating AC-4/AC-10/AC-18 in one
+      pure directly-testable function; a denylist serializer was rejected because it fails open
+      when RunRecord later grows a field, whereas the allowlist fails closed. RunDiffSummary is a
+      new port shape rather than ReviewDiff so D8 becomes structural -- with no diff bodies in the
+      input, no serializer bug can write them. Verified with node that the compact-ISO timestamp
+      sorts lexicographically as chronologically, and corrected a wrong epoch example in the
+      artifact (1755868200123 is 2025, not 2026). Verified no import cycle: nothing in src/core
+      imports history. AC-11's mid-staging failure injection reuses the vi.doMock(node:fs/promises)
+      technique already precedented in opencode-adapter.test.ts; AC-14's clockless proof uses fake
+      timers across two far-apart system times rather than grepping the source for Date.now(.
+    last_updated_at: "2026-08-22T14:40:00Z"
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-22T14:45:00Z"
+    completed_at: "2026-08-22T15:00:00Z"
+    notes: >-
+      plan.md written: 4 executor stages, sequenced exactly per design.md's own recommendation
+      (core-first, then pure layout module, then fs adapter + contract suite, then fs-specific
+      tests as the closing gate). ST-1 core port surface (no test file -- pure declarations plus
+      one zod schema); ST-2 pure run-layout.ts with unit tests proving AC-4/AC-9/AC-10/AC-18's
+      serializer guarantees before any fs I/O exists to obscure them; ST-3 impure run-store-fs.ts
+      wiring design's 10-step save() flow plus the portable RunStore.contract.ts; ST-4
+      fs-specific atomicity/determinism tests (vi.doMock injection precedented in
+      opencode-adapter.test.ts; vi.useFakeTimers for AC-14) and the story's closing gate,
+      re-verifying AC-3's empty src/core/run diff and the architecture guards. No manual
+      verification stage anywhere in the plan (unlike H1/H2's AC-24) -- pure fs I/O against a
+      temp dir, fully testable in CI. AC-17 (no env reads) has no automated test anywhere in the
+      plan, per design's own explicit deferral; ST-4 records a grep-for-process.env inspection in
+      the execution log instead of silently omitting evidence.
+    last_updated_at: "2026-08-22T15:00:00Z"
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-22T15:05:00Z"
+    notes: >-
+      ST-1 (core port surface) completed. RunStore/RunRecord/RunDiffSummary/RunFailureRecord,
+      RunRecordPathFieldsSchema, the HistoryError family, and the real history/index.ts barrel.
+      npm run check green (depcruise: 70 modules, 134 dependencies, no violations) and npm test
+      295/295 unchanged (ST-1 adds no test file by design). git diff --stat -- src/core/run is
+      empty, confirming AC-3 holds. One mechanical deviation: biome's organizeImports reordered
+      history/index.ts's three export blocks alphabetically after --write, same fix H3's ST-2
+      needed for the same reason -- no logic change. ST-2..ST-4 remain pending, each requiring
+      its own stage_approval before touching code. ST-2 (pure run-layout.ts) completed:
+      formatRunTimestamp/deriveRunPaths/serializeRunMetadata, 14 unit tests, npm run check green
+      (depcruise: 71 modules, 136 deps), npm test 309/309 (295+14). Non-vacuity proven by
+      mutation: injected a _leak field spreading record.prompt into serializeRunMetadata's
+      output, ran only the AC-18 decoy test, confirmed it failed for the right reason, reverted,
+      re-verified clean. git diff --stat -- src/core/run still empty. ST-3 (impure
+      run-store-fs.ts + RunStore.contract.ts + storage barrel export) completed: 10-step
+      save() flow wired verbatim, 9 contract tests, npm run check green (depcruise: 72 modules,
+      142 deps), npm test 318/318 (309+9). One flagged plan deviation: created
+      run-store-fs.test.ts now as the contract-suite driver (nothing runs a parameterized
+      describe block without one) -- same filename ST-4 already targeted, so ST-4 extends it
+      rather than creating a new file. One design refinement: wrapped the step-4 stat failure
+      in RunPersistenceError too, matching AC-20's "every raw fs failure" scope. Non-vacuity
+      proven by mutation: disabled the collision pre-check, the AC-13 test still failed but
+      instructively (rename's ENOTEMPTY backstop engaged, surfacing RunPersistenceError instead
+      of RunAlreadyExistsError -- risk-005 observed live). Reverted, re-verified clean.
+      ST-4 (fs-specific tests + closing gate) completed: extended run-store-fs.test.ts
+      (+224/-7, 8 new tests, no production file changed), npm run check green (depcruise: 72
+      modules, 142 deps, unchanged from ST-3), npm test 326/326 (318+8). Three targeted
+      mutations: (1) removed staging cleanup on failure -- secondary assertion caught it,
+      load-bearing assertion correctly unaffected; (2) made the adapter read Date.now()
+      instead of record.startedAtEpochMs -- determinism test failed immediately with the
+      exact fake-timer values, proving real clock independence; (3) a red-herring mutation
+      (stray post-rename directory) hit an unreachable path for the failure-injection test --
+      recognized and discarded rather than counted as a pass. All reverted, suite re-verified
+      clean. AC-17 inspection: grep for process.env across all new/edited files -- zero
+      matches. CLOSING GATE: git diff --stat -- src/core/run empty (AC-3 holds across the
+      whole story); full 10-file story diff confined to src/core/history/** and
+      src/adapters/driven/storage/** exactly, matching plan.md plus the two flagged
+      deviations; depcruise confirms AC-21's guards. All 21 ACs from spec.md revision 2 now
+      covered. plan.md's ST-1..ST-4 fully executed.
+    last_updated_at: "2026-08-22T16:15:00Z"
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-22T16:20:00Z"
+    completed_at: "2026-08-22T16:45:00Z"
+    notes: >-
+      full-4r tier (1016 changed lines, over the 400-line threshold outright; grepped for
+      auth/security/payments/sensitive-data/migration markers, none genuine). 4 lens sweeps: R2
+      readability clean; R1 risk and R3 reliability independently converged on the SAME defect
+      (concurrent save() of the identical record races on the shared deterministic stagingDir),
+      merged by location+claim into one CRITICAL row per protocol; R4 resilience found a
+      distinct WARNING (best-effort staging cleanup on failure silently swallows its OWN
+      failure, masking a secondary error while the original cause is still preserved). Refuter
+      pass on the merged CRITICAL: traced save()'s actual await-interleaving semantics
+      step-by-step and showed that in every constructible interleaving, exactly one concurrent
+      caller's rename targets an already-consumed stagingDir or an existing finalDir and is
+      GUARANTEED to throw, refuting the claim's load-bearing clause ("no error surfaced to
+      either caller"). Verdict: pass_with_warnings, 0 open severe findings, 1 info row.
+      Residual nuance from the refuter's own trace (content-mixing possible in the WINNING
+      caller's directory before the loser's rename fails) recorded as a refinement to risk-005
+      below rather than a new finding, per the protocol rule that refuters may not add findings.
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-22T16:50:00Z"
+    completed_at: "2026-08-22T17:05:00Z"
+    notes: >-
+      final mode, verdict pass. Independently re-verified rather than trusting execution-log.md:
+      fresh npm run check (green) and npm test (326/326); AC-3 via a fresh git diff --stat over
+      src/core/run (empty); the full 10-file story diff scope; AC-17 by re-running the process.env
+      grep scoped to production files only (a first unscoped attempt hit a comment documenting the
+      grep command itself as text -- recognized as a false positive, re-scoped, confirmed clean);
+      AC-14 by grepping for Date.now/bare new Date() (zero hits, both real new Date() calls take
+      an explicit epoch argument); AC-2 and AC-16 by direct read of RunRecord/RunFailureRecord
+      against spec.md's field list; AC-21 via depcruise. Consumed review-ledger.md's
+      pass_with_warnings verdict (0 open severe, 1 info) without re-deriving it. 21 of 21 ACs
+      pass. No amendment cycle needed, unlike [E4.F2.H3] -- the gap-closing work here happened at
+      spec revision 2, before any code was written.
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f2-h1-run-store/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f2-h1-run-store/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f2-h1-run-store/spec.md
+  design: sdd-lite/openspec/changes/e5-f2-h1-run-store/design.md
+  plan: sdd-lite/openspec/changes/e5-f2-h1-run-store/plan.md
+  execution_log: sdd-lite/openspec/changes/e5-f2-h1-run-store/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e5-f2-h1-run-store/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e5-f2-h1-run-store/review-ledger.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is complete and ready for sddl-spec. Three B-level questions are recorded for
+      spec to resolve as firm acceptance criteria before any design work.
+    question: >-
+      Approve the proposal and proceed to sddl-spec for [E5.F2.H1] RunStore full persistence?
+    free_input_allowed: true
+    created_at: "2026-08-22T13:10:00Z"
+    response:
+      free_text: "si, avanza con el spec"
+      responded_at: "2026-08-22T13:15:00Z"
+    resolved_at: "2026-08-22T13:15:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete at revision 2 with 21 acceptance criteria (a user-directed re-analysis Three B-level decisions (D1 metadata source,
+      fixed five rev-1 gaps, including one self-contradictory AC -- see the spec's Revision
+      Notes -- and added A-level D7 clockless-adapter and D8 diff-summary-only decisions).
+      D2 the store's caller, D3 atomicity strategy) are resolved with recommendations and need
+      ratification, because D1 in particular determines whether this story touches src/core/run at
+      all.
+    question: >-
+      Ratify D1 (the caller composes a RunRecord; runReview stays byte-identical), D2 (port and
+      adapter ship with no caller, wiring deferred to E6.F1) and D3 (staging directory inside the
+      runs root plus a single rename, no completion marker), and proceed to sddl-design?
+    options:
+      - id: opt-ratify-all
+        label: Ratify all three and proceed to design
+        description: >-
+          Accept D1/D2/D3 as specified. This story stays entirely inside src/core/history and
+          src/adapters/driven/storage, with an empty diff over src/core/run.
+        recommended: true
+      - id: opt-d1-grow-result
+        label: Reject D1 -- grow RunReviewResult instead
+        description: >-
+          Have runReview carry harness, branch and duration on its result the way [E4.F2.H3] did
+          for engineName. Requires amending the scope boundary, AC-2 and AC-3 before design, and
+          makes runReview responsible for measuring wall-clock duration.
+      - id: opt-d3-marker
+        label: Reject D3 -- ordered write plus completion marker
+        description: >-
+          Write files in a fixed order into the final directory with a marker file written last.
+          Simpler to implement, but every reader must then know the marker rule, and a partial run
+          occupies the real run path rather than an obviously-partial one.
+    free_input_allowed: true
+    created_at: "2026-08-22T13:35:00Z"
+    response:
+      selected_option_id: opt-ratify-all
+      free_text: "ratifico las tres, avanza con el design"
+      responded_at: "2026-08-22T14:15:00Z"
+    resolved_at: "2026-08-22T14:15:00Z"
+  - id: cp-design-approval
+    type: stage_approval
+    stage: sddl-design
+    summary: >-
+      design.md is complete: 6 new files, 2 modified, 7 design decisions, 0 blocking open
+      questions. All 21 ACs are covered; AC-17 (no process.env reads) is the one criterion
+      verified by inspection rather than an automated test, stated explicitly rather than left
+      for QA to discover.
+    question: >-
+      Approve design.md -- including D-3's relocation of the error module to
+      ports/run-store-errors.ts, a refinement of the path spec.md sketched -- and proceed to
+      sddl-plan?
+    free_input_allowed: true
+    created_at: "2026-08-22T14:40:00Z"
+    response:
+      free_text: "si, avanza con el plan"
+      responded_at: "2026-08-22T14:45:00Z"
+    resolved_at: "2026-08-22T14:45:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    summary: >-
+      plan.md is complete: 4 executor stages (ST-1..ST-4), each with its own stage_approval gate
+      to come during sddl-executor. Sequencing matches design.md's own recommendation with no
+      deviation. ST-4 is the closing gate and the only stage that re-verifies AC-3 (empty diff
+      over src/core/run) directly.
+    question: >-
+      Approve plan.md and proceed to sddl-executor, which will request separate approval before
+      each of ST-1 through ST-4 touches code?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:00:00Z"
+    response:
+      free_text: "si, arranca con ST-1"
+      responded_at: "2026-08-22T15:05:00Z"
+    resolved_at: "2026-08-22T15:05:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-1 (core port surface) approved to start by the same "si, arranca con ST-1" instruction
+      that approved plan.md, and completed cleanly: npm run check and npm test both green, diff
+      scoped to exactly the 4 files plan.md named, src/core/run untouched.
+    question: >-
+      ST-1 complete. Proceed to ST-2 (pure run-layout.ts with its unit tests)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:05:00Z"
+    response:
+      free_text: "si, arranca con ST-1"
+      responded_at: "2026-08-22T15:05:00Z"
+    resolved_at: "2026-08-22T15:20:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2 (pure run-layout.ts) approved to start by the same "si, arranca con ST-2"
+      instruction, and completed cleanly: npm run check and npm test both green (309/309), diff
+      scoped to exactly the 2 files plan.md named, non-vacuity proven by mutation on the AC-18
+      decoy test, src/core/run untouched.
+    question: >-
+      ST-2 complete. Proceed to ST-3 (impure run-store-fs.ts wiring the 10-step save() flow, plus
+      the portable RunStore.contract.ts)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:25:00Z"
+    response:
+      free_text: "si, arranca con ST-2"
+      responded_at: "2026-08-22T15:25:00Z"
+    resolved_at: "2026-08-22T15:40:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-3 (impure run-store-fs.ts + RunStore.contract.ts) approved to start by the same
+      "si, arranca con ST-3" instruction, and completed cleanly: npm run check and npm test
+      both green (318/318), diff matches plan.md's ST-3 list plus one flagged driver-file
+      deviation, non-vacuity proven by mutation on the collision pre-check, src/core/run
+      untouched.
+    question: >-
+      ST-3 complete. Proceed to ST-4 (fs-specific atomicity/determinism tests, extending
+      run-store-fs.test.ts, and the story's closing gate re-verifying AC-3)?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:45:00Z"
+    response:
+      free_text: "si, arranca con ST-3"
+      responded_at: "2026-08-22T15:45:00Z"
+    resolved_at: "2026-08-22T15:55:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-4 (fs-specific tests + closing gate) approved to start by "si, arranca con ST-4",
+      and completed cleanly: npm run check and npm test both green (326/326), three targeted
+      mutations prove non-vacuity, AC-17 verified by inspection with zero process.env hits.
+      Closing gate confirms AC-3 (empty src/core/run diff) and AC-21 (architecture guards)
+      across the full 10-file story diff. All 21 ACs covered.
+    question: >-
+      plan.md's ST-1..ST-4 are complete. Proceed to sddl-code-review (4R protocol) before
+      sddl-qa-review?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:55:00Z"
+    response:
+      free_text: "si, arranca con ST-4"
+      responded_at: "2026-08-22T15:55:00Z"
+    resolved_at: "2026-08-22T16:15:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-approval
+    free_text: "si, avanza con el spec"
+    rationale: >-
+      User approved the proposal and directed the spec stage to run. Authorship: claude->user.
+    recorded_at: "2026-08-22T13:15:00Z"
+  - id: dec-002
+    checkpoint_id: cp-spec-approval
+    selected_option_id: opt-ratify-all
+    free_text: "ratifico las tres, avanza con el design"
+    rationale: >-
+      User ratified all three B-level decisions as recommended: D1 (the caller composes the
+      RunRecord, so runReview stays byte-identical and AC-3 pins its diff as empty), D2 (port and
+      adapter ship with no caller; wiring deferred to E6.F1, precedent set by resolveEngine in
+      [E4.F2.H3]) and D3 (staging directory inside the runs root plus a single rename, no
+      completion marker). The A-level D7 (clockless adapter) and D8 (diff summary only) added by
+      spec revision 2 were ratified implicitly with the same approval. Authorship: claude->user.
+    recorded_at: "2026-08-22T14:15:00Z"
+open_risks:
+  - id: risk-001
+    summary: >-
+      CLOSED by D1, ratified at cp-spec-approval (dec-002). The caller composes the RunRecord, so
+      runReview needs no change; AC-3 pins its diff over src/core/run as empty and QA verifies it.
+    severity: low
+  - id: risk-002
+    summary: >-
+      CLOSED by D3, ratified at cp-spec-approval (dec-002). Staging inside the runs root plus one
+      rename; AC-12 pins the same-filesystem requirement that makes rename safe, which an
+      os.tmpdir() staging area would violate with EXDEV. Residual concurrency exposure is tracked
+      separately as risk-005.
+    severity: low
+  - id: risk-003
+    summary: >-
+      "Nothing sensitive persisted" needs a decidable, testable definition. The prompt legitimately
+      contains the repo's own diff, which is the point rather than a leak; the real hazard is
+      narrower -- RunReviewResult.failure.error is typed unknown and may be a raw exception whose
+      message or stack carries a command line or environment. Largely addressed by D4 plus AC-13
+      (RunRecord.failure is a typed { stage: RunStage; message: string }, so a raw exception cannot
+      structurally reach the store) and by AC-18 (a decoy-token test). Rev 2 of the spec fixed
+      rev 1's version of that test, which was self-contradictory: it planted the decoy in every
+      optional string field including failure.message, whose contract is to be written INTO
+      metadata.json. The decoy set is now prompt/engineOutput/validationOutput with
+      failure.message explicitly excluded and the rationale stated in the AC itself.
+    severity: low
+  - id: risk-004
+    summary: >-
+      With a write-only port (D6), RunStore.contract.ts can only assert what is observable through
+      save, so the on-disk assertions live in the non-portable fs-adapter test. The shared suite is
+      therefore thin by deliberate choice; [E5.F2.H2] is where it thickens. Recorded so a later
+      reviewer does not read the thinness as an oversight rather than a stated trade-off.
+    severity: low
+  - id: risk-005
+    summary: >-
+      TOCTOU window between the step-4 collision pre-check and the step-9 rename: two
+      concurrent saves of the SAME run (identical repoName+startedAtEpochMs) can both pass the
+      pre-check. REFINED by the sddl-code-review full-4r refuter pass (2026-08-22): traced the
+      exact interleaving through save()'s await boundaries. In every constructible ordering,
+      exactly one caller's rename targets an already-consumed stagingDir or an existing
+      finalDir and is GUARANTEED to throw -- caught and surfaced as RunPersistenceError, never
+      silent. The refuter's trace also confirmed a narrower nuance: before the losing rename
+    severity: low
+      fails, the WINNING caller's finalDir can contain an interleave of both callers' staged
+      files (its rm+mkdir at step 6 has no lock), so the winner's resolved path is not
+      guaranteed to contain only its own record's data under true concurrency. Still accepted,
+      not solved -- Node offers no portable atomic create-exclusive on a directory, and no
+      caller of RunStore.save() exists yet in this story (E6.F1 wires the composition root) so
+      no code path in this repo can currently trigger it. Neither ordering ever produces a
+      SILENT success on both sides, which is the property review-ledger.md's R1/R3-001 refuter
+      pass specifically disproved.
+    severity: low
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 1
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 1
+  summary: >-
+    full-4r tier (1016 changed lines). R2 clean; R1+R3 converged on one CRITICAL finding
+    (concurrent save() of the identical record racing on the shared stagingDir), refuted by a
+    step-by-step await-interleaving trace proving the losing caller always errors; R4 found one
+    WARNING (info) about masked secondary cleanup-failure diagnostics. 0 open severe findings.
+  reported_at: "2026-08-22T16:45:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f2-h1-run-store/review-ledger.md
+
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    21 of 21 ACs pass, independently re-verified (not merely trusted from execution-log.md).
+    npm run check and npm test both fresh-green (326/326). AC-3 confirmed via a fresh git diff
+    over src/core/run (empty). review-ledger.md's pass_with_warnings consumed as evidence (0
+    open severe findings). No amendment cycle needed -- clean pass on the first final attempt.
+  reported_at: "2026-08-22T17:05:00Z"
+  report_path: sdd-lite/openspec/changes/e5-f2-h1-run-store/qa-report.md
+
+next_action:
+  kind: complete
+  summary: >-
+    final QA pass, change completed. Remaining work outside this change: write the mandatory
+    history-log entry before closing the session; offer the PR only if the user asks
+    ([E5.F2.H1] RunStore: full persistence, Closes #33); [E5.F2.H2] (listRuns/getRun, #34) is now
+    unblocked.
+created_at: "2026-08-22T13:00:00Z"
+updated_at: "2026-08-22T17:05:00Z"

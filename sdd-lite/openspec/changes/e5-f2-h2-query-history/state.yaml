@@ -129,7 +129,15 @@ stages:
       unchanged (replaces the stub bodies rather than adding new methods).
       Mechanical biome import-order fix applied via --write to index.ts and get-run.test.ts
       (same recurring deviation class [E5.F2.H1]'s stages recorded).
-    last_updated_at: "2026-08-22T20:35:00Z"
+      ST-2 (pure adapter functions) completed: parseRunTimestamp (exact inverse of
+      formatRunTimestamp, null not throw on malformed input) and classifyRunDirEntry (D9's
+      three-way rule, D5's id-without-prefix addressing contract) in run-layout.ts. npm run
+      check green (depcruise unchanged: 75 modules, 151 deps), npm test 339/339 (331+8). No
+      deviation -- exactly the planned 2 files. Non-vacuity proven by mutation: short-circuited
+      the .partial- branch condition, only the partial-classification test failed (for the
+      right reason), the other 4 classifyRunDirEntry tests stayed green, reverted and
+      re-verified clean. git diff --stat -- src/core/run empty.
+    last_updated_at: "2026-08-22T20:55:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -245,6 +253,22 @@ checkpoints:
       free_text: "ejecutar todo modo auto"
       responded_at: "2026-08-22T20:10:00Z"
     resolved_at: "2026-08-22T20:35:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      ST-2 (pure adapter functions) approved to start by the same blanket auto-mode
+      authorization, and completed cleanly: npm run check and npm test both green (339/339), no
+      deviation, non-vacuity proven by mutation, src/core/run untouched.
+    question: >-
+      ST-2 complete. Proceed to ST-3 (impure list()/get() flows, replacing ST-1's stubs, plus
+      RunStore.contract.ts thickening)?
+    free_input_allowed: true
+    created_at: "2026-08-22T20:55:00Z"
+    response:
+      free_text: "ejecutar todo modo auto"
+      responded_at: "2026-08-22T20:10:00Z"
+    resolved_at: "2026-08-22T20:55:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -304,7 +328,7 @@ open_risks:
 next_action:
   kind: user_checkpoint
   summary: >-
-    ST-1 complete (core surface). Awaiting approval to proceed to ST-2 (pure adapter functions),
-    already covered by the blanket auto-mode authorization.
+    ST-2 complete (pure adapter functions). Awaiting approval to proceed to ST-3 (impure
+    list()/get() flows), already covered by the blanket auto-mode authorization.
 created_at: "2026-08-22T17:50:00Z"
-updated_at: "2026-08-22T20:35:00Z"
+updated_at: "2026-08-22T20:55:00Z"

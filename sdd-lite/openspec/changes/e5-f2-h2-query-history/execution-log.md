@@ -5,7 +5,7 @@
 | Stage Id | Goal | Status |
 |---|---|---|
 | ST-1 | Core surface: port extension, RunMetadataSchema, errors, use cases, barrel | completed |
-| ST-2 | Pure adapter functions: parseRunTimestamp, classifyRunDirEntry | pending |
+| ST-2 | Pure adapter functions: parseRunTimestamp, classifyRunDirEntry | completed |
 | ST-3 | Impure list()/get() flows + RunStore.contract.ts thickening | pending |
 | ST-4 | Planted-state tests + closing gate | pending |
 
@@ -45,3 +45,29 @@ None.
 ### Next action
 
 ST-2 (pure `parseRunTimestamp`/`classifyRunDirEntry` in `run-layout.ts`), pending its own stage_approval (already covered by the blanket auto-mode authorization).
+
+## ST-2 — Pure adapter functions
+
+- **Approval reference**: blanket auto-mode authorization, same as ST-1.
+- **Planned scope**: `src/adapters/driven/storage/run-layout.ts` (edit), `src/adapters/driven/storage/__test__/run-layout.test.ts` (edit).
+- **Actual changed files**: exactly the planned set. No deviation.
+
+### What was implemented
+
+- `parseRunTimestamp(name): number | null` — exact inverse of `formatRunTimestamp`, returns `null` (never throws) for anything not shaped like a run directory name.
+- `classifyRunDirEntry(name, isDirectory): RunDirEntryKind` — D9's three-way rule: non-directory → `other`; `.partial-<ts>` directory with a valid ts suffix → `partial` (prefix stripped from `id`, per D5's addressing contract — the same `id` a `list()` caller passes straight to `get()`); ts-named directory → `final`; anything else (stray file, `.DS_Store`, non-ts dir, malformed `.partial-` suffix) → `other`.
+
+### Quick checks
+
+- `npm run check`: green (biome clean, no import-order fix needed this time; `tsc --noEmit` clean; `depcruise`: 75 modules, 151 deps, 0 violations — unchanged from ST-1, no new import).
+- `npm test`: 339/339 (331 + 8 new: 3 `parseRunTimestamp` round-trip/rejection tests, 5 `classifyRunDirEntry` branch tests).
+- `git diff --stat -- src/core/run`: empty.
+- **Non-vacuity proof (mutation)**: short-circuited the `.partial-` branch condition (`if (false && name.startsWith(PARTIAL_PREFIX))`). Ran only the `classifyRunDirEntry` tests: the "classifies a `.partial-<ts>` directory as partial" test failed for the right reason (`{ kind: "other" }` instead of `{ kind: "partial", ... }`); the other 4 tests in that block still passed, confirming the mutation was scoped correctly. Reverted, re-ran full suite (339/339) and `npm run check` (green).
+
+### Blockers
+
+None.
+
+### Next action
+
+ST-3 (impure `list()`/`get()` flows in `run-store-fs.ts`, replacing ST-1's stubs, plus `RunStore.contract.ts` thickening), pending its own stage_approval (already covered by the blanket auto-mode authorization).

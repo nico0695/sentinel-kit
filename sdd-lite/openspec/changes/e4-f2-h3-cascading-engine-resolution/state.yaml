@@ -1,0 +1,83 @@
+version: "0.1"
+change_name: e4-f2-h3-cascading-engine-resolution
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E4.F2.H3] (issue #30): a pure resolution function selecting which
+    ReviewEngine a run uses, per PRD §3.1-D/§6.2's cascade (global default ->
+    per-repo override -> per-run override), plus unknown-engine validation
+    and recording the resolved engine in run metadata. Both cascade levels
+    modeled in the schema already (config-schemas.ts); the missing piece is
+    the resolution function/use case itself, its validation error, and
+    exposing "engine used" from a completed run. No new engine, no
+    RunStore/history persistence (module does not exist yet), no CLI wiring
+    (E6.F1 territory) in scope.
+  confidence: high
+  recorded_at: "2026-08-22T00:00:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No material unknown blocks routing to spec. Lightweight proposal-stage
+      exploration (config-schemas.ts, run-review.ts, run/index.ts, PRD §3.1-D
+      and §6.2, a grep confirming no src/core/history/ module exists yet, and
+      a glob confirming the CLI adapter is still a scaffold stub) was
+      sufficient to frame the problem and scope sketch.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T00:00:00Z"
+    completed_at: "2026-08-22T00:00:00Z"
+    notes: >-
+      proposal.md written. Confirmed GlobalConfigSchema.defaultEngine and
+      RepoEntrySchema.defaultEngine already exist and validate against the
+      same ["claude-code","opencode"] enum, so the cascade's first two levels
+      are pre-modeled. Confirmed no src/core/history/ module exists yet, so
+      "recorded in run metadata" is scoped honestly to what this story can
+      actually touch (result-shape field, not a store write) -- flagged as
+      an open question for spec to pin down. Confirmed CLI adapter
+      (src/adapters/driving/cli/index.ts) is still a scaffold, so --engine
+      flag parsing and composition-root wiring are out of scope (E6.F1
+      territory, which itself depends on this story). Three open questions
+      recorded for spec: where the per-run override enters the core (new
+      RunReviewRequest field vs. separate pre-runReview use case), the exact
+      shape of "engine used" on the result, and whether H2 needs to be
+      merged first (currently PR #67, open) or resolution can proceed
+      against the port alone.
+decisions: []
+open_risks:
+  - id: risk-001
+    severity: low
+    status: open
+    summary: >-
+      [E4.F2.H2] (the opencode adapter) is only PR'd (#67), not yet merged,
+      as of this proposal, even though the backlog lists it as a hard
+      dependency for [E4.F2.H3]. Resolution logic itself only needs the
+      ReviewEngine port (already merged, E0.F2.H1) and the two engine names
+      as strings/enum values, not the concrete adapters, so this is unlikely
+      to block spec/design/plan. Flagged as an open question rather than a
+      blocker; worth a conscious call at spec time.
+review_summary: null
+qa_summary: null
+next_action:
+  kind: continue
+  target: sddl-spec
+  summary: >-
+    proposal.md complete, no blocking ambiguity identified. Recommend
+    proceeding to sddl-spec to firm up scope boundaries and acceptance
+    criteria, resolving the three open questions (per-run override entry
+    point, "engine used" result shape, H2-merge-before-start question) as
+    firm decisions rather than leaving them open into spec.
+created_at: "2026-08-22T00:00:00Z"
+updated_at: "2026-08-22T00:00:00Z"
+artifacts:
+  state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
+  proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    status: pending

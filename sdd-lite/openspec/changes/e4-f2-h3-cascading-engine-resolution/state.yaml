@@ -211,6 +211,17 @@ open_risks:
       acceptance criterion. Three routes offered in qa-report.md's Next
       Action; recommendation is option 1 (amend the spec wording to match
       the implemented behavior, plus one pinning test).
+
+      REVALIDATED by the standard-tier 4R review (2026-08-22): the
+      reliability lens, working from a fresh context with no sight of the QA
+      report, independently reported the identical defect as R3-001 and
+      rated it WARNING -- which maps to `medium`, the same severity QA
+      assigned. Two independent passes therefore converge both on the
+      defect being real and on it sitting BELOW the blocking floor: it is
+      recorded as `info`, is non-blocking, and does not enter the fix loop.
+      The review additionally sharpened option 3's cost: both passes noted
+      independently that no test pins EITHER reading, so accepting as-is
+      leaves the approved AC both contradicted and unpinned.
   - id: risk-003
     severity: low
     status: open
@@ -222,7 +233,55 @@ open_risks:
       final QA report the sole review over the diff. Both proportionate to
       the change's size (203 insertions, 8 files, pure functions and
       data-shape additions); recorded so neither is a silent omission.
-review_summary: null
+review_summary:
+  mode: 4r
+  tier: standard
+  target: 30c90aa9150f20d56e0de89485560f517f25d16b
+  verdict: pass_with_warnings
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 2
+  open_severe_findings: 0
+  round: 1
+  summary: >-
+    Standard-tier 4R review (224 changed lines, below the 400-line full-4r
+    threshold; no auth/security/payments/sensitive-data/migration surface,
+    verified by grep over the diff's added lines). One lens: reliability,
+    the dominant risk signal (behavior/state/determinism/tests). No refuter
+    pass -- it is full-4r-only and applies solely to severe inferential
+    findings; this review produced zero severe findings and both recorded
+    findings are deterministic.
+
+    The lens found NO correctness defect in the resolution logic: precedence
+    ordering correct, all four presence/absence combinations covered,
+    rejection tested at both reachable levels, echo uniform across all five
+    terminal states (single return site), AC-9 holds, function is
+    synchronous and pure with no propagation gap, no nondeterminism, no
+    vanity test (it specifically validated the try/expect.unreachable/catch
+    pattern as sound).
+
+    R3-001 (WARNING, info, non-blocking) independently confirms final QA's
+    QA-1 from a fresh context with no sight of the QA report: an
+    empty-string override wins precedence and throws instead of cascading,
+    contradicting spec.md's "first non-empty one in precedence order", with
+    no test covering the empty case in either direction. Two independent
+    passes converging on the same severity raises confidence both that the
+    defect is real AND that it is genuinely below the blocking floor.
+    R3-002 (SUGGESTION, info): under exactOptionalPropertyTypes the natural
+    composition-root call shape does not compile -- orchestrator verified
+    this by compiling a probe call site (TS2379), then contextualized it as
+    NOT a defect: zero optional props in src/core/** use an explicit
+    `| undefined` and 14 conditional-spread call sites already exist, so
+    this is the codebase's established convention, recorded only so the
+    E6.F1 author is not surprised.
+
+    No fix round triggered (zero open severe findings, nothing eligible for
+    the fix loop). The QA-1/R3-001 question remains the open B-level
+    cp-final-review decision.
+  reported_at: "2026-08-22T02:20:00Z"
+  report_path: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/review-ledger.md
 qa_summary:
   mode: final
   verdict: pass_with_warnings
@@ -268,6 +327,7 @@ artifacts:
   plan: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/plan.md
   execution_log: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/execution-log.md
   qa_report: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/review-ledger.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval

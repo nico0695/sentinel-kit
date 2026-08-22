@@ -1,0 +1,74 @@
+version: "0.1"
+change_name: e5-f2-h2-query-history
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F2.H2] (issue #34), second story of the E5 milestone: give the history core module
+    its read side -- listRuns and getRun use cases over the RunStore port, which [E5.F2.H1] left
+    write-only (save() alone). The on-disk layout (runs/<repo>/<ts>/, metadata.json, the
+    .partial-<ts> staging convention) is fully specified by the merged [E5.F2.H1]. The use-case
+    pattern is directly precedented by listRepos/listBranches ([E2.F2.H3]). Risk is concentrated
+    in one open design question rather than in mechanics: what "corrupt/partial, listed with a
+    marker" means precisely, given that [E5.F2.H1]'s own AC-19 scanning convention already skips
+    dot-prefixed .partial-<ts> entries rather than surfacing them -- the literal opposite of what
+    this story's acceptance criterion asks for.
+  confidence: medium-high
+  recorded_at: "2026-08-22T18:00:00Z"
+lifecycle_status: draft
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. [E5.F2.H1]'s port, fs adapter and layout module are all directly
+      readable, as is the E2.F2.H3 listRepos/listBranches precedent; lightweight proposal-stage
+      exploration was sufficient.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T17:50:00Z"
+    completed_at: "2026-08-22T18:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/history/index.ts and
+      ports/run-store.ts (RunStore currently write-only, save() alone), src/adapters/driven/
+      storage/run-layout.ts and run-store-fs.ts ([E5.F2.H1]'s on-disk layout, timestamp format,
+      and .partial-<ts> staging convention), src/core/repos/list-repos.ts and list-branches.ts
+      (the structural template for a thin, dependency-injected read use case), and
+      docs/backlog-mvp-sentinel.md's E5.F2.H2 entry. Four open questions recorded for spec, two
+      B-level: the precise definition of "corrupt/partial" given [E5.F2.H1]'s AC-19 already skips
+      .partial-<ts> entries during scanning, and the shape of RunStore's new read method(s).
+      [E5.F2.H3] (cost/tokens) treated as out of scope per workflow contract rule 7.
+    last_updated_at: "2026-08-22T18:00:00Z"
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
+checkpoints:
+  - id: cp-proposal-approval
+    type: stage_approval
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is complete and ready for sddl-spec. Two B-level questions are recorded for spec
+      to resolve as firm acceptance criteria before any design work: the precise meaning of
+      "corrupt/partial, listed with a marker," and the shape of RunStore's new read method(s).
+    question: >-
+      Approve the proposal and proceed to sddl-spec for [E5.F2.H2] Query history?
+    free_input_allowed: true
+    created_at: "2026-08-22T18:00:00Z"
+decisions: []
+open_risks:
+  - id: risk-001
+    summary: >-
+      Issue #34's "corrupt/partial runs listed with a marker" reads, on a literal interpretation
+      of "partial," in tension with [E5.F2.H1]'s own AC-19 convention of skipping dot-prefixed
+      .partial-<ts> staging directories during any scan. Spec must decide explicitly whether this
+      story's scan treats .partial-<ts> entries differently than [E5.F2.H1]'s did, and state the
+      rationale.
+    severity: medium
+next_action:
+  kind: user_checkpoint
+  summary: >-
+    proposal.md ready. Awaiting approval to proceed to sddl-spec, which must resolve the
+    corrupt/partial definition and the RunStore read-method shape as firm acceptance criteria.
+created_at: "2026-08-22T17:50:00Z"
+updated_at: "2026-08-22T18:00:00Z"

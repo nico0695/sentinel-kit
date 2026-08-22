@@ -18,8 +18,8 @@ complexity_assessment:
     made atomic with partial runs identifiable.
   confidence: medium-high
   recorded_at: "2026-08-22T13:10:00Z"
-lifecycle_status: planned
-current_stage: sddl-design
+lifecycle_status: implementing
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -101,7 +101,24 @@ stages:
       timers across two far-apart system times rather than grepping the source for Date.now(.
     last_updated_at: "2026-08-22T14:40:00Z"
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T14:45:00Z"
+    completed_at: "2026-08-22T15:00:00Z"
+    notes: >-
+      plan.md written: 4 executor stages, sequenced exactly per design.md's own recommendation
+      (core-first, then pure layout module, then fs adapter + contract suite, then fs-specific
+      tests as the closing gate). ST-1 core port surface (no test file -- pure declarations plus
+      one zod schema); ST-2 pure run-layout.ts with unit tests proving AC-4/AC-9/AC-10/AC-18's
+      serializer guarantees before any fs I/O exists to obscure them; ST-3 impure run-store-fs.ts
+      wiring design's 10-step save() flow plus the portable RunStore.contract.ts; ST-4
+      fs-specific atomicity/determinism tests (vi.doMock injection precedented in
+      opencode-adapter.test.ts; vi.useFakeTimers for AC-14) and the story's closing gate,
+      re-verifying AC-3's empty src/core/run diff and the architecture guards. No manual
+      verification stage anywhere in the plan (unlike H1/H2's AC-24) -- pure fs I/O against a
+      temp dir, fully testable in CI. AC-17 (no env reads) has no automated test anywhere in the
+      plan, per design's own explicit deferral; ST-4 records a grep-for-process.env inspection in
+      the execution log instead of silently omitting evidence.
+    last_updated_at: "2026-08-22T15:00:00Z"
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -188,6 +205,23 @@ checkpoints:
       sddl-plan?
     free_input_allowed: true
     created_at: "2026-08-22T14:40:00Z"
+    response:
+      free_text: "si, avanza con el plan"
+      responded_at: "2026-08-22T14:45:00Z"
+    resolved_at: "2026-08-22T14:45:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    summary: >-
+      plan.md is complete: 4 executor stages (ST-1..ST-4), each with its own stage_approval gate
+      to come during sddl-executor. Sequencing matches design.md's own recommendation with no
+      deviation. ST-4 is the closing gate and the only stage that re-verifies AC-3 (empty diff
+      over src/core/run) directly.
+    question: >-
+      Approve plan.md and proceed to sddl-executor, which will request separate approval before
+      each of ST-1 through ST-4 touches code?
+    free_input_allowed: true
+    created_at: "2026-08-22T15:00:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -251,11 +285,10 @@ open_risks:
     severity: low
 next_action:
   kind: wait_for_approval
-  target: cp-design-approval
+  target: cp-plan-approval
   summary: >-
-    Await approval of design.md before running sddl-plan. One spec detail was refined rather
-    than silently applied (D-3 relocates the error module to ports/run-store-errors.ts to match
-    the port-error convention repos already follows); one new risk was surfaced (risk-005, the
-    TOCTOU window between the collision pre-check and the rename).
+    Await approval of plan.md before running sddl-executor. Executor still requests a separate
+    stage_approval before each of ST-1 through ST-4 touches code -- plan approval does not
+    pre-authorize execution.
 created_at: "2026-08-22T13:00:00Z"
-updated_at: "2026-08-22T14:40:00Z"
+updated_at: "2026-08-22T15:00:00Z"

@@ -16,8 +16,8 @@ complexity_assessment:
     this story's acceptance criterion asks for.
   confidence: medium
   recorded_at: "2026-08-22T18:00:00Z"
-lifecycle_status: reviewing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -193,7 +193,22 @@ stages:
       0 open severe findings, 4 info rows remain (non-blocking).
     last_updated_at: "2026-08-22T22:50:00Z"
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-22T23:00:00Z"
+    completed_at: "2026-08-22T23:10:00Z"
+    notes: >-
+      final mode, verdict pass. Independently re-verified rather than trusting execution-log.md:
+      fresh npm run check (green) and npm test (362/362); AC-15 via a fresh git diff --stat over
+      src/core/run (empty); the full 14-file story diff scope (matches plan.md's ST-1..ST-5
+      exactly); AC-17 via a fresh process.env grep (zero matches). Consumed review-ledger.md's
+      pass_with_warnings verdict (0 open severe, 4 info) without re-deriving it -- both
+      CRITICALs already independently mutation-proven fixed in ST-5. All 15 ACs from spec.md
+      revision 2 spot-checked against their assigned tests, including AC-7/AC-11/AC-14 which the
+      ST-5 fixes strengthened. 2 low-severity QA findings recorded (4 non-blocking ledger info
+      rows as optional follow-up; a process note about jsonschema validation gaps this session
+      caught in state.yaml that a prior hand-rolled check had missed). Clean pass, no amendment
+      cycle needed.
+    last_updated_at: "2026-08-22T23:10:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e5-f2-h2-query-history/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f2-h2-query-history/proposal.md
@@ -534,11 +549,26 @@ review_summary:
     severe findings remain; 4 info rows (non-blocking) carried forward as optional follow-up.
   reported_at: "2026-08-22T22:50:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f2-h2-query-history/review-ledger.md
-next_action:
-  kind: run_stage
-  target: sddl-qa-review
+
+qa_summary:
+  mode: final
+  verdict: pass
   summary: >-
-    ST-5 fix stage complete, both CRITICAL findings fixed and verified. review-ledger.md verdict
-    pass_with_warnings, 0 open severe findings. Proceeding to sddl-qa-review in final mode.
+    All 15 ACs pass, independently re-verified. npm run check and npm test both fresh-green
+    (362/362). AC-15 confirmed via a fresh git diff over src/core/run (empty). review-ledger.md's
+    pass_with_warnings consumed as evidence (0 open severe findings, both CRITICALs fixed and
+    mutation-proven in ST-5). 2 low-severity QA findings recorded as non-blocking. Clean pass on
+    the first final attempt after the ST-5 fix round.
+  reported_at: "2026-08-22T23:10:00Z"
+  report_path: sdd-lite/openspec/changes/e5-f2-h2-query-history/qa-report.md
+
+next_action:
+  kind: complete
+  summary: >-
+    final QA pass, change completed. Remaining work outside this change: write the mandatory
+    history-log entry before closing the session; offer the PR only if the user asks
+    ([E5.F2.H2] Query history, Closes #34); E5 milestone stories E5.F1.H1/H2 (#31/#32) remain
+    untouched and E5.F2.H3 (#35) is optional, so the epic-summary-and-STOP rule does not trigger
+    yet.
 created_at: "2026-08-22T17:50:00Z"
 updated_at: "2026-08-22T21:50:00Z"

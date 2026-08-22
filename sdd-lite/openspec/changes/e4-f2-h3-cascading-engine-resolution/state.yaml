@@ -17,7 +17,7 @@ complexity_assessment:
   confidence: high
   recorded_at: "2026-08-22T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -92,6 +92,22 @@ stages:
       inspects. All 9 spec ACs mapped to concrete file locations. No new
       open technical question -- both pieces are direct applications of
       patterns already present in the codebase.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-22T01:20:00Z"
+    completed_at: "2026-08-22T01:20:00Z"
+    notes: >-
+      plan.md written, status complete, execution_ready: true. 3 executor
+      stages, strictly ordered by import dependency: ST-1 (schema refactor,
+      repos module), ST-2 (resolveEngine + UnknownEngineError, run module,
+      depends on ST-1 for the EngineName type), ST-3 (run-review.ts echo
+      field, independent of ST-2 at the code level but sequenced last for a
+      single closing gate). Each stage bundles its own tests -- no separate
+      test-only stage, proportional to the change's small core-only surface
+      (unlike H1/H2's dedicated ST-4 test stage, justified there by a much
+      larger single-file surface). No manual/human verification needed
+      anywhere in this plan -- everything is a pure function or data-shape
+      change, fully testable in CI, unlike H1/H2's permanently-open AC-24.
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-approval
@@ -109,19 +125,20 @@ review_summary: null
 qa_summary: null
 next_action:
   kind: continue
-  target: sddl-plan
+  target: sddl-executor
   summary: >-
-    design.md complete, all affected areas mapped to concrete file
-    locations, no open technical question remaining. Recommend proceeding to
-    sddl-plan to sequence executor stages (schema refactor, resolve-engine.ts
-    + its error class, run-review.ts echo field, tests).
+    plan.md complete, execution_ready: true, 3 stages (ST-1 schema refactor,
+    ST-2 resolveEngine + error, ST-3 run-review.ts echo field). Recommend
+    proceeding to sddl-executor for ST-1, gated by its own stage_approval
+    checkpoint per the workflow contract.
 created_at: "2026-08-22T00:00:00Z"
-updated_at: "2026-08-22T01:10:00Z"
+updated_at: "2026-08-22T01:20:00Z"
 artifacts:
   state: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/state.yaml
   proposal: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/proposal.md
   spec: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/spec.md
   design: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/design.md
+  plan: sdd-lite/openspec/changes/e4-f2-h3-cascading-engine-resolution/plan.md
 checkpoints:
   - id: cp-proposal-approval
     type: stage_approval
@@ -138,4 +155,12 @@ checkpoints:
   - id: cp-design-approval
     type: stage_approval
     stage: sddl-design
-    status: pending
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:15:00Z"
+  - id: cp-plan-approval
+    type: stage_approval
+    stage: sddl-plan
+    status: approved
+    decided_by: user
+    decided_at: "2026-08-22T01:20:00Z"

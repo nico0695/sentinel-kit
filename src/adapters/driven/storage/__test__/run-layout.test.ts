@@ -6,8 +6,10 @@
 import { describe, expect, it } from "vitest";
 import type { RunRecord } from "../../../../core/history/index.js";
 import {
+  classifyRunDirEntry,
   deriveRunPaths,
   formatRunTimestamp,
+  parseRunTimestamp,
   serializeRunMetadata,
 } from "../run-layout.js";
 
@@ -206,5 +208,75 @@ describe("serializeRunMetadata (AC-4, AC-10, AC-18)", () => {
 
   it("is round-trippable: JSON.parse(serializeRunMetadata(record)) never throws", () => {
     expect(() => JSON.parse(serializeRunMetadata(baseRecord()))).not.toThrow();
+  });
+});
+
+describe("parseRunTimestamp (AC-2, inverse of formatRunTimestamp)", () => {
+  it("round-trips exactly against formatRunTimestamp for a known epoch", () => {
+    const epoch = 1787404200123;
+    expect(parseRunTimestamp(formatRunTimestamp(epoch))).toBe(epoch);
+  });
+
+  it("round-trips for epochs spanning a day, a month and a year boundary", () => {
+    const epochs = [
+      Date.parse("2026-08-22T13:10:00.123Z"),
+      Date.parse("2026-08-23T00:00:00.000Z"),
+      Date.parse("2026-09-01T00:00:00.000Z"),
+      Date.parse("2027-01-01T00:00:00.000Z"),
+    ];
+    for (const epoch of epochs) {
+      expect(parseRunTimestamp(formatRunTimestamp(epoch))).toBe(epoch);
+    }
+  });
+
+  it("returns null for a malformed or non-ts name, rather than throwing", () => {
+    for (const name of [
+      "",
+      "not-a-timestamp",
+      "20260822T131000123",
+      "20260822T131000123Y",
+      "2026-08-22T13:10:00.123Z",
+      ".partial-20260822T131000123Z",
+    ]) {
+      expect(parseRunTimestamp(name)).toBeNull();
+    }
+  });
+});
+
+describe("classifyRunDirEntry (AC-5, AC-12, D9's three-way rule)", () => {
+  it("classifies a ts-named directory as final, with the name itself as id", () => {
+    const result = classifyRunDirEntry("20260822T131000123Z", true);
+    expect(result).toEqual({
+      kind: "final",
+      id: "20260822T131000123Z",
+      epochMs: 1787404200123,
+    });
+  });
+
+  it("classifies a .partial-<ts> directory as partial, with the prefix stripped from id", () => {
+    const result = classifyRunDirEntry(".partial-20260822T131000123Z", true);
+    expect(result).toEqual({
+      kind: "partial",
+      id: "20260822T131000123Z",
+      epochMs: 1787404200123,
+    });
+  });
+
+  it("classifies a non-directory entry as other, even with a ts-shaped name", () => {
+    expect(classifyRunDirEntry("20260822T131000123Z", false)).toEqual({
+      kind: "other",
+    });
+  });
+
+  it("classifies a stray file/dir with an unrecognized name as other", () => {
+    for (const name of [".DS_Store", "notes.txt", "some-other-dir", ".git"]) {
+      expect(classifyRunDirEntry(name, true)).toEqual({ kind: "other" });
+    }
+  });
+
+  it("classifies a .partial- directory with a malformed suffix as other, not partial", () => {
+    expect(classifyRunDirEntry(".partial-not-a-timestamp", true)).toEqual({
+      kind: "other",
+    });
   });
 });

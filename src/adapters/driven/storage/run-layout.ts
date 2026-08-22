@@ -29,6 +29,61 @@ export function formatRunTimestamp(epochMs: number): string {
   return new Date(epochMs).toISOString().replaceAll(/[-:.]/g, "");
 }
 
+const TS_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})Z$/;
+const PARTIAL_PREFIX = ".partial-";
+
+/**
+ * Inverse of `formatRunTimestamp`. Returns `null` for anything not shaped
+ * like a run directory name, rather than throwing — every caller treats a
+ * non-ts directory entry as data to classify, not an error (`[E5.F2.H2]`
+ * D9). Round-trip exactness with `formatRunTimestamp` verified with node
+ * during spec revision 2.
+ */
+export function parseRunTimestamp(name: string): number | null {
+  const m = TS_PATTERN.exec(name);
+  if (m === null) {
+    return null;
+  }
+  const [, year, month, day, hour, minute, second, ms] = m;
+  const iso = `${year}-${month}-${day}T${hour}:${minute}:${second}.${ms}Z`;
+  const epochMs = Date.parse(iso);
+  return Number.isNaN(epochMs) ? null : epochMs;
+}
+
+/** One `readdir` entry, classified per `[E5.F2.H2]` D9's three-way rule. */
+export type RunDirEntryKind =
+  | { readonly kind: "final"; readonly id: string; readonly epochMs: number }
+  | { readonly kind: "partial"; readonly id: string; readonly epochMs: number }
+  | { readonly kind: "other" };
+
+/**
+ * `id` is always the directory's ts (never the `.partial-` prefix) — D5's
+ * addressing contract, so a `list()` caller can pass a `partial` entry's
+ * `id` straight to `get()`. Not a directory at all is `"other"`, same as an
+ * unrecognized name — this function receives only the entry's name and
+ * whether it's a directory, so a stray file with a ts-shaped name still
+ * classifies as `"other"` when `isDirectory` is false.
+ */
+export function classifyRunDirEntry(
+  name: string,
+  isDirectory: boolean,
+): RunDirEntryKind {
+  if (!isDirectory) {
+    return { kind: "other" };
+  }
+  if (name.startsWith(PARTIAL_PREFIX)) {
+    const id = name.slice(PARTIAL_PREFIX.length);
+    const epochMs = parseRunTimestamp(id);
+    return epochMs === null
+      ? { kind: "other" }
+      : { kind: "partial", id, epochMs };
+  }
+  const epochMs = parseRunTimestamp(name);
+  return epochMs === null
+    ? { kind: "other" }
+    : { kind: "final", id: name, epochMs };
+}
+
 export interface RunPaths {
   readonly repoDir: string;
   readonly finalDir: string;

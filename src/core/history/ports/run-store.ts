@@ -60,7 +60,34 @@ export interface RunRecord {
   readonly failure?: RunFailureRecord;
 }
 
+/** Every run entry falls into exactly one of these three states on read. */
+export type RunStatus = "ok" | "partial" | "corrupt";
+
+/**
+ * One entry of `RunStore.list`'s result. A `partial`/`corrupt` entry cannot
+ * supply the fields below `status` at all — there is no trustworthy
+ * `metadata.json` to read them from — so every field but the first four is
+ * optional rather than fabricated (`[E5.F2.H2]` D2).
+ */
+export interface RunSummary {
+  readonly id: string;
+  readonly repoName: string;
+  readonly startedAtEpochMs: number;
+  readonly status: RunStatus;
+  readonly durationMs?: number;
+  readonly harness?: string;
+  readonly baseRef?: string;
+  readonly targetRef?: string;
+  readonly state?: TerminalState;
+  readonly verdict?: Verdict;
+  readonly engine?: string;
+}
+
 export interface RunStore {
   /** Resolves with the absolute path of the created run directory. */
   save(record: RunRecord): Promise<string>;
+  /** Ascending by `startedAtEpochMs`. Resolves `[]` for a repo with no runs. */
+  list(repoName: string): Promise<readonly RunSummary[]>;
+  /** Resolves with the full record for an `ok` run; rejects otherwise. */
+  get(repoName: string, id: string): Promise<RunRecord>;
 }

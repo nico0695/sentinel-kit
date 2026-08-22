@@ -48,10 +48,51 @@ export class RunAlreadyExistsError extends HistoryError {
   }
 }
 
-/** Any raw fs failure during staging or the closing rename. */
+/** Any raw fs failure inside the store — write-side staging/rename, or a read. */
 export class RunPersistenceError extends HistoryError {
   constructor(message: string, options?: HistoryErrorOptions) {
     super(message, options);
     this.name = "RunPersistenceError";
+  }
+}
+
+/** Raised before any fs access — `repoName`/`id` fails query-input validation. */
+export class InvalidRunQueryError extends HistoryError {
+  readonly fields: ReadonlyArray<{
+    readonly path: string;
+    readonly message: string;
+  }>;
+  constructor(
+    message: string,
+    fields: ReadonlyArray<{ readonly path: string; readonly message: string }>,
+    options?: HistoryErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "InvalidRunQueryError";
+    this.fields = fields;
+  }
+}
+
+/** `get()` found no `<ts>` or `.partial-<ts>` directory for `repoName`/`id`. */
+export class RunNotFoundError extends HistoryError {
+  readonly repoName: string;
+  readonly id: string;
+  constructor(repoName: string, id: string, options?: HistoryErrorOptions) {
+    super(`Run not found: ${repoName}/${id}`, options);
+    this.name = "RunNotFoundError";
+    this.repoName = repoName;
+    this.id = id;
+  }
+}
+
+/** `get()` targeted a `partial` or `corrupt` run — nothing trustworthy to return. */
+export class RunCorruptedError extends HistoryError {
+  readonly repoName: string;
+  readonly id: string;
+  constructor(repoName: string, id: string, options?: HistoryErrorOptions) {
+    super(`Run is partial or corrupted: ${repoName}/${id}`, options);
+    this.name = "RunCorruptedError";
+    this.repoName = repoName;
+    this.id = id;
   }
 }

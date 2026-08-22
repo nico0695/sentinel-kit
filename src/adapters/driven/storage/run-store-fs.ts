@@ -1,7 +1,7 @@
 /**
  * Driven adapter: storage — filesystem-backed `RunStore` implementation.
  *
- * Implements design.md's 10-step `save()` flow: validate the path-sensitive
+ * `save()` implements design.md's 10-step flow: validate the path-sensitive
  * fields (step 1), derive the deterministic paths (steps 2-3, via
  * `run-layout.ts`), reject a genuine collision (step 4), create the repo
  * directory (step 5), clear a same-timestamp staging remnant from an earlier
@@ -9,21 +9,46 @@
  * deterministic, D7), stage every file (steps 7-8), and atomically rename
  * into place (step 9). Every fs failure is translated into the port error
  * hierarchy; callers never see a raw `ENOENT`/`EACCES`/`ENOTEMPTY`.
+ *
+ * `list()`/`get()` (`[E5.F2.H2]`) read the same layout back: `list()` scans
+ * `runsRoot/<repoName>/` and classifies every entry via
+ * `classifyRunDirEntry` (D9's three-way rule), validating each `final`
+ * entry's `metadata.json` against `RunMetadataSchema` to decide `ok` vs
+ * `corrupt` (D6); `get()` resolves one specific `id` and, for an `ok` run,
+ * also reads the optional body files `save()` conditionally wrote.
  */
-import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import type { ZodError } from "zod";
 import {
+  InvalidRunQueryError,
   InvalidRunRecordError,
   RunAlreadyExistsError,
+  RunCorruptedError,
+  type RunMetadata,
+  RunMetadataSchema,
+  RunNotFoundError,
   RunPersistenceError,
+  RunQueryFieldsSchema,
   type RunRecord,
   RunRecordPathFieldsSchema,
   type RunStore,
+  type RunSummary,
 } from "../../../core/history/index.js";
 import {
+  classifyRunDirEntry,
   deriveRunPaths,
   formatRunTimestamp,
+  parseRunTimestamp,
   serializeRunMetadata,
 } from "./run-layout.js";
 
@@ -34,6 +59,92 @@ function zodToFields(
     path: i.path.join("."),
     message: i.message,
   }));
+}
+
+/** `readFile`'d `metadata.json`, parsed and schema-validated. */
+type MetadataReadResult = RunMetadata | "corrupt" | "missing";
+
+async function readMetadata(finalDir: string): Promise<MetadataReadResult> {
+  let raw: string;
+  try {
+    raw = await readFile(join(finalDir, "metadata.json"), "utf-8");
+  } catch (err: unknown) {
+    if (isEnoent(err)) {
+      return "missing";
+    }
+    throw err;
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    return "corrupt";
+  }
+
+  const result = RunMetadataSchema.safeParse(parsedJson);
+  return result.success ? result.data : "corrupt";
+}
+
+function toSummaryFromMetadata(
+  id: string,
+  repoName: string,
+  epochMs: number,
+  metadata: RunMetadata,
+): RunSummary {
+  return {
+    id,
+    repoName,
+    startedAtEpochMs: epochMs,
+    status: "ok",
+    durationMs: metadata.durationMs,
+    harness: metadata.harness,
+    baseRef: metadata.baseRef,
+    targetRef: metadata.targetRef,
+    state: metadata.state,
+    ...(metadata.verdict !== undefined ? { verdict: metadata.verdict } : {}),
+    ...(metadata.engine !== undefined ? { engine: metadata.engine } : {}),
+  };
+}
+
+function minimalSummary(
+  id: string,
+  repoName: string,
+  epochMs: number,
+  status: "partial" | "corrupt",
+): RunSummary {
+  return { id, repoName, startedAtEpochMs: epochMs, status };
+}
+
+async function readOptionalFile(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch (err: unknown) {
+    if (isEnoent(err)) {
+      return undefined;
+    }
+    throw err;
+  }
+}
+
+async function readOptionalValidationLogs(
+  validationsDir: string,
+): Promise<readonly string[] | undefined> {
+  let names: readonly string[];
+  try {
+    names = await readdir(validationsDir);
+  } catch (err: unknown) {
+    if (isEnoent(err)) {
+      return undefined;
+    }
+    throw err;
+  }
+  const sorted = [...names].sort();
+  const contents: string[] = [];
+  for (const name of sorted) {
+    contents.push(await readFile(join(validationsDir, name), "utf-8"));
+  }
+  return contents;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -147,6 +258,213 @@ export function createRunStoreFsAdapter(runsRoot: string): RunStore {
       }
 
       return finalDir;
+    },
+
+    async list(repoName: string): Promise<readonly RunSummary[]> {
+      const parsedRepo = RunQueryFieldsSchema.pick({
+        repoName: true,
+      }).safeParse({ repoName });
+      if (!parsedRepo.success) {
+        throw new InvalidRunQueryError(
+          "Invalid repoName",
+          zodToFields(parsedRepo.error),
+          { cause: parsedRepo.error },
+        );
+      }
+
+      const repoDir = join(runsRoot, repoName);
+
+      let entries: Dirent[];
+      try {
+        entries = await readdir(repoDir, { withFileTypes: true });
+      } catch (err: unknown) {
+        if (isEnoent(err)) {
+          return [];
+        }
+        throw new RunPersistenceError(`Failed to list runs at ${repoDir}`, {
+          cause: err,
+        });
+      }
+
+      const partials = new Map<string, RunSummary>();
+      const finals = new Map<string, RunSummary>();
+
+      for (const entry of entries) {
+        const classified = classifyRunDirEntry(entry.name, entry.isDirectory());
+        if (classified.kind === "other") {
+          continue;
+        }
+        if (classified.kind === "partial") {
+          partials.set(
+            classified.id,
+            minimalSummary(
+              classified.id,
+              repoName,
+              classified.epochMs,
+              "partial",
+            ),
+          );
+          continue;
+        }
+
+        /* A raw (non-ENOENT) failure reading THIS entry's metadata — e.g.
+         * EACCES, EMFILE — degrades only this entry to `corrupt` rather
+         * than aborting the whole list() call: one bad entry must never
+         * take every other already-classified run down with it (AC-7). A
+         * caller that needs to know about the raw failure specifically
+         * still gets it from `get()`, which is unaffected by this change. */
+        let metadata: MetadataReadResult;
+        try {
+          metadata = await readMetadata(join(repoDir, classified.id));
+        } catch {
+          metadata = "corrupt";
+        }
+
+        finals.set(
+          classified.id,
+          metadata === "corrupt" || metadata === "missing"
+            ? minimalSummary(
+                classified.id,
+                repoName,
+                classified.epochMs,
+                "corrupt",
+              )
+            : toSummaryFromMetadata(
+                classified.id,
+                repoName,
+                classified.epochMs,
+                metadata,
+              ),
+        );
+      }
+
+      /* Final wins over a same-id staging remnant (AC-4): merge partials
+       * first, finals second, so a `Map` spread lets the later entry win. */
+      const merged = new Map<string, RunSummary>([...partials, ...finals]);
+      return [...merged.values()].sort(
+        (a, b) => a.startedAtEpochMs - b.startedAtEpochMs,
+      );
+    },
+
+    async get(repoName: string, id: string): Promise<RunRecord> {
+      const parsedQuery = RunQueryFieldsSchema.safeParse({ repoName, id });
+      if (!parsedQuery.success) {
+        throw new InvalidRunQueryError(
+          "Invalid run query",
+          zodToFields(parsedQuery.error),
+          { cause: parsedQuery.error },
+        );
+      }
+
+      const epochMs = parseRunTimestamp(id);
+      if (epochMs === null) {
+        throw new RunNotFoundError(repoName, id);
+      }
+
+      const { finalDir, stagingDir } = deriveRunPaths(runsRoot, repoName, id);
+
+      let metadata: MetadataReadResult;
+      try {
+        metadata = await readMetadata(finalDir);
+      } catch (err: unknown) {
+        throw new RunPersistenceError(`Failed to read run ${repoName}/${id}`, {
+          cause: err,
+        });
+      }
+
+      if (metadata === "corrupt") {
+        throw new RunCorruptedError(repoName, id);
+      }
+      if (metadata === "missing") {
+        /* readMetadata's ENOENT alone can't tell "finalDir doesn't exist"
+         * apart from "finalDir exists but metadata.json is gone" — both
+         * fail readFile the same way. Check finalDir itself first so this
+         * matches list()'s classification of the identical on-disk state
+         * (a present-but-metadata-less dir is corrupt, not not-found). */
+        let finalDirExists: boolean;
+        try {
+          finalDirExists = await exists(finalDir);
+        } catch (err: unknown) {
+          throw new RunPersistenceError(
+            `Failed to check for run directory at ${finalDir}`,
+            { cause: err },
+          );
+        }
+        if (finalDirExists) {
+          throw new RunCorruptedError(repoName, id);
+        }
+
+        let partialExists: boolean;
+        try {
+          partialExists = await exists(stagingDir);
+        } catch (err: unknown) {
+          throw new RunPersistenceError(
+            `Failed to check for a partial run at ${stagingDir}`,
+            { cause: err },
+          );
+        }
+        throw partialExists
+          ? new RunCorruptedError(repoName, id)
+          : new RunNotFoundError(repoName, id);
+      }
+
+      let engineOutput: string | undefined;
+      let prompt: string | undefined;
+      let validationOutput: readonly string[] | undefined;
+      try {
+        engineOutput = await readOptionalFile(join(finalDir, "result.md"));
+        prompt = await readOptionalFile(join(finalDir, "prompt.md"));
+        validationOutput = await readOptionalValidationLogs(
+          join(finalDir, "validations"),
+        );
+      } catch (err: unknown) {
+        throw new RunPersistenceError(`Failed to read run ${repoName}/${id}`, {
+          cause: err,
+        });
+      }
+
+      return {
+        repoName,
+        startedAtEpochMs: epochMs,
+        durationMs: metadata.durationMs,
+        harness: metadata.harness,
+        baseRef: metadata.baseRef,
+        targetRef: metadata.targetRef,
+        state: metadata.state,
+        ...(metadata.engine !== undefined ? { engine: metadata.engine } : {}),
+        ...(metadata.verdict !== undefined
+          ? { verdict: metadata.verdict }
+          : {}),
+        ...(prompt !== undefined ? { prompt } : {}),
+        ...(engineOutput !== undefined ? { engineOutput } : {}),
+        ...(metadata.diff !== undefined
+          ? {
+              diff: {
+                ...metadata.diff,
+                warnings: metadata.diff.warnings ?? [],
+              },
+            }
+          : {}),
+        ...(metadata.usage !== undefined
+          ? {
+              usage: {
+                ...(metadata.usage.inputTokens !== undefined
+                  ? { inputTokens: metadata.usage.inputTokens }
+                  : {}),
+                ...(metadata.usage.outputTokens !== undefined
+                  ? { outputTokens: metadata.usage.outputTokens }
+                  : {}),
+                ...(metadata.usage.totalTokens !== undefined
+                  ? { totalTokens: metadata.usage.totalTokens }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(validationOutput !== undefined ? { validationOutput } : {}),
+        ...(metadata.failure !== undefined
+          ? { failure: metadata.failure }
+          : {}),
+      };
     },
   };
 }

@@ -17,8 +17,8 @@ complexity_assessment:
     caller that does not exist yet.
   confidence: high
   recorded_at: "2026-08-22T23:10:00Z"
-lifecycle_status: planning
-current_stage: sddl-spec
+lifecycle_status: planned
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -73,7 +73,18 @@ stages:
       absoluteness delegated to the adapter's node:path isAbsolute, following the precedent
       run-review.ts:59-62 already documents for the identical reason.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T00:00:00Z"
+    completed_at: "2026-08-23T00:10:00Z"
+    notes: >-
+      plan.md written, 4 stages following design.md's own recommended sequencing: ST-1 core
+      types + guard-clause pre-flight + two new errors (pure, no execa/fs); ST-2 the pure
+      classify-execa-result.ts function carrying all six of spec revision 2's empirical findings,
+      unit-tested with hand-built result records and zero spawning; ST-3 the impure adapter shell
+      wiring the pinned execa option bag to the classifier, plus the sixth ProcessRunner.contract.ts;
+      ST-4 the real-child suite (AC-1's reaping is the load-bearing case) as the closing gate,
+      re-verifying AC-15. No stage wires the port into runReview or any caller -- ships uncalled,
+      matching both prior E5 stories' precedent.
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -201,11 +212,10 @@ open_risks:
       rather than hidden.
     severity: low
 next_action:
-  kind: wait_for_approval
-  target: sddl-plan
+  kind: ask_user
+  target: sddl-executor
   summary: >-
-    Design complete, 0 blocking open questions. Awaiting user approval to run sddl-plan, which
-    should stage the work so the pure classifier and its childless unit tests land before the
-    real-child suite that depends on them.
+    Plan complete, 4 stages, execution-ready. Awaiting stage_approval for ST-1 (core types +
+    pre-flight + two errors) before sddl-executor touches any code.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-22T23:55:00Z"
+updated_at: "2026-08-23T00:10:00Z"

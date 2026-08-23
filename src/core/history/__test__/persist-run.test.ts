@@ -190,8 +190,17 @@ describe("persistRun", () => {
       truncated: true,
       warnings: ["diff truncated: 1 of 2 files"],
     });
-    expect(JSON.stringify(record)).not.toContain(diffBody);
-    expect(JSON.stringify(record)).not.toContain("src/a.ts");
+    // `JSON.stringify` emits the real newlines inside `diffBody` as the
+    // two-character escape `\n`, so searching the serialized record for the
+    // raw string can never match — not even for a record that persisted the
+    // diff verbatim. Compare against the escaped form the serializer actually
+    // produces (QA finding F-1).
+    const serialized = JSON.stringify(record);
+    const serializedDiffBody = JSON.stringify(diffBody).slice(1, -1);
+
+    expect(serializedDiffBody).not.toBe(diffBody);
+    expect(serialized).not.toContain(serializedDiffBody);
+    expect(serialized).not.toContain("src/a.ts");
   });
 
   it("stringifies a non-Error throwable into failure.message", async () => {

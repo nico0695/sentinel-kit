@@ -14,7 +14,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S2 | Review-request resolution in core (D3 + D5) | yes | completed |
 | S3 | D7 alias → storage-key normalisation inside `core/history` | yes | completed |
 | S4 | `persistRun` use case (D1/AC-5) | yes | completed |
-| S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | pending |
+| S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | completed |
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | pending |
 | S7 | `review` command | yes | pending |
 | S8 | Sentinel home resolution (D2/AC-7) | yes | pending |
@@ -386,3 +386,154 @@ S4 is complete and both gates are green, which **closes the approved `batch-s1-s
 no approval and were not started. Recommended: `sddl-qa-review` in **stage mode** over S1-S4 as
 planned, then a fresh `stage_approval` for S5 (CLI shell). The one item QA should carry forward is
 `risk-e6h1-009` — deliberately left open here and assigned to the S6/S7 renderers.
+
+## S5 — CLI shell: factory, deps contract, error/version/root-help behaviour
+
+- status: completed
+- approval: `cp-stage-approval-s5-s7` (user, S5-S7 approved as a batch, one stage per executor
+  invocation) plus the user-approved **F-1 addendum** folded into this stage only.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `f02985c`, working tree clean;
+  `npm run check` exit 0 (biome 124 files, depcruise 84 modules / 183 dependencies, 0 violations)
+  and `npm test` exit 0 (551 tests / 31 files) before the stage, matching QA's independent re-run.
+
+### Planned scope (plan.md, S5 row)
+
+`src/adapters/driving/cli/{index.ts,cli-deps.ts,create-cli.ts,render/format-error.ts}` and
+`__test__/{help,version,errors}.test.ts`. Out of scope and untouched: `commands/**`,
+`render/format-{repos,runs,review}.ts` (S6/S7), everything under `src/main/**` (S8/S9).
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driving/cli/cli-deps.ts` | New. `CliIo`, `ReviewContext`, `CliUseCases`, `CliDeps` exactly as design's interface block fixes them. Imports only core module barrels — no driven adapter, no `node:*`, no `process`. |
+| `src/adapters/driving/cli/create-cli.ts` | New. `createCli(deps): SentinelCli` with `run(argv): Promise<number>`; `program.exitOverride()` + `configureOutput` bound to the injected `CliIo`, both set **before** any subcommand is registered (commander copies them at `.command()` time); root name/description/`-V, --version`/`addHelpText("after", …)`; the catch-all that turns a `CommanderError` into `err.exitCode` and any other throwable into a rendered stderr line + exit 1. |
+| `src/adapters/driving/cli/render/format-error.ts` | New. `formatErrorLine(error: unknown): string` — message only, no stack, no `cause`, no per-error-type branching; a multi-line message is collapsed to one line and an empty message falls back to the error name. |
+| `src/adapters/driving/cli/index.ts` | `export {}` replaced by the adapter's public API: `createCli`, `SentinelCli`, `CommandRegistrar`, `commandRegistrars`, `formatErrorLine` and the four `cli-deps` types. |
+| `src/adapters/driving/cli/__test__/cli-test-doubles.ts` | New (test support). Capturing `CliIo`, fake `CliUseCases` whose entries throw unless overridden, `createTestDeps`, and an `argv(...)` helper producing the `process.argv` shape. |
+| `src/adapters/driving/cli/__test__/help.test.ts` | New. 6 tests (AC-2, D2, D8). |
+| `src/adapters/driving/cli/__test__/version.test.ts` | New. 3 tests (AC-4). |
+| `src/adapters/driving/cli/__test__/errors.test.ts` | New. 20 tests (AC-13, AC-10, AC-12 boundary). |
+| `src/core/history/__test__/persist-run.test.ts` | **F-1 addendum only.** The vacuous `expect(JSON.stringify(record)).not.toContain(diffBody)` replaced by a comparison against the escaped form the serializer actually emits. No other assertion touched; the sound sibling `not.toContain("src/a.ts")` kept; test count unchanged at 8. |
+
+`src/main/**` was not touched. No `commands/` file was created — the shell registers no command
+group, so root `--help` currently lists none; S6/S7 fill `commandRegistrars`.
+
+### Decisions taken in this stage
+
+- **A-level — `createCli(deps, registrars = commandRegistrars)`.** Design fixes
+  `createCli(deps): SentinelCli`, and that signature is unchanged for every caller. The optional
+  second parameter is the seam the command modules plug into (`CommandRegistrar =
+  (program, deps) => void`, exactly design's `registerRepoCommands(program, deps)` shape) and it is
+  also what makes AC-13 testable *in S5*: with no command registered yet, a thrown core error
+  cannot otherwise reach the shell's catch-all, and deferring that coverage to S6 would leave the
+  stage's stated exit condition unmet. S6/S7 add their registrars to `commandRegistrars`.
+- **A-level — `formatErrorLine` collapses newlines and falls back to the error name.** AC-13
+  guarantees *one* line on stderr; nothing stops a core message from carrying a newline, and an
+  `Error` with an empty message would otherwise render as a blank line.
+- **A-level — `CliIo` is line-oriented, so commander's chunks are split.** `configureOutput`
+  receives multi-line help in a single call with a trailing newline; `writeChunk` drops the
+  trailing newline and emits one call per line, which is what keeps AC-10's "one record per line"
+  true for the S6/S7 listings that will share the same writers.
+- **A-level — one test-support module (`__test__/cli-test-doubles.ts`) rather than three copies.**
+  Same pattern as `core/run/__test__/fake-process-runner.ts`; it is inside the stage's own
+  `__test__` folder and is excluded from `depcruise` by the existing `(^|/)__test__/` exclusion.
+
+### F-1 addendum — how the replacement was verified to be able to fail
+
+The finding was reproduced and the fix mutation-tested rather than asserted:
+
+1. **Vacuity reproduced.** `JSON.stringify({diff:{files:[{path:"src/a.ts",content:diffBody}]}})`
+   does **not** contain the raw `diffBody` (its real newlines are emitted as the two-character
+   escape `\n`), so the old assertion passed against a record that leaked the entire diff.
+2. **Replacement fails against a leak.** `src/core/history/persist-run.ts` was temporarily mutated
+   so `toDiffSummary` also persisted `files: diff.files`, and the sibling `toEqual` assertion was
+   temporarily neutralised so it could not mask the assertion under test. The run then failed on
+   exactly the new line:
+   ```
+   × reduces the diff to a summary and never persists a diff body
+   AssertionError: expected '{"repoName":"owner__repo","startedAtE…' not to contain '@@ -1 +1 @@\n-old\n+new'
+   Tests  1 failed | 7 passed (8)
+   ```
+3. **Both temporary mutations were reverted** (`git diff` on `persist-run.ts` is empty) and the
+   suite re-run green: `Test Files 1 passed (1)`, `Tests 8 passed (8)`.
+
+The replacement also asserts `serializedDiffBody !== diffBody`, so the day the fixture body loses
+its newlines the test says so instead of silently going vacuous again.
+
+### Quick checks
+
+- `npm run check` → exit 0:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 131 files in 126ms. No fixes applied.
+
+  ✔ no dependency violations found (88 modules, 192 dependencies cruised)
+  ```
+  124 → **131 files**, 84 → **88 modules**, 183 → **192 dependencies**, still **0 violations** — in
+  particular `adapters-isolated` (the CLI imports `commander` and four core barrels, nothing under
+  `src/adapters/driven/**`), `wiring-only-in-main` and `core-no-adapters`. Biome required one
+  formatting/`useImportType` pass (`biome check --write src/adapters/driving/cli`) before the gate
+  went green; no lint rule was suppressed.
+- `npm test` → exit 0:
+  ```
+  > vitest run
+
+   Test Files  34 passed (34)
+        Tests  580 passed (580)
+     Duration  8.90s
+  ```
+  551 → **580 tests** (+29) across 31 → 34 files. **All 551 pre-existing tests still pass**; the only
+  pre-existing file edited is `persist-run.test.ts`, whose test count is unchanged (8) and whose
+  assertions were hardened, not weakened.
+- Targeted re-run: `npx vitest run --project adapters src/adapters/driving/cli` → exit 0,
+  `Test Files 3 passed (3)`, `Tests 29 passed (29)`.
+- `grep -rn "process" src/adapters/driving/cli/` → matches in **comments and test titles only**;
+  no executable reference to `process` exists in the adapter, and every test runs without stubbing
+  a global stream or `process.exit`.
+
+Coverage against the plan's S5 row: root `--help` exits 0, prints a non-empty `Usage: sentinel`
+block on stdout with an empty stderr, and names `SENTINEL_HOME` (with its `~/.sentinel` default)
+and `SENTINEL_OPENCODE_MODEL` · `-h` behaves identically to `--help` · a subcommand registered
+through the seam inherits the injected io (`Usage: sentinel demo` lands on the captured stdout) ·
+`--version`/`-V` print the **injected** version as a single stdout line and exit 0 · an unknown
+flag and an unknown command exit non-zero with output on stderr and nothing on stdout · each of
+the ten core error families listed in the handoff (`RepoNotFoundError`, `ConfigValidationError`,
+`ConfigReadError`, `ConfigWriteError`, `BranchListError`, `RunNotFoundError`, `RunCorruptedError`,
+`UnknownEngineError`, `InvalidRunRequestError`, `HarnessNotFoundError`) renders as exactly one
+stderr line equal to its message, with no stack frame and no error-name prefix · async rejections,
+multi-line messages and non-`Error` throwables render the same way · `run` resolves its exit code
+instead of terminating the process.
+
+Skipped: nothing. `e2e/**` stays empty (AC-14).
+
+### Notes and observations
+
+- **Carry-forward for S7 (`--timeout` is a string).** The `review` command's options are *not*
+  defined in this stage — the shell declares only `-V, --version` and commander's built-in `-h`.
+  So the type hole QA flagged is still ahead: when S7 declares `--timeout <ms>`, commander hands
+  the value over as a **string**, which must be parsed to a number (and rejected if it is not one)
+  before it type-checks against `ResolveReviewRequestFlags.timeoutMs`. Nothing in S5 papers over it.
+- **Carry-forward for S6/S7 (`risk-e6h1-009`).** `format-error.ts` renders no repo name — it emits
+  the error's message verbatim — so the "echo the alias the user typed, never the stored
+  `owner__repo`" rule does not bite in this stage. It stays entirely with the S6/S7 renderers.
+- The root help footer is the only place `SENTINEL_HOME` and `SENTINEL_OPENCODE_MODEL` are
+  documented anywhere in the product until `[E7.F2.H1]`; both D2 and D8 name `--help` as their
+  discovery surface.
+- AC-12 holds structurally so far: the shell derives its exit code from commander or from the
+  catch-all, and there is no `result.state` read anywhere in the adapter (there is no command yet).
+- No git side effects: no commit, stage, stash or branch operation.
+
+### Blockers
+
+None.
+
+### Next action
+
+S5 is complete and both gates are green. S6 (`repo add`/`repo list`, `runs list`/`runs show` and
+their formatters) is approved under the same `cp-stage-approval-s5-s7` batch and is the next
+executor invocation; it should register its two groups by adding registrars to `commandRegistrars`
+in `create-cli.ts` and must echo the alias the user typed rather than the stored `repoName`
+(`risk-e6h1-009`). QA review stays deferred until the S5-S7 batch is complete, per the batch
+approval.

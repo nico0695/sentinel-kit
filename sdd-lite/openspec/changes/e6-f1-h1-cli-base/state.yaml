@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: implementing
-current_stage: sddl-qa-review
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -121,6 +121,7 @@ stages:
       - S2
       - S3
       - S4
+      - S5
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -170,6 +171,33 @@ stages:
       This closes the approved batch-s1-s4; S5-S11 were not started.
       Details in execution-log.md. QA review still deferred until the S1-S4 batch is complete;
       S4 (persistRun) is next under the same approval.
+      S5 (CLI shell) completed under cp-stage-approval-s5-s7, together with the user-approved
+      F-1 addendum. New src/adapters/driving/cli/cli-deps.ts (CliIo, ReviewContext, CliUseCases,
+      CliDeps), create-cli.ts (createCli(deps) returning SentinelCli.run(argv) -> Promise<number>,
+      exitOverride and configureOutput bound to the injected CliIo and set before any subcommand so
+      commander copies them, root name/description/-V --version and an addHelpText footer, plus the
+      catch-all mapping CommanderError to err.exitCode and any other throwable to one rendered
+      stderr line and exit 1), render/format-error.ts (formatErrorLine: message only, no stack, no
+      cause, no per-error-type branching) and the index.ts barrel replacing export {}. run never
+      calls process.exit and the adapter contains no executable reference to process at all -- only
+      comments -- so every test drives it with a capturing CliIo and no global stubbing. 29 new
+      adapter tests across help/version/errors plus one shared test-doubles module. A-level calls:
+      createCli takes an optional second parameter (registrars, defaulting to the empty
+      commandRegistrars) as the seam S6/S7 plug their command groups into and as the only way to
+      exercise AC-13's catch-all while no command exists; formatErrorLine collapses newlines and
+      falls back to the error name for an empty message; commander's multi-line output chunks are
+      split into single CliIo lines; one test-support module instead of three copies. F-1: the
+      vacuous not.toContain(diffBody) assertion in persist-run.test.ts was replaced by a comparison
+      against JSON.stringify(diffBody).slice(1, -1) and verified to genuinely fail -- persist-run.ts
+      was temporarily mutated to leak diff.files with the sibling toEqual neutralised, the new
+      assertion failed on exactly that line, and both mutations were reverted. No other assertion
+      touched and the file's test count is unchanged. Gates after S5: npm run check exit 0 (biome
+      131 files, tsc clean, depcruise 88 modules / 192 dependencies, 0 violations) and npm test exit
+      0 with 580 tests across 34 files, up from 551/31, all 551 pre-existing tests still passing.
+      Carried forward: S7 must parse commander's string --timeout into a number before it type-checks
+      against ResolveReviewRequestFlags.timeoutMs (no review option is declared in S5), and
+      risk-e6h1-009 stays with the S6/S7 renderers since format-error.ts renders no repo name.
+      S6-S11 were not started. Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -654,9 +682,13 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    cp-stage-approval-s5-s7 resolved: S5-S7 approved as a batch, with F-1 hardening folded into S5
-    as an addendum. Run sddl-executor on S5 (CLI shell), then S6 and S7 in sequence, one stage per
-    invocation, each ending green on `npm run check` + `npm test`. Stop after S7 and present the
-    accumulated diff before S8-S9.
+    S5 (CLI shell) is complete: `npm run check` exit 0 (biome 131 files, depcruise 88 modules /
+    192 dependencies, 0 violations) and `npm test` exit 0 (580 tests / 34 files, up from 551/31,
+    all pre-existing tests passing), with the F-1 addendum applied and mutation-verified. Run
+    sddl-executor on S6 (`repo add`/`repo list`, `runs list`/`runs show` and their formatters)
+    under the same cp-stage-approval-s5-s7 batch, then S7, one stage per invocation. S6/S7 must
+    register their groups via `commandRegistrars` in `create-cli.ts`, echo the alias the user
+    typed rather than the stored `owner__repo` (risk-e6h1-009), and S7 must parse commander's
+    string `--timeout` to a number. Stop after S7 and present the accumulated diff before S8-S9.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T00:30:00Z"
+updated_at: "2026-08-24T06:30:00Z"

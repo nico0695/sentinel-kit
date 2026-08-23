@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -41,15 +41,27 @@ stages:
       (runtime deps: execa, yaml, zod) and docs/backlog-mvp-sentinel.md §E6 /
       docs/setup-tecnico-sentinel.md §4-§5.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T22:00:00Z"
+    completed_at: "2026-08-23T22:00:00Z"
     notes: >-
-      The four open decisions were settled by the user at cp-proposal-b-decisions (D1-D4) instead
-      of travelling to spec. spec.md must treat them as fixed inputs and formalize them into
-      acceptance criteria: persistRun as an in-scope core/history use case (D1), SENTINEL_HOME
-      with a ~/.sentinel default (D2), reviewTimeoutMs in GlobalConfigSchema plus a --timeout flag
-      with flag > config precedence (D3), and commander as the only new runtime dependency (D4).
-      Still open for spec to confirm: the H1/H2 exit-code boundary proposed in proposal.md
-      (risk-e6h1-005).
+      spec.md written with D1-D4 treated as fixed inputs and formalized into acceptance criteria
+      (AC-5 persistRun, AC-7 SENTINEL_HOME, AC-8 reviewTimeoutMs + --timeout precedence, AC-9
+      commander as sole new dependency). 14 numbered acceptance criteria covering the six command
+      paths, per-command --help (AC-2), the zero-logic rule (AC-1), stdout/stderr separation
+      (AC-10) and the quality gate (AC-14). Two A-level items decided in this stage: the H1/H2
+      boundary (AC-12 -- H1 owns review's full argument surface and exits 0 for any completed
+      invocation; H2 owns the terminal-state-to-exit-code mapping, its configurability and the
+      no-TTY guarantee) and processRunner wiring (AC-11 -- createExecProcessRunner is wired and
+      declared validations run through the CLI review path). Two B-level questions are recorded
+      unresolved for the user: OQ-1 (a --json output surface, recommendation = defer) and OQ-2
+      (who composes the RunReviewRequest cascade, recommendation = a pure resolveReviewRequest
+      helper exported from core/run, sibling to resolveEngine). Repo evidence re-verified for the
+      spec: GlobalConfigSchema (validationTimeoutMs optional, no review timeout),
+      DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 in run-validations.ts (the pattern AC-8 mirrors with
+      DEFAULT_REVIEW_TIMEOUT_MS = 600_000), RunRecord/RunSummary/RunStore shapes, RunReviewRequest/
+      RunReviewDeps/RunReviewResult, the exported use-case request shapes, and that listBranches
+      lives in core/repos with no command in this story.
   sddl-design:
     status: pending
   sddl-plan:
@@ -111,6 +123,52 @@ checkpoints:
       before escalating (RunReviewDeps has no RunStore member; `grep -rn "\\.save("` over src
       excluding __test__ returns zero non-test callers; RunStore.save exists at
       src/core/history/ports/run-store.ts:88). See decisions D1-D4.
+  - id: cp-spec-output-decisions
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete and definitive on everything D1-D4 settled, plus two A-level decisions
+      taken in this stage (AC-12 H1/H2 boundary, AC-11 processRunner wiring). Two B-level questions
+      remain deliberately unresolved because both are public-surface commitments: OQ-1 -- whether
+      the listing and review commands get a --json flag (spec recommends deferring it; AC-10
+      already guarantees stable line-oriented stdout with diagnostics on stderr); OQ-2 -- who
+      composes the RunReviewRequest cascade (spec recommends a pure resolveReviewRequest helper
+      exported from core/run's barrel, sibling to the already-exported resolveEngine; the
+      alternative is leaving the cascade in the adapter as pure option-defaulting).
+    question: >-
+      Decide OQ-1 (--json now or deferred) and OQ-2 (resolveReviewRequest in core/run, or the
+      cascade in the CLI adapter), then approve spec.md and continue to sddl-design?
+    options:
+      - id: approve-recommendations
+        label: Approve spec and take both recommendations (defer --json; resolveReviewRequest in core/run)
+        description: >-
+          AC-10's line-oriented stdout is the pipe contract for now, and the request cascade moves
+          into core beside resolveEngine, keeping the review command a parse-and-delegate shell.
+        recommended: true
+      - id: decide-differently
+        label: Approve spec but decide OQ-1 and/or OQ-2 differently
+        description: >-
+          e.g. commit to --json in this story, or accept the cascade inside the CLI adapter as
+          below AC-1's threshold. Free input carries the chosen answers into design.
+      - id: revise
+        label: Revise the spec
+        description: Change scope boundaries or acceptance criteria before design.
+      - id: stop
+        label: Stop
+        description: Halt the change.
+    free_input_allowed: true
+    created_at: "2026-08-23T22:00:00Z"
+    status: open
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T22:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Both open questions settled by the user. OQ-1 deferred, OQ-2 accepted as new core surface.
+      Before escalating OQ-2 the orchestrator independently confirmed its premise: RunReviewRequest
+      carries ten fields spanning flags, RepoEntry and GlobalConfig, and core/repos exports no
+      getRepo/resolveRepo -- only listRepos, listBranches, registerRepo and the config schemas.
+      See decisions D5-D6.
 decisions:
   - id: D1
     level: C
@@ -204,6 +262,54 @@ decisions:
       package.json runtime deps go from 3 to 4. The bootstrap refresh trigger recorded in
       config.yaml ("first E6 runtime dependency") is satisfied by this change and config.yaml plus
       project-context.md need a follow-up touch once it merges.
+  - id: D5
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: RunReviewRequest composition is owned by a pure `resolveReviewRequest` in `core/run`
+    context: >-
+      Surfaced by sddl-spec beyond its brief and logged as risk-e6h1-007 / OQ-2. Nothing owns
+      composing a RunReviewRequest from the flag -> RepoEntry -> GlobalConfig cascade (repoPath,
+      baseRef, targetRef, harnessType, timeoutMs, cleanupPolicy, limits, validations,
+      validationTimeoutMs, engineName). core/repos exports no getRepo/resolveRepo; only
+      resolveEngine exists as a pure exported core helper. Putting the cascade in the review
+      command is the same class of concern D1 removed from the CLI, and [E6.F2.H1]'s TUI would
+      need to duplicate the same precedence rules.
+    decision: >-
+      Export a pure `resolveReviewRequest` from `core/run`'s public barrel, sibling to
+      `resolveEngine`. The CLI passes parsed flags plus the resolved RepoEntry/GlobalConfig and
+      receives a complete RunReviewRequest; the command holds no precedence logic.
+    rationale: >-
+      Consistent with D1 and with AC-1 (zero logic in the command), and resolveEngine already sets
+      the precedent for a pure resolver living in core/run's barrel. Leaving the cascade in the
+      adapter was rejected because the TUI must reuse it; a getRepo use case plus in-CLI merging
+      was rejected as a half fix -- it relocates the lookup but leaves the precedence rules in the
+      command.
+    consequences: >-
+      Second piece of core surface this story adds beyond its literal backlog text, after D1. Both
+      deviations must be declared together in the PR description and the history entry. design.md
+      owns resolveReviewRequest's exact signature and its interaction with resolveEngine; it needs
+      core unit tests covering the precedence order fixed by D3 (flag > config > constant).
+  - id: D6
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: No `--json` flag in this story; stable line format only
+    context: >-
+      OQ-1 from spec.md. The backlog says only "output suitable for terminal and pipes".
+      A --json surface is a public API commitment (payload shape, versioning).
+    decision: >-
+      [E6.F1.H1] ships AC-10 only -- results on stdout, diagnostics on stderr, one stable line per
+      record. The --json question is deferred to [E6.F1.H2] (#37), the non-interactive scripting
+      story that is its natural owner. Not closed off permanently.
+    rationale: >-
+      AC-10 already satisfies "suitable for terminal and pipes". Committing to a JSON payload shape
+      before a real consumer exists to validate it risks freezing the wrong contract; #37 is where
+      TTY-less scripting requirements actually land. Ruling --json out forever was rejected: the
+      PRD's gate mode will likely want it.
+    consequences: >-
+      spec.md's OQ-1 is closed as deferred. design.md must not introduce a JSON serializer, and
+      the output format it fixes should stay easy to extend with one later.
 open_risks:
   - id: risk-e6h1-001
     summary: >-
@@ -247,6 +353,26 @@ open_risks:
       H1/H2 overlap risk: [E6.F1.H2] (#37) owns the review exit-code contract but both stories
       touch the same command. proposal.md proposes an explicit boundary that spec must confirm.
     severity: low
+    status: resolved
+    resolution: >-
+      Confirmed at sddl-spec as an A-level decision and fixed as spec.md AC-12. H1 owns review's
+      full argument surface (<repo> <branch> --type --engine --timeout), the runReview + persistRun
+      invocation and the printed result, exiting 0 for any completed invocation regardless of
+      terminal state and non-zero only on usage/invocation failure. H2 adds the terminal-state to
+      exit-code mapping, its configurability and the no-TTY guarantee. Rationale: H1 must define
+      --type regardless, because RunReviewRequest.harnessType is mandatory and has no other source;
+      [E6.F1.H2]'s backlog description restates the command shape as context, and the only surface
+      its acceptance criteria uniquely name is exit codes plus TTY-less usability.
+  - id: risk-e6h1-007
+    summary: >-
+      Composing the RunReviewRequest from the flag -> RepoEntry -> GlobalConfig cascade (repoPath,
+      baseRef, harnessType, timeoutMs, limits, validations, validationTimeoutMs) has no owner. If
+      it lands inside the review command it is the same class of concern D1 removed from the CLI
+      and it duplicates PRD 3.1-D precedence rules outside core, where the TUI ([E6.F2.H1]) will
+      need them again. Recorded as spec.md OQ-2, B-level (additive core surface, like D1).
+    severity: medium
+    status: resolved
+    resolution: Settled by D5 (resolveReviewRequest in core/run).
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
@@ -255,10 +381,9 @@ open_risks:
     severity: medium
 next_action:
   kind: run_stage
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Checkpoint cp-proposal-b-decisions resolved with `approve` and all four decisions settled
-    (D1-D4). Run sddl-spec with D1-D4 as fixed inputs, formalizing them into acceptance criteria
-    and firm scope boundaries, and confirming the H1/H2 exit-code boundary.
+    Checkpoint cp-spec-output-decisions resolved with `approve`; OQ-1 and OQ-2 settled as D6 and
+    D5. Run sddl-design against spec.md's 14 acceptance criteria with D1-D6 as fixed inputs.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-23T21:30:00Z"
+updated_at: "2026-08-23T22:00:00Z"

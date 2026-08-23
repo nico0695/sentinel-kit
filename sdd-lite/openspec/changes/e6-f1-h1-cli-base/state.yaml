@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -93,7 +93,26 @@ stages:
       cp-design-integration-decisions as D7 and D8, so the stage is complete for routing purposes.
       design.md itself needs no rewrite: plan.md carries D7 and D8 as fixed inputs.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-24T00:00:00Z"
+    completed_at: "2026-08-24T00:00:00Z"
+    notes: >-
+      plan.md written against design.md with D1-D8 as fixed inputs. Eleven ordered stages:
+      S1 tooling staged alone (commander in package.json, the widened adapters vitest include
+      from design A-4, the one-line docs/testing.md update) so those touches never hide inside a
+      feature diff; S2 core review-request resolution (reviewTimeoutMs field,
+      DEFAULT_REVIEW_TIMEOUT_MS, resolveReviewRequest + barrel); S3 D7's module-private alias
+      normaliser applied to listRuns/getRun, isolated in its own stage because it changes the
+      observable behaviour of two use cases merged by [E5.F2.H2], with idempotency and
+      no-separator tests; S4 persistRun on top of S3; S5-S7 the CLI adapter bottom-up (shell and
+      error/help/version, then repo+runs commands, then review); S8 src/main/paths.ts alone
+      (unit-testable, rides S1's widened include); S9 container.ts + cli.ts last, so a failure in
+      the hot-path assembly points at wiring rather than logic; S10 the mandatory manual smoke for
+      risk-e6h1-006 with its transcript recorded in execution-log.md; S11 a non-code closeout that
+      declares D1, D5 and D7 as user-authorised widenings in the PR description and the history
+      entry. Every stage must end with npm run check and npm test green and the existing 500 tests
+      intact. Acceptance-criteria coverage is mapped stage by stage in the validation strategy;
+      e2e/** stays empty per AC-14. S1-S9 each require stage_approval.
   sddl-executor:
     status: pending
   sddl-code-review:
@@ -479,11 +498,12 @@ open_risks:
       surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
     severity: medium
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: checkpoint
+  target: stage_approval
   summary: >-
-    cp-design-integration-decisions resolved; OQ-D1 and OQ-D2 settled as D7 and D8. Run sddl-plan
-    against design.md with D1-D8 as fixed inputs, giving D7 its own execution stage and staging
-    the vitest.config.ts / docs/testing.md / package.json touches design flagged.
+    plan.md is ready with eleven ordered stages. Take stage_approval to the user for S1 (tooling
+    prerequisites: commander, the widened adapters vitest include, the docs/testing.md line), then
+    run sddl-executor one approved stage per invocation. sddl-plan does not route to execution
+    itself.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-23T23:00:00Z"
+updated_at: "2026-08-24T00:00:00Z"

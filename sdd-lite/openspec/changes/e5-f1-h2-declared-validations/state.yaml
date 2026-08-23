@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -53,7 +53,38 @@ stages:
       timeout" has no home in the shipped config schema. Seven decision candidates recorded,
       three B-level.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T04:25:00Z"
+    completed_at: "2026-08-23T04:55:00Z"
+    notes: >-
+      spec.md written with 21 acceptance criteria, In Scope / Out of Scope / Non-Goals tables,
+      an Expected Behavior table, a Downstream Constraints section and a pinned-untouched-files
+      criterion (AC-20). The four ratified decisions are encoded as firm criteria and were not
+      reopened: dec-001 -> AC-1/AC-18, dec-002 -> AC-4/AC-5, dec-003 -> AC-6/AC-7, dec-004 ->
+      AC-9/AC-11/AC-12/AC-13. DC-5, DC-6 and DC-7 were settled at A level as D5 (RunStage gains
+      "validations"; additive enum widening, no released metadata.json reader, option (b) would
+      persist a wrong stage, so the trade-off is one-way and no escalation was warranted), D6
+      (head 100 + tail 100 lines per stream with an exact elision marker, plus a 2000-char
+      per-line backstop) and D7 (one validationOutput element per declared script, format pinned
+      byte-exactly by AC-14). Empirical re-verification against the working tree contradicted
+      three stated facts and they are recorded in spec.md's Empirical Corrections table: (E1)
+      src/core/run/ports/process-run-request.ts does not exist -- the request/result types live
+      inside ports/process-runner.ts and validateProcessRunRequest lives at
+      src/core/run/process-run-request.ts, so the new use case is a sibling of run-review.ts and
+      run gains no new port; (E2) ProcessRunResult carries NO duration field, so DC-7's
+      recommended header ("command, exit code, duration, flags") was not producible -- duration
+      is excluded outright, which also preserves PRD 6.3's "same input -> same prompt"
+      (new AC-21); (E3) dec-004's "fail before a worktree exists" conflicted with placing
+      validations at stage 5 (after worktree creation) -- resolved by hoisting the declaration
+      check into stage 1, reusing the file's own documented "harness (hoisted: an unknown
+      harness leaves no orphan)" precedent, with the consequence that a malformed declaration
+      reports failure.stage "request" rather than "validations" (AC-10). Position taken on the
+      two risks the proposal demanded a stance on: risk-001 resolved by an additive optional
+      validationTimeoutMs on both GlobalConfigSchema and RepoEntrySchema (no zod default, so the
+      single default constant DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 lives in run and repos
+      never duplicates it); risk-006 (process-group kill) consciously inherited rather than
+      escalated to a new backlog item, recorded as an accepted exposure and routed to the E5
+      closing summary as a follow-up.
   sddl-design:
     status: pending
   sddl-plan:
@@ -90,6 +121,30 @@ checkpoints:
         Approved by the user. All four B-level recommendations ratified verbatim: DC-1 (c), DC-2 (a),
         DC-3 (d), DC-4 (b). sddl-spec must encode them as firm acceptance criteria.
       responded_at: "2026-08-23T04:20:00Z"
+  - id: cp-spec-validation
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete at 21 acceptance criteria. The four ratified B-level decisions are
+      encoded verbatim and were not reopened. Three A-level decisions were settled in the spec
+      with recorded rationale: D5 (RunStage gains a "validations" member, accepting a one-line
+      cross-module diff in history/ports/run-metadata-schemas.ts), D6 (prompt-facing head-100 /
+      tail-100 line window per stream with an exact elision marker and a 2000-char per-line
+      backstop) and D7 (one validationOutput element per declared script, whose exact byte format
+      AC-14 freezes for both <validation-output> and validations/NNN.log). Empirical
+      re-verification contradicted three stated facts from the proposal and the handoff (no
+      process-run-request.ts under ports/; ProcessRunResult has no duration field so DC-7's
+      recommended header was not producible; dec-004's "before a worktree exists" needed the
+      stage-1 hoist to be true), all recorded in spec.md. Positions taken: risk-001 resolved via
+      an additive optional validationTimeoutMs at both config levels; risk-006 (process-group
+      kill) consciously inherited and routed to the E5 closing summary rather than escalated.
+    question: >-
+      Approve the spec and continue to sddl-design, revise this phase, or stop? Note in
+      particular AC-7's pinned shell-metacharacter rejection set (which deliberately refuses
+      quoted and globbed declarations), AC-14's frozen evidence format, and D5's acceptance of a
+      cross-module diff into the history module.
+    free_input_allowed: true
+    created_at: "2026-08-23T04:55:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-validation
@@ -130,73 +185,130 @@ decisions:
       Concretely: add InvalidProcessRequestError to classifyFailure's validation-failed branch and
       deliberately NOT ProcessSpawnError. Level B, decided by the user.
     recorded_at: "2026-08-23T04:20:00Z"
+  - id: dec-005
+    checkpoint_id: cp-spec-validation
+    selected_option_id: DC-5-a
+    rationale: >-
+      D5: RunStage gains a "validations" member and RUN_STAGES in
+      history/ports/run-metadata-schemas.ts gains the matching entry so the _AllRunStagesCovered
+      guard still resolves to never. Settled at level A rather than escalated because the change
+      only widens the persisted metadata.json enum additively, there is no released reader of
+      that file (the CLI does not exist until E6), and [E5.F2.H2]'s AC-15 pinned the LOCATION of
+      RUN_STAGES, not its contents. Option (b) has no upside beyond a smaller diff and would
+      persist a wrong stage into metadata.json forever, so the fork is one-way. Honest caveat
+      recorded in spec.md: the reachable population of stage "validations" is narrow, since
+      declaration faults are hoisted to stage "request" and every runtime outcome is evidence.
+      Decided by claude.
+    recorded_at: "2026-08-23T04:55:00Z"
+  - id: dec-006
+    checkpoint_id: cp-spec-validation
+    selected_option_id: DC-6-c
+    rationale: >-
+      D6: a prompt-facing head + tail line window is applied per stream on top of the adapter's
+      1,000,000-char capture budget -- VALIDATION_HEAD_LINES 100, VALIDATION_TAIL_LINES 100, with
+      the literal marker "... [N lines elided by sentinel] ..." carrying the exact removed count,
+      plus VALIDATION_MAX_LINE_CHARS 2000 as a backstop so a single minified line cannot make a
+      line-based window unbounded. A failing test suite's diagnostic value is concentrated at both
+      ends, so a head-only cut discards the half that matters most. Residual accepted and recorded:
+      validations/NNN.log persists the same windowed element, so the full capture is not available
+      for post-hoc inspection -- prompt/log agreement was judged worth more than an unbounded log.
+      Decided by claude.
+    recorded_at: "2026-08-23T04:55:00Z"
+  - id: dec-007
+    checkpoint_id: cp-spec-validation
+    selected_option_id: DC-7-a
+    rationale: >-
+      D7: one validationOutput element per declared script, since that is the only granularity
+      under which run-store-fs's zero-padded validations/NNN.log numbering matches declaration
+      order 1:1. AC-14 pins the element byte-exactly. Deviation from the proposal's recommended
+      header, forced by evidence: ProcessRunResult carries no duration field and the exec adapter
+      discards the elapsed time it measures, so duration cannot be reported without a new clock
+      seam -- and adding one was rejected outright because a wall-clock value in the prompt breaks
+      PRD 6.3's "same input -> same prompt" claim. The element therefore carries command, exit
+      code, signal, timedOut and truncated only, and new AC-21 asserts prompt determinism.
+      Decided by claude.
+    recorded_at: "2026-08-23T04:55:00Z"
 open_risks:
   - id: risk-001
     summary: >-
-      #32 requires a "per-script timeout" but the merged config schema has no timeout field
-      anywhere (neither RepoEntry nor GlobalConfig). Spec must either add one additively or
-      explicitly re-scope the criterion to "per-script application of a shared budget" -- and
-      say which, rather than letting the acceptance criterion quietly go unmet. Choosing to
-      widen validations from string[] to a union also re-litigates a public config format one
-      story after it shipped.
-    severity: high
+      RESOLVED BY SPEC (was high). #32's "per-script timeout" had no home in the merged config
+      schema. spec.md AC-5 adds validationTimeoutMs as z.number().optional() to BOTH
+      GlobalConfigSchema and RepoEntrySchema -- additive, no zod default, validations left as
+      string[] and unwidened -- and AC-4 pins DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 as the
+      single fallback constant, owned by run so repos never duplicates it and never imports run.
+      Residual: the cascade that picks run vs repo vs global is explicitly E6's, recorded as
+      downstream constraint 1.
+    severity: low
   - id: risk-002
     summary: >-
-      Turning a declared string like "npm test" into (command, args) with the adapter pinned to
-      shell:false is the story's security- and correctness-load-bearing line. Injection is
-      structurally impossible, but SILENT MISINTERPRETATION is not: "npm test 2>&1" or "a && b"
-      would be passed as literal arguments under a naive whitespace split and fail confusingly.
-      A tokenization policy with explicit rejection of what it cannot honor is needed, not a
-      .split(" ").
-    severity: high
+      RESOLVED BY SPEC (was high). Silent misinterpretation under the adapter's pinned
+      shell:false is closed by AC-6/AC-7: whitespace tokenization on space and tab only, plus an
+      exactly pinned rejection set (| & ; < > $ backtick ( ) { } [ ] * ? ! ~ # backslash single-
+      and double-quote, and every ASCII control char other than space/tab), enforced as a literal
+      list rather than a heuristic and raising InvalidValidationDeclarationError. Residual
+      accepted and documented: legitimate quoted or globbed declarations are over-rejected; the
+      non-breaking escape hatch is a future quote-aware tokenizer or array config form.
+    severity: low
   - id: risk-003
     summary: >-
-      The validationOutput array's granularity is already a frozen on-disk format: RunStore's fs
-      adapter writes one validations/NNN.log per array element, and assemblePrompt joins the
-      elements inside a single <validation-output> block. Whatever this story puts in an element
-      becomes the persisted run layout that [E5.F2.H1]'s "readable without the tool" criterion
-      is judged against.
-    severity: medium
+      DECIDED AND FROZEN (was medium). dec-007 fixes one validationOutput element per declared
+      script and AC-14 pins its byte format. This is now a persisted format governing both
+      <validation-output> in every prompt.md and every validations/NNN.log; changing it later is
+      a format change, not a rendering tweak. Recorded as downstream constraint 7.
+    severity: low
   - id: risk-004
     summary: >-
-      Cross-module compile-time ripple, discovered by reading rather than by compiling: adding a
-      "validations" member to RunStage breaks typecheck at history/ports/run-metadata-schemas.ts:54,
-      where _AllRunStagesCovered is an Expect<Exclude<RunStage, ...>> guard over a hand-maintained
-      RUN_STAGES list that [E5.F2.H2]'s AC-15 deliberately pinned in place. Either the story
-      accepts an intentional two-module diff, or failure.stage misreports validation faults as
-      "request" into metadata.json forever.
-    severity: medium
+      ACCEPTED (was medium). dec-005 takes the cross-module compile-time ripple deliberately:
+      RunStage gains "validations" and RUN_STAGES in history/ports/run-metadata-schemas.ts gains
+      the matching entry. AC-19 bounds the history-side diff to exactly one array entry plus one
+      comment clause and makes tsc --noEmit the proof that _AllRunStagesCovered still resolves to
+      never. [E5.F2.H2]'s AC-15 is respected: the union is not relocated into src/core/run.
+    severity: low
   - id: risk-005
     summary: >-
-      The exec adapter's default capture budget is 1,000,000 characters PER STREAM, PER SCRIPT
-      (process-runner-exec.ts:27) -- sized for capture, not for a token-budgeted prompt. Without
-      a prompt-facing truncation policy in this story, two verbose validations can dwarf the
-      entire diff in the assembled prompt and in every persisted prompt.md.
-    severity: medium
+      RESOLVED BY SPEC (was medium). dec-006 adds a prompt-facing window on top of the adapter's
+      1,000,000-char-per-stream capture budget: head 100 + tail 100 lines per stream with an exact
+      elision marker, plus a 2000-char per-line backstop (AC-15). Residual accepted: the same
+      windowed element is what validations/NNN.log persists, so the full capture is not retained
+      for post-hoc inspection.
+    severity: low
   - id: risk-006
     summary: >-
-      [E5.F1.H1] risk-007 becomes reachable for the first time here: the merged adapter kills
-      only the immediate child pid, never a process group, and a declared "npm test" is exactly
-      the forking command that risk described. Fixing it means changing merged adapter code
-      (detached / kill strategy) with its own test surface, so it is out of scope -- but spec
-      should decide consciously between inherit-and-record and escalating it to its own backlog
-      item, rather than letting it fall between two stories.
+      CONSCIOUSLY INHERITED, NOT ESCALATED. The merged exec adapter kills only the immediate child
+      pid, never a process group, and this story is what first spawns user-declared, potentially
+      forking commands such as "npm test", so orphaned grandchildren become reachable in practice.
+      Fixing it means changing merged adapter code (detached / kill strategy) with its own child-
+      process test surface, so spec.md's Out Of Scope table excludes it explicitly and AC-20 pins
+      src/adapters/** as an empty diff. Routed to the E5 closing summary as a follow-up backlog
+      item alongside [E5.F1.H1] risk-004, so it does not fall between two stories.
     severity: medium
   - id: risk-007
     summary: >-
-      A declared script that prints its environment leaks secrets into both the assembled prompt
-      and validations/*.log. [E5.F1.H1]'s spec explicitly deferred this to THIS story's decision
-      about what reaches the prompt. No detection heuristic is proposed (the codebase has
-      avoided them everywhere); the mitigation available is the truncation/marker policy of DC-6
-      plus documenting the exposure. Recorded so it is an accepted risk, not an oversight.
+      ACCEPTED AND DOCUMENTED. A declared script that prints its environment still leaks secrets
+      into the assembled prompt and into validations/*.log. No detection heuristic is proposed --
+      the codebase has avoided them everywhere. The only mitigation delivered is dec-006's bounded
+      window, which reduces exposure without removing it. The script is one the repo owner declared
+      in their own config, on their own machine, against their own repo.
     severity: low
+  - id: risk-008
+    summary: >-
+      NEW, introduced by dec-001's shape. deps.processRunner is optional on RunReviewDeps -- it has
+      to be, because AC-20 pins every existing runReview caller and test as untouched -- so a
+      composition root that forgets to wire createExecProcessRunner() produces a review that
+      silently skips every declared validation and says nothing about it. Mitigated only by
+      documentation: spec.md downstream constraint 2 makes wiring it E6's explicit obligation.
+      E6 should consider surfacing "validations declared but no runner wired" as a visible warning.
+    severity: medium
 next_action:
   kind: wait_for_approval
-  target: sddl-spec
+  target: sddl-design
   summary: >-
-    Await resolution of checkpoint cp-proposal-validation, then run sddl-spec. Spec must convert
-    DC-1 through DC-4 into firm acceptance criteria and must state a position on risk-001
-    (per-script timeout has no config home) and risk-006 (process-group kill) rather than
-    inheriting either silently.
+    Await resolution of checkpoint cp-spec-validation, then run sddl-design. spec.md is complete
+    at 21 acceptance criteria with the four ratified decisions encoded and DC-5/DC-6/DC-7 settled
+    at A level (dec-005..dec-007). Design must honor the pinned values verbatim -- AC-7's
+    metacharacter rejection set, AC-14's evidence element format, dec-006's window constants and
+    DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 -- and must place runValidations as a use case at
+    src/core/run/run-validations.ts (a sibling of run-review.ts), NOT as a new port and NOT under
+    ports/, since src/core/run/ports/process-run-request.ts does not exist (spec.md E1).
 created_at: "2026-08-23T03:50:00Z"
-updated_at: "2026-08-23T04:05:00Z"
+updated_at: "2026-08-23T04:55:00Z"

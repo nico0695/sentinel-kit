@@ -1,0 +1,191 @@
+# Spec
+
+## Routing Digest
+
+- change_name: e5-f1-h2-declared-validations
+- objective: new-feature
+- route: continue-lite
+- digest_summary: Story `[E5.F1.H2]` (issue #32) makes `RepoEntry.validations` live. A new standalone use case `runValidations` (`src/core/run/run-validations.ts`) turns each declared string into a `(command, args)` pair by whitespace split, refuses any entry containing a POSIX shell-expansion character, runs the entries sequentially through `ProcessRunner` with the review worktree as `cwd` and a per-script timeout, and returns one evidence string per declared entry. `runReview` calls it at its reserved stage 5 when the new optional `deps.processRunner` is present, so the evidence lands in the assembled prompt (and therefore in the persisted `prompt.md` and `validations/NNN.log`). No runtime outcome — non-zero exit, unspawnable binary, timeout — ever aborts the review; only a malformed *declaration* does, as `validation-failed`.
+- scope_digest: IN = `run-validations.ts` (+ pre-flight `validateValidationDeclarations`, `InvalidValidationDeclarationError`), `run-review.ts` (request fields, `deps.processRunner`, stage 1 hoisted declaration check, stage 5 wiring, `RunStage` member, `classifyFailure` branch), `run/index.ts` barrel, one additive `validationTimeoutMs` field in `repos/ports/config-schemas.ts`, one line + comment in `history/ports/run-metadata-schemas.ts`'s `RUN_STAGES`, core unit tests. OUT = composition-root wiring (E6), auto-detection of any kind, parallel execution, aggregate validation budget, CLI/TUI flags, process-group kill hardening, quote-aware tokenization, secret redaction, adapter changes of any kind.
+- acceptance_digest: 21 ACs. AC-1..AC-4 execution contract (only declared, sequential, cwd, per-script timeout); AC-5 additive config field; AC-6..AC-8 tokenization and the pinned rejection set; AC-9..AC-10 terminal-state mapping and hoisted pre-flight; AC-11..AC-13 the three never-abort runtime paths; AC-14..AC-17 evidence format, truncation window, concatenation, prompt visibility; AC-18 standalone testability; AC-19 the `RunStage` cross-module ripple; AC-20 guards + pinned untouched files; AC-21 prompt determinism.
+
+## Summary
+
+- change_name: e5-f1-h2-declared-validations
+- objective: new-feature
+- route: continue-lite
+- spec_status: complete. All four B-level decisions (`dec-001`..`dec-004`) arrive ratified and are encoded as firm criteria below, not re-opened. DC-5, DC-6 and DC-7 are settled here at A level with recorded rationale; none was escalated. Every code fact below was re-verified against the working tree at `c3065d1` rather than trusted from `proposal.md` — three of the prompt's/proposal's stated facts were wrong (see Empirical Corrections).
+
+## Empirical Corrections
+
+Re-verification found three inaccuracies in the inputs. Recorded here because a downstream stage that trusts them will write code that does not compile or a format that cannot be produced.
+
+| Id | Stated | Reality on `c3065d1` | Consequence for this spec |
+|---|---|---|---|
+| E1 | The handoff names `src/core/run/ports/process-run-request.ts` as a file to read. | No such file. The request/result **types** live inside `src/core/run/ports/process-runner.ts`; the pre-flight `validateProcessRunRequest` lives one level up at `src/core/run/process-run-request.ts` (not under `ports/`). | New files follow the real layout: the use case is `src/core/run/run-validations.ts`, a sibling of `process-run-request.ts`, not a port. `run` gains **no** new port. |
+| E2 | DC-7's recommended element header is "command, exit code, **duration**, timed-out/truncated flags". | `ProcessRunResult` has **no duration field** (`stdout`, `stderr`, `exitCode?`, `signal?`, `timedOut`, `stdoutTruncated`, `stderrTruncated`). The exec adapter measures `elapsedMs` internally and discards it. | Duration is **excluded** from the element (AC-14). Adding a `now` seam to measure it was considered and rejected: PRD §6.3 states the inline-diff prompt is "deterministic and reproducible (same input → same prompt)", and a wall-clock duration in the prompt breaks that literally. Pinned as AC-21. |
+| E3 | `dec-004` / DC-4 says a malformed declaration fails "at pre-flight, **before a worktree exists**" — but the proposal also places validations at stage 5, which is *after* worktree creation (stage 3). | Both are satisfiable, and the file already documents the technique: stage 2 is labelled `harness (hoisted: an unknown harness leaves no orphan)`. | The declaration check is **hoisted into stage 1** in `runReview` (AC-10), while execution stays at stage 5. `runValidations` also runs the same check itself, because a standalone caller gets no stage 1. Consequence: a malformed declaration reports `failure.stage: "request"`, not `"validations"`. |
+
+## Ratified Decisions (input, not re-opened)
+
+| Id | Decision | Encoded by |
+|---|---|---|
+| dec-001 | Validations run in a standalone, independently unit-testable `runValidations` that `runReview` calls at stage 5 when the optional `deps.processRunner` is present. | AC-1, AC-18 |
+| dec-002 | `RepoEntry.validations` stays `string[]`; the per-script timeout comes from one additive optional `validationTimeoutMs` config field. | AC-4, AC-5 |
+| dec-003 | Whitespace split **and** rejection of any entry containing a shell metacharacter, with `validation-failed`. The rejected set is pinned exactly by this spec. | AC-6, AC-7 |
+| dec-004 | A malformed *declaration* → `validation-failed` at pre-flight. A *runtime* failure (non-zero exit, missing binary, timeout) is pure evidence; the review proceeds. `InvalidProcessRequestError` joins `classifyFailure`'s `validation-failed` branch; `ProcessSpawnError` deliberately does **not**. | AC-9, AC-11, AC-12, AC-13 |
+
+## Decisions Settled Here
+
+### D5 (A) — `RunStage` gains `"validations"` (DC-5 option a)
+
+Stage 5 becomes a real pipeline stage that can fault, and `RunStage` is documented in `run-review.ts` as "the pipeline stage a fault occurred in". Reporting a stage-5 fault as `"diff"` or `"prompt"` would persist misinformation into `metadata.json`, which `[E5.F2.H2]`'s listing then shows to a human. The compile-time ripple is accepted and made explicit (AC-19).
+
+**Why this is A and not escalated**, despite touching a persisted format: the change *widens* `RunMetadataSchema`'s `failure.stage` enum additively, there is no released reader of `metadata.json` (the CLI does not exist until E6), and `[E5.F2.H2]`'s AC-15 pinned the **location** of `RUN_STAGES` — forbidding its move into `src/core/run` — not its contents. Option (b) has no upside other than a smaller diff, so there is no genuine two-way trade-off. Honest caveat recorded: the reachable population of `stage: "validations"` is narrow (an unexpected throwable from a `ProcessRunner` implementation), since declaration faults are hoisted to `"request"` (E3) and every runtime outcome is evidence.
+
+### D6 (A) — Head + tail line window per stream, with an explicit marker (DC-6 option c)
+
+The exec adapter's default capture budget is 1,000,000 **characters per stream, per script** — sized for capture, not for a token-budgeted prompt. `runValidations` applies a second, prompt-facing window on top of it, pinned to these values:
+
+| Constant | Value | Rationale |
+|---|---|---|
+| `VALIDATION_HEAD_LINES` | `100` | A failing run's setup, invocation and first errors. |
+| `VALIDATION_TAIL_LINES` | `100` | A test runner's failure summary — the half a head-only cut throws away. |
+| `VALIDATION_MAX_LINE_CHARS` | `2_000` | Backstop: a single minified line makes a line-based window unbounded. |
+
+Applied per stream, independently: if the stream has more than `HEAD + TAIL` lines, keep the first `HEAD` and the last `TAIL` with the literal marker line `... [N lines elided by sentinel] ...` between them (`N` = the exact count removed). Each retained line longer than `VALIDATION_MAX_LINE_CHARS` is cut to that length with the literal suffix ` ... [line truncated]`. A stream at or under the limits is emitted byte-for-byte unchanged.
+
+### D7 (A) — One `validationOutput` element per declared script (DC-7 option a)
+
+`RunStore`'s fs adapter writes one `validations/NNN.log` per array element, zero-padded from `001`, in array order (verified at `run-store-fs.ts:241-247`). One element per declared script is the only granularity under which that numbering matches declaration order 1:1 — which is what `[E5.F2.H1]`'s "run readable without the tool" criterion is judged against. stdout and stderr are two labelled sections of the **same** element, so a failure's cause stays next to its context. Exact format pinned in AC-14.
+
+## Scope Boundary
+
+### In Scope
+
+| File | Change | Pinned values |
+|---|---|---|
+| `src/core/run/run-validations.ts` *(new)* | The `runValidations` use case + the pure pre-flight `validateValidationDeclarations` + the tokenizer + the D6 window. Returns `readonly string[]` — one element per declared entry, always the same length as the input. Never throws for a runtime outcome. | `DEFAULT_VALIDATION_TIMEOUT_MS = 120_000`; D6's three constants; AC-7's rejection set; AC-14's element format |
+| `src/core/run/run-errors.ts` | Add `InvalidValidationDeclarationError extends RunError` (no `cause`, mirroring `InvalidRunRequestError` / `InvalidProcessRequestError`). | — |
+| `src/core/run/run-review.ts` | `RunReviewRequest` gains `validations?: readonly string[]` and `validationTimeoutMs?: number`; `RunReviewDeps` gains `processRunner?: ProcessRunner`; stage 1 hoists the declaration check; stage 5 replaces the comment placeholder with the `runValidations` call; `RunStage` gains `"validations"`; `classifyFailure` gains two classes. | Stage-5 `cwd` is `worktree.path` |
+| `src/core/run/index.ts` | Export `runValidations`, its request/deps/result types, `validateValidationDeclarations`, `InvalidValidationDeclarationError`. | — |
+| `src/core/repos/ports/config-schemas.ts` | Additive `validationTimeoutMs: z.number().optional()` on **both** `GlobalConfigSchema` and `RepoEntrySchema`. `.optional()` on both — deliberately **no** `z.default()`, so the single default constant lives in `run` and `repos` never duplicates it (and never imports `run`). | — |
+| `src/core/history/ports/run-metadata-schemas.ts` | One entry appended to `RUN_STAGES` + one clause in the existing comment naming this story. Nothing else. | — |
+| `src/core/run/__test__/run-validations.test.ts` *(new)* | Unit suite over an in-memory `ProcessRunner` fake, per `docs/testing.md`. | — |
+| `src/core/run/__test__/run-review.test.ts`, `run-review-fixtures.ts` | Cases for stage-5 wiring and the three never-abort paths; the fake `ProcessRunner` added to the fixtures' `buildDeps` overrides surface. `buildDeps` must keep returning valid deps with `processRunner` absent. | — |
+
+Additional in-scope behavioral rules:
+
+- **Cascade resolution of `validationTimeoutMs`** (which of run / repo / global wins) is **not** performed by `run`. `runReview` receives one already-resolved `request.validationTimeoutMs`; the cascade is E6's composition concern, exactly as `resolveEngine`'s inputs are.
+- **Concatenation rule**: when a caller supplies `request.validationOutput` *and* validations execute, the caller's entries come **first** and the computed entries follow (AC-16). The field is documented as "forwarded verbatim"; silently discarding it would be a regression.
+
+### Out Of Scope
+
+| Excluded | Why, and who owns it |
+|---|---|
+| Process-group kill hardening (`risk-006`, inherited from `[E5.F1.H1]` risk-007) | **Consciously inherited, not escalated to a new backlog item.** A declared `npm test` is exactly the forking command the risk describes, so it becomes reachable here — but the fix changes the merged adapter's `detached`/kill strategy and needs its own child-process test surface. It is an adapter hardening pass, not a line of this story. Recorded as an accepted, documented exposure in `state.yaml` `risk-006`; the epic-E5 summary should surface it as a follow-up. |
+| A quote-aware tokenizer | `dec-003` explicitly allows layering it on later without breaking the contract. Entries needing quotes are *rejected*, never mis-split, so adding it later is a pure widening. |
+| Any CLI/TUI surface (`--skip-validations`, `--validation-timeout`, rendering validation results) | E6/E7. Not named in #32. |
+| Composition-root wiring | E6.F1, unchanged from every prior story's deferral. This story ships behavior reachable through `runReview`'s deps. |
+| Auto-detection of any kind (`package.json` scripts, Makefile sniffing, defaulting to `npm test`) | PRD §3.1-E forbids it in as many words. A repo with no `validations` key runs zero validations, silently and correctly (AC-1). |
+| Parallel execution, retries, an aggregate budget across all scripts | The backlog says "in order"; sequential is what makes `NNN.log` numbering meaningful. Only a **per-script** timeout is specified; `n` scripts can take up to `n × validationTimeoutMs`. |
+| Secret detection or redaction of captured output (`risk-007`) | No heuristic is proposed — the codebase has avoided them everywhere. The mitigation actually delivered is D6's bounded window; the exposure stays documented and accepted. |
+| Any change to `src/adapters/**` or `src/main/**` | Pinned by AC-20. |
+| Retrofitting the engine seams or `git-cli.ts` onto `ProcessRunner` | `[E5.F1.H1]` risk-004, still a follow-up backlog item. |
+
+### Non-Goals
+
+- No shell semantics of any kind — no pipes, redirection, globbing, `&&`, tilde or variable expansion. Refusing them (AC-7) is the feature, not a limitation to work around.
+- No interpretation of a validation's exit code by the domain. `exitCode: 1` is evidence handed to the engine, never a judgment `runValidations` makes.
+- No `validationOutput` entry is ever omitted or reordered. The result array is positionally 1:1 with the declared list, whatever happened at runtime.
+
+## Expected Behavior
+
+| Scenario | Expected Outcome | AC |
+|---|---|---|
+| `validations` absent, or `[]` | Zero `ProcessRunner.run` calls; `validationOutput` is `undefined`/unchanged; no `<validation-output>` block in the prompt | AC-1 |
+| `deps.processRunner` absent, `validations` declared | Stage 5 is a no-op; `request.validationOutput` still passes through verbatim; the run is otherwise identical to today's | AC-1 |
+| `["npm run lint", "npm test"]` | Two `run()` calls, in that order, second only after the first settles; `cwd` is the worktree path for both | AC-2, AC-3 |
+| A declared entry exits `1` | Element records `exit=1`; the review **continues** to the engine; terminal state is decided by the engine, not the validation | AC-11 |
+| A declared entry names a binary that does not exist (`ProcessSpawnError`) | Caught inside `runValidations`; element records `spawn-failed` plus the error message; the review **continues**; the error never reaches `classifyFailure` | AC-12 |
+| A declared entry outruns its timeout | `ProcessRunner` resolves with `timedOut: true`; element records `timedOut=true` and the partial output; the review **continues** | AC-13 |
+| `"npm test 2>&1"` | Rejected at pre-flight (`>` and `&`): `InvalidValidationDeclarationError` → `validation-failed`, `failure.stage: "request"`, **no worktree created**, **no process spawned** | AC-7, AC-10 |
+| `"  "` or `""` | Same rejection path (empty after tokenization) | AC-8 |
+| A validation floods 50k lines of stdout | Element carries the first 100 and last 100 lines with the elision marker between them; `truncated=true` | AC-15 |
+| Caller supplies `validationOutput: ["pre"]` and two validations run | Result array is `["pre", <entry 1>, <entry 2>]`; `validations/001.log` holds `"pre"` | AC-16 |
+| A `ProcessRunner` implementation throws something unexpected | Escapes to `executePipeline`'s catch-all → `engine-error` with `failure.stage: "validations"` | AC-19 |
+| The same declarations against the same `ProcessRunResult`s, run twice | Byte-identical `validationOutput` elements and byte-identical `prompt` | AC-21 |
+
+## Acceptance Criteria
+
+| Criteria Id | Acceptance Criteria | Validation Hint | Priority |
+|---|---|---|---|
+| AC-1 | **Only declared scripts are executable.** `runValidations` runs exactly the entries it is given and nothing else — no default, no fallback, no `package.json`/Makefile inspection anywhere in the diff. With `validations` absent or `[]`, or with `deps.processRunner` absent, `ProcessRunner.run` is called **zero** times and `runReview`'s behavior is byte-identical to today's. | Fake `ProcessRunner` counting calls: assert `0` for each of the three cases. Plus a repo-wide grep over the diff for `package.json`, `Makefile`, `scripts` — zero hits outside test fixtures. This is #32's first acceptance criterion. | must |
+| AC-2 | Entries run **sequentially, in declaration order**: call `n+1` is not issued until call `n` has settled, and the result array's index `i` corresponds to declared index `i`. | Fake runner recording `(command, args)` per call and resolving on a controlled deferred; assert ordering and non-overlap. Mutation: `Promise.all` → the non-overlap assertion fails. | must |
+| AC-3 | Every `ProcessRunRequest.cwd` is the **review worktree path** (`worktree.path` from stage 3), never the managed clone and never `process.cwd()`. This is the backlog's "cwd in the worktree" and PRD §3.1-E's "executed in the worktree". | Assert each captured request's `cwd` equals the fake git port's worktree path, and differs from `request.repoPath`. | must |
+| AC-4 | **Per-script timeout.** Each `run()` carries its own `timeoutMs`, equal to `request.validationTimeoutMs` when supplied and to `DEFAULT_VALIDATION_TIMEOUT_MS = 120_000` otherwise. No aggregate budget exists; `n` scripts may take up to `n × timeoutMs`. | Two cases (supplied / omitted); assert the exact `timeoutMs` on every captured request. | must |
+| AC-5 | `validationTimeoutMs` is added **additively and optionally** to both `GlobalConfigSchema` and `RepoEntrySchema` (`z.number().optional()`, no `z.default()`). `RepoEntry.validations` stays exactly `z.array(z.string()).optional()` — unwidened. A config document written before this story still parses, and a document carrying the new field round-trips through `ConfigStore` unchanged. | Schema unit tests: parse a pre-story fixture (success, field `undefined`); parse with the field (success, value preserved). Assert `RepoEntrySchema.shape.validations` is unchanged. Mutation: add `.default(...)` → the "absent stays undefined" assertion fails. | must |
+| AC-6 | **Tokenization**: an accepted entry is split on runs of space (`U+0020`) and tab (`U+0009`); the first token becomes `command` and the remainder becomes `args` verbatim, in order. Leading/trailing whitespace is ignored. No token is unquoted, unescaped, expanded or reordered. | `"npm  run   lint"` → `("npm", ["run","lint"])`. `" npm test "` → `("npm", ["test"])`. | must |
+| AC-7 | **The rejected character set is exactly this, and is enforced by a pinned list — not a "looks suspicious" heuristic**: `\|` `&` `;` `<` `>` `$` `` ` `` `(` `)` `{` `}` `[` `]` `*` `?` `!` `~` `#` `\` `'` `"`, plus every ASCII control character in `U+0000`–`U+001F` and `U+007F` **other than** space and tab (so a newline inside an entry is rejected, not treated as a separator). An entry containing any of them throws `InvalidValidationDeclarationError` naming the offending character and the entry. The set is exactly "every character with a meaning in POSIX shell word expansion that `shell: false` cannot honor" — refusing them is honest, because passing them through would silently mean something the author did not intend. Accepted over-rejection: `~/x.sh`, `eslint 'src/**'` and `jq '.a[0]'` are rejected; the documented escape hatch is a future quote-aware tokenizer or array config form, both explicitly non-breaking widenings. | Table-driven: one rejection case per listed character, plus accept cases for characters deliberately **not** in the set (`-`, `=`, `.`, `/`, `:`, `,`, `+`, `@`, `%`). Assert `instanceof InvalidValidationDeclarationError` and `instanceof RunError`, and that the message contains both the character and the entry. Mutation: replace the list with a regex that also rejects `=` → the `--foo=bar` accept case fails. | must |
+| AC-8 | An entry that is empty or yields zero tokens after trimming is rejected with the same error, before any spawn. | `""`, `"   "`, `"\t"`. | must |
+| AC-9 | `classifyFailure` maps **`InvalidValidationDeclarationError`** and **`InvalidProcessRequestError`** to `"validation-failed"`, and **does not** name `ProcessSpawnError` — which, per AC-12, can never reach it anyway. The existing seven branches are unchanged, and the base classes `RunError`/`WorkspaceError`/`HarnessError` are still never tested. | Unit assertions on the resulting `result.state` for each class. Mutation: add `ProcessSpawnError` to the branch → AC-12's "review continues" test fails, proving the two ACs are coupled deliberately. | must |
+| AC-10 | The declaration check is **hoisted into `runReview`'s stage 1** (the `"request"` pre-flight), mirroring the file's existing `harness (hoisted: an unknown harness leaves no orphan)` precedent. A malformed declaration therefore produces `state: "validation-failed"` with `failure.stage: "request"`, **`GitPort.addWorktree` never called**, and `result.cleanup` = `{ attempted: false }`. `runValidations` runs the *same* check itself, so a standalone caller is equally protected. | Fake git port asserting zero worktree creations; assert `failure.stage === "request"` and `cleanup.attempted === false`. Separately call `runValidations` directly with a bad entry and assert it throws before any `run()` call. | must |
+| AC-11 | **A non-zero exit never aborts the review.** `runValidations` resolves normally, the element records the exit code, and the pipeline proceeds to prompt and engine. The terminal state is whatever the engine/parse stages produce — a failing validation cannot by itself yield `validation-failed`, `engine-error` or `timeout`. | Fake runner resolving `{ exitCode: 1, stdout: "1 failing", ... }`; assert `state === "ok"`, `result.prompt` contains `1 failing`, and the engine was invoked. This is #32's third acceptance criterion. | must |
+| AC-12 | **`ProcessSpawnError` never aborts the review.** `runValidations` catches it per entry, emits an element marked `spawn-failed` carrying the error's `message`, and continues to the next entry. It is never rethrown, so it never reaches `classifyFailure`. Any *other* throwable from `run()` is likewise caught per entry and recorded the same way, so a third-party adapter cannot break the guarantee. | Fake runner rejecting with `ProcessSpawnError` on entry 1 and resolving on entry 2; assert both elements present, entry 2 executed, `state === "ok"`. Mutation: remove the catch → the run becomes `engine-error`. | must |
+| AC-13 | **A timeout never aborts the review.** A result with `timedOut: true` is recorded as evidence — including whatever partial output was captured — and the review proceeds. `runReview`'s `timeout` terminal state stays reserved for `EngineTimeoutError` alone. | Fake runner resolving `{ timedOut: true, signal: "SIGKILL", stdout: "started…" }`; assert `state === "ok"`, element contains `timedOut=true` and the partial output. | must |
+| AC-14 | **One element per declared entry, in this exact format** (pinned because `validations/NNN.log` and `<validation-output>` both render it verbatim). Normal path: line 1 `$ {declared entry, verbatim}`; line 2 `exit={n or -} signal={s or -} timedOut={true\|false} truncated={true\|false}`; then `--- stdout ---` and the windowed stdout; then `--- stderr ---` and the windowed stderr. An empty stream body is the literal `(empty)`. Spawn/unexpected-failure path: line 1 unchanged; line 2 is the literal `spawn-failed`; then `--- error ---` and the message. `truncated` is `true` when either capture flag was set **or** D6's window elided anything. **No duration and no timestamp** appear anywhere (see E2, AC-21). The result array is always exactly as long as the declared list. | Exact-string assertions (not `toContain`) on a fixture-driven element, both paths. Assert `result.length === declarations.length` for a mixed success/spawn-fail/timeout batch. | must |
+| AC-15 | **D6's window is applied per stream**: over `100 + 100` lines → first 100, the literal marker `... [N lines elided by sentinel] ...` with the exact removed count, last 100. A retained line over 2,000 chars is cut with the literal suffix ` ... [line truncated]`. A stream within both limits is emitted byte-for-byte unchanged, trailing newline included. One stream exceeding a limit never alters the other. | 300-line stdout + 3-line stderr: assert the exact marker text with `N = 100`, stdout line count `201`, and stderr byte-identical. Assert a 250-line stream and a 200-line stream (boundary: 200 is untouched). | must |
+| AC-16 | When `request.validationOutput` is supplied **and** validations execute, the forwarded entries come first and the computed ones follow, in that order. When validations do not execute, `request.validationOutput` still passes through verbatim (today's behavior, unregressed). | Assert the exact array `["pre", elem1, elem2]` reaches `assemblePrompt`. | must |
+| AC-17 | **Output is visible in the persisted prompt.** `result.prompt` contains a single `<validation-output>` block holding every element joined by `\n`, positioned after the `<diff>` block — the existing `assemblePrompt` rendering, unmodified. `[E5.F2.H1]` persists `result.prompt` as `prompt.md`, so no further work is needed for "visible in the persisted prompt". | Assert `result.prompt` contains `<validation-output>` and each element's `$ ` header line. Assert `src/core/review/assemble-prompt.ts` has an empty diff. This is #32's second acceptance criterion. | must |
+| AC-18 | `runValidations` is a **standalone exported use case**, unit-testable without `runReview`, `GitPort`, an engine or a harness — it takes only its declarations, a `cwd`, a timeout and a `ProcessRunner`. It is exported from `src/core/run/index.ts` together with `validateValidationDeclarations` and `InvalidValidationDeclarationError`, and it is verb+noun camelCase per the conventions. | The new `run-validations.test.ts` imports only `run-validations.js` and a local fake — no harness or git fixture in the file. | must |
+| AC-19 | `RunStage` gains `"validations"`, and `RUN_STAGES` in `src/core/history/ports/run-metadata-schemas.ts` gains the matching entry so `_AllRunStagesCovered` still resolves to `never`. That file's diff is **exactly** one array entry plus one comment clause — the union is not moved into `src/core/run` (`[E5.F2.H2]` AC-15). Stage 5 sets `stage = "validations"` before calling `runValidations`, so an unexpected escapee is attributed honestly. | `tsc --noEmit` green is the proof the guard is satisfied. `git diff --stat` on `run-metadata-schemas.ts` shows a one-line-plus-comment change. Mutation: add the union member without the list entry → typecheck fails, which is the guard working. | must |
+| AC-20 | **Blast radius is pinned.** `npm run check` (biome + `tsc --noEmit` + `depcruise src` at 0 violations) and `npm test` are green. `src/core/run/run-validations.ts` imports nothing from `src/adapters/**`, `src/main/**` or any I/O library. `git diff --stat` shows **no change at all** to: `src/adapters/**` (the whole tree — in particular `process-runner-exec.ts`, unhardened per the out-of-scope table, and `run-store-fs.ts`), `src/main/**`, `src/core/review/**`, `src/core/workspace/**`, `src/core/repos/` other than `ports/config-schemas.ts`, `src/core/history/` other than the one line in `ports/run-metadata-schemas.ts`, and `src/core/run/ports/process-runner.ts` (the port is consumed, never changed). | Closing gate, same discipline as `[E5.F1.H1]` AC-15 and `[E5.F2.H2]` AC-15. | must |
+| AC-21 | **The prompt stays reproducible.** Given the same declarations and the same `ProcessRunResult`s, two runs produce byte-identical `validationOutput` elements and a byte-identical `prompt`. No wall-clock duration, timestamp, pid, hostname or absolute path other than what the declaration itself contains appears in an element. This is what makes PRD §6.3's "same input → same prompt" hold for the validations block. | Run the use case twice over the same fakes; `expect(a).toEqual(b)` on the arrays and a strict-equality assert on the prompt. Mutation: add `durationMs` to the header → the test still passes with a fixed clock but the AC's no-duration clause is asserted separately by AC-14's exact-string check. | must |
+
+## Interface Notes
+
+- **Placement**: `src/core/run/run-validations.ts`, a sibling of `run-review.ts` and `process-run-request.ts`. It is a **use case, not a port** — `run` gains no new port (E1). Errors go in the module's single `run-errors.ts`, per the house pattern.
+- **Shape** (indicative; `sddl-design` owns the final signature): `runValidations(request: { declarations: readonly string[]; cwd: string; timeoutMs?: number }, deps: { processRunner: ProcessRunner }): Promise<readonly string[]>`. Rejects only for a malformed declaration; resolves for every runtime outcome.
+- **`exactOptionalPropertyTypes`**: every new optional field on `RunReviewRequest`/`RunReviewDeps` is read with the conditional-spread idiom the file already uses throughout. `deps.processRunner` must be genuinely optional so every existing `buildDeps()` caller and every existing `runReview` test keeps compiling untouched.
+- **Naming**: `runValidations` (verb + noun), `InvalidValidationDeclarationError` (`Error` suffix, lives in its module), `validateValidationDeclarations` mirroring the existing `validateProcessRunRequest`.
+
+## Downstream Constraints
+
+Recorded so later stories inherit them explicitly.
+
+**For E6 (CLI / composition root):**
+
+1. **The `validationTimeoutMs` cascade is E6's to implement.** This story adds the field at both config levels and consumes one already-resolved number. Precedence must follow the `resolveEngine` shape (run override → repo → global), and the fallback when all three are absent is `run`'s `DEFAULT_VALIDATION_TIMEOUT_MS = 120_000` — do **not** re-declare that number in `repos` or in the CLI.
+2. **`deps.processRunner` is optional, and omitting it silently skips validations.** The composition root must wire `createExecProcessRunner()` in, or a repo's declared validations will never run and nothing will say so. A `sentinel review` that skips validations without a word is the failure mode this optionality creates.
+3. **`request.validations` must be fed from `RepoEntry.validations`, never re-derived.** "Only declared scripts" (AC-1) is a provenance guarantee the core cannot check — it can only refuse to invent commands, which it does.
+4. **A rejected declaration is a config error and should be reported as one.** `InvalidValidationDeclarationError` names the offending character and entry; the CLI should surface that message rather than a generic "validation-failed", and should point at the array/array-form escape hatch.
+
+**For a future validations hardening pass:**
+
+5. **Process-group kill (`risk-006`) is live from this story onward.** The first user-declared, potentially forking command now runs under an adapter that kills only the immediate child pid. Accepted here consciously (out-of-scope table); it should be raised in the epic-E5 closing summary as a follow-up backlog item together with `[E5.F1.H1]` risk-004.
+6. **`stage: "validations"` now exists in `metadata.json`.** Any reader must tolerate it; `RUN_STAGES` is the single place to extend, and `[E5.F2.H2]` AC-15 still forbids relocating the list.
+7. **The evidence element format is frozen by AC-14.** Changing it changes both `<validation-output>` in every persisted `prompt.md` and every `validations/NNN.log`. Treat it as a persisted format, not a rendering detail.
+
+## Risks And Trade-offs
+
+| Risk | Position taken |
+|---|---|
+| `risk-001` — no config home for the per-script timeout | **Resolved**, not re-scoped: `validationTimeoutMs` added additively at both levels (AC-5), and the criterion is met literally — each script gets its own budget (AC-4). |
+| `risk-002` — silent misinterpretation under `shell: false` | **Resolved** by AC-7's pinned rejection set. Trade-off accepted: legitimate quoted/globbed declarations are refused, loudly, rather than mis-executed silently. |
+| `risk-003` — the array granularity is a frozen on-disk format | **Decided** (D7) and pinned exactly (AC-14), with the freeze recorded as downstream constraint 7. |
+| `risk-004` — cross-module compile-time ripple | **Accepted** (D5), scoped to one line + one comment, verified by AC-19's typecheck gate. |
+| `risk-005` — the 1M-char capture budget can dwarf the diff | **Resolved** by D6's prompt-facing window (AC-15). Note the residual: the window bounds what reaches the *prompt*, and `validations/NNN.log` persists that same windowed element — so a large capture is bounded on disk too, but the full output is then unavailable for post-hoc inspection. Accepted: reproducibility of the prompt and the log matching each other is worth more than an unbounded log. |
+| `risk-006` — process-group kill | **Consciously inherited**, not escalated to a backlog item now; surfaced in the E5 closing summary (downstream constraint 5). |
+| `risk-007` — a script printing its environment leaks secrets | **Accepted and documented.** No detection heuristic. The only mitigation delivered is D6's bounded window, which reduces exposure but does not remove it. The script is one the repo owner declared, in their own config, on their own machine. |
+| **New** — `deps.processRunner` optionality makes a silent skip possible | Mitigated only by downstream constraint 2. Deliberate: making it required would break every existing `runReview` caller and test, which AC-20 pins as untouched. |
+
+## Open Questions
+
+None blocking. Everything DC-1 through DC-7 raised is now either ratified (`dec-001`..`dec-004`) or settled above (D5, D6, D7). The three empirical corrections (E1, E2, E3) resolve rather than open questions. `sddl-design` may proceed without a user decision.
+
+## Approval Notes
+
+- Scope is `[E5.F1.H2]` / issue #32 alone; both declared dependencies are merged on `main`.
+- Branch `claude/e5-f1-h2-declared-validations` at `c3065d1`, clean. 0 open PRs.
+- This is the last required story of milestone E5; on merge, workflow contract rule 6 (epic summary + STOP) triggers, and that summary should carry downstream constraint 5.
+- Recommended next stage: `sddl-design`.

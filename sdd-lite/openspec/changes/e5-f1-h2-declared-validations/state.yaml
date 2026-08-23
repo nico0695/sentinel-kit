@@ -156,7 +156,7 @@ stages:
       objective is new-feature, not planner, so this is not a terminal stop; next_action routes
       to sddl-executor pending user stage_approval for ST-1.
   sddl-executor:
-    status: implementing
+    status: in_progress
     notes: >-
       ST-1 completed: additive validationTimeoutMs: z.number().optional() on both GlobalConfigSchema
       and RepoEntrySchema, no .default(), RepoEntry.validations left unwidened. New

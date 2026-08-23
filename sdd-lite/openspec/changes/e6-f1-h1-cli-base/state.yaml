@@ -1,0 +1,264 @@
+version: "0.1"
+change_name: e6-f1-h1-cli-base
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F1.H1] (issue #36), first story of the E6 milestone: replace the [E0.F1.H3]
+    --version stub in src/main/cli.ts with the real composition root and build the CLI driving
+    adapter (repo add|list, review, runs list|show, --version, --help). Bounded scope span --
+    one driving adapter plus the composition root. Low ambiguity on the command surface: the
+    backlog story and PRD §3.2 fix it, and every core use case it must call already exists with
+    an explicit request/deps/result signature. Blast radius is real but contained: src/main/cli.ts
+    is hot-path wiring and this is the first time the full dependency graph is assembled. Risk
+    profile is medium: the change introduces the first runtime dependency since E0 (a B-level
+    decision), and proposal-stage exploration surfaced three unowned integration facts -- the
+    sentinel home path root, review's timeoutMs source, and run persistence (runReview has no
+    RunStore dep and nothing calls store.save()).
+  confidence: medium
+  recorded_at: "2026-08-23T00:00:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown requiring deep investigation. Lightweight proposal-stage exploration
+      of the five core module indexes, the driven adapter factories, package.json and the stub
+      composition root was sufficient to frame the change. The open items are decisions for the
+      user, not facts to discover in the codebase.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-23T00:00:00Z"
+    completed_at: "2026-08-23T00:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/{repos,run,history,review,
+      workspace}/index.ts (use-case signatures), src/core/repos/ports/config-schemas.ts
+      (GlobalConfig has validationTimeoutMs but no review timeout), src/core/run/run-review.ts
+      (RunReviewRequest/RunReviewDeps -- no RunStore, timeoutMs mandatory), the driven adapter
+      factories in src/adapters/driven/*/index.ts, src/main/cli.ts (the stub), package.json
+      (runtime deps: execa, yaml, zod) and docs/backlog-mvp-sentinel.md §E6 /
+      docs/setup-tecnico-sentinel.md §4-§5.
+  sddl-spec:
+    status: pending
+    notes: >-
+      The four open decisions were settled by the user at cp-proposal-b-decisions (D1-D4) instead
+      of travelling to spec. spec.md must treat them as fixed inputs and formalize them into
+      acceptance criteria: persistRun as an in-scope core/history use case (D1), SENTINEL_HOME
+      with a ~/.sentinel default (D2), reviewTimeoutMs in GlobalConfigSchema plus a --timeout flag
+      with flag > config precedence (D3), and commander as the only new runtime dependency (D4).
+      Still open for spec to confirm: the H1/H2 exit-code boundary proposed in proposal.md
+      (risk-e6h1-005).
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e6-f1-h1-cli-base/state.yaml
+  proposal: sdd-lite/openspec/changes/e6-f1-h1-cli-base/proposal.md
+  spec: sdd-lite/openspec/changes/e6-f1-h1-cli-base/spec.md
+  design: sdd-lite/openspec/changes/e6-f1-h1-cli-base/design.md
+  plan: sdd-lite/openspec/changes/e6-f1-h1-cli-base/plan.md
+  execution_log: sdd-lite/openspec/changes/e6-f1-h1-cli-base/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e6-f1-h1-cli-base/review-ledger.md
+checkpoints:
+  - id: cp-proposal-b-decisions
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec, but three B-level decisions are deliberately unresolved and
+      spec should not invent answers to them: (1) adopt commander as the first runtime CLI
+      dependency, and whether picocolors belongs in this story or in [E6.F2.H2]; (2) who persists
+      a run after review, given runReview has no RunStore dep and nothing calls store.save();
+      (3) where the sentinel home path root comes from (~/.sentinel, SENTINEL_HOME, a global flag).
+    question: >-
+      Approve the proposal and continue to sddl-spec (carrying the three B-level questions to a
+      decision checkpoint there), revise this phase, or stop?
+    options:
+      - id: approve
+        label: Approve and continue to sddl-spec
+        description: >-
+          Proposal framing accepted; the B-level questions travel to spec, which must present
+          them for decision rather than resolve them.
+        recommended: true
+      - id: revise
+        label: Revise the proposal
+        description: Reframe the problem, scope sketch, or open questions before spec.
+      - id: stop
+        label: Stop
+        description: >-
+          Halt the change -- e.g. if the run-persistence gap should be settled as a backlog
+          question with the user before any further stage runs.
+    free_input_allowed: true
+    created_at: "2026-08-23T00:00:00Z"
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T21:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Proposal approved and all four open decisions settled at the checkpoint rather than being
+      carried into spec. The orchestrator independently confirmed the risk-e6h1-001 evidence
+      before escalating (RunReviewDeps has no RunStore member; `grep -rn "\\.save("` over src
+      excluding __test__ returns zero non-test callers; RunStore.save exists at
+      src/core/history/ports/run-store.ts:88). See decisions D1-D4.
+decisions:
+  - id: D1
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: Run persistence is owned by a new `persistRun` use case in `core/history`
+    context: >-
+      Neither [E4.F1.H1] (runReview: worktree -> diff -> prompt -> engine -> parse -> terminal
+      state -> cleanup) nor [E5.F2.H1] (RunStore: complete persistence) assigns an owner to the
+      act of composing a RunRecord and calling save(). [E5.F2.H1] deliberately made RunRecord
+      caller-composed so that "history never depends on run's request shape and runReview is
+      never touched by this module's existence" (run-store.ts). The result is a genuine backlog
+      gap, not a design fork: PRD use case 5 and [E5.F2.H2]'s listRuns read a store nothing
+      writes. Escalated as workflow-contract rule 8 (C level).
+    decision: >-
+      Add a thin `persistRun` use case to `core/history` that composes a RunRecord from the
+      RunReviewRequest/RunReviewResult pair and calls RunStore.save(). The CLI adapter calls two
+      use cases in sequence and holds no mapping logic of its own. Accepted inside [E6.F1.H1]
+      rather than deferred to a new E5 story.
+    rationale: >-
+      Preserves this story's AC-1 (zero logic in the command) and honours [E5.F2.H1]'s explicit
+      decision to leave runReview untouched, which the rejected `runStore` in RunReviewDeps
+      option would have reversed. Composing the record in src/main/ was rejected as domain
+      mapping in the composition root, a grey zone against the "use cases are the only core API"
+      guard. Opening a separate E5 story was rejected as an extra PR that delays E6 for no
+      structural gain.
+    consequences: >-
+      [E6.F1.H1] widens beyond the backlog entry's literal text by adding one core/history use
+      case. The deviation is deliberate, user-authorised, and must be declared in the story's PR
+      description and in the history entry. spec.md must carry persistRun as in-scope with its
+      own acceptance criteria and unit tests (core, in-memory RunStore fake).
+  - id: D2
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Sentinel home root is `SENTINEL_HOME` with a `~/.sentinel` default
+    context: >-
+      createConfigStoreAdapter(basePath), createRunStoreFsAdapter(runsRoot),
+      createHarnessLoaderAdapter(basePath) and runReview's clonesDir/worktreesDir all require
+      absolute paths, and no component resolves them. The composition root is the first code
+      forced to decide (risk-e6h1-002).
+    decision: >-
+      Resolve one home root in the composition root: the SENTINEL_HOME environment variable when
+      set, otherwise ~/.sentinel. All adapter paths derive from it.
+    rationale: >-
+      Keeps the [E7.F1.H1] e2e smoke suite able to point at a temp directory without mutating the
+      real HOME, and stays scriptable in CI. A hardcoded ~/.sentinel would force HOME juggling in
+      tests; a global --home flag is noisier to type and does not cover the TUI entry point.
+    consequences: >-
+      SENTINEL_HOME becomes public surface and must be documented in --help and in [E7.F2.H1]
+      user documentation. design.md owns the exact subdirectory layout under the root.
+  - id: D3
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Review timeout comes from a new `reviewTimeoutMs` global config field plus a `--timeout` flag
+    context: >-
+      RunReviewRequest.timeoutMs is mandatory with no default, and GlobalConfigSchema carries only
+      validationTimeoutMs (risk-e6h1-003).
+    decision: >-
+      Add reviewTimeoutMs to GlobalConfigSchema as the default source, overridable per invocation
+      by a --timeout flag on the review command.
+    rationale: >-
+      Mirrors how validationTimeoutMs is already resolved, so the config format stays internally
+      consistent and the effective value stays visible and auditable. A composition-root constant
+      would make an agent-invoking CLI's slowest knob non-configurable; a mandatory flag is hostile
+      to interactive use.
+    consequences: >-
+      This is a config-format change to an existing schema. spec.md must state the default value
+      and the precedence order (flag > config > schema default), and the schema change needs its
+      own test coverage.
+  - id: D4
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Adopt `commander` only; defer `picocolors` to [E6.F2.H2]
+    context: >-
+      First runtime dependency since E0 (risk-e6h1-004). docs/setup-tecnico-sentinel.md §4
+      recommends commander, @clack/prompts, picocolors and optional marked/marked-terminal, but
+      CLAUDE.md makes those recommendations re-evaluable at implementation time with justification.
+    decision: >-
+      Add commander as the only new runtime dependency in this change. picocolors is deferred to
+      [E6.F2.H2] (terminal result rendering), which owns output presentation. @clack/prompts stays
+      with [E6.F2.H1] (TUI). The setup doc's recommendation is ratified, not overridden.
+    rationale: >-
+      Keeps a command-surface story to one new dependency and avoids committing to output styling
+      before the story that owns rendering exists. node:util parseArgs was rejected: hand-rolling
+      subcommands, per-command --help and validation is precisely this story's AC-2, and it would
+      deviate from the setup doc without a benefit that justifies the divergence.
+    consequences: >-
+      package.json runtime deps go from 3 to 4. The bootstrap refresh trigger recorded in
+      config.yaml ("first E6 runtime dependency") is satisfied by this change and config.yaml plus
+      project-context.md need a follow-up touch once it merges.
+open_risks:
+  - id: risk-e6h1-001
+    summary: >-
+      Run persistence has no owner: RunReviewDeps excludes RunStore and no code calls
+      store.save(), so sentinel review would write no history and PRD use case 5 (consult a
+      repo's review history) stays dead. Fixing it in the CLI adapter would violate this story's
+      own AC-1 (zero logic in the command); fixing it in core adds surface the backlog entry does
+      not authorize. May be a workflow-rule-8 STOP rather than a design fork.
+    severity: high
+    status: resolved
+    resolution: >-
+      Escalated to the user as a C-level backlog gap and settled by D1: a new `persistRun` use
+      case in core/history, in scope for this change.
+  - id: risk-e6h1-002
+    summary: >-
+      No component resolves the sentinel home root. ConfigStore, HarnessLoader, RunStore and
+      runReview all require injected absolute paths (basePath, runsRoot, clonesDir, worktreesDir)
+      and the composition root is the first code that must decide. Affects config-format
+      expectations and every later story that reads those files.
+    severity: medium
+    status: resolved
+    resolution: Settled by D2.
+  - id: risk-e6h1-003
+    summary: >-
+      RunReviewRequest.timeoutMs is mandatory with no default and GlobalConfigSchema has no
+      review/engine timeout field (only validationTimeoutMs). The review command needs a value
+      from a source that does not exist yet; adding a config field is a config-format change.
+    severity: medium
+    status: resolved
+    resolution: Settled by D3.
+  - id: risk-e6h1-004
+    summary: >-
+      First runtime dependency added since E0 (current deps: execa, yaml, zod). Per CLAUDE.md the
+      setup doc's commander recommendation is re-evaluable on implementation with justification,
+      making adoption a B-level decision the user owns.
+    severity: medium
+    status: resolved
+    resolution: Settled by D4.
+  - id: risk-e6h1-005
+    summary: >-
+      H1/H2 overlap risk: [E6.F1.H2] (#37) owns the review exit-code contract but both stories
+      touch the same command. proposal.md proposes an explicit boundary that spec must confirm.
+    severity: low
+  - id: risk-e6h1-006
+    summary: >-
+      src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
+      the first time; integration mismatches between core request shapes and adapter factories
+      surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
+    severity: medium
+next_action:
+  kind: run_stage
+  target: sddl-spec
+  summary: >-
+    Checkpoint cp-proposal-b-decisions resolved with `approve` and all four decisions settled
+    (D1-D4). Run sddl-spec with D1-D4 as fixed inputs, formalizing them into acceptance criteria
+    and firm scope boundaries, and confirming the H1/H2 exit-code boundary.
+created_at: "2026-08-23T00:00:00Z"
+updated_at: "2026-08-23T21:30:00Z"

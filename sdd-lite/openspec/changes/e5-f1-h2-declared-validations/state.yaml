@@ -17,8 +17,8 @@ complexity_assessment:
     _AllRunStagesCovered exhaustiveness guard).
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
-lifecycle_status: reviewing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -207,7 +207,7 @@ stages:
       sddl-code-review in full-4r tier (~1590 insertions across 11 files touching core/run's hot
       execution path -- matches the project's >400-changed-lines / hot-path triage rule).
   sddl-qa-review:
-    status: in_progress
+    status: completed
     notes: >-
       Stage-mode QA (ST-1..ST-3, before the closing gate ST-4): verdict pass, zero findings.
       Independently verified by a fresh reviewer against code at 391f7d3, not the execution log's
@@ -221,7 +221,7 @@ stages:
       names, nothing beyond. npm run check clean, full npm test 494/494. Orchestrator independently
       re-ran the diff --stat and re-read the catch block and AC-16 line; both confirmed. qa-report.md
       written (stage mode). Recommended: proceed to ST-4 using beb5d48 as the AC-20 base.
-      FINAL QA (closeout): verdict pass_with_warnings, ready to be marked completed. Independently
+      FINAL QA round 1 (closeout): verdict pass_with_warnings, ready to be marked completed. Independently
       re-verified at HEAD 53370f8 (one commit past the review-ledger's b7376e6, documentation-only,
       no src/ drift): npm run check clean, full npm test 494/494, git diff --stat beb5d48..HEAD --
       src/ unchanged since ST-4 (same 11 files, 1593+/8-). Re-confirmed AC-1's structural no-op,
@@ -232,6 +232,17 @@ stages:
       aggregate duration) remain as honest, non-blocking, deliberately-deferred scope observations.
       Orchestrator independently re-ran check/test/diff --stat and confirmed identical. All 21
       acceptance criteria verified. qa-report.md written (final mode).
+      FINAL QA round 2 (re-run after PR #72's fix round, 2026-08-23T21:00): independently re-verified
+      all 22 ACs (original 21 + new AC-22) at HEAD d992bf5. npm run check clean, full npm test
+      500/500 (up from 494). git diff --stat beb5d48..HEAD confirms exactly the 18 amended AC-20
+      files. AC-22's security mechanism verified at every layer by direct source read: the single
+      construction site (run-validations.ts), the guard's exact throw condition (rejects only when
+      env is undefined, not {}), the adapter's strict === false gate (never !inheritEnv, ruling out a
+      regression on every caller that omits the field). AC-1/AC-9..AC-13/AC-20 spot-checked intact,
+      unregressed. Verdict upgraded from pass_with_warnings to clean pass -- the one open CRITICAL
+      (R1-001) is now fixed and adversarially corroborated twice. qa-report.md updated with a new
+      qa-3 section, original qa-2 content kept under a SUPERSEDED note for audit continuity.
+      lifecycle_status: completed.
 artifacts:
   state: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/proposal.md

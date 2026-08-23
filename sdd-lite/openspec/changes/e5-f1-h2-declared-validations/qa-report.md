@@ -1,6 +1,8 @@
 # QA Report
 
-## Closeout Digest
+## Closeout Digest — SUPERSEDED, see qa-3 below
+
+The digest and body immediately below (qa-2) reflect the **first** final pass, before PR #72's formal GitHub review re-raised R1-001 as CRITICAL. That review is now superseded by ST-5's fix round and this document's **qa-3** section (bottom of file), which is the current, authoritative closeout verdict. Kept verbatim for audit continuity — do not delete.
 
 - change_name: e5-f1-h2-declared-validations
 - review_mode: final
@@ -154,3 +156,101 @@ All 21 acceptance criteria verify clean against a fresh, independent read of cur
 ## Budget Notes
 
 - Final review for a 4-stage change (11 changed files, 1593 inserted / 8 deleted lines), reusing the review-ledger's already-corroborated R1-001/R1-002 dispositions and the stage-mode QA's already-verified AC-2/3/6/7/8/16/17/18 evidence as consumed context, while independently re-deriving from fresh source and test reads the specific contracts this handoff called out (AC-1, AC-9..AC-13, AC-20, AC-21) plus the full `npm run check`/`npm test` gate and the complete 21-AC coverage table.
+
+---
+
+# qa-3 — Final re-review after PR #72 fix round (ST-5), CURRENT / AUTHORITATIVE
+
+## Closeout Digest
+
+- change_name: e5-f1-h2-declared-validations
+- review_mode: final (second pass — supersedes qa-2 above)
+- reviewed_scope: full-change, all 22 ACs (original 21 + new AC-22)
+- verdict: **pass**
+- trigger: PR #72's formal GitHub review ("Changes Requested") re-raised R1-001 (env-leakage via a declared validation such as `env`/`printenv`) as CRITICAL, superseding qa-2's `wont-fix`/info closure. Fix landed at ST-5 (commit `93290f7`, folded into `d992bf5`): `ProcessRunRequest.inheritEnv?: boolean`, a mandatory pre-flight guard in `validateProcessRunRequest`, and a strict `{PATH, HOME}` environment allowlist for every declared validation's spawned child. Spec.md gained AC-22 and an amended AC-20 file-pin (18 files, not 11). A scoped adversarial re-review of the fix delta (`git diff 391f7d3..93290f7`) already reported CLEAN (review-ledger.md Fix Rounds, round 2, R1-001 `fixed`).
+- HEAD verified at `d992bf5` on branch `claude/e5-f1-h2-declared-validations`.
+- blocking_findings_digest: none — 0 open severe findings, `npm run check` and `npm test` both fresh-green (118 files / 500 tests), all 22 ACs independently re-verified against current source, AC-22's security-critical mechanism confirmed by direct code read at every layer named in the handoff.
+- residual_risk_digest: unchanged from qa-2 — risk-006 (process-group kill, consciously inherited), risk-008 (silent skip when `deps.processRunner` absent), R3-001/R4-001 (ledger, info-tier, non-blocking). **risk-007 is now materially narrowed**: the specific env-leakage mechanism R1-001 flagged is closed by AC-22's allowlist; the residual risk-007 exposure is limited to a declared script leaking secrets through some channel *other than* the reviewing process's own environment (e.g. reading a credential file on disk, or a secret baked into the repo itself) — no longer "the reviewing process's own env is handed to the child verbatim."
+- next_action_digest: change eligible for `completed`. Ready to push back to PR #72 as addressing the "Changes Requested" review. Recommend opening/updating the PR only on explicit user instruction per CLAUDE.md's PR-creation gate; epic-E5 closing summary should still carry risk-006 and risk-008 as named follow-ups.
+
+## Summary
+
+- lifecycle_status_before_review: reviewing (re-opened from `completed` by PR #72's Changes-Requested review)
+- lifecycle_status_after_review: **completed**
+- code_touched: no (QA is read-only; ST-5 already applied and committed at `93290f7`/`d992bf5`)
+- verdict: pass
+- completion_eligible: true
+- reported_at: "2026-08-23T21:30:00Z"
+
+## Review History (extends the table above)
+
+| Review Id | Mode | Reviewed Scope | Verdict | Reported At | Next Action |
+|---|---|---|---|---|---|
+| qa-1 | stage | ST-1..ST-3 | pass | "2026-08-23T00:00:00Z" | continue to ST-4 |
+| qa-2 | final | full-change (21 ACs) | pass_with_warnings | "2026-08-23T18:10:00Z" | **superseded** by PR #72 review |
+| qa-3 | final | full-change (22 ACs, post-fix) | **pass** | "2026-08-23T21:30:00Z" | complete; push back to PR #72 |
+
+## Fresh Checks Run
+
+| Check | Result |
+|---|---|
+| `git log --oneline -1` | `d992bf5` on `claude/e5-f1-h2-declared-validations` |
+| `npm run check` (biome + `tsc --noEmit` + `depcruise src`) | passed — `Checked 118 files in 120ms. No fixes applied.` / tsc clean / `✔ no dependency violations found (81 modules, 170 dependencies cruised)` |
+| `npm test` (full suite, all 3 vitest projects) | passed — `Test Files 28 passed (28)`, `Tests 500 passed (500)` (confirms the expected count: 494 pre-fix + 6 new ST-5 cases) |
+| `git diff --stat beb5d48..HEAD -- src/ sdd-lite/.../spec.md` | 18 files, 1961 insertions(+), 8 deletions(-) — matches spec.md's amended AC-20 list **exactly**: the original 11 (`run-metadata-schemas.ts`, `repos/__test__/config-schemas.test.ts`, `repos/ports/config-schemas.ts`, `run/__test__/fake-process-runner.ts`, `run/__test__/run-review-fixtures.ts`, `run/__test__/run-review.test.ts`, `run/__test__/run-validations.test.ts`, `run/index.ts`, `run/run-errors.ts`, `run/run-review.ts`, `run/run-validations.ts`) plus the 6 net-new from this fix round (`run/ports/process-runner.ts`, `run/process-run-request.ts`, `run/__test__/process-run-request.test.ts`, `adapters/driven/exec/process-runner-exec.ts`, `adapters/driven/exec/__test__/process-runner-exec.test.ts`, `adapters/driven/exec/__test__/ProcessRunner.contract.ts`) plus `spec.md` itself = 18 |
+
+## AC-22 — Direct Code Verification (security-critical, re-verified fresh, not trusted from any prior report)
+
+| Sub-check | Site | Result |
+|---|---|---|
+| Every declared validation's `ProcessRunRequest` carries `inheritEnv: false` and `env` limited to `{PATH, HOME}` | `src/core/run/run-validations.ts:87` (`VALIDATION_ALLOWED_ENV_VAR_NAMES = ["PATH", "HOME"] as const`), `:95-101` (`buildValidationEnv()`, reads only those two names off `process.env`), `:337` (`const validationEnv = buildValidationEnv();`, computed once before the loop), `:342-349` (every per-entry `ProcessRunRequest` literal hardcodes `inheritEnv: false, env: validationEnv` — unconditional, not test-name-trusted) | confirmed by direct read, construction site only — not a test name |
+| Pre-flight guard throws for `inheritEnv:false` + no `env`, does not throw for `inheritEnv:false` + `env:{}` | `src/core/run/process-run-request.ts:42-46` (`if (request.inheritEnv === false && request.env === undefined) throw new InvalidProcessRequestError(...)`) | confirmed — the condition is exactly `env === undefined`, so an explicit empty object legally passes. Cross-checked against `process-run-request.test.ts:65-67` (rejects, env omitted) and `:100-108` (does NOT throw, `env: {}`) — both bodies read directly, not just names |
+| Adapter's `extendEnv` mapping gated exactly on `inheritEnv === false`, never `!inheritEnv` | `src/adapters/driven/exec/process-runner-exec.ts:70-71` — `...(request.inheritEnv === false ? { extendEnv: false } : {})` followed by the pre-existing `...(request.env !== undefined ? { env: request.env } : {})` | confirmed — strict `=== false`. A caller with `inheritEnv: undefined` (the default for every other caller) produces an option bag with no `extendEnv` key at all, byte-identical to pre-fix code; `!inheritEnv` would have wrongly fired on `undefined` too, which this code does not do |
+| `[E5.F1.H1]`'s original env-overlay-on-inherit behavior is unchanged for any caller omitting `inheritEnv` | Structural: `run-validations.ts` is the **only** production construction site of `ProcessRunRequest` in the diff (confirmed — no other caller exists yet; composition-root wiring is E6's). Any future/existing caller that does not set `inheritEnv` reaches the adapter with the same conditional-spread shape as before this fix round (`env` overlay only, no `extendEnv` key), per the strict `=== false` gate above | confirmed — the backward-compatibility guarantee is structural (unreachable branch when omitted), not merely test-covered |
+
+**Empirical grounding re-confirmed**: design.md Amendment 1 A-1 documents a live probe showing `extendEnv:false` alone (no `env`) is a **silent no-op** in execa — the child still inherits the full parent environment. This is exactly why the guard in `process-run-request.ts` is load-bearing rather than defensive polish, and why AC-22(a)'s real-child adapter test (asserting a marker env var set on the *test* process is absent from the child's dumped `process.env`) is the correct proof, not a mocked assertion.
+
+## Regression Spot-Checks On The Original 21 ACs (fix round did not touch these code paths)
+
+| AC | Spot-check | Result |
+|---|---|---|
+| AC-1 | `run-review.ts:357-365` — hoisted pre-flight guarded by `validationsWillRun = deps.processRunner !== undefined && declarations.length > 0`, structurally unreachable when false; unchanged by ST-5 (fix round touched only env-construction, not this gate) | intact |
+| AC-9 | `run-review.ts:496-517` `classifyFailure` — `validation-failed` branch still lists exactly `InvalidValidationDeclarationError` and `InvalidProcessRequestError`; `ProcessSpawnError` still absent with its explanatory comment | intact |
+| AC-10 | `run-review.ts:357-382` — hoist still conditional on `validationsWillRun`; unaffected by the env change | intact |
+| AC-11 | `run-review.test.ts:740` — `exitCode: 1` case still present and passing (part of the 500) | intact |
+| AC-12 | `run-validations.ts:356-359` — `ProcessSpawnError` still the only class caught inline, never rethrown; `run-review.test.ts:771` (`spawn-failed` string) still present | intact |
+| AC-13 | `run-review.test.ts:780,794` — `timedOut: true` case and `timedOut=true` assertion still present | intact |
+
+`npm test`'s 500/500 (up from 494, exactly the 6 new ST-5 cases: 2 core `process-run-request` + 1 core `run-validations` + 2 adapters `ProcessRunner.contract` + 1 adapters `process-runner-exec` real-child) is itself evidence no existing test regressed.
+
+## Full 22-AC Coverage Table
+
+AC-1 through AC-21: unchanged from qa-2's coverage table above — each independently re-spot-checked this pass where flagged (AC-1, AC-9..AC-13, AC-20, AC-21) and found intact; none is discharged by code this fix round touched except AC-20's file-pin, which is re-verified fresh above under "Fresh Checks Run" against the amended (18-file) list.
+
+| AC-22 | Discharged By | Verified |
+|---|---|---|
+| AC-22 | `run-validations.ts:87,95-101,337,342-349` (construction) + `process-run-request.ts:42-46` (guard) + `process-runner-exec.ts:70-71` (adapter mapping) + `process-runner-exec.test.ts` real-child marker-absence case + `ProcessRunner.contract.ts` two new abstract cases + `run-validations.test.ts` fake-based wiring assertion | yes — every sub-site read directly this pass, not trusted from any prior report or test name |
+
+## Both Review Rounds' Disposition (audit summary)
+
+1. **Round 1** (proposal-stage `risk-007`, "low", accepted) → **qa-2's closeout** (`pass_with_warnings`, `completed`) → **PR #72's formal review** re-raised the identical mechanism as CRITICAL (R1-001, review-ledger.md), superseding the round-1 closure. User re-ratified via `cp-pr-review-r1-001-reopen`.
+2. **Round 2 fix** (ST-5, commit `93290f7`): `inheritEnv` field + pre-flight guard + `{PATH,HOME}` allowlist. Scoped adversarial re-review of the delta (`git diff 391f7d3..93290f7`) reported CLEAN across all 6 checked dimensions (review-ledger.md Fix Rounds table, round 2). This qa-3 pass independently re-derives the same conclusion from a fresh, full-scope read rather than trusting that scoped re-review's narrative — and concurs.
+
+## Verdict Rationale
+
+- All 22 ACs verify clean against current `HEAD` (`d992bf5`), each read directly from source and test bodies this pass — not from qa-2's, execution-log.md's ST-5 entry's, or review-ledger.md's narrative.
+- `npm run check` and `npm test` both fresh-green; the test count (500, up from 494 by exactly the 6 ST-5 cases) is itself corroborating evidence of no regression and of the fix's tests actually running.
+- The blast radius matches spec.md's amended AC-20 exactly: 18 files, verified by independent `git diff --stat`.
+- AC-22's security mechanism was verified at every layer named in the handoff — construction site, pre-flight guard's exact throw condition, and the adapter's strict `=== false` gate (ruling out the `!inheritEnv` regression risk explicitly) — by direct code read, not by trusting a test name.
+- The backward-compatibility guarantee (unchanged behavior for any caller omitting `inheritEnv`) is structural, not merely asserted: `run-validations.ts` is the diff's only production construction site, and the adapter's gate is unreachable for `undefined`/`true`.
+- No new findings surfaced. The two ledger `info` rows (R3-001, R4-001) and the three previously-accepted risks (risk-006, risk-007-narrowed, risk-008) remain the only residuals, all non-blocking.
+- **Verdict is `pass`** (not `pass_with_warnings`): unlike qa-2, there is no longer an open CRITICAL under active dispute — R1-001 is genuinely fixed and adversarially corroborated twice over (the scoped re-review plus this independent full pass). The residual info-tier ledger rows and consciously-accepted risks are the same class of non-blocking observation qa-2 already carried; they do not by themselves demote the verdict below `pass` now that the one open severe item is closed.
+
+## Explicit Statement On Readiness
+
+- **Ready for `lifecycle_status: completed`**: yes. No further fix stage, replanning, or `sddl-plan` detour required.
+- **Ready to push back to PR #72**: yes. The fix directly addresses the review's CRITICAL finding (env-leakage via a declared validation like `env`/`printenv`) with a mechanism proven by a real-child-process test (AC-22(a)) and a unit-level wiring test (AC-22(b)), backed by an empirical probe (design.md Amendment 1, A-1) that ruled out the naive `extendEnv:false`-alone footgun. `npm run check`/`npm test` are green and the blast radius is pinned and matches. Recommend updating PR #72 (or opening it, if not yet open) only on explicit user instruction per CLAUDE.md's PR-creation gate — this report is the evidence to attach when doing so.
+
+## State Sync Notes (qa-3)
+
+- `state.yaml` should record: `lifecycle_status: completed` (re-affirmed after the PR #72 fix round), qa-3 as the current final review entry, verdict `pass`, AC count `22/22`, and risk-007 annotated as narrowed (not closed) by AC-22. `open_risks` risk-006 and risk-008 unchanged. This QA worker does not itself touch `state.yaml` per its execution boundary — the orchestrator applies this.

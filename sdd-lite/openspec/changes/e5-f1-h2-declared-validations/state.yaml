@@ -196,6 +196,16 @@ stages:
       Independently re-verified by the orchestrator: git diff confined to the 4 named files, npm run
       check clean, full npm test 494/494 (up from 479), and the classifyFailure invariant re-confirmed
       by direct source read. No deviation from plan/spec/design.
+      ST-4 completed (closing gate, verification only, no new production files): npm run check 100%
+      clean (biome, tsc, depcruise 0 violations), full npm test 494/494. git diff --stat beb5d48..HEAD
+      -- src/ shows exactly the 11 pinned files, 1593 insertions(+)/8 deletions(-), nothing under
+      src/adapters/**, src/main/**, src/core/review/**, src/core/workspace/**. package.json/Makefile/
+      scripts grep over the full diff: 0 hits. Full end-to-end diff read as a final sanity pass found
+      no stray edits. Independently re-verified by the orchestrator: check and full test re-run clean,
+      diff --stat re-confirmed identical. Discharges AC-20 and AC-1's no-auto-detection clause. All 21
+      acceptance criteria now implemented and tested across ST-1..ST-4. Recommended next:
+      sddl-code-review in full-4r tier (~1590 insertions across 11 files touching core/run's hot
+      execution path -- matches the project's >400-changed-lines / hot-path triage rule).
   sddl-qa-review:
     status: in_progress
     notes: >-

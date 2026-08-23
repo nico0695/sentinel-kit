@@ -243,7 +243,7 @@ artifacts:
 review_summary:
   mode: 4r
   verdict: pass_with_warnings
-  round: 1
+  round: 2
   counts:
     confirmed: 0
     suspect: 0
@@ -263,7 +263,17 @@ review_summary:
     deduped): no cap on declaration count or aggregate stage duration. No refuter pass run: the sole
     CRITICAL/BLOCKER candidate (R1-001) is evidence_class deterministic, which the protocol never
     routes to the refuter. Zero open severe findings after user ratification; all remaining rows info.
-  reported_at: "2026-08-23T17:20:00Z"
+    ROUND 2 (fix-round scoped re-review, 2026-08-23T20:45): PR #72's formal "Changes Requested" review
+    (repo owner, verdict FAIL) re-raised R1-001's exact mechanism, superseding round 1's wont-fix
+    closure. Fixed via ST-5 (design.md Amendment 1): additive ProcessRunRequest.inheritEnv?:boolean
+    (default true, preserves [E5.F1.H1] D2), a mandatory pre-flight guard (extendEnv:false alone is a
+    silent no-op in execa, confirmed by live probe), and a strict {PATH, HOME} allowlist wired into
+    every declared validation's child process in run-validations.ts. Adversarial scoped re-review of
+    the fix delta only (git diff 391f7d3..93290f7, 9 files, never re-litigating the original diff):
+    CLEAN across all 6 checked dimensions. Orchestrator independently re-verified the single
+    construction site and guard placement by direct code read. R1-001: wont-fix -> fixed. check clean,
+    full suite 500/500 (up from 494).
+  reported_at: "2026-08-23T20:45:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/review-ledger.md
 checkpoints:
   - id: cp-pr-review-r1-001-reopen

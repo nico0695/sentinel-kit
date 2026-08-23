@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -131,7 +131,30 @@ stages:
       the test-only fake-process-runner.ts, inside src/core/run/ which AC-20 does not pin.
       Zero blocking open technical questions.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T07:00:00Z"
+    completed_at: "2026-08-23T07:30:00Z"
+    notes: >-
+      plan.md written with 4 ordered, individually-approvable stages (ST-1..ST-4), each carrying
+      scope, discharged ACs, dependencies and a targeted validation command. ST-1 lands the
+      additive validationTimeoutMs config field in isolation (config-schemas.ts + new
+      config-schemas.test.ts, AC-5) with no forward code dependency inside this story. ST-2 lands
+      the entire pure-function surface self-contained (run-validations.ts, run-errors.ts's new
+      error, the barrel exports for it, the shared fake-process-runner.ts, and
+      run-validations.test.ts), discharging AC-2/4(default half)/6/7/8/14/15/18/21 with zero
+      dependency on runReview. ST-3 is the wiring stage, binding run-review.ts and
+      history/ports/run-metadata-schemas.ts's RunStage/RUN_STAGES edit into one stage per
+      design's constraint 1 (typecheck is red between them, AC-19's exhaustiveness guard), and
+      depending on ST-2 for the fake and the evidence format per design's constraint 2 (the
+      pure-function stage precedes the wiring stage); discharges
+      AC-1/3/4(guard half)/9/10/11/12/13/16/17/19. ST-4 is the closing gate: full npm run check +
+      npm test, AC-20's pinned-untouched-files verification via git diff --stat against the
+      frozen story base, and AC-1's package.json/Makefile grep. Each stage carries a
+      mutation-testing note for its load-bearing pure logic (AC-7's rejection set and the
+      AC-14/AC-15 formatter/window in ST-2; the RUN_STAGES exhaustiveness guard and the
+      ProcessSpawnError exclusion in ST-3), following the e5-f1-h1-process-runner precedent.
+      objective is new-feature, not planner, so this is not a terminal stop; next_action routes
+      to sddl-executor pending user stage_approval for ST-1.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -349,18 +372,14 @@ open_risks:
       E6 should consider surfacing "validations declared but no runner wired" as a visible warning.
     severity: medium
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: wait_for_approval
+  target: sddl-executor
   summary: >-
-    Run sddl-plan against design.md. The design is complete with zero blocking open technical
-    questions: seven decisions (D-1..D-7), exact signatures for runValidations /
-    validateValidationDeclarations / the three private pure functions, the stage-1 hoist and
-    stage-5 call sites written out, the validationTimeoutMs flow traced from zod through to
-    ProcessRunRequest.timeoutMs, an affected-areas table (11 files: 3 new, 8 modified) with line
-    estimates, and a per-AC coverage map. Planning should stage the work so the cross-module
-    compile-time ripple (RunStage + RUN_STAGES, AC-19) lands together with the run-review.ts edit
-    in one stage -- typecheck is red between the two -- and should keep the pure-function stage
-    (run-validations.ts + its unit suite) ahead of the runReview wiring stage, since the wiring
-    tests consume the fake and the evidence format the first stage establishes.
+    plan.md is complete and execution-ready: 4 stages (ST-1 config schema, ST-2 pure-function
+    surface, ST-3 runReview + RunStage wiring bundled per constraint 1, ST-4 closing gate),
+    each with scope, discharged ACs, dependencies, a targeted validation command, and
+    mutation-testing notes for the load-bearing pure logic. Awaiting user stage_approval for
+    ST-1 before sddl-executor begins. objective is new-feature, so this is not a planner
+    terminal stop.
 created_at: "2026-08-23T03:50:00Z"
-updated_at: "2026-08-23T06:45:00Z"
+updated_at: "2026-08-23T07:30:00Z"

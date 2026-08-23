@@ -17,8 +17,8 @@ complexity_assessment:
     caller that does not exist yet.
   confidence: high
   recorded_at: "2026-08-22T23:10:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -91,16 +91,19 @@ stages:
   sddl-executor:
     status: completed
     started_at: "2026-08-23T00:15:00Z"
-    completed_at: "2026-08-23T01:35:00Z"
+    completed_at: "2026-08-23T02:15:00Z"
     notes: >-
-      All 4 stages completed and independently re-verified at every step (npm run check + npm
+      All 5 stages completed and independently re-verified at every step (npm run check + npm
       test re-run fresh per stage, diff-scope confirmed via git status/diff, source read
       directly -- never merely trusted from the executor workers' self-reports). ST-4's closing
       gate independently re-confirmed against the correct merge-base (origin/main at 8c080cb,
       post-[E5.F2.H2]-merge): full story diff is exactly 11 files under src/ (680 insertions, 3
       deletions), zero touch to src/core/run/run-review.ts, src/adapters/driven/git/**, or
       src/adapters/driven/engines/** (AC-15), zero execa import under src/core/** (grep-confirmed
-      beyond depcruise's 0 violations). 400 tests green, up from 375 at session start.
+      beyond depcruise's 0 violations). ST-5 (fix stage for review-ledger R4-001) also completed
+      and independently re-verified: diff scoped to exactly the 4 named files, regression test
+      assertions read directly (toMatchObject on cause), mutation proof narration cross-checked.
+      401 tests green, up from 375 at session start.
   sddl-code-review:
     status: pending
   sddl-qa-review:
@@ -280,10 +283,10 @@ decisions:
     recorded_at: "2026-08-22T23:45:00Z"
 review_summary:
   mode: 4r
-  verdict: fail
-  round: 0
+  verdict: pass_with_warnings
+  round: 1
   counts:
-    confirmed: 1
+    confirmed: 0
     suspect: 0
     escalated: 0
     info: 6
@@ -298,9 +301,11 @@ review_summary:
     contract) plus 1 WARNING (no process-group kill, so a forking command's grandchildren can
     outlive the timeout). 0 refuter passes -- the sole CRITICAL is evidence_class:deterministic,
     independently re-verified by the orchestrator via direct code reading before merging (per
-    ledger contract, deterministic findings are never refuted). 1 open severe finding
-    (R4-001) requires a fix round before this change can close.
-  reported_at: "2026-08-23T01:55:00Z"
+    ledger contract, deterministic findings are never refuted). R4-001 fixed in ST-5
+    (user-authorized at cp-review-gate), independently verified by mutation. 0 open severe
+    findings; 6 info-tier rows remain, non-blocking, optional follow-up (R4-002/risk-007 in
+    particular).
+  reported_at: "2026-08-23T02:15:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f1-h1-process-runner/review-ledger.md
 open_risks:
   - id: risk-001
@@ -365,9 +370,11 @@ open_risks:
       review budget favors a narrow fix round for the one CRITICAL finding only.
     severity: low
 next_action:
-  kind: run_stage
-  target: sddl-executor
+  kind: ask_user
+  target: sddl-qa-review
   summary: >-
-    ST-5 (R4-001 fix) approved and dispatched to a fresh executor worker via the Agent tool.
+    ST-5 complete and independently re-verified (R4-001 fixed, mutation-proven, 0 open severe
+    findings). Story fully implemented and reviewed. Recommend sddl-qa-review in final mode as
+    the closeout.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-23T02:05:00Z"
+updated_at: "2026-08-23T02:15:00Z"

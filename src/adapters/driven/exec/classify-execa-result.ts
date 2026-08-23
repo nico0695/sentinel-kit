@@ -25,6 +25,15 @@ export interface ExecaLikeResult {
   readonly isMaxBuffer: boolean;
   /** Present on a genuine spawn-failure error (e.g. "ENOENT", "EACCES"). */
   readonly code?: string;
+  /**
+   * Identifying context for a genuine spawn failure (R4-001) — carried
+   * through into `ProcessSpawnError`'s message/`cause` so an operator can
+   * tell which binary/args/cwd actually failed without inspecting the raw
+   * execa result.
+   */
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
 }
 
 /**
@@ -48,7 +57,7 @@ export function classifyExecaResult(
   // classification that tried to key on it would not type-check.
   if (result.exitCode === undefined && result.signal === undefined) {
     throw new ProcessSpawnError(
-      `process failed to spawn${result.code !== undefined ? ` (${result.code})` : ""}`,
+      `process failed to spawn: ${result.command}${result.code !== undefined ? ` (${result.code})` : ""}`,
       { cause: result },
     );
   }

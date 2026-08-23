@@ -15,6 +15,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       exitCode: 0,
       isMaxBuffer: false,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     expect(classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10)).toEqual({
@@ -37,6 +40,9 @@ describe("classifyExecaResult", () => {
       stderr: "boom",
       exitCode: 1,
       isMaxBuffer: false,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
@@ -51,6 +57,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       signal: "SIGKILL",
       isMaxBuffer: false,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
@@ -66,6 +75,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       isMaxBuffer: false,
       code: "ENOENT",
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     let thrown: unknown;
@@ -86,6 +98,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       isMaxBuffer: false,
       code: "EACCES",
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     expect(() => classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10)).toThrow(
@@ -100,10 +115,42 @@ describe("classifyExecaResult", () => {
       stdout: "",
       stderr: "",
       isMaxBuffer: false,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     expect(() => classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10)).toThrow(
       ProcessSpawnError,
+    );
+  });
+
+  it("populates ProcessSpawnError's cause and message with command/args/cwd (R4-001)", () => {
+    const result: ExecaLikeResult = {
+      stdout: "",
+      stderr: "",
+      isMaxBuffer: false,
+      code: "ENOENT",
+      command: "nonexistent-binary-xyz",
+      args: ["--flag", "value"],
+      cwd: "/some/test/dir",
+    };
+
+    let thrown: unknown;
+    try {
+      classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ProcessSpawnError);
+    expect((thrown as ProcessSpawnError).cause).toMatchObject({
+      command: "nonexistent-binary-xyz",
+      args: ["--flag", "value"],
+      cwd: "/some/test/dir",
+    });
+    expect((thrown as ProcessSpawnError).message).toContain(
+      "nonexistent-binary-xyz",
     );
   });
 
@@ -113,6 +160,9 @@ describe("classifyExecaResult", () => {
       stderr: "short",
       exitCode: 0,
       isMaxBuffer: true,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
@@ -127,6 +177,9 @@ describe("classifyExecaResult", () => {
       stderr: "x".repeat(BUDGET),
       exitCode: 0,
       isMaxBuffer: true,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
@@ -141,6 +194,9 @@ describe("classifyExecaResult", () => {
       stderr: "y".repeat(BUDGET),
       exitCode: 0,
       isMaxBuffer: true,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(result, BUDGET, TIMEOUT_MS, 10);
@@ -155,6 +211,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       signal: "SIGTERM",
       isMaxBuffer: true,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(
@@ -174,6 +233,9 @@ describe("classifyExecaResult", () => {
       stderr: "",
       signal: "SIGKILL",
       isMaxBuffer: false,
+      command: "some-command",
+      args: [],
+      cwd: "/tmp",
     };
 
     const classified = classifyExecaResult(

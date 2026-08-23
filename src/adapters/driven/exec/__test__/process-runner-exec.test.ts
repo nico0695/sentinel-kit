@@ -190,6 +190,19 @@ describe("real-child: spawn failures (AC-14)", () => {
     await expect(rejection).rejects.toMatchObject({
       cause: expect.anything(),
     });
+
+    let thrown: unknown;
+    try {
+      await rejection;
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as ProcessSpawnError).cause).toMatchObject({
+      command: filePath,
+      args: [],
+      cwd: process.cwd(),
+    });
+    expect((thrown as ProcessSpawnError).message).toContain(filePath);
   });
 
   it("rejects with ProcessSpawnError for a cwd that does not exist on disk", async () => {
@@ -199,14 +212,25 @@ describe("real-child: spawn failures (AC-14)", () => {
     );
 
     const runner = createExecProcessRunner();
-    await expect(
-      runner.run({
-        command: process.execPath,
-        args: ["-e", "process.exit(0)"],
-        cwd: missingDir,
-        timeoutMs: 5000,
-      }),
-    ).rejects.toBeInstanceOf(ProcessSpawnError);
+    const rejection = runner.run({
+      command: process.execPath,
+      args: ["-e", "process.exit(0)"],
+      cwd: missingDir,
+      timeoutMs: 5000,
+    });
+
+    await expect(rejection).rejects.toBeInstanceOf(ProcessSpawnError);
+
+    let thrown: unknown;
+    try {
+      await rejection;
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as ProcessSpawnError).cause).toMatchObject({
+      command: process.execPath,
+      cwd: missingDir,
+    });
   });
 });
 

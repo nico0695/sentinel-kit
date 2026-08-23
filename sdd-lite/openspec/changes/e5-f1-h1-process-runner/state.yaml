@@ -17,8 +17,8 @@ complexity_assessment:
     caller that does not exist yet.
   confidence: high
   recorded_at: "2026-08-22T23:10:00Z"
-lifecycle_status: reviewing
-current_stage: sddl-code-review
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -75,7 +75,7 @@ stages:
   sddl-plan:
     status: completed
     started_at: "2026-08-23T00:00:00Z"
-    completed_at: "2026-08-23T00:10:00Z"
+    completed_at: "2026-08-23T02:05:00Z"
     notes: >-
       plan.md written, 4 stages following design.md's own recommended sequencing: ST-1 core
       types + guard-clause pre-flight + two new errors (pure, no execa/fs); ST-2 the pure
@@ -84,7 +84,10 @@ stages:
       wiring the pinned execa option bag to the classifier, plus the sixth ProcessRunner.contract.ts;
       ST-4 the real-child suite (AC-1's reaping is the load-bearing case) as the closing gate,
       re-verifying AC-15. No stage wires the port into runReview or any caller -- ships uncalled,
-      matching both prior E5 stories' precedent.
+      matching both prior E5 stories' precedent. All four completed and independently re-verified.
+      ST-5 appended post-review (R4-001 fix, cp-review-gate authorized): ProcessSpawnError.cause
+      grows command/args/cwd so it actually honors run-errors.ts's own "raw error preserved for
+      observability" contract.
   sddl-executor:
     status: completed
     started_at: "2026-08-23T00:15:00Z"
@@ -208,8 +211,35 @@ checkpoints:
       Fix R4-001 now via a new sddl-plan fix stage (rerun plan to insert one bounded stage,
       stage_approval, then sddl-executor), or defer and close with it open?
     free_input_allowed: true
+    response:
+      free_text: "si, corré el plan para arreglar R4-001"
+      responded_at: "2026-08-23T02:00:00Z"
     created_at: "2026-08-23T01:55:00Z"
+    resolved_at: "2026-08-23T02:00:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Approval to execute ST-5 -- the R4-001 fix stage: ProcessSpawnError.cause grows
+      command/args/cwd in both classify-execa-result.ts's ExecaLikeResult and
+      process-runner-exec.ts's object construction, with regression tests at both the pure
+      classifier and the real-process boundary.
+    question: "Proceed with ST-5?"
+    free_input_allowed: true
+    response:
+      free_text: "si, corré el plan para arreglar R4-001"
+      responded_at: "2026-08-23T02:00:00Z"
+    created_at: "2026-08-23T02:00:00Z"
+    resolved_at: "2026-08-23T02:00:00Z"
 decisions:
+  - id: dec-st5-approval
+    checkpoint_id: cp-st5-approval
+    free_text: "si, corré el plan para arreglar R4-001"
+    rationale: >-
+      Single user message both authorized rerunning sddl-plan (which appended ST-5) and
+      approved executing it, matching [E5.F2.H2]'s S23 precedent where the review_gate
+      authorization and the fix-stage approval were the same user turn.
+    recorded_at: "2026-08-23T02:00:00Z"
   - id: dec-st4-approval
     checkpoint_id: cp-st4-approval
     free_text: "si, avanza con ST-4"
@@ -335,11 +365,9 @@ open_risks:
       review budget favors a narrow fix round for the one CRITICAL finding only.
     severity: low
 next_action:
-  kind: ask_user
-  target: sddl-plan
+  kind: run_stage
+  target: sddl-executor
   summary: >-
-    full-4r review complete: 1 confirmed CRITICAL (R4-001, deterministic, independently
-    re-verified), 6 info-tier findings. Awaiting review_gate decision: fix R4-001 via a new
-    sddl-plan fix stage (in scope, active change), or defer.
+    ST-5 (R4-001 fix) approved and dispatched to a fresh executor worker via the Agent tool.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-23T01:55:00Z"
+updated_at: "2026-08-23T02:05:00Z"

@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -157,6 +157,12 @@ checkpoints:
       cross-module diff into the history module.
     free_input_allowed: true
     created_at: "2026-08-23T04:55:00Z"
+    response:
+      free_text: >-
+        Ratified by the user after the directed adversarial re-analysis (revision 2). The spec is
+        approved as amended by R2-1..R2-8; sddl-design may proceed. No ratified decision was
+        reopened and no Q-class item remained open at ratification.
+      responded_at: "2026-08-23T05:50:00Z"
 decisions:
   - id: dec-001
     checkpoint_id: cp-proposal-validation

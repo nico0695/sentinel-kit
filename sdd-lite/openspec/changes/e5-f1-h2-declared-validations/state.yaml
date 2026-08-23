@@ -55,7 +55,7 @@ stages:
   sddl-spec:
     status: completed
     started_at: "2026-08-23T04:25:00Z"
-    completed_at: "2026-08-23T04:55:00Z"
+    completed_at: "2026-08-23T05:40:00Z"
     notes: >-
       spec.md written with 21 acceptance criteria, In Scope / Out of Scope / Non-Goals tables,
       an Expected Behavior table, a Downstream Constraints section and a pinned-untouched-files
@@ -85,6 +85,18 @@ stages:
       never duplicates it); risk-006 (process-group kill) consciously inherited rather than
       escalated to a new backlog item, recorded as an accepted exposure and routed to the E5
       closing summary as a follow-up.
+      REVISION 2 (directed adversarial re-analysis, user-requested): eight F-class defects
+      found and fixed in spec.md -- R2-1 internal contradiction (AC-12 catch-all made dec-004's
+      InvalidProcessRequestError branch dead code; now ProcessSpawnError is the only per-entry
+      catch), R2-2 validationTimeoutMs zod hole (0/-5/1.5/2^31 all ACCEPTED by the schema,
+      confirmed by probe; stage-1 guard pinned mirroring run-review's MAX_TIMEOUT_MS pattern),
+      R2-3 AC-1/AC-10 conflict (hoisted check now conditional on stage 5 executing), R2-4/R2-5
+      byte-exactness gaps in AC-15/AC-14 (trailing-newline line-count semantics; assembly rule
+      pinned), R2-6 AC-5/AC-20 jointly unsatisfiable (new config-schemas.test.ts added to In
+      Scope), R2-7 worst-case element ceiling stated (~808K chars), R2-8 vacuous space-exclusion
+      wording. Plus 8 N-class notes (metacharacter set verified complete against POSIX
+      word-expansion; PRD 3.1-E conformance verified verbatim). No ratified decision reopened;
+      zero Q-class items. Orchestrator independently re-ran the zod probe and confirmed R2-2.
   sddl-design:
     status: pending
   sddl-plan:

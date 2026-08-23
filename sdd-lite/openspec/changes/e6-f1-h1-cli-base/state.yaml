@@ -122,6 +122,7 @@ stages:
       - S3
       - S4
       - S5
+      - S6
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -198,6 +199,34 @@ stages:
       against ResolveReviewRequestFlags.timeoutMs (no review option is declared in S5), and
       risk-e6h1-009 stays with the S6/S7 renderers since format-error.ts renders no repo name.
       S6-S11 were not started. Details in execution-log.md.
+      S6 (repo + runs command groups) completed under the same cp-stage-approval-s5-s7 batch. New
+      commands/repo-commands.ts (repo add -> registerRepo, repo list -> listRepos) and
+      commands/runs-commands.ts (runs list -> listRuns, runs show -> getRun), new
+      render/format-repos.ts (formatRepoLine: alias, url, baseBranch, harness; formatRegisterOutcome:
+      alias, registered|already-registered, localPath) and render/format-runs.ts
+      (formatRunSummaryLine: 11 fields; formatRunRecordBlock: 20 scalar key/value lines then
+      count-prefixed diffWarnings / validationOutput / engineOutput sections), all tab-separated with
+      a literal - for absent optionals and no colour and no --json (D4/D6). Both groups registered by
+      turning commandRegistrars into [registerRepoCommands, registerRunsCommands] -- create-cli.ts is
+      the only pre-existing file modified and its signature, exitOverride/configureOutput ordering and
+      catch-all are untouched. 30 new adapter tests reusing S5's cli-test-doubles.ts, no new double.
+      risk-e6h1-009 handled by construction: the renderers take the requested alias as a parameter and
+      never read RunSummary.repoName / RunRecord.repoName (grep confirms repoName appears only on the
+      request side), no denormalising helper was added and D7's input-only scope is unchanged; two
+      regression guards assert owner__repo never reaches stdout and were mutation-verified (reading
+      the stored field made exactly those tests fail; the mutation was reverted). A-level calls: repo
+      add prints entry.localPath with - when absent rather than reconstructing ${clonesDir}/${alias}
+      (that cascade is core's); the repo add record carries a status field so already-registered is
+      honest and still machine-readable; runs show reports promptLineCount instead of dumping the
+      prompt; multi-line values use count-prefixed sections rather than banners; neither command
+      sorts or filters; an empty result prints nothing on stdout and one note on stderr, exit 0.
+      Observation carried to QA/S7: RunNotFoundError's message is composed in core from the storage
+      key, so a failed runs show renders Run not found: owner__repo/<id> on stderr -- a core
+      message-composition concern outside S6's scope and not papered over in the adapter, since AC-13
+      forbids per-error-type branching there. Gates after S6: npm run check exit 0 (biome 137 files,
+      tsc clean, depcruise 92 modules / 203 dependencies, 0 violations) and npm test exit 0 with 610
+      tests across 36 files, up from 580/34, all 580 pre-existing tests still passing. S7-S11 were not
+      started. Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -671,6 +700,22 @@ open_risks:
     severity: medium
     status: open
     owner_stage: S6/S7
+  - id: risk-e6h1-010
+    summary: >-
+      Surfaced by S6 and confirmed by the orchestrator. RunNotFoundError composes its message in
+      core as `Run not found: ${repoName}/${id}`, and it is constructed by the DRIVEN adapter
+      (src/adapters/driven/storage/run-store-fs.ts:361 and :408), which only ever receives the
+      normalised storage key -- getRun passes toRunStorageKey(request.repoName) down. So a failed
+      `runs show owner/repo x` prints `Run not found: owner__repo/x` on stderr, leaking D7's
+      normalisation to the user on the error path. The happy path is clean: S6's renderers echo
+      the requested alias by construction and never read the stored repoName.
+      Options if fixed: (a) getRun catches RunNotFoundError and rethrows carrying the original
+      alias -- a fourth core behaviour change, same class as D7; (b) branch per error type in the
+      CLI, which AC-13 forbids; (c) accept it as a cosmetic leak on an error path only.
+      Not fixed in S6: outside its scope, and the choice is the user's.
+    severity: low
+    status: open
+    owner_stage: user decision, candidate for S9 or a follow-up story
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
@@ -682,13 +727,14 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S5 (CLI shell) is complete: `npm run check` exit 0 (biome 131 files, depcruise 88 modules /
-    192 dependencies, 0 violations) and `npm test` exit 0 (580 tests / 34 files, up from 551/31,
-    all pre-existing tests passing), with the F-1 addendum applied and mutation-verified. Run
-    sddl-executor on S6 (`repo add`/`repo list`, `runs list`/`runs show` and their formatters)
-    under the same cp-stage-approval-s5-s7 batch, then S7, one stage per invocation. S6/S7 must
-    register their groups via `commandRegistrars` in `create-cli.ts`, echo the alias the user
-    typed rather than the stored `owner__repo` (risk-e6h1-009), and S7 must parse commander's
-    string `--timeout` to a number. Stop after S7 and present the accumulated diff before S8-S9.
+    S6 (repo + runs commands and their formatters) is complete: `npm run check` exit 0 (biome 137
+    files, depcruise 92 modules / 203 dependencies, 0 violations) and `npm test` exit 0 (610 tests /
+    36 files, up from 580/34, all pre-existing tests passing). Both groups are registered through
+    `commandRegistrars` and risk-e6h1-009 is guarded by two mutation-verified regression tests. Run
+    sddl-executor on S7 (`review` command + render/format-review.ts) under the same
+    cp-stage-approval-s5-s7 batch; S7 must add its registrar to `commandRegistrars`, parse
+    commander's string `--timeout` into a number, call runReview then persistRun exactly once and
+    read no `result.state` for exit purposes (AC-12). Stop after S7 and present the accumulated diff
+    before S8-S9; QA review stays deferred until then.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T06:30:00Z"
+updated_at: "2026-08-24T07:30:00Z"

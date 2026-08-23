@@ -15,7 +15,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S3 | D7 alias → storage-key normalisation inside `core/history` | yes | completed |
 | S4 | `persistRun` use case (D1/AC-5) | yes | completed |
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | completed |
-| S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | pending |
+| S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | completed |
 | S7 | `review` command | yes | pending |
 | S8 | Sentinel home resolution (D2/AC-7) | yes | pending |
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | pending |
@@ -537,3 +537,191 @@ executor invocation; it should register its two groups by adding registrars to `
 in `create-cli.ts` and must echo the alias the user typed rather than the stored `repoName`
 (`risk-e6h1-009`). QA review stays deferred until the S5-S7 batch is complete, per the batch
 approval.
+
+## S6 — `repo add`/`repo list` and `runs list`/`runs show` commands + their formatters
+
+- status: completed
+- approval: `cp-stage-approval-s5-s7` (user, S5-S7 approved as a batch, one stage per executor
+  invocation).
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `41421c9`, working tree clean;
+  `npm run check` exit 0 (biome 131 files, depcruise 88 modules / 192 dependencies, 0 violations)
+  and `npm test` exit 0 (580 tests / 34 files) before the stage, matching S5's closing numbers.
+
+### Planned scope (plan.md, S6 row)
+
+`commands/repo-commands.ts`, `commands/runs-commands.ts`, `render/format-repos.ts`,
+`render/format-runs.ts`, `__test__/{repo,runs}.test.ts`, plus registering both groups through the
+`commandRegistrars` seam S5 left in `create-cli.ts`. Out of scope and untouched:
+`commands/review-command.ts` and `render/format-review.ts` (S7), everything under `src/main/**`
+(S8/S9), and every core module (this stage adds no core surface).
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driving/cli/commands/repo-commands.ts` | New. `registerRepoCommands(program, deps)` → `repo add` (one call to `registerRepo`) and `repo list` (one call to `listRepos`). Each option and positional carries a description (AC-2). No lookup, no cascade, no sorting, no adapter construction; typed core errors are left to propagate into the shell's catch-all. |
+| `src/adapters/driving/cli/commands/runs-commands.ts` | New. `registerRunsCommands(program, deps)` → `runs list` (one call to `listRuns`) and `runs show` (one call to `getRun`). Both echo the alias the caller typed into the rendered output (`risk-e6h1-009`). |
+| `src/adapters/driving/cli/render/format-repos.ts` | New. `formatRepoLine(alias, entry)` → `alias⇥url⇥baseBranch⇥harness`; `formatRegisterOutcome(result)` → `alias⇥{registered\|already-registered}⇥localPath`. Field-name tuples `REPO_LINE_FIELDS` / `REGISTER_OUTCOME_FIELDS` exported so the tests assert the contract rather than a hand-copied string. |
+| `src/adapters/driving/cli/render/format-runs.ts` | New. `formatRunSummaryLine(repoAlias, summary)` (11 fields, `RUN_SUMMARY_FIELDS`) and `formatRunRecordBlock(repoAlias, id, record)` (20 scalar `key⇥value` lines in `RUN_RECORD_FIELDS` order, then three count-prefixed sections). Absent optionals render as the literal `-`; tabs/newlines inside a scalar value are collapsed so one record stays one line. |
+| `src/adapters/driving/cli/create-cli.ts` | `commandRegistrars` goes from `[]` to `[registerRepoCommands, registerRunsCommands]`, plus the two imports and a doc-comment update. **The only pre-existing file modified**; `createCli`'s signature, `exitOverride`/`configureOutput` ordering and catch-all are untouched. |
+| `src/adapters/driving/cli/__test__/repo.test.ts` | New. 13 tests (AC-1, AC-2, AC-3, AC-10, AC-13). |
+| `src/adapters/driving/cli/__test__/runs.test.ts` | New. 17 tests, including the two `risk-e6h1-009` regression guards. |
+
+No new test double was written: both suites drive the CLI through S5's
+`__test__/cli-test-doubles.ts` (`createTestDeps`, `createFakeUseCases`, capturing `CliIo`, `argv`).
+`review` was not created, `src/main/**` was not touched, and no file under `src/core/**` was read
+for anything but its exported types.
+
+### How `risk-e6h1-009` was handled
+
+The renderers never read `RunSummary.repoName` / `RunRecord.repoName`. Both `formatRunSummaryLine`
+and `formatRunRecordBlock` take the **requested alias** as their first parameter, and the commands
+pass the positional `<repo>` the user typed. `grep -n "repoName" src/adapters/driving/cli/render
+src/adapters/driving/cli/commands` returns matches only on the **request** side
+(`listRuns({ repoName: repo })`, `getRun({ repoName: repo, id })`) — nothing reads the field back
+off a store result. No denormalising helper was added anywhere; D7's input-only scope is unchanged.
+
+Two explicit regression guards (`runs list` and `runs show`) assert that `owner__repo` appears
+nowhere in stdout while the fixture the fake use case returns carries exactly that value in its
+`repoName`. The guards were mutation-verified rather than assumed: with `formatRunSummaryLine`
+temporarily reading `summary.repoName` and `formatRunRecordBlock` reading `record.repoName`, the
+suite failed on exactly those tests plus the two field-order assertions:
+
+```
+     × passes the alias verbatim to listRuns and prints one record per run 13ms
+     × echoes the alias the user typed, never the stored storage key 2ms
+     × prints the record as key/value lines on stdout in a fixed order 1ms
+     × echoes the alias the user typed, never the stored storage key 3ms
+      Tests  4 failed | 12 passed (16)
+```
+
+The mutation was reverted and the suite re-run green (`Test Files 5 passed (5)`,
+`Tests 59 passed (59)`).
+
+**Observation carried forward (not fixed here).** `RunNotFoundError`'s message is composed in core
+as `Run not found: ${repoName}/${id}` from the value the *store* was called with — the normalised
+storage key. So a `runs show owner/repo missing` failure renders `Run not found: owner__repo/missing`
+on stderr. That is a core message-composition concern in `history`, not a renderer one (AC-13
+forbids per-error-type branching in the adapter, so the CLI cannot rewrite it), and fixing it would
+mean touching `getRun`/`RunStore` error construction — outside S6's approved scope. Recorded for
+QA/S7 rather than improvised.
+
+### Decisions taken in this stage
+
+- **A-level — `repo add` prints `entry.localPath`, rendering `-` when the registry holds none,
+  instead of reconstructing `${clonesDir}/${alias}`.** Spec's behaviour table says "prints alias +
+  resolved local path", but `registerRepo` only stores `localPath` when `--local-path` was given;
+  for a cloned repo the path is derived by core's cascade (`resolveReviewRequest`). Re-deriving it
+  in a renderer would put a domain rule inside the adapter (AC-1) and would silently disagree with
+  core the day the cascade changes. The record stays honest about what the registry actually holds.
+- **A-level — `repo add`'s stdout record carries a `status` field
+  (`registered` / `already-registered`).** The handoff requires `alreadyRegistered` to be reflected
+  honestly; a stderr-only note would leave a piped consumer unable to tell the two outcomes apart,
+  and a decorative stdout sentence would violate AC-10. A positional field keeps the line
+  machine-readable.
+- **A-level — `runs show` reports `promptLineCount` instead of printing the prompt.** The prompt
+  embeds the whole diff sent to the engine; dumping it by default would bury the review the command
+  exists to display, while omitting it silently would hide that it exists. The stored `prompt.md`
+  remains the place to read it.
+- **A-level — multi-line values are emitted as count-prefixed sections**
+  (`engineOutput⇥2` followed by exactly two raw lines; likewise `diffWarnings`, `validationOutput`).
+  A record cannot carry a newline on one tab-separated line, and a banner (`--- engine output ---`)
+  would be decoration on stdout. A declared count keeps the block parseable with no invented
+  separator and no data loss.
+- **A-level — neither command sorts or filters.** `RunStore.list` is already ascending by start
+  time and `repo list` renders the registry in its own key order; sorting in a command body is the
+  domain logic AC-1 forbids. A test pins each behaviour, so a later "helpful" sort cannot slip in.
+- **A-level — an empty result writes one note to stderr and nothing to stdout** (`No repositories
+  registered.` / `No runs recorded for "<alias>".`), exit 0. AC-10's stdout is records only.
+
+### Quick checks
+
+Planned validation (plan.md, S6 row): adapter tests with fake use cases only (AC-1); one test per
+command path (AC-3); results on stdout / diagnostics on stderr with a stable tab-separated field
+order and an empty registry printing nothing to stdout (AC-10); `partial`/`corrupt` entries
+rendering their status without fabricated fields; `--help` non-empty at each level (AC-2).
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 137 files in 125ms. No fixes applied.
+
+  ✔ no dependency violations found (92 modules, 203 dependencies cruised)
+  ```
+  131 → **137 files**, 88 → **92 modules**, 192 → **203 dependencies**, still **0 violations** — in
+  particular `adapters-isolated` (the new modules import `commander` and two core barrels, nothing
+  under `src/adapters/driven/**`), `core-no-adapters` and `wiring-only-in-main`. Biome required one
+  formatting pass (`biome check --write src/adapters/driving/cli`, 4 files reformatted) before the
+  gate went green; no lint rule was suppressed.
+- `npm test` → exit **0**:
+  ```
+  > vitest run
+
+   Test Files  36 passed (36)
+        Tests  610 passed (610)
+     Duration  8.51s
+  ```
+  580 → **610 tests** (+30) across 34 → 36 files. **All 580 pre-existing tests still pass**; the
+  only pre-existing file modified is `create-cli.ts`, and S5's `help`/`version`/`errors` suites are
+  unchanged and green against the now non-empty `commandRegistrars`.
+- Targeted re-run: `npx vitest run --project adapters src/adapters/driving/cli` → exit 0,
+  `Test Files 5 passed (5)`, `Tests 59 passed (59)` (29 → 59).
+- `grep -rn "\bprocess\b" src/adapters/driving/cli/commands src/adapters/driving/cli/render` →
+  no match. The stage adds no `process` access, no `node:*` import and no filesystem call.
+
+Coverage against the plan's S6 row, test by test:
+
+- **AC-3, one use case per path** — `repo add` maps `<url> --local-path --base-branch --harness`
+  onto a `RegisterRepoRequest` (asserted field by field), `repo list` → `listRepos`,
+  `runs list <repo>` → `listRuns({ repoName })`, `runs show <repo> <id>` →
+  `getRun({ repoName, id })`, each asserted on the captured request. Absent flags produce **absent
+  keys**, not `undefined` values (`Object.keys(request)` equals `["url"]`).
+- **AC-10** — `repo list` emits exactly `REPO_LINE_FIELDS.length` tab-separated fields per line with
+  `-` for an entry lacking `baseBranch`/`defaultHarness`; `runs list` emits exactly
+  `RUN_SUMMARY_FIELDS.length`; `repo add` emits one record and an empty stderr; an empty registry
+  and a repo with no runs both produce `io.out === []` with exactly one stderr note and exit 0.
+- **`partial`/`corrupt` without fabrication** — a `corrupt` and a `partial` summary render their
+  status in the `status` position and `["-","-","-","-","-","-","-"]` for the seven fields below it.
+- **`runs show`** — the 20 scalar keys arrive in `RUN_RECORD_FIELDS` order; a minimal
+  `engine-error` record renders `-` for `verdict`/`engine`/`diffFileCount`/`usageTotalTokens`/
+  `promptLineCount` and collapses a two-line `failure.message` into one field
+  (`engine binary not found`); the three sections render as `diffWarnings⇥1` … `engineOutput⇥2`
+  with the raw lines after each count, and as `⇥0` with no lines when the value is absent.
+- **AC-2** — `sentinel repo`, `repo add`, `repo list`, `sentinel runs`, `runs list`, `runs show`
+  each exit 0 with a non-empty `Usage: sentinel …` block on stdout and an empty stderr; `repo add`'s
+  help names all three options with their descriptions and the `<url>` positional's meaning;
+  `runs show`'s help describes both positionals; the `repo` group help lists `add` and `list`.
+- **AC-13** — `RepoNotFoundError` out of `registerRepo` and `RunNotFoundError` out of `getRun` each
+  render as exactly one stderr line equal to the error message, with nothing on stdout, no stack
+  frame (`not.toContain("at ")`) and a non-zero exit.
+- **Usage failures** — `repo add` with no `<url>` and `runs list` with no `<repo>` exit non-zero
+  without the use-case fake being called (the fakes throw if touched).
+
+Skipped: nothing. `e2e/**` stays empty (AC-14). No manual/integration evidence was produced — that
+is S10, and unit tests with fakes still cannot see `risk-e6h1-006`.
+
+### Notes and observations
+
+- AC-12 still holds structurally: no command in this stage reads a terminal state, and the exit
+  code continues to come from commander or the shell's catch-all.
+- The `commandRegistrars` seam worked exactly as S5 left it: registering the two groups needed no
+  change to `createCli`, `exitOverride`/`configureOutput` ordering or the catch-all, and S5's
+  "propagates the shell's output routing to registered subcommands" test now has real subjects.
+- S7 adds `registerReviewCommand` to the same array; the carry-forward that commander hands
+  `--timeout <ms>` over as a **string** is still open and unaddressed here (no numeric option
+  exists in S6).
+- No git side effects: no commit, stage, stash or branch operation.
+
+### Blockers
+
+None.
+
+### Next action
+
+S6 is complete and both gates are green. S7 (`review` command + `render/format-review.ts`) is
+approved under the same `cp-stage-approval-s5-s7` batch and is the next executor invocation. Per
+the batch approval, stop after S7 and present the accumulated diff before S8-S9; QA review stays
+deferred until then.

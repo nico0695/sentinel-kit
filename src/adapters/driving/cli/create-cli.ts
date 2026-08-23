@@ -22,6 +22,8 @@
 
 import { Command, CommanderError } from "commander";
 import type { CliDeps, CliIo } from "./cli-deps.js";
+import { registerRepoCommands } from "./commands/repo-commands.js";
+import { registerRunsCommands } from "./commands/runs-commands.js";
 import { formatErrorLine } from "./render/format-error.js";
 
 /** The adapter's public entry point: parse an argv, resolve an exit code. */
@@ -38,11 +40,14 @@ export interface SentinelCli {
 export type CommandRegistrar = (program: Command, deps: CliDeps) => void;
 
 /**
- * The command groups the real CLI exposes. Empty while only the shell exists;
- * the parameter on `createCli` lets a test drive the shell with its own
- * registrar instead.
+ * The command groups the real CLI exposes. `review` joins them in S7; the
+ * parameter on `createCli` lets a test drive the shell with its own registrar
+ * instead.
  */
-export const commandRegistrars: readonly CommandRegistrar[] = [];
+export const commandRegistrars: readonly CommandRegistrar[] = [
+  registerRepoCommands,
+  registerRunsCommands,
+];
 
 const ROOT_DESCRIPTION = "AI-powered code review orchestrator";
 

@@ -237,6 +237,27 @@ checkpoints:
       "/" and "\\", while deriveAlias in src/core/repos/register-repo.ts returns
       `${owner}/${repo}` for any URL with two or more non-empty segments. The two contracts are
       genuinely incompatible, not a misreading.
+  - id: cp-stage-approval-s1-s4
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      plan.md's eleven stages presented with their dependency order, the acceptance criteria each
+      satisfies, and the note that S9 (composition root) concentrates the blast radius and is
+      mitigated by sequencing rather than by tests of its own.
+    question: >-
+      How should the eleven execution stages be run -- one at a time, the core batch S1-S4, all
+      code stages S1-S9, or stop here?
+    status: resolved
+    resolution: batch-s1-s4
+    resolved_at: "2026-08-23T23:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User pre-authorised S1, S2, S3 and S4 as one approved batch: tooling prerequisites plus the
+      three core additions, each independently unit-testable and each required to end green on
+      `npm run check` + `npm test`. sddl-executor still runs ONE stage per invocation; the
+      batch removes the per-stage confirmation pause, not the per-stage execution boundary. The
+      orchestrator shows the accumulated diff before requesting approval for S5 (CLI adapter).
+      Stages S5-S11 remain unapproved.
 decisions:
   - id: D1
     level: C
@@ -498,12 +519,11 @@ open_risks:
       surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
     severity: medium
 next_action:
-  kind: checkpoint
-  target: stage_approval
+  kind: run_stage
+  target: sddl-executor
   summary: >-
-    plan.md is ready with eleven ordered stages. Take stage_approval to the user for S1 (tooling
-    prerequisites: commander, the widened adapters vitest include, the docs/testing.md line), then
-    run sddl-executor one approved stage per invocation. sddl-plan does not route to execution
-    itself.
+    cp-stage-approval-s1-s4 resolved: S1-S4 approved as a batch. Run sddl-executor on S1 (tooling
+    prerequisites), then S2, S3 and S4 in sequence, one stage per invocation, each ending green on
+    `npm run check` + `npm test`. Stop after S4 and present the accumulated diff before S5.
 created_at: "2026-08-23T00:00:00Z"
 updated_at: "2026-08-24T00:00:00Z"

@@ -8,11 +8,11 @@
 - tier: full-4r
 - scope: change:e5-f1-h2-declared-validations
 - round: 1
-- counts: confirmed=1 suspect=0 escalated=0 info=3
-- open_severe_findings: 1
+- counts: confirmed=0 suspect=0 escalated=0 info=4
+- open_severe_findings: 0
 - verdict: pass_with_warnings
-- next_action_digest: R1-001 (CRITICAL, deterministic, corroborated by direct code read) matches an already-accepted risk (risk-007, "low" severity, recorded during the proposal stage) but a fresh unbiased lens rated it CRITICAL — raised to the user as a review_gate rather than resolved unilaterally either way. R1-002 reconciled as spec-conformant (not a defect) against R3's independent reading of AC-14. 3 info-tier findings remain, non-blocking.
-- updated_at: "2026-08-23T17:10:00Z"
+- next_action_digest: R1-001 (CRITICAL, deterministic, corroborated by direct code read) matched an already-accepted risk (risk-007, "low" severity, recorded during the proposal stage). Raised as cp-review-gate-r1-001; the user ratified risk-007 as already-decided and correctly scoped — R1-001 closed wont-fix/info, no code change. R1-002 reconciled as spec-conformant (not a defect) against R3's independent reading of AC-14. Zero open severe findings. Recommend sddl-qa-review in final mode.
+- updated_at: "2026-08-23T17:20:00Z"
 
 ## Review History
 
@@ -32,7 +32,7 @@
 
 | Id | Lens/Judge | Location | Severity | Status | Evidence Class | Causal Disposition | Blocking | Claim | Proof Refs |
 |---|---|---|---|---|---|---|---|---|---|
-| R1-001 | risk | src/core/run/run-review.ts:425-436; src/core/run/ports/process-runner.ts:35 | CRITICAL | suspect | deterministic | behavior-activated | yes | A declared validation string with no rejected shell character (e.g. `env`, `printenv`) is not blocked by the tokenizer and will dump the reviewing process's own environment — potentially including the LLM API key and git/GitHub credentials — into stdout, which is captured verbatim and injected into the LLM prompt and persisted to disk. | src/core/run/run-review.ts:421-438; src/core/run/ports/process-runner.ts:24-36; src/core/run/run-validations.ts:75-155 (rejection set has no lexical concept of "dangerous command name", only shell metacharacters) |
+| R1-001 | risk | src/core/run/run-review.ts:425-436; src/core/run/ports/process-runner.ts:35 | CRITICAL | wont-fix | deterministic | behavior-activated | no | A declared validation string with no rejected shell character (e.g. `env`, `printenv`) is not blocked by the tokenizer and will dump the reviewing process's own environment — potentially including the LLM API key and git/GitHub credentials — into stdout, which is captured verbatim and injected into the LLM prompt and persisted to disk. | src/core/run/run-review.ts:421-438; src/core/run/ports/process-runner.ts:24-36; src/core/run/run-validations.ts:75-155 (rejection set has no lexical concept of "dangerous command name", only shell metacharacters). CLOSED at `cp-review-gate-r1-001`: the user ratified risk-007 (proposal stage, "low" severity) as already-decided and correctly scoped. No code change. |
 | R1-002 | risk | src/core/run/run-validations.ts:203-224, 257-268 | WARNING | info | deterministic | introduced | no | `truncated` does not reflect a per-line character cut, only a window-elision or an adapter capture flag. | src/core/run/run-validations.ts:216-224,257-268 | RECONCILED as spec-conformant, not a defect: spec.md AC-14 pins `truncated` as "true when either capture flag was set **or** D6's window elided anything" — a per-line char cut is neither; R3's independent reading of the same code reached the same conclusion, citing the identical AC-14 clause. No fix required. |
 | R3-001 | reliability | src/core/run/run-validations.ts (runValidations loop); src/core/run/process-run-request.ts:29-32 | WARNING | info | deterministic | introduced | no | `runValidations`/`validateProcessRunRequest` never enforce the `MAX_TIMEOUT_MS` (Node's 32-bit `setTimeout` ceiling) that `run-review.ts` documents and guards at its own call site; a future caller of the standalone `runValidations` (AC-18) that doesn't replicate that guard could pass an overflowing `timeoutMs` straight through. | src/core/run/run-review.ts:232-236,375-379; src/core/run/run-validations.ts; src/core/run/process-run-request.ts:29-32 |
 | R4-001 | resilience | src/core/run/run-validations.ts (sequential loop); src/core/repos/ports/config-schemas.ts:41,46 | WARNING | info | deterministic | introduced | no | Declared validations run strictly sequentially with only a per-entry timeout; no cap on declaration count or aggregate stage duration, so a config with many entries can hold `runReview` for an effectively unbounded total time. | src/core/run/run-validations.ts; src/core/repos/ports/config-schemas.ts:41,46; src/core/run/run-review.ts:232 (MAX_TIMEOUT_MS bounds only a single entry) |

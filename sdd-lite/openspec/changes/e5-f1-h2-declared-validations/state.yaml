@@ -234,7 +234,7 @@ review_summary:
   verdict: pass_with_warnings
   round: 1
   counts:
-    confirmed: 1
+    confirmed: 0
     suspect: 0
     escalated: 0
   summary: >-
@@ -243,15 +243,16 @@ review_summary:
     no rejected shell character (e.g. "env") is not blocked by the tokenizer and dumps the reviewing
     process's environment into the LLM prompt and disk; independently corroborated by the orchestrator
     reading REJECTED_SHELL_CHARS/isRejectedChar, and cross-matched against risk-007 (recorded during
-    the proposal stage, rated "low" with an explicit rationale). Fresh review disagrees with that
-    severity call -- raised to the user as review_gate rather than resolved unilaterally. R1-002
-    reconciled as spec-conformant against AC-14's exact text and R3's independent identical reading --
-    not a defect. R3 Reliability found R3-001 (WARNING): runValidations doesn't itself enforce
-    MAX_TIMEOUT_MS, relying on run-review.ts's call-site guard -- a future standalone caller (AC-18)
-    could skip it. R4 Resilience found R4-001 (WARNING, same substance as R1-003, deduped): no cap on
-    declaration count or aggregate stage duration. No refuter pass run: the sole CRITICAL/BLOCKER
-    candidate (R1-001) is evidence_class deterministic, which the protocol never routes to the refuter.
-  reported_at: "2026-08-23T17:10:00Z"
+    the proposal stage, rated "low" with an explicit rationale). Raised as cp-review-gate-r1-001; the
+    user ratified option A (risk-007 stands as already-decided) -- R1-001 closed as wont-fix/info, no
+    code change. R1-002 reconciled as spec-conformant against AC-14's exact text and R3's independent
+    identical reading -- not a defect. R3 Reliability found R3-001 (WARNING): runValidations doesn't
+    itself enforce MAX_TIMEOUT_MS, relying on run-review.ts's call-site guard -- a future standalone
+    caller (AC-18) could skip it. R4 Resilience found R4-001 (WARNING, same substance as R1-003,
+    deduped): no cap on declaration count or aggregate stage duration. No refuter pass run: the sole
+    CRITICAL/BLOCKER candidate (R1-001) is evidence_class deterministic, which the protocol never
+    routes to the refuter. Zero open severe findings after user ratification; all remaining rows info.
+  reported_at: "2026-08-23T17:20:00Z"
   ledger_path: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/review-ledger.md
 checkpoints:
   - id: cp-review-gate-r1-001
@@ -289,6 +290,12 @@ checkpoints:
       by default.
     free_input_allowed: true
     created_at: "2026-08-23T17:10:00Z"
+    response:
+      selected_option_id: A
+      free_text: >-
+        Ratified by the user: option A, risk-007 stands as already-decided and correctly scoped.
+        R1-001 closes as info/wont-fix, no code change. The change proceeds to sddl-qa-review final.
+      responded_at: "2026-08-23T17:20:00Z"
   - id: cp-proposal-validation
     type: phase_validation
     stage: sddl-proposal

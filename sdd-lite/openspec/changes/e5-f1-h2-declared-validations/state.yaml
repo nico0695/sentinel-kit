@@ -85,7 +85,51 @@ checkpoints:
       firm acceptance criteria), revise this phase, or stop?
     free_input_allowed: true
     created_at: "2026-08-23T04:05:00Z"
-decisions: []
+    response:
+      free_text: >-
+        Approved by the user. All four B-level recommendations ratified verbatim: DC-1 (c), DC-2 (a),
+        DC-3 (d), DC-4 (b). sddl-spec must encode them as firm acceptance criteria.
+      responded_at: "2026-08-23T04:20:00Z"
+decisions:
+  - id: dec-001
+    checkpoint_id: cp-proposal-validation
+    selected_option_id: DC-1-c
+    rationale: >-
+      DC-1: validations run in a standalone, independently unit-testable runValidations use case
+      that runReview calls at its stage 5 when the optional deps.processRunner is present. Rejected:
+      folding the logic into runReview only (buries the never-aborts guarantee inside the pipeline
+      try) and standalone-only (makes the "visible in the persisted prompt" criterion depend on a
+      CLI caller that does not exist until E6). Level B, decided by the user.
+    recorded_at: "2026-08-23T04:20:00Z"
+  - id: dec-002
+    checkpoint_id: cp-proposal-validation
+    selected_option_id: DC-2-a
+    rationale: >-
+      DC-2: keep RepoEntry.validations as string[] and satisfy the per-script timeout criterion with
+      one additive optional validationTimeoutMs field on the config. Rejected: widening validations to
+      a (string | object)[] union, which is the better long-term shape but re-litigates a public config
+      format one story after it shipped; and a hard-coded constant, which meets the criterion only
+      technically and gives the user no control. Level B, decided by the user.
+    recorded_at: "2026-08-23T04:20:00Z"
+  - id: dec-003
+    checkpoint_id: cp-proposal-validation
+    selected_option_id: DC-3-d
+    rationale: >-
+      DC-3: tokenize a declared entry by whitespace split AND reject any entry containing shell
+      metacharacters with validation-failed. Refusing what the pinned shell:false cannot honor beats a
+      silent misparse ("npm test 2>&1" would otherwise pass "2>&1" to npm as a literal argument). A
+      quote-aware tokenizer can be layered on later without breaking this contract. Level B, decided
+      by the user.
+    recorded_at: "2026-08-23T04:20:00Z"
+  - id: dec-004
+    checkpoint_id: cp-proposal-validation
+    selected_option_id: DC-4-b
+    rationale: >-
+      DC-4: a malformed DECLARATION yields the validation-failed terminal state at pre-flight; a RUNTIME
+      failure (non-zero exit, missing binary, timeout) is pure evidence and the review proceeds.
+      Concretely: add InvalidProcessRequestError to classifyFailure's validation-failed branch and
+      deliberately NOT ProcessSpawnError. Level B, decided by the user.
+    recorded_at: "2026-08-23T04:20:00Z"
 open_risks:
   - id: risk-001
     summary: >-

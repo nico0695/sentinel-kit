@@ -34,6 +34,18 @@ export interface ProcessRunRequest {
   readonly timeoutMs: number;
   /** Overlaid on top of the inherited parent environment, never a replacement (D2). */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Whether the child inherits the reviewing process's own environment.
+   * `true` or absent (default): unchanged `[E5.F1.H1]` D2 behavior — `env`,
+   * when present, overlays the full inherited parent environment. `false`:
+   * the child receives ONLY `env` — the parent environment is not visible to
+   * it at all. `env` MUST be present when this is `false`
+   * (`InvalidProcessRequestError` otherwise, D2-amend below) — execa's own
+   * `extendEnv:false` is a no-op without an accompanying `env`, empirically
+   * confirmed (design.md Amendment 1, A-1), so this guard is not optional
+   * hardening, it is what makes the field safe to expose at all.
+   */
+  readonly inheritEnv?: boolean;
   /** Per-stream capture budget, in characters (execa's own unit — not bytes). Adapter-defaulted when absent. */
   readonly maxOutputChars?: number;
 }

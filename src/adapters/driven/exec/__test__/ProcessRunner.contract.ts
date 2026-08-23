@@ -71,5 +71,39 @@ export function runProcessRunnerContract(
       });
       expect(result.stdout).toContain("hello from child");
     });
+
+    it("rejects with InvalidProcessRequestError when inheritEnv is false and env is omitted (Amendment 1, A-3/A-7)", async () => {
+      const runner = createRunner();
+      await expect(
+        runner.run({
+          command: process.execPath,
+          args: ["-e", "process.exit(0)"],
+          cwd: process.cwd(),
+          timeoutMs: 5000,
+          inheritEnv: false,
+        }),
+      ).rejects.toBeInstanceOf(InvalidProcessRequestError);
+    });
+
+    it("the child receives none of the calling process's environment beyond an explicit allowlist when inheritEnv is false (Amendment 1, A-7)", async () => {
+      const runner = createRunner();
+      const markerName = "SENTINEL_CONTRACT_PROBE_MARKER";
+      process.env[markerName] = "should-not-reach-child";
+      try {
+        const result = await runner.run({
+          command: process.execPath,
+          args: ["-e", "process.stdout.write(JSON.stringify(process.env))"],
+          cwd: process.cwd(),
+          timeoutMs: 5000,
+          inheritEnv: false,
+          env: { PATH: process.env.PATH ?? "" },
+        });
+        const childEnv = JSON.parse(result.stdout) as Record<string, string>;
+        expect(childEnv[markerName]).toBeUndefined();
+        expect(childEnv.PATH).toBe(process.env.PATH ?? "");
+      } finally {
+        delete process.env[markerName];
+      }
+    });
   });
 }

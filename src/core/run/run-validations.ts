@@ -71,6 +71,37 @@ function elisionMarker(elidedCount: number): string {
 const LINE_TRUNCATED_SUFFIX = " ... [line truncated]";
 
 /**
+ * The complete, hardcoded, non-configurable set of environment variables a
+ * declared validation's child process receives (PR #72 / R1-001 fix,
+ * design.md Amendment 1). Deliberately minimal: PATH so the child can
+ * locate its own interpreter/binary at all (npm, node, python, ...) and
+ * HOME because most real-world build/test toolchains read it for config
+ * or cache directories (npm's cache, git config lookup, venv resolution)
+ * and fail or misbehave without it. Everything else the reviewing
+ * process's own environment carries — cloud credentials
+ * (AWS_SECRET_ACCESS_KEY, AWS_ACCESS_KEY_ID), CI/VCS tokens (GITHUB_TOKEN,
+ * GH_TOKEN), and sentinel's own LLM API key — is excluded by construction:
+ * this is a strict allowlist, so anything not named here never reaches the
+ * child, full stop.
+ */
+const VALIDATION_ALLOWED_ENV_VAR_NAMES = ["PATH", "HOME"] as const;
+
+/**
+ * Builds the minimal allowlisted environment (design.md Amendment 1, A-5).
+ * `process.env` is a Node global read, not an import of an I/O library, so
+ * `depcruise`'s `core-no-io-libs` rule does not flag it — the allowlist is
+ * domain logic this story owns, not an adapter concern.
+ */
+function buildValidationEnv(): Readonly<Record<string, string>> {
+  const env: Record<string, string> = {};
+  for (const name of VALIDATION_ALLOWED_ENV_VAR_NAMES) {
+    const value = process.env[name];
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
+}
+
+/**
  * The pinned rejection set: every character with a meaning in POSIX shell
  * word expansion that `shell: false` cannot honor (spec.md AC-7, design.md
  * D-3). A literal `Set`, never a regex — AC-7 names the mutation
@@ -303,6 +334,7 @@ export async function runValidations(
 ): Promise<RunValidationsResult> {
   validateValidationDeclarations(request.declarations);
   const timeoutMs = request.timeoutMs ?? DEFAULT_VALIDATION_TIMEOUT_MS;
+  const validationEnv = buildValidationEnv();
 
   const elements: string[] = [];
   for (const entry of request.declarations) {
@@ -312,6 +344,8 @@ export async function runValidations(
       args,
       cwd: request.cwd,
       timeoutMs,
+      inheritEnv: false,
+      env: validationEnv,
     };
 
     try {

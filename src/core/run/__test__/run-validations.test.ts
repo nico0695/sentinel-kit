@@ -280,6 +280,30 @@ describe("run-validations", () => {
       });
     });
 
+    describe("minimal allowlisted environment (AC-22(b), design.md Amendment 1)", () => {
+      it("every constructed request carries inheritEnv: false and the PATH/HOME allowlist", async () => {
+        const fake = createFakeProcessRunner([
+          { kind: "resolve", result: okResult() },
+          { kind: "resolve", result: okResult() },
+        ]);
+
+        await runValidations(
+          { declarations: ["npm run lint", "npm test"], cwd: CWD },
+          { processRunner: fake },
+        );
+
+        const expectedEnv: Record<string, string> = {};
+        if (process.env.PATH !== undefined) expectedEnv.PATH = process.env.PATH;
+        if (process.env.HOME !== undefined) expectedEnv.HOME = process.env.HOME;
+
+        expect(fake.calls).toHaveLength(2);
+        for (const call of fake.calls) {
+          expect(call.inheritEnv).toBe(false);
+          expect(call.env).toEqual(expectedEnv);
+        }
+      });
+    });
+
     describe("never-abort runtime paths (AC-11, AC-12, AC-13)", () => {
       it("a non-zero exit resolves normally and records the exit code (AC-11)", async () => {
         const fake = createFakeProcessRunner([

@@ -31,6 +31,8 @@ export interface FakeProcessRunnerCall {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly timeoutMs: number;
+  readonly env: Readonly<Record<string, string>> | undefined;
+  readonly inheritEnv: boolean | undefined;
 }
 
 export interface FakeProcessRunner extends ProcessRunner {
@@ -82,6 +84,8 @@ export function createFakeProcessRunner(
           args: request.args,
           cwd: request.cwd,
           timeoutMs: request.timeoutMs,
+          env: request.env,
+          inheritEnv: request.inheritEnv,
         });
 
         const outcome = queue.shift();

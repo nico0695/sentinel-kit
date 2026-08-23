@@ -234,6 +234,34 @@ describe("real-child: spawn failures (AC-14)", () => {
   });
 });
 
+describe("real-child: minimal allowlisted environment (AC-22(a), design.md Amendment 1)", () => {
+  it("excludes a marker env var while including the explicit PATH/HOME allowlist", async () => {
+    const runner = createExecProcessRunner();
+    const markerName = "SENTINEL_PROBE_SECRET";
+    process.env[markerName] = "should-not-leak-to-child";
+    try {
+      const result = await runner.run({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write(JSON.stringify(process.env))"],
+        cwd: process.cwd(),
+        timeoutMs: 5000,
+        inheritEnv: false,
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: process.env.HOME ?? "",
+        },
+      });
+
+      const childEnv = JSON.parse(result.stdout) as Record<string, string>;
+      expect(childEnv[markerName]).toBeUndefined();
+      expect(childEnv.PATH).toBe(process.env.PATH ?? "");
+      expect(childEnv.HOME).toBe(process.env.HOME ?? "");
+    } finally {
+      delete process.env[markerName];
+    }
+  });
+});
+
 describe("real-child: overflow-then-hang corroboration (AC-17)", () => {
   it("reports timedOut: true and a truncation flag when a child floods output and then hangs", async () => {
     const runner = createExecProcessRunner();

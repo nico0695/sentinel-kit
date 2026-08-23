@@ -39,4 +39,9 @@ export function validateProcessRunRequest(request: ProcessRunRequest): void {
       "maxOutputChars must be a finite number greater than 0 when present",
     );
   }
+  if (request.inheritEnv === false && request.env === undefined) {
+    throw new InvalidProcessRequestError(
+      "env must be provided when inheritEnv is false (execa's extendEnv:false alone still inherits the full parent environment when no env is given)",
+    );
+  }
 }

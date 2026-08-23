@@ -67,6 +67,7 @@ export function createExecProcessRunner(): ProcessRunner {
         forceKillAfterDelay: FORCE_KILL_AFTER_DELAY_MS,
         maxBuffer: { stdout: budget, stderr: budget },
         stripFinalNewline: false,
+        ...(request.inheritEnv === false ? { extendEnv: false } : {}),
         ...(request.env !== undefined ? { env: request.env } : {}),
       });
       const elapsedMs = Date.now() - startedAt;

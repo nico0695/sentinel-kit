@@ -18,8 +18,8 @@ complexity_assessment:
     RunStore dep and nothing calls store.save()).
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -114,7 +114,20 @@ stages:
       intact. Acceptance-criteria coverage is mapped stage by stage in the validation strategy;
       e2e/** stays empty per AC-14. S1-S9 each require stage_approval.
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-08-24T00:00:00Z"
+    stages_completed:
+      - S1
+    notes: >-
+      S1 (tooling prerequisites) completed under the batch-s1-s4 stage approval. commander ^15.0.0
+      added to package.json dependencies (runtime deps now exactly commander, execa, yaml, zod --
+      AC-9), package-lock.json regenerated, the adapters vitest project include widened to also
+      cover src/main/**/__test__/**/*.test.ts (design A-4), and docs/testing.md updated with one
+      line recording that the adapters project carries composition-root unit tests. No source code
+      touched. npm run check exit 0 (biome 118 files, tsc clean, depcruise 81 modules / 170
+      dependencies, no violations); npm test exit 0 with 500 tests across 28 files, unchanged from
+      the baseline as expected for a stage that adds no tests. Details in execution-log.md. QA
+      review not recommended for S1 alone; S2 is next under the same approval.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -512,6 +525,16 @@ open_risks:
     severity: medium
     status: resolved
     resolution: Settled by D5 (resolveReviewRequest in core/run).
+  - id: risk-e6h1-008
+    summary: >-
+      Engines mismatch introduced by S1: commander@15.0.0 declares engines.node ">=22.12.0" while
+      package.json declares ">=22". Verified directly in node_modules/commander/package.json. CI is
+      unaffected -- .github/workflows/ci.yml pins node [22, 24], which actions/setup-node resolves
+      to the latest 22.x -- but a consumer installing @nico0695/sentinel on Node 22.0-22.11 would
+      hit EBADENGINE. Deliberately not fixed in passing: S1's scope was "package.json ... nothing
+      else", and engines is published metadata. Decide before [E7.F2.H3] (first publish).
+    severity: low
+    status: open
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
@@ -522,8 +545,10 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    cp-stage-approval-s1-s4 resolved: S1-S4 approved as a batch. Run sddl-executor on S1 (tooling
-    prerequisites), then S2, S3 and S4 in sequence, one stage per invocation, each ending green on
-    `npm run check` + `npm test`. Stop after S4 and present the accumulated diff before S5.
+    S1 (tooling prerequisites) is complete and green. Under the same cp-stage-approval-s1-s4 batch
+    resolution, run sddl-executor on S2 (review-request resolution in core, D3 + D5), then S3 and
+    S4, one stage per invocation, each ending green on `npm run check` + `npm test` with the
+    existing 500 tests intact. Stop after S4 and present the accumulated diff before requesting
+    approval for S5.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T00:00:00Z"
+updated_at: "2026-08-24T01:00:00Z"

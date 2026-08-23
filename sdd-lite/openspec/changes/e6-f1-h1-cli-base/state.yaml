@@ -346,6 +346,29 @@ checkpoints:
       batch removes the per-stage confirmation pause, not the per-stage execution boundary. The
       orchestrator shows the accumulated diff before requesting approval for S5 (CLI adapter).
       Stages S5-S11 remain unapproved.
+  - id: cp-stage-approval-s5-s7
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Stage QA over S1-S4 returned `pass` (0 blockers, 0 high, 0 medium; three low/info findings)
+      with both gates re-run independently: check exit 0, 551 tests across 31 files. QA confirmed
+      S5-S7 are safe to build on the S1-S4 foundation.
+    question: >-
+      How should the CLI adapter stages run, and should QA's F-1 (a vacuous assertion in
+      persist-run.test.ts) be hardened?
+    status: resolved
+    resolution: batch-s5-s7-with-f1-addendum
+    resolved_at: "2026-08-24T00:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved S5, S6 and S7 as one batch -- the CLI driving adapter, cut in three by diff
+      size rather than by concern. sddl-executor still runs ONE stage per invocation. S8-S11 stay
+      unapproved; the orchestrator stops after S7 and presents the accumulated diff before the
+      composition root. User also approved hardening F-1 as a small addendum to S5 rather than as
+      its own plan-routed fix stage: the assertion at persist-run.test.ts:193 cannot fail because
+      JSON.stringify escapes newlines, which the orchestrator reproduced independently. AC-5's
+      property stays covered by the sibling file-path assertion either way, so this is test
+      honesty, not a coverage gap.
 decisions:
   - id: D1
     level: C
@@ -628,18 +651,12 @@ open_risks:
     severity: medium
     status: open
 next_action:
-  kind: request_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    sddl-qa-review (stage mode) closed batch-s1-s4 with verdict pass: gates re-run independently
-    are green (npm run check exit 0, depcruise 84 modules / 183 dependencies, 0 violations; npm
-    test exit 0, 551 tests / 31 files), AC-5/AC-8/AC-9/AC-14 are met against the code, design
-    conformance is verbatim for both the precedence and RunRecord tables, and the three findings
-    are low/info with no correction round required. Stage mode does not close the change. Next:
-    take a fresh stage_approval to the user for S5 (CLI shell -- createCli, CliDeps,
-    error/version/root-help behaviour), then run sddl-executor for S5 alone. S6/S7 must carry
-    risk-e6h1-009 (render the alias the user typed, never the stored owner__repo repoName) and
-    must parse commander's --timeout string into a number before it reaches
-    ResolveReviewRequestFlags.
+    cp-stage-approval-s5-s7 resolved: S5-S7 approved as a batch, with F-1 hardening folded into S5
+    as an addendum. Run sddl-executor on S5 (CLI shell), then S6 and S7 in sequence, one stage per
+    invocation, each ending green on `npm run check` + `npm test`. Stop after S7 and present the
+    accumulated diff before S8-S9.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T05:00:00Z"
+updated_at: "2026-08-24T00:30:00Z"

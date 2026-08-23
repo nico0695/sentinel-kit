@@ -37,6 +37,7 @@ export {
   EngineTimeoutError,
   InvalidProcessRequestError,
   InvalidRunRequestError,
+  InvalidValidationDeclarationError,
   ProcessSpawnError,
   RunError,
   type RunErrorOptions,
@@ -52,6 +53,13 @@ export {
   type RunStage,
   runReview,
 } from "./run-review.js";
+export {
+  type RunValidationsDeps,
+  type RunValidationsRequest,
+  type RunValidationsResult,
+  runValidations,
+  validateValidationDeclarations,
+} from "./run-validations.js";
 export type { TerminalState } from "./terminal-state.js";
 export type { Verdict, VerdictParser } from "./verdict.js";
 export type { WorktreeRef } from "./worktree-ref.js";

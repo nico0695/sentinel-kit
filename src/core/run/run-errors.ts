@@ -103,6 +103,21 @@ export class ProcessSpawnError extends RunError {
   }
 }
 
+/**
+ * Raised by `validateValidationDeclarations` / `tokenizeDeclaration` when a
+ * declared validation entry is malformed: it contains a character with a
+ * meaning in POSIX shell word expansion that `shell: false` cannot honor
+ * (spec.md AC-7), or it is empty / yields zero tokens after trimming
+ * (AC-8). An EXPECTED domain outcome, not a bug: `cause` is intentionally
+ * not populated, mirroring `InvalidRunRequestError`.
+ */
+export class InvalidValidationDeclarationError extends RunError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidValidationDeclarationError";
+  }
+}
+
 /** The cascade level a rejected `resolveEngine` value came from (PRD §3.1-D). */
 export type EngineResolutionLevel = "run" | "repo" | "global";
 

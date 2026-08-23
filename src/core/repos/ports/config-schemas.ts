@@ -24,6 +24,11 @@ export const GlobalConfigSchema = z.object({
   defaultEngine: EngineNameSchema.default("claude-code"),
   defaultBaseBranch: z.string().default("main"),
   diffLimits: DiffLimitsSchema.optional(),
+  // Per-script validation timeout, in milliseconds. Deliberately no
+  // `.default()` — the single fallback constant (`DEFAULT_VALIDATION_TIMEOUT_MS`)
+  // lives in `run`, and the numeric range guard lives at `runReview`'s stage-1
+  // pre-flight, not here (spec.md AC-4/AC-5, [E5.F1.H2]).
+  validationTimeoutMs: z.number().optional(),
 });
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
@@ -36,6 +41,11 @@ export const RepoEntrySchema = z.object({
   defaultEngine: EngineNameSchema.optional(),
   extraSkills: z.array(z.string()).optional(),
   validations: z.array(z.string()).optional(),
+  // Per-script validation timeout, in milliseconds. Deliberately no
+  // `.default()` — the single fallback constant (`DEFAULT_VALIDATION_TIMEOUT_MS`)
+  // lives in `run`, and the numeric range guard lives at `runReview`'s stage-1
+  // pre-flight, not here (spec.md AC-4/AC-5, [E5.F1.H2]).
+  validationTimeoutMs: z.number().optional(),
 });
 
 export type RepoEntry = z.infer<typeof RepoEntrySchema>;

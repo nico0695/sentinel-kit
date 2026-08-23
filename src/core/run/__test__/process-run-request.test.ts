@@ -61,6 +61,10 @@ describe("validateProcessRunRequest", () => {
         name: "maxOutputChars non-finite",
         request: { ...validRequest, maxOutputChars: Number.NaN },
       },
+      {
+        name: "inheritEnv false with env omitted (Amendment 1, A-3)",
+        request: { ...validRequest, inheritEnv: false },
+      },
     ];
 
     it.each(cases)("rejects: $name", ({ request }) => {
@@ -90,6 +94,16 @@ describe("validateProcessRunRequest", () => {
   it("does NOT reject a relative cwd (D-2: absoluteness is the adapter's job)", () => {
     expect(() =>
       validateProcessRunRequest({ ...validRequest, cwd: "relative/path" }),
+    ).not.toThrow();
+  });
+
+  it("does NOT reject inheritEnv: false paired with an explicit empty env (Amendment 1, A-3)", () => {
+    expect(() =>
+      validateProcessRunRequest({
+        ...validRequest,
+        inheritEnv: false,
+        env: {},
+      }),
     ).not.toThrow();
   });
 });

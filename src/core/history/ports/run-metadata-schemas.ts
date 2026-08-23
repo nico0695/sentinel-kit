@@ -40,6 +40,7 @@ const RUN_STAGES = [
   "harness",
   "worktree",
   "diff",
+  "validations", // [E5.F1.H2] #32: declared-validation execution, between diff and prompt
   "prompt",
   "engine",
   "parse",

@@ -34,6 +34,19 @@ import type {
   TimeoutScheduler,
 } from "../index.js";
 
+/**
+ * Re-exported, not just imported: `run-review.test.ts` reaches the declared-
+ * validations fake through this fixtures module rather than importing
+ * `fake-process-runner.js` directly (D-7's file stays the sole implementation).
+ */
+export {
+  createFakeProcessRunner,
+  type FakeProcessOutcome,
+  type FakeProcessRunner,
+  type FakeProcessRunnerCall,
+  okResult,
+} from "./fake-process-runner.js";
+
 /* ------------------------------------------------------------------ */
 /*  Shared constants                                                   */
 /* ------------------------------------------------------------------ */

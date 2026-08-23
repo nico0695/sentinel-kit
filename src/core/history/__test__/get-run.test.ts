@@ -67,3 +67,50 @@ describe("getRun", () => {
     );
   });
 });
+
+describe("getRun storage-key normalisation (D7)", () => {
+  it("normalises an `owner/repo` alias before calling store.get", async () => {
+    let receivedRepoName: string | undefined;
+    const store = createFakeRunStore((repoName, _id) => {
+      receivedRepoName = repoName;
+      return Promise.resolve(RECORD);
+    });
+
+    await getRun(
+      { repoName: "owner/repo", id: "20260822T131000123Z" },
+      { store },
+    );
+
+    expect(receivedRepoName).toBe("owner__repo");
+  });
+
+  it("passes an alias with no separator through unchanged", async () => {
+    let receivedRepoName: string | undefined;
+    const store = createFakeRunStore((repoName, _id) => {
+      receivedRepoName = repoName;
+      return Promise.resolve(RECORD);
+    });
+
+    await getRun(
+      { repoName: "sentinel-kit", id: "20260822T131000123Z" },
+      { store },
+    );
+
+    expect(receivedRepoName).toBe("sentinel-kit");
+  });
+
+  it("leaves the run id untouched", async () => {
+    let receivedId: string | undefined;
+    const store = createFakeRunStore((_repoName, id) => {
+      receivedId = id;
+      return Promise.resolve(RECORD);
+    });
+
+    await getRun(
+      { repoName: "owner/repo", id: "20260822T131000123Z" },
+      { store },
+    );
+
+    expect(receivedId).toBe("20260822T131000123Z");
+  });
+});

@@ -12,7 +12,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 |---|---|---|---|
 | S1 | Tooling prerequisites (`commander`, widened `adapters` vitest include, docs line) | yes | completed |
 | S2 | Review-request resolution in core (D3 + D5) | yes | completed |
-| S3 | D7 alias → storage-key normalisation inside `core/history` | yes | pending |
+| S3 | D7 alias → storage-key normalisation inside `core/history` | yes | completed |
 | S4 | `persistRun` use case (D1/AC-5) | yes | pending |
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | pending |
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | pending |
@@ -149,3 +149,115 @@ None.
 ### Next action
 
 S2 is complete and both gates are green. S3 (D7 alias → storage-key normalisation in `core/history`) is the next executor invocation, already authorised under the same `batch-s1-s4` resolution. QA review is **not** recommended yet: S2's blast radius is one new pure core function plus one optional schema field, fully covered by 31 new unit tests, and no caller exists until S7 — QA is better spent once the S1-S4 batch is complete, as recorded after S1.
+
+## S3 — D7 alias → storage-key normalisation inside `core/history`
+
+- status: completed
+- approval: `cp-plan-stage-approval` resolved `batch-s1-s4` (user, resolved_at `2026-08-23T23:00:00Z`) — S3 executed as the third stage of that batch, one stage per executor invocation.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `a20dd5a`, working tree clean with S1 and S2 committed; `npm run check` exit 0 (biome 120 files, depcruise 82 modules / 176 dependencies, 0 violations) and `npm test` exit 0 (531 tests / 29 files) before the stage.
+
+### Planned scope (plan.md, S3 row)
+
+Module-private idempotent helper in `src/core/history/` (no barrel export), applied by
+`list-runs.ts` and `get-run.ts`. Validation: `owner/repo` → `owner__repo`; an alias with no
+separator passes through unchanged; the helper is idempotent (`f(f(x)) === f(x)`); the existing
+`listRuns`/`getRun` suites still pass; `depcruise` clean.
+
+### The collision this stage closes (D7)
+
+`registerRepo`'s `deriveAlias` (`src/core/repos/register-repo.ts`) yields `owner/repo` for any URL
+with two or more non-empty segments, while `RunRecordPathFieldsSchema` and `RunQueryFieldsSchema`
+(`src/core/history/ports/run-store-schemas.ts`) validate `repoName` through `PathSegmentSchema`,
+which refines against any `/` **and** any `\`. Both facts were re-read in the source at the start
+of this stage and confirm the orchestrator's finding. Without this stage every `runs list` /
+`runs show` against a registered repo would fail inside `listRuns`/`getRun`, and `persistRun` (S4)
+would fail the same way.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/core/history/run-storage-key.ts` | New, **module-private**. `toRunStorageKey(repoName: string): string` replaces every `/` and every `\` with `__`. Idempotent by construction: the output contains no separator, so a second application is a no-op. The file's doc comment records why it is not exported from the barrel. |
+| `src/core/history/list-runs.ts` | `store.list()` is now called with `toRunStorageKey(request.repoName)` instead of the raw alias. `ListRunsRequest.repoName` gains a doc comment naming it the user-facing alias. Signature and result shape unchanged. |
+| `src/core/history/get-run.ts` | `store.get()` is now called with `toRunStorageKey(request.repoName)`; `request.id` is passed through untouched. `GetRunRequest.repoName` gains the same doc comment. Signature and result shape unchanged. |
+| `src/core/history/__test__/run-storage-key.test.ts` | New. 6 unit tests: `owner/repo` → `owner__repo`; an alias with no separator unchanged; idempotency across four aliases; backslash normalisation; a multi-segment alias; the empty string unchanged. |
+| `src/core/history/__test__/list-runs.test.ts` | **Appended** a `listRuns storage-key normalisation (D7)` describe block (3 tests). No pre-existing test was edited or removed. |
+| `src/core/history/__test__/get-run.test.ts` | **Appended** a `getRun storage-key normalisation (D7)` describe block (3 tests, including one asserting the run id is not normalised). No pre-existing test was edited or removed. |
+
+Explicitly **not** touched, per the stage fence: `src/core/history/index.ts` (no new public export — D7's
+rejected alternative), `src/core/history/persist-run.ts` (S4), `src/adapters/**` (including
+`src/adapters/driven/storage/__test__/RunStore.contract.ts`, read for AC-19's exact shape but left
+unmodified), `src/main/**`.
+
+### Decisions taken inside the stage
+
+- **A-level:** the helper is named `toRunStorageKey` and lives in `run-storage-key.ts` — a
+  domain-named file in the module that owns the persistence contract, not a `utils/` folder
+  (prohibited in core). It is `export`ed from its own file so `list-runs.ts` and `get-run.ts` can
+  import it, but is absent from `index.ts`, so it is not part of the core's public API.
+- **A-level:** normalisation maps to `__` (D7's literal mapping) and is applied to `repoName` only.
+  `RunSummary.repoName` / `RunRecord.repoName` values coming *back* out of the store are returned
+  unchanged — reverse mapping was not authorised by D7 and would be a behaviour change beyond the
+  stage. Recorded as an observation for S6/S7 below, not fixed in passing.
+- **A-level:** the empty string is left unchanged rather than rejected. Validation of `repoName` is
+  `RunQueryFieldsSchema`'s job (`min(1)`), and rejecting here would move a validation rule into a
+  pure mapping helper.
+
+### Quick checks
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 122 files in 137ms. No fixes applied.
+
+  ✔ no dependency violations found (83 modules, 178 dependencies cruised)
+  ```
+  82 → **83 modules** (+1: `run-storage-key.ts`), 176 → **178 dependencies** (+2: the two importers),
+  **0 violations**. `core-no-io-libs`, `core-no-adapters` and `core-modules-via-index` all clean —
+  the helper imports nothing at all.
+- `npm test` → exit **0**
+  ```
+  RUN  v4.1.10 /home/user/sentinel-kit
+
+  Test Files  30 passed (30)
+       Tests  543 passed (543)
+   Duration  11.49s
+  ```
+  531 → **543 tests** (+12: 6 helper + 3 `listRuns` + 3 `getRun`) across 29 → 30 files. **All 531
+  pre-existing tests still pass**, none modified or removed.
+- Targeted re-run of the three touched suites:
+  `npx vitest run --project core src/core/history/__test__/run-storage-key.test.ts src/core/history/__test__/list-runs.test.ts src/core/history/__test__/get-run.test.ts`
+  → exit 0, `Test Files 3 passed (3)`, `Tests 17 passed (17)`. The pre-existing `listRuns`/`getRun`
+  assertions use separator-free aliases (`sentinel-kit`, `never-saved`), so the pass-through branch
+  is what keeps them green — the sharpest available signal that `[E5.F2.H2]` is intact.
+
+Skipped: nothing. `e2e/**` stays empty (AC-14). No manual validation is outstanding for S3; the
+integration evidence for `risk-e6h1-006` remains S10's job.
+
+### Notes and observations
+
+- **Carried forward to S6/S7, not a blocker:** the `RunSummary`/`RunRecord` objects returned by the
+  store still carry the normalised `owner__repo` in their own `repoName` field, because D7 authorises
+  input normalisation only. If `runs list` / `runs show` render that field verbatim, the user would
+  read `owner__repo` where they typed `owner/repo`. The renderer can echo the requested alias instead;
+  flagged here so the S6/S7 executor decides deliberately rather than by omission.
+- `RunStore.contract.ts` AC-19 was read to confirm the constraint's exact shape and left untouched, as
+  the handoff required.
+- No git side effects: no commit, stash, or branch operation. The working tree carries the six files
+  listed above.
+
+### Blockers
+
+None. The collision was exactly as D7 anticipated — no evidence of a deeper mismatch surfaced.
+
+### Next action
+
+S3 is complete and both gates are green. **S4** (`persistRun`, D1/AC-5) is the next executor
+invocation, already authorised under the same `batch-s1-s4` resolution; it consumes this stage's
+helper. QA review is still **not** recommended before the batch closes: S3's blast radius is one
+pure 3-line mapping plus its two call sites, fully covered by 12 new unit tests with the 531
+existing ones intact. Recommend `sddl-qa-review` in stage mode once S4 lands, closing the
+S1-S4 batch as planned after S1 and S2.

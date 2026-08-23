@@ -119,25 +119,37 @@ stages:
     stages_completed:
       - S1
       - S2
+      - S3
     notes: >-
-      S1 (tooling prerequisites) and S2 (review-request resolution in core) completed under the
-      batch-s1-s4 stage approval, one stage per invocation. S1: commander ^15.0.0 added to
-      package.json dependencies (runtime deps now exactly commander, execa, yaml, zod -- AC-9),
-      package-lock.json regenerated, the adapters vitest project include widened to also cover
-      src/main/**/__test__/**/*.test.ts (design A-4), docs/testing.md updated; no source touched.
-      S2 (D3 + D5): GlobalConfigSchema gains reviewTimeoutMs as z.number().optional() with no zod
-      default (RepoEntrySchema untouched); new pure src/core/run/resolve-review-request.ts exports
-      resolveReviewRequest plus DEFAULT_REVIEW_TIMEOUT_MS = 600_000 beside resolve-engine.ts,
-      implementing design's per-field precedence table verbatim (timeout: --timeout > config >
-      constant), doing the registry lookup itself (RepoNotFoundError via repos' public barrel) and
-      calling resolveEngine internally so UnknownEngineError surfaces before any git or engine
-      work; missing harness throws InvalidRunRequestError (design A-3, no invented default); the
-      run barrel exports the function, the constant and its two input types (D5). 31 new core unit
-      tests. No adapters, no src/main, no persistRun, no D7 normaliser -- those stay S3-S9.
-      Gates after S2: npm run check exit 0 (biome 120 files, tsc clean, depcruise 82 modules / 176
-      dependencies, 0 violations) and npm test exit 0 with 531 tests across 29 files, up from the
-      500/28 baseline with no pre-existing test changed. Details in execution-log.md. QA review
-      still deferred until the S1-S4 batch is complete; S3 is next under the same approval.
+      S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
+      storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
+      invocation. S1: commander ^15.0.0 added to package.json dependencies (runtime deps now
+      exactly commander, execa, yaml, zod -- AC-9), package-lock.json regenerated, the adapters
+      vitest project include widened to also cover src/main/**/__test__/**/*.test.ts (design A-4),
+      docs/testing.md updated; no source touched. S2 (D3 + D5): GlobalConfigSchema gains
+      reviewTimeoutMs as z.number().optional() with no zod default (RepoEntrySchema untouched);
+      new pure src/core/run/resolve-review-request.ts exports resolveReviewRequest plus
+      DEFAULT_REVIEW_TIMEOUT_MS = 600_000 beside resolve-engine.ts, implementing design's per-field
+      precedence table verbatim (timeout: --timeout > config > constant), doing the registry lookup
+      itself (RepoNotFoundError via repos' public barrel) and calling resolveEngine internally so
+      UnknownEngineError surfaces before any git or engine work; missing harness throws
+      InvalidRunRequestError (design A-3, no invented default); the run barrel exports the function,
+      the constant and its two input types (D5). 31 new core unit tests. S3 (D7): new
+      module-private src/core/history/run-storage-key.ts exporting toRunStorageKey, which replaces
+      every forward slash and backslash with a double underscore and is idempotent by construction;
+      applied by list-runs.ts and get-run.ts to request.repoName only (run id untouched, signatures
+      and result shapes unchanged); deliberately NOT exported from src/core/history/index.ts -- the
+      rejected alternative in D7 -- so the storage-key rule stays inside the module owning the
+      persistence contract. 12 new core unit tests (owner/repo to owner__repo, separator-free
+      pass-through, idempotency, backslashes, multi-segment, empty string) and no pre-existing test
+      edited; persist-run.ts was NOT created (that is S4) and RunStore.contract.ts was read but left
+      untouched. Observation carried to S6/S7: RunSummary/RunRecord returned by the store still
+      carry the normalised owner__repo in their own repoName field, so the renderer should echo the
+      alias the user typed rather than that field. Gates after S3: npm run check exit 0 (biome 122
+      files, tsc clean, depcruise 83 modules / 178 dependencies, 0 violations) and npm test exit 0
+      with 543 tests across 30 files, up from 531/29, all 531 pre-existing tests still passing.
+      Details in execution-log.md. QA review still deferred until the S1-S4 batch is complete;
+      S4 (persistRun) is next under the same approval.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -545,6 +557,16 @@ open_risks:
       else", and engines is published metadata. Decide before [E7.F2.H3] (first publish).
     severity: low
     status: open
+  - id: risk-e6h1-009
+    summary: >-
+      Surfaced by S3. D7 authorises INPUT normalisation only, so RunSummary/RunRecord objects
+      returned by the store still carry the normalised `owner__repo` in their own repoName field.
+      If S6/S7's renderers print that field verbatim, the user reads `owner__repo` where they
+      typed `owner/repo`. The renderers must echo the requested alias instead of the stored key.
+      Deliberately not fixed inside S3, whose scope was the helper and its two call sites.
+    severity: medium
+    status: open
+    owner_stage: S6/S7
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
@@ -555,10 +577,11 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S1 and S2 are complete and green (npm run check exit 0; npm test exit 0, 531 tests / 29 files).
-    Under the same cp-stage-approval-s1-s4 batch resolution, run sddl-executor on S3 (D7 alias ->
-    storage-key normalisation in core/history), then S4 (persistRun), one stage per invocation,
-    each ending green on `npm run check` + `npm test` with the existing tests intact. Stop after S4
-    and present the accumulated diff before requesting approval for S5.
+    S1, S2 and S3 are complete and green (npm run check exit 0, depcruise 83 modules / 178
+    dependencies with 0 violations; npm test exit 0, 543 tests / 30 files with all 531 pre-existing
+    tests intact). Under the same cp-stage-approval-s1-s4 batch resolution, run sddl-executor on S4
+    (persistRun, D1/AC-5), which consumes S3's module-private toRunStorageKey helper, ending green
+    on `npm run check` + `npm test` with the existing tests intact. Stop after S4 and present the
+    accumulated diff before requesting approval for S5.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T02:00:00Z"
+updated_at: "2026-08-24T03:00:00Z"

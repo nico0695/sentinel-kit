@@ -7,7 +7,12 @@
  * cannot be driven with these two has domain logic it should not have.
  */
 
-import type { CliDeps, CliIo, CliUseCases } from "../cli-deps.js";
+import type {
+  CliDeps,
+  CliIo,
+  CliUseCases,
+  ReviewContext,
+} from "../cli-deps.js";
 
 export interface CapturingIo extends CliIo {
   readonly out: string[];
@@ -59,6 +64,15 @@ export interface TestDepsOverrides {
   readonly useCases?: Partial<CliUseCases>;
   readonly io?: CapturingIo;
   readonly version?: string;
+  /**
+   * The `review` path's only input beyond its arguments (design A-5). Left
+   * throwing by default so a command that reads configuration it should not
+   * read fails loudly.
+   */
+  readonly loadContext?: () => Promise<ReviewContext>;
+  /** Fixed clock; `review` reads it once, for the run's start instant. */
+  readonly now?: () => number;
+  readonly clonesDir?: string;
 }
 
 /** Builds a complete `CliDeps` around the capturing io and the fakes. */
@@ -70,12 +84,14 @@ export function createTestDeps(
   return {
     useCases: createFakeUseCases(overrides.useCases ?? {}),
     io,
-    loadContext: () => {
-      throw new Error("loadContext was not expected to be called");
-    },
-    now: () => 0,
+    loadContext:
+      overrides.loadContext ??
+      (() => {
+        throw new Error("loadContext was not expected to be called");
+      }),
+    now: overrides.now ?? (() => 0),
     version: overrides.version ?? "0.0.0-test",
-    clonesDir: "/tmp/sentinel-test/clones",
+    clonesDir: overrides.clonesDir ?? "/tmp/sentinel-test/clones",
   };
 }
 

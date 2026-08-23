@@ -123,6 +123,7 @@ stages:
       - S4
       - S5
       - S6
+      - S7
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -227,6 +228,41 @@ stages:
       tsc clean, depcruise 92 modules / 203 dependencies, 0 violations) and npm test exit 0 with 610
       tests across 36 files, up from 580/34, all 580 pre-existing tests still passing. S7-S11 were not
       started. Details in execution-log.md.
+      S7 (review command) completed under the same cp-stage-approval-s5-s7 batch, closing it. New
+      commands/review-command.ts (review <repo> <branch> --type --engine --timeout) and
+      render/format-review.ts (formatReviewOutcome -> the REVIEW_OUTCOME_FIELDS key/value block:
+      repo, targetRef, state, verdict, engine, harness, durationMs, failureStage, failureMessage,
+      runDir, with - for absent fields), registered by adding registerReviewCommand to
+      commandRegistrars. The command body is a parse-and-delegate shell: loadContext ->
+      resolveReviewRequest (core run barrel, D5) -> runReview -> persistRun (once, unconditionally,
+      D1/AC-6) -> render; it holds no cascade, no registry lookup, no RunRecord composition and no
+      process access. The four traps were handled explicitly: --timeout is parsed by a commander
+      parseArg callback that throws InvalidArgumentError for anything that is not a positive whole
+      number, so no NaN can reach ResolveReviewRequestFlags and an unusable value is a usage error
+      with no use case called (trap 1); no terminal state is read for exit purposes anywhere in the
+      adapter and no exit-code table was introduced -- the exit code still comes from commander or
+      createCli's catch-all, and five tests pin exit 0 across engine-error, ambiguous, timeout,
+      validation-failed and a request-changes verdict (trap 2 / AC-12); persistRun is called exactly
+      once with the very request handed to runReview and the very result it returned (identity
+      assertions) and is skipped only when no run was produced (trap 3 / AC-6); and the renderer
+      takes the requested alias as a parameter and never reads record.repoName, with a guard
+      asserting owner__repo appears in no rendered field except runDir, which is a genuine
+      filesystem path derived from the storage key (trap 4 / risk-e6h1-009). AC-11 is covered on the
+      command side: validations and validationTimeoutMs from the repo entry reach the runReview fake,
+      with the config-level fallback tested too; wiring processRunner is S9's half. Four A-level
+      calls: the outcome renders as a key/value block matching runs show rather than a one-line
+      record; failureStage/failureMessage are fields rather than a stderr diagnostic so a piped
+      consumer sees why a run failed; parseTimeoutMs also rejects 0, negatives and non-integers; and
+      createTestDeps gained three optional overrides (loadContext, now, clonesDir) with byte-identical
+      defaults instead of a second builder. All four guards were mutation-verified (state-derived exit
+      code: 6 failed; skipping persistence for non-ok: 6 failed; unchecked Number(): 5 failed;
+      rendering record.repoName: 1 failed) and every mutation reverted, with both gates re-run green.
+      Gates after S7: npm run check exit 0 (biome 140 files, tsc clean, depcruise 94 modules / 209
+      dependencies, 0 violations) and npm test exit 0 with 638 tests across 37 files, up from 610/36,
+      all 610 pre-existing tests still passing. Two tsc errors in new fixtures were fixed rather than
+      cast away (RunCleanupReason has no "policy" member; verdict: undefined violates
+      exactOptionalPropertyTypes). No file under src/core/**, src/adapters/driven/** or src/main/**
+      was touched. S8-S11 were NOT started and are not approved. Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -725,16 +761,17 @@ open_risks:
     status: open
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    S6 (repo + runs commands and their formatters) is complete: `npm run check` exit 0 (biome 137
-    files, depcruise 92 modules / 203 dependencies, 0 violations) and `npm test` exit 0 (610 tests /
-    36 files, up from 580/34, all pre-existing tests passing). Both groups are registered through
-    `commandRegistrars` and risk-e6h1-009 is guarded by two mutation-verified regression tests. Run
-    sddl-executor on S7 (`review` command + render/format-review.ts) under the same
-    cp-stage-approval-s5-s7 batch; S7 must add its registrar to `commandRegistrars`, parse
-    commander's string `--timeout` into a number, call runReview then persistRun exactly once and
-    read no `result.state` for exit purposes (AC-12). Stop after S7 and present the accumulated diff
-    before S8-S9; QA review stays deferred until then.
+    S7 (the `review` command) is complete and closes the approved cp-stage-approval-s5-s7 batch:
+    `npm run check` exit 0 (biome 140 files, depcruise 94 modules / 209 dependencies, 0 violations)
+    and `npm test` exit 0 (638 tests / 37 files, up from 610/36, all pre-existing tests passing).
+    All six command paths of AC-3 now exist behind `commandRegistrars`; AC-6, AC-11, AC-12 and
+    AC-13 are covered by 28 new adapter tests driven with fakes only, and the four load-bearing
+    guards were mutation-verified. S8-S11 were not started and are NOT approved. Present the
+    accumulated S5-S7 diff to the user, then run sddl-qa-review in stage mode over that batch (the
+    CLI adapter is now complete and is the largest single surface of this change) and take a fresh
+    stage_approval before S8 (src/main/paths.ts).
+
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T07:30:00Z"
+updated_at: "2026-08-24T09:30:00Z"

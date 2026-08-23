@@ -23,6 +23,7 @@
 import { Command, CommanderError } from "commander";
 import type { CliDeps, CliIo } from "./cli-deps.js";
 import { registerRepoCommands } from "./commands/repo-commands.js";
+import { registerReviewCommand } from "./commands/review-command.js";
 import { registerRunsCommands } from "./commands/runs-commands.js";
 import { formatErrorLine } from "./render/format-error.js";
 
@@ -33,19 +34,20 @@ export interface SentinelCli {
 
 /**
  * Registers one command group on the root program. The extension point the
- * command modules plug into: `[E6.F1.H1]`'s S6 adds `repo`/`runs` and S7 adds
- * `review`, each as a registrar in {@link commandRegistrars}, without the
- * shell knowing anything about them.
+ * command modules plug into: `[E6.F1.H1]`'s S6 added `repo`/`runs` and S7
+ * added `review`, each as a registrar in {@link commandRegistrars}, without
+ * the shell knowing anything about them.
  */
 export type CommandRegistrar = (program: Command, deps: CliDeps) => void;
 
 /**
- * The command groups the real CLI exposes. `review` joins them in S7; the
- * parameter on `createCli` lets a test drive the shell with its own registrar
- * instead.
+ * The command groups the real CLI exposes — the six command paths of AC-3.
+ * The parameter on `createCli` lets a test drive the shell with its own
+ * registrar instead.
  */
 export const commandRegistrars: readonly CommandRegistrar[] = [
   registerRepoCommands,
+  registerReviewCommand,
   registerRunsCommands,
 ];
 

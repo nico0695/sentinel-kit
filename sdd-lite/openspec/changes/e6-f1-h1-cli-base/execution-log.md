@@ -16,7 +16,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S4 | `persistRun` use case (D1/AC-5) | yes | completed |
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | completed |
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | completed |
-| S7 | `review` command | yes | pending |
+| S7 | `review` command | yes | completed |
 | S8 | Sentinel home resolution (D2/AC-7) | yes | pending |
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | pending |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
@@ -725,3 +725,216 @@ S6 is complete and both gates are green. S7 (`review` command + `render/format-r
 approved under the same `cp-stage-approval-s5-s7` batch and is the next executor invocation. Per
 the batch approval, stop after S7 and present the accumulated diff before S8-S9; QA review stays
 deferred until then.
+
+## S7 — the `review` command
+
+- status: completed
+- approval: `cp-stage-approval-s5-s7` (user, S5-S7 approved as a batch, one stage per executor
+  invocation). S8-S11 are **not** approved and were not started.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c`, working tree clean at stage start;
+  `npm run check` exit 0 (biome 137 files, tsc clean, depcruise 92 modules / 203 dependencies,
+  0 violations) and `npm test` exit 0 (610 tests / 36 files), matching S6's closing numbers.
+
+### Planned scope (plan.md, S7 row)
+
+`commands/review-command.ts`, `render/format-review.ts`, `__test__/review.test.ts`, plus adding the
+registrar to `commandRegistrars` in `create-cli.ts`. Out of scope and untouched: everything under
+`src/main/**` (S8/S9), the manual smoke (S10), the closeout (S11), and every file under
+`src/core/**` — this stage adds **no core surface**.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driving/cli/commands/review-command.ts` | New. `registerReviewCommand(program, deps)` → `review <repo> <branch> --type <harness> --engine <engine> --timeout <ms>`. The body is a parse-and-delegate shell: `deps.loadContext()` → `resolveReviewRequest` (core `run` barrel) → `deps.useCases.runReview` → `deps.useCases.persistRun` (once, unconditionally) → `formatReviewOutcome`. No cascade, no registry lookup, no `RunRecord` composition, no adapter construction, no `process`. Typed core errors are not caught — they propagate into `createCli`'s catch-all (AC-13). |
+| `src/adapters/driving/cli/render/format-review.ts` | New. `formatReviewOutcome(repoAlias, record, runDir)` → the `REVIEW_OUTCOME_FIELDS` block of `key⇥value` lines (`repo`, `targetRef`, `state`, `verdict`, `engine`, `harness`, `durationMs`, `failureStage`, `failureMessage`, `runDir`), `-` for absent fields, tabs/newlines inside a value collapsed so one field stays one line. |
+| `src/adapters/driving/cli/create-cli.ts` | `commandRegistrars` goes from `[registerRepoCommands, registerRunsCommands]` to `[registerRepoCommands, registerReviewCommand, registerRunsCommands]`, plus the import and two doc-comment updates. `createCli`'s signature, the `exitOverride`/`configureOutput` ordering and the catch-all are untouched. |
+| `src/adapters/driving/cli/__test__/cli-test-doubles.ts` | `TestDepsOverrides` gains three optional entries — `loadContext`, `now`, `clonesDir` — each defaulting to exactly the previous hard-coded value (a throwing `loadContext`, `() => 0`, `/tmp/sentinel-test/clones`). Purely additive: no existing caller changes behaviour, and the S5/S6 suites are green unmodified. |
+| `src/adapters/driving/cli/__test__/review.test.ts` | New. 28 tests (AC-1, AC-2, AC-6, AC-10, AC-11, AC-12, AC-13). |
+
+No file under `src/core/**`, `src/adapters/driven/**` or `src/main/**` was modified.
+
+### The four traps, and how each was handled
+
+1. **`--timeout` arrives as a string.** Parsed by `parseTimeoutMs`, passed as `commander`'s
+   per-option `parseArg` callback, which rejects anything that is not a positive whole number by
+   throwing `InvalidArgumentError`. `commander` turns that into a usage error: the message reaches
+   `stderr` through the injected `CliIo` and `run` resolves a non-zero exit code, with **no use
+   case called and no run persisted**. `NaN` can therefore not reach `ResolveReviewRequestFlags`.
+   Only the shape is checked — the upper bound stays `runReview`'s stage-1 pre-flight, since
+   re-stating it in the adapter would duplicate a domain rule (AC-1).
+2. **AC-12 — exit code.** The command reads no terminal state for any purpose other than
+   rendering. `grep -rn "\.state" src/adapters/driving/cli --include='*.ts'` outside `__test__`
+   returns three matches, all inside a renderer building a display field
+   (`format-review.ts:82`, `format-runs.ts:76`, `:153`), plus the AC-12 comment in
+   `review-command.ts`. No exit-code table exists; the exit code still comes from `commander` or
+   from `createCli`'s catch-all, exactly as S5 left it. Five tests pin exit 0 across
+   `engine-error`, `ambiguous`, `timeout`, `validation-failed` and a `request-changes` verdict.
+3. **AC-6 — exactly one persisted run.** `persistRun` is called unconditionally after `runReview`
+   resolves, with the request object that was passed to `runReview` (asserted by identity) and the
+   result object it returned (asserted by identity), and the returned `runDir` is printed.
+   Non-`ok` runs are persisted too, and persistence is skipped only when the invocation never
+   produced a run (unregistered alias, unresolvable harness, unknown engine, bad `--timeout`,
+   `runReview` throwing).
+4. **`risk-e6h1-009`.** `formatReviewOutcome` takes the requested alias as its first parameter and
+   never reads `record.repoName`, exactly as S6's renderers do; `persistRun` is handed the alias
+   the user typed (`repoName: repo`) and core normalises it (D7). No denormalising helper was
+   added anywhere. Guarded by a test asserting no rendered field carries `owner__repo` — with the
+   deliberate exception of `runDir`, which is a real filesystem path derived from the storage key
+   and legitimately contains it; the guard filters that one line out so it stays honest instead of
+   vacuous.
+
+### AC-11 — declared validations reach the engine path
+
+`resolveReviewRequest` composes `validations` and `validationTimeoutMs` into the request, and the
+command forwards that request verbatim. A test asserts the `runReview` fake receives
+`["npm test", "npm run check"]` and `validationTimeoutMs: 45_000` from the repo entry; a second
+asserts the config-level fallback (`30_000`) when the entry declares none, and that
+`validations`/`limits` are then **absent keys**, not `undefined` values
+(`exactOptionalPropertyTypes`). Wiring `processRunner` itself is S9's half of AC-11.
+
+### Decisions taken in this stage
+
+- **A-level — the outcome renders as a `key⇥value` block, not a one-line record.** `runs show`
+  already renders the same record in that shape, and `review`'s output *is* the record
+  `sentinel runs show` will print later; a consumer that parses one parses the other. `repo add`'s
+  single line stays a single line because it carries three fields, not ten.
+- **A-level — `failureStage` / `failureMessage` are fields of the block rather than a `stderr`
+  diagnostic.** A failed run has to explain itself, and putting the explanation on `stderr` would
+  make the reason invisible to a piped consumer while adding a branch keyed on the failure's
+  presence. As fields they render `-` when absent, with no decoration on `stdout` (AC-10).
+- **A-level — `parseTimeoutMs` rejects `0`, negatives and non-integers, not only non-numerics.**
+  A zero or negative budget is a usage error with no sensible interpretation; rejecting it at the
+  parse boundary keeps the message actionable (`error: option '--timeout <ms>' argument 'soon' is
+  invalid. expected a positive whole number of milliseconds`) instead of surfacing later as an
+  `InvalidRunRequestError` from a stage-1 pre-flight the user cannot see.
+- **A-level — `createTestDeps` gained three optional overrides instead of a second builder.**
+  `review` is the first command that needs `loadContext`, a fixed clock and a known `clonesDir`.
+  Every default is byte-identical to what the function hard-coded before, so no existing test
+  changes behaviour, and the alternative (a parallel `createReviewTestDeps`) would have duplicated
+  the double the S5 note explicitly wanted to keep singular.
+- **A-level — `format-review.ts` is not re-exported from the adapter's `index.ts`.** Same as S6's
+  two renderers: the barrel exposes `createCli`, the deps contract and `formatErrorLine`; the
+  formatters are internal to the adapter and reached only by the tests inside it.
+
+### Quick checks
+
+Planned validation (plan.md, S7 row): adapter tests with fakes; the flag surface maps onto the
+resolved request; `persistRun` called exactly once with the `runReview` result and the run dir
+printed (AC-6); `validations`/`validationTimeoutMs` reach the `runReview` fake (AC-11); exit 0 for
+`engine-error` and `request-changes`, non-zero for an unregistered alias with no run persisted
+(AC-12); no `result.state` read for exit purposes (code read, AC-1).
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 140 files in 136ms. No fixes applied.
+
+  ✔ no dependency violations found (94 modules, 209 dependencies cruised)
+  ```
+  137 → **140 files**, 92 → **94 modules**, 203 → **209 dependencies**, still **0 violations** — in
+  particular `adapters-isolated` (the new modules import `commander` and two core barrels,
+  `core/run` and `core/history`, nothing under `src/adapters/driven/**`), `core-no-adapters` and
+  `wiring-only-in-main`. Biome required one formatting pass
+  (`biome check --write src/adapters/driving/cli`) before the gate went green; no lint rule was
+  suppressed. Two `tsc` errors were surfaced and fixed rather than cast away: a cleanup fixture
+  used `reason: "policy"` where `RunCleanupReason` has no such member (`policy-always`), and two
+  record fixtures set `verdict: undefined`, which `exactOptionalPropertyTypes` rejects — replaced
+  by a helper that drops the key.
+- `npm test` → exit **0**:
+  ```
+  > vitest run
+
+   Test Files  37 passed (37)
+        Tests  638 passed (638)
+     Duration  9.24s
+  ```
+  610 → **638 tests** (+28) across 36 → 37 files. **All 610 pre-existing tests still pass**; the
+  only pre-existing files modified are `create-cli.ts` (one array entry, one import) and
+  `cli-test-doubles.ts` (three optional overrides with identical defaults), neither of which
+  changes an existing assertion.
+- Targeted re-run: `npx vitest run --project adapters src/adapters/driving/cli` → exit 0,
+  `Test Files 6 passed (6)`, `Tests 87 passed (87)` (59 → 87).
+- `grep -n "\bprocess\b" src/adapters/driving/cli/commands/review-command.ts
+  src/adapters/driving/cli/render/format-review.ts` → **no match**. The stage adds no `process`
+  access, no `node:*` import and no filesystem call.
+
+### Mutation verification of the load-bearing guards
+
+Each of the four traps was checked to be genuinely covered, not merely named. Every mutation was
+applied to the source, the suite run, and the mutation reverted (`diff` against a pre-mutation copy
+confirms both files are byte-identical to their pre-mutation state, and both gates were re-run
+green afterwards):
+
+1. Deriving the exit code from the terminal state (`if (result.state !== "ok") throw …`):
+   `Tests  6 failed | 22 passed (28)`.
+2. Skipping persistence for a non-`ok` run: `Tests  6 failed | 22 passed (28)`, failing on
+   `persists a run that ended in a non-ok terminal state`, the four `exits 0 for …` cases and the
+   absent-verdict rendering test.
+3. Dropping the `parseTimeoutMs` guard so `Number(raw)` passes through unchecked:
+   `Tests  5 failed | 23 passed (28)`, failing on the non-numeric case and all four unusable
+   values.
+4. Rendering `record.repoName` instead of the requested alias: `Tests  1 failed | 27 passed (28)`,
+   failing on `echoes the alias the user typed, never the stored storage key`.
+
+### Test coverage against the plan's S7 row, test by test
+
+- **Argument surface (AC-1/AC-3)** — all three flags plus both positionals map onto the resolved
+  request (`repoPath` from the clones-dir cascade, `baseRef` from the entry, `harnessType`,
+  `timeoutMs`, `engineName`); with no flags the entry/config/constant cascade produces
+  `pr-review` / `600_000` / `claude-code`; absent optionals are absent keys.
+- **`--timeout` (trap 1)** — `soon`, `0`, `-5`, `1.5` and the empty string each exit non-zero with
+  no use case called; the message names the option.
+- **Persistence (AC-6)** — one `persistRun` call carrying the same request object handed to
+  `runReview`, the same result object it returned, the typed alias and `deps.now()`'s reading; the
+  printed `runDir` equals what `persistRun` resolved; a non-`ok` run is persisted; a throwing
+  `runReview` persists nothing and renders one stderr line.
+- **Exit codes (AC-12)** — exit 0 for `engine-error`, `ambiguous`, `timeout`, `validation-failed`
+  and for a `request-changes` verdict; non-zero with nothing persisted and empty stdout for an
+  unregistered alias (stderr equal to `RepoNotFoundError`'s message), for an unresolvable harness
+  (message names `--type`) and for an unknown engine.
+- **Output (AC-10)** — the stdout keys equal `REVIEW_OUTCOME_FIELDS` in order, stderr empty on the
+  happy path; a failed run renders `-` for `verdict`/`engine` and collapses a two-line failure
+  message into one field; the block is exactly `REVIEW_OUTCOME_FIELDS.length` lines.
+- **AC-13** — a core error out of `runReview` renders as exactly one stderr line equal to its
+  message, no `at ` frame, nothing on stdout, exit 1.
+- **AC-2** — `review --help` exits 0, prints `Usage: sentinel review`, both positionals and all
+  three options, with an empty stderr; the root help lists `review`.
+
+Skipped: nothing. `e2e/**` stays empty (AC-14). No integration evidence was produced — unit tests
+with fakes still cannot see `risk-e6h1-006`; that is S10, which is not approved yet.
+
+### Notes and observations
+
+- **`risk-e6h1-010` is untouched and unchanged.** `review` renders no `RunNotFoundError`, so the
+  storage key leaking into that message stays exactly where S6 left it: an open user decision.
+- **Carry-forward for S9.** `CliDeps` now has three consumers of facts `src/main/` must supply on
+  the review path — `loadContext` (design A-5), `clonesDir` and `now` — none of which any other
+  command uses. S9's `container.ts` must provide all three, and `resolveReviewRequest` will receive
+  `clonesDir` from `sentinelPaths` (S8), not from a literal.
+- **Observation, not a blocker.** `resolveReviewRequest` derives `repoPath` as
+  `${clonesDir}/${alias}` where the alias contains a slash (`owner/repo`), so a cloned repository
+  lives at `<root>/clones/owner/repo` — a two-segment path. That matches design's home-layout table
+  (`<root>/clones/<owner>/<repo>`) and `registerRepo`'s own cascade, so nothing is wrong here; it is
+  recorded because it is the one place the un-normalised alias legitimately becomes a path, and S10
+  will be the first run to create it on disk.
+- AC-12 holds structurally across the whole adapter now that all six command paths exist: no
+  command inspects a terminal state to choose an exit code.
+- No git side effects: no commit, stage, stash or branch operation.
+
+### Blockers
+
+None.
+
+### Next action
+
+S7 is complete and both gates are green (`npm run check` exit 0; `npm test` exit 0, 638 tests /
+37 files). This closes the approved `cp-stage-approval-s5-s7` batch: **S8-S11 were not started and
+are not approved.** Per that approval, the orchestrator should present the accumulated S5-S7 diff
+to the user and take a fresh `stage_approval` before S8 (`src/main/paths.ts`). A stage-mode
+`sddl-qa-review` over the S5-S7 batch is the recommended next stage, since the CLI adapter is now
+complete and is the largest single surface of this change; S8-S9 build the composition root on top
+of it.

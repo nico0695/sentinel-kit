@@ -5,7 +5,11 @@
  * run-domain `TerminalState` model, the `WorktreeRef` boundary value, the
  * `runReview` use case with its request/deps/result shapes, its error family
  * and its two injectable seams (`VerdictParser`, `TimeoutScheduler`), and the
- * `resolveEngine` cascade function (`[E4.F2.H3]`, #30) with its own error.
+ * `resolveEngine` cascade function (`[E4.F2.H3]`, #30) with its own error,
+ * and the pure `resolveReviewRequest` composer with its
+ * `DEFAULT_REVIEW_TIMEOUT_MS` fallback (`[E6.F1.H1]`, #36, decision D5) —
+ * the single owner of the flag → repo → global cascade every driving
+ * adapter needs before it can call `runReview`.
  * The module's second driven port, `ProcessRunner` (`[E5.F1.H1]`, #31), and
  * its request pre-flight `validateProcessRunRequest` — no caller yet, an
  * execa adapter lands the same story.
@@ -31,6 +35,12 @@ export type {
 } from "./ports/review-engine.js";
 export { validateProcessRunRequest } from "./process-run-request.js";
 export { type ResolveEngineInput, resolveEngine } from "./resolve-engine.js";
+export {
+  DEFAULT_REVIEW_TIMEOUT_MS,
+  type ResolveReviewRequestFlags,
+  type ResolveReviewRequestInput,
+  resolveReviewRequest,
+} from "./resolve-review-request.js";
 export {
   EngineInvocationError,
   type EngineResolutionLevel,

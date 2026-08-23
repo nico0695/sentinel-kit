@@ -11,7 +11,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | Stage Id | Goal | Touches Code | Status |
 |---|---|---|---|
 | S1 | Tooling prerequisites (`commander`, widened `adapters` vitest include, docs line) | yes | completed |
-| S2 | Review-request resolution in core (D3 + D5) | yes | pending |
+| S2 | Review-request resolution in core (D3 + D5) | yes | completed |
 | S3 | D7 alias → storage-key normalisation inside `core/history` | yes | pending |
 | S4 | `persistRun` use case (D1/AC-5) | yes | pending |
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | pending |
@@ -84,3 +84,68 @@ None.
 ### Next action
 
 `stage_approval` for S1 is consumed. S2 (core review-request resolution, D3 + D5) is already authorised under the same `batch-s1-s4` resolution and is the next executor invocation. QA review is **not** recommended after S1: the stage touches no source code, its blast radius is configuration plus one doc line, and both gates are green. QA is better spent once the S1-S4 batch is complete.
+
+## S2 — Review-request resolution in core (D3 + D5)
+
+- status: completed
+- approval: `cp-plan-stage-approval` resolved `batch-s1-s4` (user, resolved_at `2026-08-23T23:00:00Z`) — S2 executed as the second stage of that batch, one stage per executor invocation.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c`, working tree clean with S1 committed; `npm run check` exit 0 (biome 118 files, depcruise 81 modules / 170 dependencies) and `npm test` exit 0 (500 tests / 28 files) before the stage.
+
+### Planned scope (plan.md, S2 row)
+
+`src/core/repos/ports/config-schemas.ts` (`reviewTimeoutMs: z.number().optional()`),
+`src/core/run/resolve-review-request.ts` (+`DEFAULT_REVIEW_TIMEOUT_MS = 600_000`),
+`src/core/run/index.ts` barrel, tests in `src/core/repos/__test__/` and
+`src/core/run/__test__/resolve-review-request.test.ts`.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/core/repos/ports/config-schemas.ts` | `GlobalConfigSchema` gains `reviewTimeoutMs: z.number().optional()`, with a comment mirroring the existing `validationTimeoutMs` one: deliberately no `.default()`, the fallback constant lives in `run`. `RepoEntrySchema` untouched — D3 scopes the field to the global config only. |
+| `src/core/run/resolve-review-request.ts` | New. Pure `resolveReviewRequest(input): RunReviewRequest` with design.md's exact signature (`ResolveReviewRequestInput` = `repoAlias`, `targetRef`, `repos`, `config`, `clonesDir`, optional `flags`), plus the exported `DEFAULT_REVIEW_TIMEOUT_MS = 600_000`. Implements design's per-field precedence table verbatim, does the registry lookup itself (`RepoNotFoundError` from `repos`' public barrel, same plain-lookup shape `listBranches` already uses) and calls `resolveEngine` internally. No I/O, no port, no `node:path` — the clone path is string-concatenated exactly as `registerRepo` does it. |
+| `src/core/run/index.ts` | Barrel exports `DEFAULT_REVIEW_TIMEOUT_MS`, `resolveReviewRequest` and its two input types, placed next to `resolveEngine` (D5). The module doc comment records the new public surface. |
+| `src/core/run/__test__/resolve-review-request.test.ts` | New. 25 tests: one or more per row of design's precedence table, all three timeout levels, the missing-harness `InvalidRunRequestError`, `RepoNotFoundError` on an unknown alias, `UnknownEngineError` through the internal `resolveEngine` call. |
+| `src/core/repos/__test__/config-schemas.test.ts` | Appended an `AC-8` describe block (6 tests): a pre-story `config.yaml` shape still parses with the field absent, an empty document keeps every other default, a document carrying the field preserves it, no schema-level default is added (`Object.hasOwn` mutation guard), a non-numeric value is rejected, and `RepoEntrySchema` does not gain the field. |
+
+Nothing else was touched. `persistRun` (S4), the D7 normaliser (S3), `src/adapters/**` (S5-S7) and `src/main/**` (S8-S9) were not created.
+
+### Decisions taken inside the stage
+
+- **A-level, implementation detail:** the registry lookup uses the same plain `repos[alias]` + `=== undefined` shape as the existing `listBranches`, rather than an `Object.hasOwn` guard. A prototype-key alias (`constructor`) would therefore not raise `RepoNotFoundError` — this is pre-existing behaviour shared with `listBranches`, and changing it here would be an unapproved behaviour change to a hardened use case. Recorded as an observation, not fixed in passing.
+- **A-level:** `ResolveReviewRequestFlags` was named and exported as a type alongside `ResolveReviewRequestInput` (design shows the flags object inline). It is the same shape, just nameable by the S7 command; no additional behaviour.
+- Because `exactOptionalPropertyTypes` is on, the optional fields (`limits`, `validations`, `validationTimeoutMs`, and `resolveEngine`'s two override levels) are attached by conditional spread so an absent source stays an absent key rather than an explicit `undefined`. The tests assert this with `Object.hasOwn`.
+
+### Quick checks
+
+Planned validation (plan.md): core unit tests for AC-8 (existing shapes still parse), one test per precedence row incl. all three timeout levels, the missing-harness `InvalidRunRequestError`, `RepoNotFoundError`, `UnknownEngineError`; `npm run check` + `npm test` green with the 500 existing tests intact.
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 120 files in 136ms. No fixes applied.
+
+  ✔ no dependency violations found (82 modules, 176 dependencies cruised)
+  ```
+  82 modules (+1: the new core file), 176 dependencies (+6), **0 violations** — `core-no-io-libs`, `core-no-adapters` and `core-modules-via-index` all still clean; the only cross-module import is `../repos/index.js`.
+- `npm test` → exit **0**
+  ```
+  RUN  v4.1.10 /home/user/sentinel-kit
+
+  Test Files  29 passed (29)
+       Tests  531 passed (531)
+  ```
+  500 → **531 tests** (+31) across 28 → 29 files. Per-file confirmation: `npx vitest run --project core src/core/run/__test__/resolve-review-request.test.ts` → 25 passed; `npx vitest run --project core src/core/repos/__test__/config-schemas.test.ts` → 13 passed (7 pre-existing + 6 new). No pre-existing test changed or was removed.
+
+Skipped: nothing. `e2e/**` stays empty (AC-14). No manual validation is outstanding for this stage — S2 is pure core logic; the integration evidence for `risk-e6h1-006` remains S10's job.
+
+### Blockers
+
+None.
+
+### Next action
+
+S2 is complete and both gates are green. S3 (D7 alias → storage-key normalisation in `core/history`) is the next executor invocation, already authorised under the same `batch-s1-s4` resolution. QA review is **not** recommended yet: S2's blast radius is one new pure core function plus one optional schema field, fully covered by 31 new unit tests, and no caller exists until S7 — QA is better spent once the S1-S4 batch is complete, as recorded after S1.

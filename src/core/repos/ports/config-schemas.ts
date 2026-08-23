@@ -24,6 +24,13 @@ export const GlobalConfigSchema = z.object({
   defaultEngine: EngineNameSchema.default("claude-code"),
   defaultBaseBranch: z.string().default("main"),
   diffLimits: DiffLimitsSchema.optional(),
+  // Default wall-clock budget for the engine invocation of a review, in
+  // milliseconds. Deliberately no `.default()` — the single fallback constant
+  // (`DEFAULT_REVIEW_TIMEOUT_MS`) lives in `run`, so an absent field stays
+  // absent after parsing and the effective value is decided in exactly one
+  // place: `resolveReviewRequest`'s `--timeout` > config > constant cascade
+  // (spec.md AC-8, [E6.F1.H1] D3).
+  reviewTimeoutMs: z.number().optional(),
   // Per-script validation timeout, in milliseconds. Deliberately no
   // `.default()` — the single fallback constant (`DEFAULT_VALIDATION_TIMEOUT_MS`)
   // lives in `run`, and the numeric range guard lives at `runReview`'s stage-1

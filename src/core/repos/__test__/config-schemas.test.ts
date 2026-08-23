@@ -89,3 +89,70 @@ describe("config-schemas — validationTimeoutMs (AC-5)", () => {
     });
   });
 });
+
+// AC-8 ([E6.F1.H1], D3): `reviewTimeoutMs` is added additively and optionally
+// to `GlobalConfigSchema` only (`z.number().optional()`, no `z.default()`).
+// A `config.yaml` written before this story still parses with the field
+// absent, and the fallback stays a `core/run` constant
+// (`DEFAULT_REVIEW_TIMEOUT_MS`) rather than a schema-level default, so
+// `resolveReviewRequest` remains the single place the effective value is
+// decided.
+describe("config-schemas — reviewTimeoutMs (AC-8)", () => {
+  it("parses a pre-story config document, leaving reviewTimeoutMs undefined", () => {
+    const result = GlobalConfigSchema.parse({
+      defaultEngine: "claude-code",
+      defaultBaseBranch: "main",
+      diffLimits: { maxLines: 5000, maxTokens: 80_000 },
+      validationTimeoutMs: 60_000,
+    });
+
+    expect(result.reviewTimeoutMs).toBeUndefined();
+    expect(result.defaultEngine).toBe("claude-code");
+    expect(result.defaultBaseBranch).toBe("main");
+    expect(result.validationTimeoutMs).toBe(60_000);
+  });
+
+  it("parses an empty document, keeping every other default intact", () => {
+    const result = GlobalConfigSchema.parse({});
+
+    expect(result.reviewTimeoutMs).toBeUndefined();
+    expect(result.defaultEngine).toBe("claude-code");
+    expect(result.defaultBaseBranch).toBe("main");
+  });
+
+  it("parses a document carrying reviewTimeoutMs, preserving the value", () => {
+    const result = GlobalConfigSchema.parse({
+      defaultEngine: "claude-code",
+      defaultBaseBranch: "main",
+      reviewTimeoutMs: 120_000,
+    });
+
+    expect(result.reviewTimeoutMs).toBe(120_000);
+  });
+
+  it("does not add a default when reviewTimeoutMs is absent", () => {
+    // Mutation guard: adding `.default(...)` to the field would make this
+    // assertion fail — the field must stay absent, not fall back to a
+    // schema-level default. The single fallback constant belongs to `run`.
+    const result = GlobalConfigSchema.parse({});
+
+    expect(Object.hasOwn(result, "reviewTimeoutMs")).toBe(false);
+  });
+
+  it("rejects a non-numeric reviewTimeoutMs", () => {
+    expect(() =>
+      GlobalConfigSchema.parse({ reviewTimeoutMs: "120000" }),
+    ).toThrow();
+  });
+
+  it("does not add reviewTimeoutMs to RepoEntrySchema", () => {
+    // D3 scopes the field to the global config only; a per-repo review
+    // timeout is not part of this story's config-format change.
+    const result = RepoEntrySchema.parse({
+      url: "https://example.com/repo.git",
+      reviewTimeoutMs: 120_000,
+    });
+
+    expect(Object.hasOwn(result, "reviewTimeoutMs")).toBe(false);
+  });
+});

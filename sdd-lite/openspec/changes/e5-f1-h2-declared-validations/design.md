@@ -267,3 +267,161 @@ None blocking. Two items settled here rather than deferred: the exact rejection-
 - No ratified decision (`dec-001`..`dec-007`) was reopened; every pinned constant and format is carried verbatim.
 - One file appears here that the spec's In Scope table does not name: `src/core/run/__test__/fake-process-runner.ts` (forced by AC-18's import restriction, D-7). It is test-only and inside `src/core/run/`, which AC-20 does not pin.
 - Recommended next stage: `sddl-plan`.
+
+## Amendment 1 — minimal allowlisted environment (fix round, PR #72 / cp-pr-review-r1-001-reopen)
+
+Fix round for the CRITICAL re-raised on PR #72: a declared validation with no rejected shell character (`env`, `printenv`) still inherits the full reviewing-process environment today, because `tokenizeDeclaration`/`REJECTED_SHELL_CHARS` (D-3) reject syntax, not command identity, and `run-validations.ts`'s constructed `ProcessRunRequest` (line ~310-315) never sets `env`, so the adapter's existing overlay-on-inherit default (`[E5.F1.H1]` D2) hands the child the same `process.env` sentinel itself runs under. User-ratified mitigation: the declared validation's child process gets an explicit, minimal, non-secret environment instead of the inherited one — nothing more.
+
+This amendment does **not** reopen D-1..D-7 above or any of dec-001..dec-007; it adds one new port field, one new pre-flight rule, one adapter option mapping, and one construction change inside `runValidations`'s existing loop (D-1's "one production file, pure logic module-private" shape is unchanged — the new logic is two lines of impure construction, not a new pure function).
+
+### A-1 — Empirical findings (probed against the installed `execa@9.6.1`, not documentation)
+
+Ran three cases via `node --experimental-strip-types -e '...'` with a real `SENTINEL_PROBE_SECRET` set on the probing process:
+
+1. **`extendEnv: false` + explicit `env: { PATH, HOME }`** → child's `process.env` keys are exactly `["PATH","HOME"]`. `SENTINEL_PROBE_SECRET` is `undefined`. This is the mechanism the mitigation relies on, confirmed working as expected.
+2. **`extendEnv: false` + NO `env` key at all** → **the child receives the full parent environment**, `SENTINEL_PROBE_SECRET` included, verbatim, alongside every other secret-shaped variable present on the probing process (`GITHUB_TOKEN`, `GH_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `AWS_ACCESS_KEY_ID`, `ANTHROPIC_BASE_URL`, etc. were all present in the dump). **`extendEnv: false` is a no-op unless `env` is also supplied** — execa's own quirk, not a hypothetical. This is the single most important empirical fact in this amendment: a naive `inheritEnv: false` field with no accompanying guard would look safe in a diff and would not be safe at runtime.
+3. **`extendEnv: false` + `env: {}`** → child's `process.env` is genuinely empty (`{}`). Confirms an explicit empty object, not just a present key, is what disables inheritance — so the guard in A-3 below (require `env` to be present, not merely truthy) is the correct shape.
+
+Conclusion: the new field must be **paired with a mandatory pre-flight guard** that refuses to reach the adapter at all when the caller asks to not-inherit but supplies no explicit environment — silently falling back to an "empty env" or, worse, to execa's actual behavior (full inheritance) are both unacceptable; the second one is exactly the vulnerability this amendment closes.
+
+### A-2 — New port field: `ProcessRunRequest.inheritEnv?: boolean`
+
+`src/core/run/ports/process-runner.ts`, on `ProcessRunRequest`, immediately after the existing `env` field:
+
+```ts
+/**
+ * Whether the child inherits the reviewing process's own environment.
+ * `true` or absent (default): unchanged `[E5.F1.H1]` D2 behavior — `env`,
+ * when present, overlays the full inherited parent environment. `false`:
+ * the child receives ONLY `env` — the parent environment is not visible to
+ * it at all. `env` MUST be present when this is `false`
+ * (`InvalidProcessRequestError` otherwise, D2-amend below) — execa's own
+ * `extendEnv:false` is a no-op without an accompanying `env`, empirically
+ * confirmed (design.md Amendment 1, A-1), so this guard is not optional
+ * hardening, it is what makes the field safe to expose at all.
+ */
+readonly inheritEnv?: boolean;
+```
+
+Additive, optional, defaults to the existing behavior when omitted — every caller that does not set it (there are currently none besides this story's own tests) is byte-identical, satisfying `[E5.F1.H1]` D2 verbatim: **D2 is not changed, `inheritEnv` is what lets a caller opt out of it.**
+
+### A-3 — Pre-flight guard: `validateProcessRunRequest` (`src/core/run/process-run-request.ts`)
+
+New rule, appended after the existing `maxOutputChars` check:
+
+```ts
+if (request.inheritEnv === false && request.env === undefined) {
+  throw new InvalidProcessRequestError(
+    "env must be provided when inheritEnv is false (execa's extendEnv:false alone still inherits the full parent environment when no env is given)",
+  );
+}
+```
+
+This function is already called from both real call sites — the adapter's `run()` (`process-runner-exec.ts:46`) and `runValidations`'s own per-entry pre-flight (`run-validations.ts:318`, immediately before `deps.processRunner.run`) — so the guard is exercised on every path with zero new call sites. A caller that sets `inheritEnv: false` and `env: {}` (an explicit, deliberately empty object) passes the guard and gets a genuinely empty child environment (A-1 case 3) — that is a legal, if unusual, request; only *absent* `env` is rejected.
+
+*Alternative considered*: silently defaulting to `env: {}` when `inheritEnv:false` and `env` is omitted, instead of throwing. Rejected — a silent substitution hides a caller bug (they meant to pass an allowlist and forgot) behind behavior that happens to be safe today only because of this specific fallback; a thrown, named error is louder and matches the existing house style of `validateProcessRunRequest` (every other rule here throws rather than coerces).
+
+### A-4 — Adapter translation (`src/adapters/driven/exec/process-runner-exec.ts`)
+
+The existing conditional-spread env line:
+
+```ts
+...(request.env !== undefined ? { env: request.env } : {}),
+```
+
+becomes two conditional spreads, `extendEnv` only ever added when explicitly opting out:
+
+```ts
+...(request.inheritEnv === false ? { extendEnv: false } : {}),
+...(request.env !== undefined ? { env: request.env } : {}),
+```
+
+When `inheritEnv` is `true` or absent, the option bag is byte-identical to today's — `extendEnv` is never mentioned, so execa's own default (`true`) governs, which is `[E5.F1.H1]` D2's overlay behavior, unchanged. When `inheritEnv` is `false`, `validateProcessRunRequest` (A-3) has already guaranteed `request.env` is present, so `extendEnv: false` is always paired with an explicit `env` in the option bag reaching execa — the A-1 case-2 footgun (case where `extendEnv:false` reaches execa alone) is structurally unreachable through this adapter.
+
+### A-5 — `run-validations.ts`'s minimal allowlist
+
+Two new module-private constants plus a two-line change to the per-entry request construction (still inside the existing `for…of` loop, D-1's shape unchanged):
+
+```ts
+/**
+ * The complete, hardcoded, non-configurable set of environment variables a
+ * declared validation's child process receives (PR #72 / R1-001 fix,
+ * design.md Amendment 1). Deliberately minimal: PATH so the child can
+ * locate its own interpreter/binary at all (npm, node, python, ...) and
+ * HOME because most real-world build/test toolchains read it for config
+ * or cache directories (npm's cache, git config lookup, venv resolution)
+ * and fail or misbehave without it. Everything else the reviewing
+ * process's own environment carries — cloud credentials
+ * (AWS_SECRET_ACCESS_KEY, AWS_ACCESS_KEY_ID), CI/VCS tokens (GITHUB_TOKEN,
+ * GH_TOKEN), and sentinel's own LLM API key — is excluded by construction:
+ * this is a strict allowlist, so anything not named here never reaches the
+ * child, full stop.
+ */
+const VALIDATION_ALLOWED_ENV_VAR_NAMES = ["PATH", "HOME"] as const;
+
+function buildValidationEnv(): Readonly<Record<string, string>> {
+  const env: Record<string, string> = {};
+  for (const name of VALIDATION_ALLOWED_ENV_VAR_NAMES) {
+    const value = process.env[name];
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
+}
+```
+
+computed **once**, before the `for…of` loop (not per entry — the value cannot change mid-run and recomputing would be pure waste), and threaded into the request built for every entry:
+
+```ts
+const validationEnv = buildValidationEnv();
+// ...inside the loop, added to the existing processRequest literal...
+const processRequest: ProcessRunRequest = {
+  command,
+  args,
+  cwd: request.cwd,
+  timeoutMs,
+  inheritEnv: false,
+  env: validationEnv,
+};
+```
+
+`process.env` is a Node global read, not an import of an I/O library, so `depcruise`'s `core-no-io-libs` rule (which polices import specifiers) does not flag it — the same reasoning already lets `git-cli.ts` read `process.env` in an adapter; here it happens in core because the allowlist *is* domain logic the story owns (D-1's "one production file" already puts every interpretive quirk of this story in `run-validations.ts`), not an adapter concern. It is the one place in `src/core/run` that touches `process.env`, and it is documented as such. This is a deliberate, narrow, justified exception; it does not read any I/O library and does not make the function's *interpretive* logic (tokenizer, window, formatter — still 100% pure) impure — only the already-impure `for…of` body gains one more environment read alongside its existing `await deps.processRunner.run(...)`.
+
+**What is deliberately excluded** (the allowlist makes this automatic, but naming the sharpest examples for the audit trail): `GITHUB_TOKEN` / `GH_TOKEN` (repo write credentials), `AWS_SECRET_ACCESS_KEY` / `AWS_ACCESS_KEY_ID` (cloud credentials), and sentinel's own LLM API key (`ANTHROPIC_API_KEY`-shaped) — all three classes were directly observed present in the A-1 probe's environment dump alongside the marker secret.
+
+*Alternative considered*: a configurable allowlist (repo config gains a `validationEnv: string[]` field). Rejected — the spec explicitly scoped `[E5.F1.H2]` to zero new config surface beyond `validationTimeoutMs` (ST-1, already shipped), and a user-configurable allowlist reopens exactly the kind of public-config-format decision the spec's Out of Scope table already closed for this story; PATH+HOME is sufficient for the MVP's stated toolchains (`npm test`, `npm run check`-shaped commands) and a configurable allowlist is a clean, additive fast-follow if a real toolchain needs more.
+
+### A-6 — New acceptance criterion: AC-22 (for `spec.md`)
+
+> **AC-22**: A declared validation's spawned child process receives exactly the minimal allowlisted environment (`PATH`, `HOME`) and nothing else from the reviewing process's own environment — proven at two levels: (a) a real-child-process adapter test sets a marker environment variable on the *test* process, runs a validation-shaped request through the real `createExecProcessRunner()` with `inheritEnv: false` and an explicit `{ PATH, HOME }` env, and asserts the marker is **absent** from the child's captured `process.env` dump while `PATH` and `HOME` are **present** and match the values passed; (b) a `run-validations.ts` unit test (via the fake) asserts the exact `ProcessRunRequest` constructed for every declared entry carries `inheritEnv: false` and `env` equal to `{ PATH: process.env.PATH, HOME: process.env.HOME }` (whichever of the two is actually defined on the test process), proving the wiring independent of any real child process.
+
+Proof sites: (a) `src/adapters/driven/exec/__test__/process-runner-exec.test.ts` (new case) and the shared `ProcessRunner.contract.ts` (new case, A-7); (b) `src/core/run/__test__/run-validations.test.ts` (new case, extending the existing per-entry request-shape assertions).
+
+### A-7 — Backward compatibility: does `ProcessRunner.contract.ts` need a case?
+
+**Yes — two new cases**, because the guarantee is a promise of the *port*, not an execa implementation detail:
+
+1. `"rejects with InvalidProcessRequestError when inheritEnv is false and env is omitted"` — this is `validateProcessRunRequest`'s own rule (A-3), already exercised by every conforming adapter's `run()` by construction (the existing "malformed request" contract case already establishes that request pre-flight is a contract-suite-level concern, not an exec-only one).
+2. `"the child receives none of the calling process's environment beyond an explicitly supplied allowlist when inheritEnv is false"` — spawns `process.execPath` with an inline script dumping `process.env` (matching the contract suite's existing `["-e", ...]` pattern), sets a marker var on the *test* process, passes `inheritEnv: false, env: { PATH: process.env.PATH ?? "" }`, and asserts the marker is absent while `PATH` is present. Any future non-execa `ProcessRunner` implementation must satisfy this or the shared suite fails for it — that is exactly what the contract suite exists to pin.
+
+The execa-specific quirk itself (A-1 case 2: `extendEnv:false` alone still inherits everything) is **not** re-asserted in the contract suite — it is an implementation detail of one adapter, not a port promise, and is instead documented as a regression-guard comment (not a new production behavior) directly above the mapping in `process-runner-exec.ts` (A-4) and covered by the existing "malformed request" pre-flight rejection, which makes the dangerous state unreachable through this adapter regardless of which execa version is installed.
+
+### A-8 — `spec.md` diff (for the plan/executor stage; not edited here)
+
+- **New AC-22** appended after AC-21, exact text per A-6.
+- **AC-20's untouched-files list**: remove `src/core/run/ports/process-runner.ts` and `src/adapters/driven/exec/**` from the pinned-untouched set. New complete touched-file list for this fix round (on top of the 11 files ST-1..ST-4 already touched, listed in Affected Areas above):
+  - `src/core/run/ports/process-runner.ts` — modified (A-2, new `inheritEnv` field)
+  - `src/core/run/process-run-request.ts` — modified (A-3, new pre-flight rule)
+  - `src/core/run/__test__/process-run-request.test.ts` — modified (new case for A-3's rule)
+  - `src/core/run/run-validations.ts` — modified (A-5, allowlist construction + `inheritEnv: false` in the built request)
+  - `src/core/run/__test__/run-validations.test.ts` — modified (AC-22(b))
+  - `src/core/run/__test__/fake-process-runner.ts` — modified (`FakeProcessRunnerCall` must additionally capture `env` and `inheritEnv` so AC-22(b) can assert on them; the fake does not otherwise change behavior)
+  - `src/adapters/driven/exec/process-runner-exec.ts` — modified (A-4, `extendEnv` mapping)
+  - `src/adapters/driven/exec/__test__/process-runner-exec.test.ts` — modified (AC-22(a), plus the A-1 case-2 regression-guard comment's paired test)
+  - `src/adapters/driven/exec/__test__/ProcessRunner.contract.ts` — modified (A-7, two new cases)
+- Still untouched by this fix round: `src/main/**`, `src/core/review/**`, `src/core/workspace/**`, `src/core/repos/**`, `src/core/history/**`, `src/adapters/driven/exec/classify-execa-result.ts` (result classification is unaffected — only the outbound option bag changes) and its test, `src/adapters/driven/git/**`, both engine seams' own `process-runner.ts` files (confirmed zero other production consumers of `createExecProcessRunner`, orchestrator grep). No new npm dependency.
+
+### A-9 — Blast-radius statement
+
+No file outside the nine listed in A-8 needs to change. The change is purely additive at the port (`inheritEnv?: boolean`, optional, unset = today's behavior) and purely additive at the adapter (a new conditional spread that only ever fires when the new field is explicitly `false`). `[E5.F1.H1]` D2 (`env` overlays the inherited environment by default) is preserved byte-for-byte for every caller that does not set `inheritEnv` — confirmed by A-4's mapping never emitting `extendEnv` unless `inheritEnv === false`, and confirmed by A-1 case 1 showing the opt-out mechanism itself works as intended once paired with the A-3 guard. `createExecProcessRunner` has zero other production consumers (orchestrator-confirmed grep, restated in the checkpoint), so the adapter's option-bag translation change has no blast radius beyond this story's own tests and the two new contract cases.
+
+- Recommended next stage after this amendment: `sddl-plan` (fix stage — one new plan stage covering A-2..A-8, sequenced after the already-merged ST-1..ST-4, with its own targeted validation command and a mutation-testing note for the A-3 guard).

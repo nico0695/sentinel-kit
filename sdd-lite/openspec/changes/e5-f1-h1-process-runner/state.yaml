@@ -1,0 +1,426 @@
+version: "0.1"
+change_name: e5-f1-h1-process-runner
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F1.H1] (issue #31), third story of the E5 milestone: introduce ProcessRunner, the
+    second driven port of src/core/run and the last unimplemented port of the PRD 4.3 MVP
+    catalog, plus its execa-backed adapter in the currently-empty src/adapters/driven/exec/.
+    Mechanically low-risk: two structurally identical private precedents already exist in-repo
+    (ClaudeCodeProcessRunner and OpenCodeProcessRunner), execa is already a runtime dependency,
+    and the contract-suite convention is established by four prior suites. Risk is concentrated
+    in two non-mechanical places: proving the timeout genuinely reaps a child that ignores
+    SIGTERM (not merely that the promise settles), and deciding where the "only declared scripts
+    executable" guarantee of the dependent story [E5.F1.H2] is enforced -- in this port, or in a
+    caller that does not exist yet.
+  confidence: high
+  recorded_at: "2026-08-22T23:10:00Z"
+lifecycle_status: completed
+current_stage: none
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. A medium-breadth read-only exploration at proposal stage was
+      sufficient: both engine process-runner.ts seams, git-cli.ts, package.json, src/core/run/
+      ports/, the four existing contract suites, and docs/setup-tecnico-sentinel.md section 4
+      are all directly readable and jointly determine the adapter's shape.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-22T23:00:00Z"
+    completed_at: "2026-08-22T23:10:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/run/index.ts (which names
+      this story as ProcessRunner's landing point), src/adapters/driven/exec/index.ts (an empty
+      placeholder naming the same story), both engines' process-runner.ts seams (the proven
+      execa option bag and resolve-not-reject contract), src/adapters/driven/git/git-cli.ts
+      (error-translation and isAbsolute pre-spawn guard precedent), the GitPort/ReviewEngine/
+      RunStore contract suites (shared-suite convention), and docs/backlog-mvp-sentinel.md
+      lines 269-279. Four open questions recorded, two B-level.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-22T23:10:00Z"
+    completed_at: "2026-08-22T23:40:00Z"
+    notes: >-
+      spec.md written, then re-derived as revision 2. Revision 1 specified the execa option bag
+      from the two in-repo engine seams and execa's README; revision 2 re-verified every claim by
+      running live probes against the installed execa 9.6.1 and reading its lib/. Four
+      assumptions were wrong and one was inherited from a false comment in already-merged code:
+      (R1) reject:false means nothing rejects at all, so a nonexistent binary would have silently
+      resolved as an empty result -- and both engine seams' doc comments assert the opposite;
+      (R2) maxBuffer counts characters, not bytes; (R3) isMaxBuffer is global, not per-stream;
+      (R4) stripFinalNewline defaults true and silently eats the trailing newline of every
+      capture; (R5) a child that both overflows the budget and hangs reports timedOut:false, the
+      most likely real hung-validation shape, which no revision-1 AC covered; (R6) AC-1/AC-9's
+      test hints referenced a pid the port does not expose. 15 ACs became 17 (new AC-16, AC-17)
+      and a third B-level decision (D3) was added. Downstream constraints for [E5.F1.H2] recorded
+      explicitly rather than left to rediscovery.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-22T23:45:00Z"
+    completed_at: "2026-08-22T23:55:00Z"
+    notes: >-
+      design.md written after the user ratified D1/D2/D3. Central choice: concentrate every
+      revision-2 empirical finding into ONE pure exported function (classifyExecaResult) that
+      turns execa's single resolved value into either a ProcessRunResult or a ProcessSpawnError,
+      leaving the impure adapter trivial. This makes the awkward cases (overflow-then-hang,
+      EACCES, signal-without-exit-code) unit-testable with zero child processes, while the
+      real-child suite is reserved for what only a real process can prove -- above all AC-1's
+      reaping of a SIGTERM-trapping child. Request validation is split: plain guard clauses in
+      core (matching runReview's existing style; run has never imported zod), with cwd
+      absoluteness delegated to the adapter's node:path isAbsolute, following the precedent
+      run-review.ts:59-62 already documents for the identical reason.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-23T00:00:00Z"
+    completed_at: "2026-08-23T02:05:00Z"
+    notes: >-
+      plan.md written, 4 stages following design.md's own recommended sequencing: ST-1 core
+      types + guard-clause pre-flight + two new errors (pure, no execa/fs); ST-2 the pure
+      classify-execa-result.ts function carrying all six of spec revision 2's empirical findings,
+      unit-tested with hand-built result records and zero spawning; ST-3 the impure adapter shell
+      wiring the pinned execa option bag to the classifier, plus the sixth ProcessRunner.contract.ts;
+      ST-4 the real-child suite (AC-1's reaping is the load-bearing case) as the closing gate,
+      re-verifying AC-15. No stage wires the port into runReview or any caller -- ships uncalled,
+      matching both prior E5 stories' precedent. All four completed and independently re-verified.
+      ST-5 appended post-review (R4-001 fix, cp-review-gate authorized): ProcessSpawnError.cause
+      grows command/args/cwd so it actually honors run-errors.ts's own "raw error preserved for
+      observability" contract.
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-23T00:15:00Z"
+    completed_at: "2026-08-23T02:15:00Z"
+    notes: >-
+      All 5 stages completed and independently re-verified at every step (npm run check + npm
+      test re-run fresh per stage, diff-scope confirmed via git status/diff, source read
+      directly -- never merely trusted from the executor workers' self-reports). ST-4's closing
+      gate independently re-confirmed against the correct merge-base (origin/main at 8c080cb,
+      post-[E5.F2.H2]-merge): full story diff is exactly 11 files under src/ (680 insertions, 3
+      deletions), zero touch to src/core/run/run-review.ts, src/adapters/driven/git/**, or
+      src/adapters/driven/engines/** (AC-15), zero execa import under src/core/** (grep-confirmed
+      beyond depcruise's 0 violations). ST-5 (fix stage for review-ledger R4-001) also completed
+      and independently re-verified: diff scoped to exactly the 4 named files, regression test
+      assertions read directly (toMatchObject on cause), mutation proof narration cross-checked.
+      401 tests green, up from 375 at session start.
+  sddl-code-review:
+    status: completed
+    started_at: "2026-08-23T01:45:00Z"
+    completed_at: "2026-08-23T02:15:00Z"
+    notes: >-
+      full-4r review (4 lenses parallel) found 1 confirmed CRITICAL (R4-001, deterministic) + 6
+      info-tier findings. R4-001 fixed in ST-5, mutation-proven. 0 open severe findings at close.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-23T02:55:00Z"
+    completed_at: "2026-08-23T03:05:00Z"
+    notes: >-
+      final mode. All 17 ACs independently re-verified against current source (not trusted from
+      execution-log.md). npm run check/test re-run fresh (114 files, 401 tests). AC-15 confirmed
+      via independently re-derived merge-base. Full story diff exactly 11 files. review-ledger.md
+      consumed as evidence (R4-001 fix spot-checked directly, not re-derived). 2 new low-severity
+      findings (QA-101, QA-102), both non-blocking. Verdict pass_with_warnings.
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    17/17 acceptance criteria independently re-verified against current source and tests, not
+    trusted from execution-log.md's narrative. npm run check and npm test both fresh-green (114
+    files, 401 tests). AC-15 confirmed via an independently re-derived merge-base
+    (git merge-base origin/main HEAD), protected-file diff empty, zero execa import under
+    src/core/**. Full story diff exactly the 11 expected files. review-ledger.md consumed as
+    evidence (verdict pass_with_warnings, 0 open severe) -- R4-001's fix spot-checked directly in
+    current source rather than taken on trust. Two new low-severity findings (QA-101: AC-2's
+    real-child test doesn't explicitly assert pre-kill output survival, indirectly covered by
+    AC-1's test; QA-102: re-confirms ledger R3-001's relative-cwd test gap still holds). Neither
+    blocks closure. lifecycle_status set to completed.
+  reported_at: "2026-08-23T03:05:00Z"
+  report_path: sdd-lite/openspec/changes/e5-f1-h1-process-runner/qa-report.md
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f1-h1-process-runner/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f1-h1-process-runner/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f1-h1-process-runner/spec.md
+  design: sdd-lite/openspec/changes/e5-f1-h1-process-runner/design.md
+  plan: sdd-lite/openspec/changes/e5-f1-h1-process-runner/plan.md
+  execution_log: sdd-lite/openspec/changes/e5-f1-h1-process-runner/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e5-f1-h1-process-runner/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e5-f1-h1-process-runner/review-ledger.md
+checkpoints:
+  - id: cp-story-selection
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      Which remaining required E5 story to run next, after [E5.F2.H2] merged as PR #70 and left
+      #31 (ProcessRunner) and #32 (declared validations) as the only required E5 stories open.
+    question: "Which E5 story do we continue with?"
+    options:
+      - id: opt-31
+        label: "#31 ProcessRunner"
+        description: >-
+          [E5.F1.H1] ProcessRunner port + exec adapter -- safe execution of declared processes
+          with timeout, capture and cwd in the worktree.
+      - id: opt-32
+        label: "#32 Declared validations"
+        description: >-
+          [E5.F1.H2] Declared validations in the review flow -- repo scripts feed the review
+          context.
+    free_input_allowed: true
+    response:
+      selected_option_id: opt-31
+      responded_at: "2026-08-22T23:00:00Z"
+    created_at: "2026-08-22T22:55:00Z"
+    resolved_at: "2026-08-22T23:00:00Z"
+  - id: cp-spec-approval
+    type: stage_approval
+    stage: sddl-spec
+    summary: >-
+      Ratification of the spec's three B-level decisions after revision 2, whose empirical
+      re-derivation against execa 9.6.1 invalidated four revision-1 assumptions and added D3.
+    question: >-
+      Ratify D1 (the "only declared scripts" guarantee lives in [E5.F1.H2], not in this port),
+      D2 (env inherits the parent environment with an optional overlay) and D3 (the adapter
+      classifies execa's resolved result itself, since reject:false means nothing rejects)?
+    free_input_allowed: true
+    response:
+      free_text: "ratifico las tres, avanza con el design"
+      responded_at: "2026-08-22T23:45:00Z"
+    created_at: "2026-08-22T23:40:00Z"
+    resolved_at: "2026-08-22T23:45:00Z"
+  - id: cp-st1-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: Approval to execute ST-1 — core ProcessRunner surface (types, pre-flight, errors, barrel).
+    question: "Proceed with ST-1?"
+    free_input_allowed: true
+    response:
+      free_text: "si, avanza con ST-1"
+      responded_at: "2026-08-23T00:15:00Z"
+    created_at: "2026-08-23T00:12:00Z"
+    resolved_at: "2026-08-23T00:15:00Z"
+  - id: cp-st2-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: Approval to execute ST-2 — the pure classify-execa-result.ts function.
+    question: "Proceed with ST-2?"
+    free_input_allowed: true
+    response:
+      free_text: "si, avanza con ST-2"
+      responded_at: "2026-08-23T00:35:00Z"
+    created_at: "2026-08-23T00:32:00Z"
+    resolved_at: "2026-08-23T00:35:00Z"
+  - id: cp-st3-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: Approval to execute ST-3 — the impure adapter shell + ProcessRunner.contract.ts.
+    question: "Proceed with ST-3?"
+    free_input_allowed: true
+    response:
+      free_text: "si, avanza con ST-3"
+      responded_at: "2026-08-23T01:00:00Z"
+    created_at: "2026-08-23T00:55:00Z"
+    resolved_at: "2026-08-23T01:00:00Z"
+  - id: cp-st4-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: Approval to execute ST-4 — real-child test suite, the story's closing gate.
+    question: "Proceed with ST-4?"
+    free_input_allowed: true
+    response:
+      free_text: "si, avanza con ST-4"
+      responded_at: "2026-08-23T01:20:00Z"
+    created_at: "2026-08-23T01:18:00Z"
+    resolved_at: "2026-08-23T01:20:00Z"
+  - id: cp-review-gate
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      1 confirmed CRITICAL finding (R4-001): ProcessSpawnError.cause strips command/args/cwd,
+      defeating the port's stated "raw error preserved for observability" contract. Active
+      change, finding is inside approved scope (a fix within classify-execa-result.ts's
+      ExecaLikeResult shape / process-runner-exec.ts's object construction, not a new file).
+    question: >-
+      Fix R4-001 now via a new sddl-plan fix stage (rerun plan to insert one bounded stage,
+      stage_approval, then sddl-executor), or defer and close with it open?
+    free_input_allowed: true
+    response:
+      free_text: "si, corré el plan para arreglar R4-001"
+      responded_at: "2026-08-23T02:00:00Z"
+    created_at: "2026-08-23T01:55:00Z"
+    resolved_at: "2026-08-23T02:00:00Z"
+  - id: cp-st5-approval
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Approval to execute ST-5 -- the R4-001 fix stage: ProcessSpawnError.cause grows
+      command/args/cwd in both classify-execa-result.ts's ExecaLikeResult and
+      process-runner-exec.ts's object construction, with regression tests at both the pure
+      classifier and the real-process boundary.
+    question: "Proceed with ST-5?"
+    free_input_allowed: true
+    response:
+      free_text: "si, corré el plan para arreglar R4-001"
+      responded_at: "2026-08-23T02:00:00Z"
+    created_at: "2026-08-23T02:00:00Z"
+    resolved_at: "2026-08-23T02:00:00Z"
+decisions:
+  - id: dec-st5-approval
+    checkpoint_id: cp-st5-approval
+    free_text: "si, corré el plan para arreglar R4-001"
+    rationale: >-
+      Single user message both authorized rerunning sddl-plan (which appended ST-5) and
+      approved executing it, matching [E5.F2.H2]'s S23 precedent where the review_gate
+      authorization and the fix-stage approval were the same user turn.
+    recorded_at: "2026-08-23T02:00:00Z"
+  - id: dec-st4-approval
+    checkpoint_id: cp-st4-approval
+    free_text: "si, avanza con ST-4"
+    rationale: User approved ST-4 execution as planned, no changes to scope.
+    recorded_at: "2026-08-23T01:20:00Z"
+  - id: dec-st3-approval
+    checkpoint_id: cp-st3-approval
+    free_text: "si, avanza con ST-3"
+    rationale: User approved ST-3 execution as planned, no changes to scope.
+    recorded_at: "2026-08-23T01:00:00Z"
+  - id: dec-st2-approval
+    checkpoint_id: cp-st2-approval
+    free_text: "si, avanza con ST-2"
+    rationale: User approved ST-2 execution as planned, no changes to scope.
+    recorded_at: "2026-08-23T00:35:00Z"
+  - id: dec-st1-approval
+    checkpoint_id: cp-st1-approval
+    free_text: "si, avanza con ST-1"
+    rationale: User approved ST-1 execution as planned, no changes to scope.
+    recorded_at: "2026-08-23T00:15:00Z"
+  - id: dec-story-selection
+    checkpoint_id: cp-story-selection
+    selected_option_id: opt-31
+    rationale: >-
+      User selected #31. It is also the dependency-correct order: the backlog marks [E5.F1.H2]
+      as depending on [E5.F1.H1], so running #32 first would require inventing the port anyway.
+    recorded_at: "2026-08-22T23:00:00Z"
+  - id: dec-spec-b-level
+    checkpoint_id: cp-spec-approval
+    free_text: "ratifico las tres"
+    rationale: >-
+      User ratified all three B-level decisions verbatim. D1 rests on a fact discovered during
+      spec work: repos' config already declares validations as string[], so provenance is not
+      something this port could verify even in principle. D2 follows both engine seams, which
+      already overlay rather than replace the environment. D3 was forced by empirical evidence
+      that reject:false makes execa resolve every failure, so the resolve-vs-throw judgment
+      cannot be delegated to the library.
+    recorded_at: "2026-08-22T23:45:00Z"
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 1
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 6
+  summary: >-
+    full-4r tier (680 changed lines, process-spawning surface). 4 lens sweeps launched in
+    parallel: R1 Risk found 1 WARNING (per-stream truncation flag can false-positive when a
+    non-overflowing stream's length exactly equals the budget); R2 Readability found 1 SUGGESTION
+    (stripFinalNewline:false undocumented); R3 Reliability found 0 correctness defects, 2
+    WARNING + 1 SUGGESTION test-coverage gaps (relative-cwd rejection, env overlay, default
+    budget path all untested); R4 Resilience found 1 CRITICAL (ProcessSpawnError.cause strips
+    command/args/cwd, defeating the port's own "raw error preserved for observability"
+    contract) plus 1 WARNING (no process-group kill, so a forking command's grandchildren can
+    outlive the timeout). 0 refuter passes -- the sole CRITICAL is evidence_class:deterministic,
+    independently re-verified by the orchestrator via direct code reading before merging (per
+    ledger contract, deterministic findings are never refuted). R4-001 fixed in ST-5
+    (user-authorized at cp-review-gate), independently verified by mutation. 0 open severe
+    findings; 6 info-tier rows remain, non-blocking, optional follow-up (R4-002/risk-007 in
+    particular).
+  reported_at: "2026-08-23T02:15:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f1-h1-process-runner/review-ledger.md
+open_risks:
+  - id: risk-001
+    summary: >-
+      A port exposing run(command, args) is the largest execution surface added to this codebase
+      so far. The "only declared scripts executable" guarantee belongs to [E5.F1.H2], which does
+      not exist yet -- so unless this port constrains its input structurally, the story ships an
+      unconstrained execution primitive with no enforcing caller. Spec must resolve where the
+      guarantee lives.
+    severity: high
+  - id: risk-002
+    summary: >-
+      Acceptance criterion 1 ("timeout kills the process") is provable only by a test whose child
+      deliberately ignores SIGTERM, so that forceKillAfterDelay's SIGKILL is what actually reaps
+      it, plus a post-hoc liveness assertion. A test asserting only timedOut === true would pass
+      against an adapter that leaks orphaned processes.
+    severity: medium
+  - id: risk-003
+    summary: >-
+      Captured stdout/stderr feeds a prompt in [E5.F1.H2]. Without a truncation policy, a single
+      verbose npm test run can produce megabytes of prompt input, and execa's maxBuffer becomes
+      an unhandled failure mode. Whether truncation lives in this port (with a truncated flag,
+      mirroring [E2.F3.H2]'s diff size policy) or in the caller is undecided.
+    severity: medium
+  - id: risk-004
+    summary: >-
+      The two existing engine process-runner.ts seams are near-duplicates of this port's job.
+      Retrofitting them (and git-cli.ts, which has no timeout at all) onto ProcessRunner is
+      explicitly out of scope here, but leaving three parallel execution paths in the codebase is
+      a real duplication debt worth a follow-up backlog item.
+    severity: low
+  - id: risk-005
+    summary: >-
+      Both merged engine process-runner.ts seams carry a doc comment asserting "Only a genuine
+      spawn failure (ENOENT, permission denied) REJECTS". Verified false for execa 9 under
+      reject:false -- nothing rejects. The comment is wrong in already-merged code, which means
+      the claude-code and opencode adapters' preflight "rejection -> EngineUnavailableError"
+      paths may be unreachable, and a missing engine binary may surface as a confusing parse
+      error instead. Out of scope for this story (AC-15 pins both adapters untouched), but it is
+      a real latent defect in E4 code and should become its own backlog item rather than being
+      silently absorbed into risk-004's retrofit.
+    severity: medium
+  - id: risk-006
+    summary: >-
+      timedOut is derived as "terminated by a signal AND elapsed >= timeoutMs" because execa's
+      own result.timedOut is false when output truncation preceded the kill (spec revision 2,
+      R5). Boundary condition: a child signalled by something other than the timeout at almost
+      exactly the budget instant is reported timedOut:true. The window is a scheduling tick and
+      the misreport is benign (the run did consume its whole budget), whereas trusting
+      result.timedOut is wrong in a case that actually occurs. Accepted deliberately, recorded
+      rather than hidden.
+    severity: low
+  - id: risk-007
+    summary: >-
+      4R review finding R4-002 (WARNING, info-tier, non-blocking): the adapter never sets
+      `detached`/process-group options, so the timeout kill targets only the immediate child
+      pid via execa's direct subprocess.kill(), never a process-group kill. Any command that
+      itself forks (a shell wrapper, a test runner invoking sub-processes) can leave
+      grandchildren alive past the "hard wall-clock budget." AC-1's reaping proof only covers a
+      single non-forking leaf process. Recorded as a real, evidenced gap for [E5.F1.H2] or a
+      future hardening pass to consider -- not fixed here since it is not blocking and the
+      review budget favors a narrow fix round for the one CRITICAL finding only.
+    severity: low
+  - id: risk-008
+    summary: >-
+      QA-101 (final QA, low): AC-2's real-child test asserts timedOut:true but doesn't itself
+      also assert pre-kill output survival in that specific test -- coverage exists indirectly
+      via AC-1's reaping test, which does capture a pre-kill stdout line, so AC-2 is not left
+      unproven. Optional: add an explicit "prints then hangs, output preserved" case in a future
+      pass. Non-blocking.
+    severity: low
+  - id: risk-009
+    summary: >-
+      QA-102 (final QA, low): re-confirms review-ledger R3-001 still holds on a fresh
+      independent read -- no test anywhere exercises the adapter's own relative-cwd rejection
+      path (process-runner-exec.ts:52-56), only the "does NOT reject at the core layer" side of
+      D-2 is tested. Not a new defect, restated for closeout completeness; carried forward as
+      optional follow-up per the ledger's own disposition.
+    severity: low
+next_action:
+  kind: complete
+  target: none
+  summary: >-
+    Change completed. Per workflow contract rule 6, [E5.F1.H1] unblocks [E5.F1.H2] (#32), the
+    only remaining required E5 story -- epic not yet fully in open/merged PRs, so the
+    epic-summary-and-STOP rule does not trigger yet. Mandatory history-log entry still pending
+    before session close. PR (Closes #31) only opens on explicit user instruction.
+created_at: "2026-08-22T23:00:00Z"
+updated_at: "2026-08-23T03:10:00Z"

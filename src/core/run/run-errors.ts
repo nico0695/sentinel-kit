@@ -75,6 +75,34 @@ export class EngineTimeoutError extends RunError {
   }
 }
 
+/**
+ * Raised by `validateProcessRunRequest` when a `ProcessRunRequest` is
+ * malformed (empty `command`, empty `cwd`, non-positive/non-finite
+ * `timeoutMs`, or an invalid `maxOutputChars`) — before any process is
+ * spawned. An EXPECTED domain outcome, not a bug: `cause` is intentionally
+ * not populated, mirroring `InvalidRunRequestError`.
+ */
+export class InvalidProcessRequestError extends RunError {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidProcessRequestError";
+  }
+}
+
+/**
+ * Raised by the `ProcessRunner` adapter when the process never actually ran
+ * (a nonexistent binary, a non-executable file, an unusable `cwd`, …). The
+ * raw underlying error is preserved in `cause` for observability — the core
+ * never names the process-execution library's own error types (guard 2
+ * `core-no-io-libs`).
+ */
+export class ProcessSpawnError extends RunError {
+  constructor(message: string, options?: RunErrorOptions) {
+    super(message, options);
+    this.name = "ProcessSpawnError";
+  }
+}
+
 /** The cascade level a rejected `resolveEngine` value came from (PRD §3.1-D). */
 export type EngineResolutionLevel = "run" | "repo" | "global";
 

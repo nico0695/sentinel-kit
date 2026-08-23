@@ -166,6 +166,19 @@ stages:
       writing code: the guard belongs to runReview's stage-1 pre-flight (ST-3). Independently
       re-verified by the orchestrator: git diff confined to the two named files, npm run check clean
       (tsc, depcruise 0 violations), full npm test 408/408 passed. Discharges AC-5.
+      ST-2 completed: entire pure-function surface in run-validations.ts (runValidations,
+      validateValidationDeclarations, tokenizeDeclaration with the pinned rejection set as a literal
+      Set + codepoint predicate, windowStream/formatOutcomeElement/formatSpawnFailureElement with D-5
+      windowing and D-6's terminated() concatenation), InvalidValidationDeclarationError in
+      run-errors.ts, standalone ProcessRunner fake (D-7), barrel exports for this surface only. 71
+      new tests discharge AC-2, AC-4 (default half), AC-6, AC-7, AC-8, AC-14, AC-15, AC-18, AC-21.
+      Mutation testing performed and reverted: (1) AC-7 rejection set swapped for a regex also
+      matching "=" -- the --foo=bar accept-case tests failed as required; (2) terminated()
+      concatenation swapped for parts.join("\n") -- 5 tests failed on the blank-line-before-header
+      case; (3) elided flag dropped from truncated computation -- the 300-line overflow test's
+      truncated=true assertion failed. All three reverted, re-confirmed clean. Independently
+      re-verified by the orchestrator: git diff confined to the 5 named files, npm run check clean,
+      npx vitest -t "run-validations" 71/71 passed. No deviation from plan/spec/design.
   sddl-qa-review:
     status: pending
 artifacts:

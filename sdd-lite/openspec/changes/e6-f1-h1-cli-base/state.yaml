@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -63,7 +63,35 @@ stages:
       RunReviewDeps/RunReviewResult, the exported use-case request shapes, and that listBranches
       lives in core/repos with no command in this story.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T23:00:00Z"
+    completed_at: "2026-08-23T23:00:00Z"
+    notes: >-
+      design.md written with D1-D6 as fixed inputs. Fixes the CLI adapter structure
+      (createCli(deps) -> SentinelCli { run(argv): Promise<number> }, exitOverride +
+      configureOutput bound to an injected CliIo, three command modules, four pure render
+      modules), the composition root split (src/main/{cli,container,paths}.ts), the sentinel
+      home layout under D2's root (config.yaml, repos.yaml, harnesses/, skills/, clones/,
+      worktrees/, runs/) with resolveSentinelHome/sentinelPaths/resolvePackageRoot, persistRun's
+      signature and RunRecord composition rules (diff reduced to RunDiffSummary via warning
+      messages, failure reduced to {stage,message}), and resolveReviewRequest's signature with a
+      per-field precedence table that calls resolveEngine internally. Six A-level decisions
+      recorded (A-1 run(argv) facade, A-2 bound use-case thunks, A-3 throw instead of defaulting
+      the harness, A-4 widen the adapters vitest include to src/main/**/__test__, A-5 loadContext
+      thunk in container.ts rather than a third core use case, A-6 per-invocation engine
+      construction). Status is partial because design surfaced OQ-D1, a real integration mismatch
+      that gates safe planning: registerRepo's alias is `owner/repo` while
+      RunRecordPathFieldsSchema/RunQueryFieldsSchema reject any repoName containing a path
+      separator (RunStore.contract.ts AC-19), so review/runs would fail on every registered repo
+      until someone owns the normalisation. Recommended option (a) normalises inside core/history
+      with a module-private helper used by persistRun, listRuns and getRun -- no new public
+      export, no signature change, but a behaviour change to two existing use cases, hence
+      B-level. OQ-D2 (opencode's mandatory `model` with no config source; recommendation:
+      SENTINEL_OPENCODE_MODEL read in container.ts) is non-blocking for planning.
+    orchestrator_note: >-
+      Returned partial on OQ-D1/OQ-D2; both resolved by the user at
+      cp-design-integration-decisions as D7 and D8, so the stage is complete for routing purposes.
+      design.md itself needs no rewrite: plan.md carries D7 and D8 as fixed inputs.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -169,6 +197,27 @@ checkpoints:
       carries ten fields spanning flags, RepoEntry and GlobalConfig, and core/repos exports no
       getRepo/resolveRepo -- only listRepos, listBranches, registerRepo and the config schemas.
       See decisions D5-D6.
+  - id: cp-design-integration-decisions
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md is complete and concrete enough to plan against, but returned partial on two
+      integration findings it refused to decide alone: OQ-D1, the repo alias (`owner/repo` from
+      registerRepo's deriveAlias) versus RunStore's repoName path-segment constraint, which as
+      designed would fail every review inside persistRun and every `runs list` inside listRuns;
+      and OQ-D2, createOpenCodeAdapter's mandatory `model` with no config field supplying one.
+    question: >-
+      Where is the alias/path-segment mismatch fixed, and where does the opencode model come from?
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T22:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Both settled as D7 and D8. The orchestrator independently confirmed OQ-D1's premise before
+      escalating: PathSegmentSchema in src/core/history/ports/run-store-schemas.ts refines against
+      "/" and "\\", while deriveAlias in src/core/repos/register-repo.ts returns
+      `${owner}/${repo}` for any URL with two or more non-empty segments. The two contracts are
+      genuinely incompatible, not a misreading.
 decisions:
   - id: D1
     level: C
@@ -310,6 +359,56 @@ decisions:
     consequences: >-
       spec.md's OQ-1 is closed as deferred. design.md must not introduce a JSON serializer, and
       the output format it fixes should stay easy to extend with one later.
+  - id: D7
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Alias-to-storage-key normalisation lives module-private inside `core/history`
+    context: >-
+      OQ-D1, surfaced by sddl-design and confirmed by the orchestrator against the source.
+      registerRepo's deriveAlias returns `owner/repo`; RunStore's RunRecordPathFieldsSchema and
+      RunQueryFieldsSchema validate repoName through PathSegmentSchema, which refines against any
+      "/" or "\\". As designed, `sentinel review` would fail inside persistRun and `runs list`
+      inside listRuns for every registered repo -- exactly the integration-mismatch class
+      risk-e6h1-006 predicted, caught at design rather than in CI.
+    decision: >-
+      Add a module-private, idempotent normaliser in core/history mapping `owner/repo` to
+      `owner__repo`, applied by persistRun, listRuns and getRun. No new public export, no
+      signature change. The user-facing alias stays `owner/repo` everywhere else, including
+      `repo list` output and the `review <repo>` argument.
+    rationale: >-
+      Keeps the storage-key rule inside the module that owns the persistence contract, so the CLI
+      never learns it and [E6.F2.H1]'s TUI inherits it for free. Exporting a public
+      `toRunRepoName` was rejected as a third piece of core surface that would push a persistence
+      detail into the adapter. Changing deriveAlias to emit `owner__repo` at the root was rejected
+      as a larger blast radius: it reopens [E2.F2.H2], changes the `clones/` directory layout, and
+      degrades the alias the user reads and types.
+    consequences: >-
+      This changes the observable behaviour of listRuns and getRun, two use cases already merged
+      by [E5.F2.H2], which spec.md had declared out of scope. The deviation is user-authorised and
+      must be declared in the PR description and the history entry alongside D1 and D5. plan.md
+      must give it its own execution stage with core unit tests covering idempotency and an alias
+      that needs no normalisation.
+  - id: D8
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: OpenCode model comes from `SENTINEL_OPENCODE_MODEL`, with a clear failure when unset
+    context: >-
+      OQ-D2. createOpenCodeAdapter requires a mandatory `model` (docs/engines/opencode.md: the
+      `-m provider/model` flag is mandatory in practice) and no GlobalConfig field supplies one.
+    decision: >-
+      container.ts reads SENTINEL_OPENCODE_MODEL. When the resolved engine is `opencode` and the
+      variable is unset or empty, fail with a one-line stderr message naming the variable. No
+      model id is hardcoded and GlobalConfigSchema is not touched.
+    rationale: >-
+      Keeps this story to the single config-format change D3 already authorised, and avoids
+      baking a provider/model string into the repo that would drift. A GlobalConfig field is more
+      discoverable but is a second schema change in one story; dropping opencode from the wiring
+      was rejected because it would leave [E4.F2.H2] unreachable from the CLI.
+    consequences: >-
+      SENTINEL_OPENCODE_MODEL joins SENTINEL_HOME as public surface and must appear in root
+      `--help` and in [E7.F2.H1] documentation. A future story may promote it to config.
 open_risks:
   - id: risk-e6h1-001
     summary: >-
@@ -381,9 +480,10 @@ open_risks:
     severity: medium
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Checkpoint cp-spec-output-decisions resolved with `approve`; OQ-1 and OQ-2 settled as D6 and
-    D5. Run sddl-design against spec.md's 14 acceptance criteria with D1-D6 as fixed inputs.
+    cp-design-integration-decisions resolved; OQ-D1 and OQ-D2 settled as D7 and D8. Run sddl-plan
+    against design.md with D1-D8 as fixed inputs, giving D7 its own execution stage and staging
+    the vitest.config.ts / docs/testing.md / package.json touches design flagged.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-23T22:00:00Z"
+updated_at: "2026-08-23T23:00:00Z"

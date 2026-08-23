@@ -120,6 +120,7 @@ stages:
       - S1
       - S2
       - S3
+      - S4
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -147,7 +148,26 @@ stages:
       carry the normalised owner__repo in their own repoName field, so the renderer should echo the
       alias the user typed rather than that field. Gates after S3: npm run check exit 0 (biome 122
       files, tsc clean, depcruise 83 modules / 178 dependencies, 0 violations) and npm test exit 0
-      with 543 tests across 30 files, up from 531/29, all 531 pre-existing tests still passing.
+      with 543 tests across 30 files, up from 531/29, all 531 pre-existing tests still passing. S4
+      (D1/AC-5): new src/core/history/persist-run.ts exporting persistRun with design's signature
+      (PersistRunRequest{repoName, startedAtEpochMs, request, result}, PersistRunDeps{store, now?},
+      PersistRunResult{runDir, record}); composes the RunRecord per design's rules -- harness/
+      baseRef/targetRef from the request, state/verdict/prompt/engineOutput/usage from the result,
+      engine = result.engineName ?? request.engineName, validationOutput from the request,
+      durationMs = Math.max(0, now() - startedAtEpochMs), diff reduced to RunDiffSummary (counts
+      plus warning messages, never a diff body) and failure reduced to {stage, message} with no
+      cause, stack or exception object -- then calls RunStore.save() and returns the run directory.
+      repoName is normalised through S3's module-private toRunStorageKey (A-level: RunRecord's
+      repoName is the storage key the store's schema requires; risk-e6h1-009's user-facing echo
+      stays a S6/S7 rendering concern). Exported from src/core/history/index.ts -- unlike S3's
+      helper this one is public core API, since the CLI calls it. The only cross-module import is
+      the type-only ../run/index.js, keeping core-modules-via-index clean. Two further A-level
+      calls: PersistRunResult carries the composed record so review needs no getRun round-trip,
+      and durationMs is clamped at 0 against a non-monotonic injected clock. 8 new core unit tests
+      with a capturing in-memory RunStore fake. Gates after S4: npm run check exit 0 (biome 124
+      files, tsc clean, depcruise 84 modules / 183 dependencies, 0 violations) and npm test exit 0
+      with 551 tests across 31 files, up from 543/30, all 543 pre-existing tests still passing.
+      This closes the approved batch-s1-s4; S5-S11 were not started.
       Details in execution-log.md. QA review still deferred until the S1-S4 batch is complete;
       S4 (persistRun) is next under the same approval.
   sddl-code-review:
@@ -575,13 +595,13 @@ open_risks:
     severity: medium
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    S1, S2 and S3 are complete and green (npm run check exit 0, depcruise 83 modules / 178
-    dependencies with 0 violations; npm test exit 0, 543 tests / 30 files with all 531 pre-existing
-    tests intact). Under the same cp-stage-approval-s1-s4 batch resolution, run sddl-executor on S4
-    (persistRun, D1/AC-5), which consumes S3's module-private toRunStorageKey helper, ending green
-    on `npm run check` + `npm test` with the existing tests intact. Stop after S4 and present the
-    accumulated diff before requesting approval for S5.
+    S4 is complete and green (npm run check exit 0, depcruise 84 modules / 183 dependencies with 0
+    violations; npm test exit 0, 551 tests / 31 files with all 543 pre-existing tests intact),
+    which closes the approved batch-s1-s4. S5-S11 have no approval and were not started. Run
+    sddl-qa-review in stage mode over S1-S4 (tooling, resolveReviewRequest, the D7 normaliser and
+    persistRun), then take a fresh stage_approval to the user for S5 (CLI shell). QA should carry
+    risk-e6h1-009 forward: it is deliberately left open and assigned to the S6/S7 renderers.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T03:00:00Z"
+updated_at: "2026-08-24T04:00:00Z"

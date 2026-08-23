@@ -13,7 +13,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S1 | Tooling prerequisites (`commander`, widened `adapters` vitest include, docs line) | yes | completed |
 | S2 | Review-request resolution in core (D3 + D5) | yes | completed |
 | S3 | D7 alias → storage-key normalisation inside `core/history` | yes | completed |
-| S4 | `persistRun` use case (D1/AC-5) | yes | pending |
+| S4 | `persistRun` use case (D1/AC-5) | yes | completed |
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | pending |
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | pending |
 | S7 | `review` command | yes | pending |
@@ -261,3 +261,128 @@ helper. QA review is still **not** recommended before the batch closes: S3's bla
 pure 3-line mapping plus its two call sites, fully covered by 12 new unit tests with the 531
 existing ones intact. Recommend `sddl-qa-review` in stage mode once S4 lands, closing the
 S1-S4 batch as planned after S1 and S2.
+
+## S4 — `persistRun` use case (D1 / AC-5)
+
+- status: completed
+- approval: `cp-plan-stage-approval` resolved `batch-s1-s4` (user, resolved_at `2026-08-23T23:00:00Z`) — S4 is the last stage of that batch. S5-S11 are NOT approved and were not started.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c`, S1-S3 committed; `npm run check` exit 0 (depcruise 83 modules / 178 dependencies, 0 violations) and `npm test` exit 0 (543 tests / 30 files) before the stage.
+
+### Planned scope (plan.md, S4 row)
+
+`src/core/history/persist-run.ts`, the `src/core/history/index.ts` barrel and
+`src/core/history/__test__/persist-run.test.ts`. Core unit tests with an in-memory `RunStore`
+fake covering an `ok` run and a failed run, the `diff` → `RunDiffSummary` reduction with no diff
+body persisted, a string `failure.message` for a non-`Error` throwable, alias normalisation via
+S3's helper, and `depcruise`'s `core-modules-via-index` (only `../run/index.js`).
+
+### The gap this stage closes (D1)
+
+`RunStore.save` existed and was contract-tested since `[E5.F2.H1]`, but **nothing outside tests
+called it**: `runReview` has no `RunStore` dependency by explicit decision, and `RunRecord` was
+left caller-composed so that "runReview is never touched by this module's existence". `persistRun`
+is that missing caller — placed in `core/history`, where the persistence rules already live, so the
+CLI command stays a two-use-case shell (AC-1) and `src/main/` does no domain mapping.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/core/history/persist-run.ts` | New. `PersistRunRequest`/`PersistRunDeps`/`PersistRunResult` and `persistRun`, exactly design's signature. Two module-private reducers: `toDiffSummary` (`ReviewDiff` → `RunDiffSummary`, read structurally) and `toFailureRecord` (`RunFailure` → `{ stage, message }`). Only cross-module import: `../run/index.js`, type-only. |
+| `src/core/history/index.ts` | Barrel: `persistRun` plus its three types exported; header doc updated to name the new use case. |
+| `src/core/history/__test__/persist-run.test.ts` | New. 8 unit tests against a capturing in-memory `RunStore` fake. |
+
+Composition, per design §4 — nothing invented:
+
+| `RunRecord` field | Source |
+|---|---|
+| `repoName` | `toRunStorageKey(request.repoName)` (S3's module-private helper) |
+| `startedAtEpochMs` | request (the caller's clock reading) |
+| `durationMs` | `Math.max(0, now() - startedAtEpochMs)`, `now` defaulting to `Date.now` |
+| `harness` / `baseRef` / `targetRef` | `RunReviewRequest.harnessType` / `.baseRef` / `.targetRef` |
+| `state` / `verdict` / `prompt` / `engineOutput` / `usage` | `RunReviewResult` |
+| `engine` | `result.engineName ?? request.engineName` |
+| `validationOutput` | `RunReviewRequest.validationOutput` (the result carries none) |
+| `diff` | `RunDiffSummary` — `files.length`, `totalLines`, `estimatedTokens`, `truncated`, `warnings.map(w => w.message)` |
+| `failure` | `{ stage, message }`, `message = error instanceof Error ? error.message : String(error)` |
+
+Every optional field is conditionally spread, so an absent value is an absent key rather than an
+explicit `undefined` — required by `exactOptionalPropertyTypes` and by `RunRecord`'s readonly
+optional shape.
+
+### Decisions taken inside the stage
+
+- **A-level — `RunRecord.repoName` holds the normalised storage key, not the raw alias.** The
+  record is the document `RunStore` persists, and `RunRecordPathFieldsSchema` rejects any
+  `repoName` containing a path separator: writing `owner/repo` there would be rejected by the
+  adapter on every registered repo. Normalising here also keeps `persistRun` consistent with
+  `listRuns`/`getRun`, so a run written under `owner__repo` is the run those two read back.
+  The known consequence (`risk-e6h1-009`: a record read back echoes `owner__repo` to the user) is
+  a **rendering** concern and stays with S6/S7, which can echo the alias the user typed. Not
+  fixed here — fixing it in `persistRun` would mean persisting a key the store must reject.
+- **A-level — `PersistRunResult` returns the composed record alongside `runDir`.** Design fixed
+  the shape; the rationale worth recording is that it lets `review` print the persisted facts
+  without a `getRun` round-trip, keeping AC-6 to one store write per invocation.
+- **A-level — `durationMs` is clamped at 0.** `now()` is an injected seam and a non-monotonic
+  clock is reachable; a negative duration would be persisted as-is and later rendered. Covered
+  by its own test.
+
+### Quick checks
+
+- `npm run check` → exit 0:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 124 files in 134ms. No fixes applied.
+
+  ✔ no dependency violations found (84 modules, 183 dependencies cruised)
+  ```
+  83 → **84 modules**, 178 → **183 dependencies**, still **0 violations** — in particular
+  `core-no-adapters`, `core-no-io-libs` (no Node builtin, no npm import in the new file) and
+  `core-modules-via-index` (the single cross-module edge is `history → run/index.js`).
+  Biome required one formatting pass (`biome check --write src/core/history`) on the test file
+  before the gate went green; no lint rule was suppressed.
+- `npm test` → exit 0:
+  ```
+  > vitest run
+
+   Test Files  31 passed (31)
+        Tests  551 passed (551)
+     Duration  9.61s
+  ```
+  543 → **551 tests** (+8) across 30 → 31 files. **All 543 pre-existing tests still pass**, none
+  modified or removed.
+- Targeted re-run: `npx vitest run --project core src/core/history/__test__/persist-run.test.ts`
+  → exit 0, `Test Files 1 passed (1)`, `Tests 8 passed (8)`.
+
+Test coverage against the plan's S4 row: `ok` run (full record asserted field by field) · failed
+run (`failure` populated, `verdict` absent) · `diff` reduced with `JSON.stringify(record)`
+asserted not to contain either the diff body or a file path · non-`Error` throwable stringified ·
+alias normalised (`owner/repo` → `owner__repo`, separator-free alias unchanged) · `engine`
+fallback and omission · negative-duration clamp · `store.save` rejection propagated unchanged.
+
+Skipped: nothing. `e2e/**` stays empty (AC-14). No manual validation is outstanding for S4;
+`risk-e6h1-006`'s integration evidence remains S10's job.
+
+### Notes and observations
+
+- Nothing sensitive is persistable through this shape: the failure reducer drops `cause`, stack
+  and the exception object itself, and the diff reducer keeps only counts plus warning messages.
+  The non-`Error` test deliberately throws an object carrying a token-looking field and asserts
+  the persisted message is the plain `String(...)` form.
+- `persistRun` reads `result.diff` structurally, so no new export was needed from `workspace` or
+  `run` — `ReviewDiff` and `DiffWarning` stay where they are.
+- AC-5 is fully satisfied by this stage; AC-6 (exactly one persisted run per `review`
+  invocation) is S7's, since it is the command that calls this use case.
+- No git side effects: no commit, stash, or branch operation.
+
+### Blockers
+
+None.
+
+### Next action
+
+S4 is complete and both gates are green, which **closes the approved `batch-s1-s4`**. S5-S11 have
+no approval and were not started. Recommended: `sddl-qa-review` in **stage mode** over S1-S4 as
+planned, then a fresh `stage_approval` for S5 (CLI shell). The one item QA should carry forward is
+`risk-e6h1-009` — deliberately left open here and assigned to the S6/S7 renderers.

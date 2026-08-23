@@ -229,7 +229,66 @@ artifacts:
   plan: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/plan.md
   execution_log: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/execution-log.md
   qa_report: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/qa-report.md
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 1
+  counts:
+    confirmed: 1
+    suspect: 0
+    escalated: 0
+  summary: >-
+    Full-4r review of beb5d48..b7376e6 (11 files, 1593+/8-). R2 Readability: clean, zero findings.
+    R1 Risk found 3 candidates: R1-001 (CRITICAL, deterministic) -- a declared validation string with
+    no rejected shell character (e.g. "env") is not blocked by the tokenizer and dumps the reviewing
+    process's environment into the LLM prompt and disk; independently corroborated by the orchestrator
+    reading REJECTED_SHELL_CHARS/isRejectedChar, and cross-matched against risk-007 (recorded during
+    the proposal stage, rated "low" with an explicit rationale). Fresh review disagrees with that
+    severity call -- raised to the user as review_gate rather than resolved unilaterally. R1-002
+    reconciled as spec-conformant against AC-14's exact text and R3's independent identical reading --
+    not a defect. R3 Reliability found R3-001 (WARNING): runValidations doesn't itself enforce
+    MAX_TIMEOUT_MS, relying on run-review.ts's call-site guard -- a future standalone caller (AC-18)
+    could skip it. R4 Resilience found R4-001 (WARNING, same substance as R1-003, deduped): no cap on
+    declaration count or aggregate stage duration. No refuter pass run: the sole CRITICAL/BLOCKER
+    candidate (R1-001) is evidence_class deterministic, which the protocol never routes to the refuter.
+  reported_at: "2026-08-23T17:10:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/review-ledger.md
 checkpoints:
+  - id: cp-review-gate-r1-001
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      Full-4r review of ST-1..ST-4's diff (beb5d48..b7376e6). R1 Risk (fresh, unbiased) rated
+      CRITICAL a mechanism this project's own proposal stage already identified and consciously
+      accepted at "low" severity as risk-007: a declared validation string with zero rejected shell
+      characters (e.g. the bare word "env" or "printenv") passes tokenizeDeclaration unmodified,
+      runs, and its stdout -- the reviewing process's own environment, potentially including the
+      LLM API key and git/GitHub credentials -- is captured verbatim and both injected into the
+      LLM prompt and persisted to validations/NNN.log on disk. Orchestrator independently
+      corroborated the mechanism by reading REJECTED_SHELL_CHARS/isRejectedChar
+      (run-validations.ts:79-115): confirmed no lexical concept of "dangerous command name" exists,
+      only shell metacharacters. risk-007's original rationale ("the script is one the repo owner
+      declared in their own config, on their own machine, against their own repo") was an A-level
+      call recorded during the proposal stage, never put to the user via an explicit question. Both
+      readings agree on the facts; they disagree on severity and on whether "the repo owner's own
+      choice" is sufficient absolution given the blast radius (secrets landing in a persisted,
+      possibly-shared prompt/log file, not just in the owner's own terminal).
+    question: >-
+      Three ways to close this: (A) ratify risk-007 as already-decided and correctly scoped --
+      close R1-001 as info/wont-fix, no code change, change proceeds to final QA as-is. (B) require
+      a mitigation before closing (options include: a documented warning banner injected into the
+      persisted evidence when validations are declared, at minimum in project docs/README; or
+      deferring further -- e.g. a config-level opt-in flag or a denylist of obviously-dangerous bare
+      commands like env/printenv/set -- as a fast-follow story rather than blocking this one). (C)
+      treat this as a genuine fix-now blocker and route it through sddl-plan for a fix stage before
+      ST-5/final QA. Recommendation: (A) -- the mechanism is genuinely the repo owner's own
+      declared config, sentinel already documents (per risk-007) that it does not attempt command
+      allow/deny-listing anywhere in the codebase, and a denylist would be trivially bypassable
+      (env -i, /usr/bin/env, printenv | cat, a two-line wrapper script) while creating a false sense
+      of safety -- but this is a security-relevant call the project should make consciously, not
+      by default.
+    free_input_allowed: true
+    created_at: "2026-08-23T17:10:00Z"
   - id: cp-proposal-validation
     type: phase_validation
     stage: sddl-proposal

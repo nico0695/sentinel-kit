@@ -197,7 +197,20 @@ stages:
       check clean, full npm test 494/494 (up from 479), and the classifyFailure invariant re-confirmed
       by direct source read. No deviation from plan/spec/design.
   sddl-qa-review:
-    status: pending
+    status: in_progress
+    notes: >-
+      Stage-mode QA (ST-1..ST-3, before the closing gate ST-4): verdict pass, zero findings.
+      Independently verified by a fresh reviewer against code at 391f7d3, not the execution log's
+      self-report -- AC-1's stage-1/stage-5 no-op gate is structurally unreachable (identical
+      once-computed boolean in both places), the ProcessSpawnError/classifyFailure invariant holds
+      (run-validations.ts's catch recovers ProcessSpawnError only, rethrows everything else,
+      classifyFailure has no ProcessSpawnError branch), AC-16's ordering is literal source order
+      (caller entries first), AC-19's RunStage/RUN_STAGES lockstep is tsc-clean. One correction to
+      the handoff: the pre-story base is beb5d48 (the E5.F1.H1 merge), not 8c080cb (an unrelated
+      earlier ancestor) -- git diff --stat beb5d48..HEAD -- src/ shows exactly the 11 files plan.md
+      names, nothing beyond. npm run check clean, full npm test 494/494. Orchestrator independently
+      re-ran the diff --stat and re-read the catch block and AC-16 line; both confirmed. qa-report.md
+      written (stage mode). Recommended: proceed to ST-4 using beb5d48 as the AC-20 base.
 artifacts:
   state: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/proposal.md

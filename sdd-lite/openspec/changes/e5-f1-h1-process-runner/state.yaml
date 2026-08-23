@@ -196,6 +196,19 @@ checkpoints:
       responded_at: "2026-08-23T01:20:00Z"
     created_at: "2026-08-23T01:18:00Z"
     resolved_at: "2026-08-23T01:20:00Z"
+  - id: cp-review-gate
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      1 confirmed CRITICAL finding (R4-001): ProcessSpawnError.cause strips command/args/cwd,
+      defeating the port's stated "raw error preserved for observability" contract. Active
+      change, finding is inside approved scope (a fix within classify-execa-result.ts's
+      ExecaLikeResult shape / process-runner-exec.ts's object construction, not a new file).
+    question: >-
+      Fix R4-001 now via a new sddl-plan fix stage (rerun plan to insert one bounded stage,
+      stage_approval, then sddl-executor), or defer and close with it open?
+    free_input_allowed: true
+    created_at: "2026-08-23T01:55:00Z"
 decisions:
   - id: dec-st4-approval
     checkpoint_id: cp-st4-approval
@@ -235,6 +248,30 @@ decisions:
       that reject:false makes execa resolve every failure, so the resolve-vs-throw judgment
       cannot be delegated to the library.
     recorded_at: "2026-08-22T23:45:00Z"
+review_summary:
+  mode: 4r
+  verdict: fail
+  round: 0
+  counts:
+    confirmed: 1
+    suspect: 0
+    escalated: 0
+    info: 6
+  summary: >-
+    full-4r tier (680 changed lines, process-spawning surface). 4 lens sweeps launched in
+    parallel: R1 Risk found 1 WARNING (per-stream truncation flag can false-positive when a
+    non-overflowing stream's length exactly equals the budget); R2 Readability found 1 SUGGESTION
+    (stripFinalNewline:false undocumented); R3 Reliability found 0 correctness defects, 2
+    WARNING + 1 SUGGESTION test-coverage gaps (relative-cwd rejection, env overlay, default
+    budget path all untested); R4 Resilience found 1 CRITICAL (ProcessSpawnError.cause strips
+    command/args/cwd, defeating the port's own "raw error preserved for observability"
+    contract) plus 1 WARNING (no process-group kill, so a forking command's grandchildren can
+    outlive the timeout). 0 refuter passes -- the sole CRITICAL is evidence_class:deterministic,
+    independently re-verified by the orchestrator via direct code reading before merging (per
+    ledger contract, deterministic findings are never refuted). 1 open severe finding
+    (R4-001) requires a fix round before this change can close.
+  reported_at: "2026-08-23T01:55:00Z"
+  ledger_path: sdd-lite/openspec/changes/e5-f1-h1-process-runner/review-ledger.md
 open_risks:
   - id: risk-001
     summary: >-
@@ -286,15 +323,23 @@ open_risks:
       result.timedOut is wrong in a case that actually occurs. Accepted deliberately, recorded
       rather than hidden.
     severity: low
+  - id: risk-007
+    summary: >-
+      4R review finding R4-002 (WARNING, info-tier, non-blocking): the adapter never sets
+      `detached`/process-group options, so the timeout kill targets only the immediate child
+      pid via execa's direct subprocess.kill(), never a process-group kill. Any command that
+      itself forks (a shell wrapper, a test runner invoking sub-processes) can leave
+      grandchildren alive past the "hard wall-clock budget." AC-1's reaping proof only covers a
+      single non-forking leaf process. Recorded as a real, evidenced gap for [E5.F1.H2] or a
+      future hardening pass to consider -- not fixed here since it is not blocking and the
+      review budget favors a narrow fix round for the one CRITICAL finding only.
+    severity: low
 next_action:
   kind: ask_user
-  target: sddl-code-review
+  target: sddl-plan
   summary: >-
-    All 4 stages complete, independently re-verified end to end, AC-15 confirmed against the
-    correct merge-base. 680-line diff over 11 files (test files dominate the count; production
-    code is roughly 245 lines), touching process-spawning surface -- triaging full-4r both on the
-    line-count threshold and on sensitive-area markers (shell-injection guard, spawn-failure
-    classification), matching the two prior E5 stories' precedent. Offering the review via
-    review_gate.
+    full-4r review complete: 1 confirmed CRITICAL (R4-001, deterministic, independently
+    re-verified), 6 info-tier findings. Awaiting review_gate decision: fix R4-001 via a new
+    sddl-plan fix stage (in scope, active change), or defer.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-23T01:40:00Z"
+updated_at: "2026-08-23T01:55:00Z"

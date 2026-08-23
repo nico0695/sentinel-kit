@@ -17,8 +17,8 @@ complexity_assessment:
     _AllRunStagesCovered exhaustiveness guard).
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -221,6 +221,17 @@ stages:
       names, nothing beyond. npm run check clean, full npm test 494/494. Orchestrator independently
       re-ran the diff --stat and re-read the catch block and AC-16 line; both confirmed. qa-report.md
       written (stage mode). Recommended: proceed to ST-4 using beb5d48 as the AC-20 base.
+      FINAL QA (closeout): verdict pass_with_warnings, ready to be marked completed. Independently
+      re-verified at HEAD 53370f8 (one commit past the review-ledger's b7376e6, documentation-only,
+      no src/ drift): npm run check clean, full npm test 494/494, git diff --stat beb5d48..HEAD --
+      src/ unchanged since ST-4 (same 11 files, 1593+/8-). Re-confirmed AC-1's structural no-op,
+      AC-9..AC-13's terminal-state mapping, AC-20's blast radius, AC-21's determinism, all by direct
+      source/test read. review-ledger.md's sole CRITICAL (R1-001) is closed wont-fix on explicit user
+      ratification (cp-review-gate-r1-001) -- not reopened. Two info-tier ledger rows (R3-001,
+      MAX_TIMEOUT_MS not self-enforced by runValidations; R4-001, no cap on declaration count/
+      aggregate duration) remain as honest, non-blocking, deliberately-deferred scope observations.
+      Orchestrator independently re-ran check/test/diff --stat and confirmed identical. All 21
+      acceptance criteria verified. qa-report.md written (final mode).
 artifacts:
   state: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/proposal.md

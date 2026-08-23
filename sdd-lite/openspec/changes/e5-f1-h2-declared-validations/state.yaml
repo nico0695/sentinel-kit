@@ -17,8 +17,8 @@ complexity_assessment:
     _AllRunStagesCovered exhaustiveness guard).
   confidence: medium
   recorded_at: "2026-08-23T04:05:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -156,7 +156,16 @@ stages:
       objective is new-feature, not planner, so this is not a terminal stop; next_action routes
       to sddl-executor pending user stage_approval for ST-1.
   sddl-executor:
-    status: pending
+    status: implementing
+    notes: >-
+      ST-1 completed: additive validationTimeoutMs: z.number().optional() on both GlobalConfigSchema
+      and RepoEntrySchema, no .default(), RepoEntry.validations left unwidened. New
+      src/core/repos/__test__/config-schemas.test.ts proves pre-story documents still parse (field
+      undefined) and documents carrying the field parse with the value preserved. R2-2's numeric-range
+      guard deliberately NOT added here -- verified against spec.md AC-5 and design.md D-4 before
+      writing code: the guard belongs to runReview's stage-1 pre-flight (ST-3). Independently
+      re-verified by the orchestrator: git diff confined to the two named files, npm run check clean
+      (tsc, depcruise 0 violations), full npm test 408/408 passed. Discharges AC-5.
   sddl-qa-review:
     status: pending
 artifacts:

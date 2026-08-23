@@ -17,8 +17,8 @@ complexity_assessment:
     caller that does not exist yet.
   confidence: high
   recorded_at: "2026-08-22T23:10:00Z"
-lifecycle_status: reviewing
-current_stage: sddl-qa-review
+lifecycle_status: completed
+current_stage: none
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -105,9 +105,38 @@ stages:
       assertions read directly (toMatchObject on cause), mutation proof narration cross-checked.
       401 tests green, up from 375 at session start.
   sddl-code-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T01:45:00Z"
+    completed_at: "2026-08-23T02:15:00Z"
+    notes: >-
+      full-4r review (4 lenses parallel) found 1 confirmed CRITICAL (R4-001, deterministic) + 6
+      info-tier findings. R4-001 fixed in ST-5, mutation-proven. 0 open severe findings at close.
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T02:55:00Z"
+    completed_at: "2026-08-23T03:05:00Z"
+    notes: >-
+      final mode. All 17 ACs independently re-verified against current source (not trusted from
+      execution-log.md). npm run check/test re-run fresh (114 files, 401 tests). AC-15 confirmed
+      via independently re-derived merge-base. Full story diff exactly 11 files. review-ledger.md
+      consumed as evidence (R4-001 fix spot-checked directly, not re-derived). 2 new low-severity
+      findings (QA-101, QA-102), both non-blocking. Verdict pass_with_warnings.
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    17/17 acceptance criteria independently re-verified against current source and tests, not
+    trusted from execution-log.md's narrative. npm run check and npm test both fresh-green (114
+    files, 401 tests). AC-15 confirmed via an independently re-derived merge-base
+    (git merge-base origin/main HEAD), protected-file diff empty, zero execa import under
+    src/core/**. Full story diff exactly the 11 expected files. review-ledger.md consumed as
+    evidence (verdict pass_with_warnings, 0 open severe) -- R4-001's fix spot-checked directly in
+    current source rather than taken on trust. Two new low-severity findings (QA-101: AC-2's
+    real-child test doesn't explicitly assert pre-kill output survival, indirectly covered by
+    AC-1's test; QA-102: re-confirms ledger R3-001's relative-cwd test gap still holds). Neither
+    blocks closure. lifecycle_status set to completed.
+  reported_at: "2026-08-23T03:05:00Z"
+  report_path: sdd-lite/openspec/changes/e5-f1-h1-process-runner/qa-report.md
 artifacts:
   state: sdd-lite/openspec/changes/e5-f1-h1-process-runner/state.yaml
   proposal: sdd-lite/openspec/changes/e5-f1-h1-process-runner/proposal.md
@@ -369,12 +398,29 @@ open_risks:
       future hardening pass to consider -- not fixed here since it is not blocking and the
       review budget favors a narrow fix round for the one CRITICAL finding only.
     severity: low
+  - id: risk-008
+    summary: >-
+      QA-101 (final QA, low): AC-2's real-child test asserts timedOut:true but doesn't itself
+      also assert pre-kill output survival in that specific test -- coverage exists indirectly
+      via AC-1's reaping test, which does capture a pre-kill stdout line, so AC-2 is not left
+      unproven. Optional: add an explicit "prints then hangs, output preserved" case in a future
+      pass. Non-blocking.
+    severity: low
+  - id: risk-009
+    summary: >-
+      QA-102 (final QA, low): re-confirms review-ledger R3-001 still holds on a fresh
+      independent read -- no test anywhere exercises the adapter's own relative-cwd rejection
+      path (process-runner-exec.ts:52-56), only the "does NOT reject at the core layer" side of
+      D-2 is tested. Not a new defect, restated for closeout completeness; carried forward as
+      optional follow-up per the ledger's own disposition.
+    severity: low
 next_action:
-  kind: ask_user
-  target: sddl-qa-review
+  kind: complete
+  target: none
   summary: >-
-    ST-5 complete and independently re-verified (R4-001 fixed, mutation-proven, 0 open severe
-    findings). Story fully implemented and reviewed. Recommend sddl-qa-review in final mode as
-    the closeout.
+    Change completed. Per workflow contract rule 6, [E5.F1.H1] unblocks [E5.F1.H2] (#32), the
+    only remaining required E5 story -- epic not yet fully in open/merged PRs, so the
+    epic-summary-and-STOP rule does not trigger yet. Mandatory history-log entry still pending
+    before session close. PR (Closes #31) only opens on explicit user instruction.
 created_at: "2026-08-22T23:00:00Z"
-updated_at: "2026-08-23T02:15:00Z"
+updated_at: "2026-08-23T03:10:00Z"

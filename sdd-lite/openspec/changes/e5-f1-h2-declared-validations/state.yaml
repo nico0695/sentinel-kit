@@ -1,0 +1,158 @@
+version: "0.1"
+change_name: e5-f1-h2-declared-validations
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E5.F1.H2] (issue #32), the last required story of milestone E5: run repo-declared
+    validation scripts inside the review worktree, in order, with a per-script timeout, and
+    inject their output into the prompt without ever aborting the review. Every collaborator is
+    already merged on main -- RepoEntry.validations (string[]), the ProcessRunner port and its
+    execa adapter from [E5.F1.H1], assemblePrompt's validationOutput seam, runReview's reserved
+    stage-5 placeholder, and RunStore's validations/NNN.log writer. The code footprint is small;
+    the risk is concentrated in decision density (seven real forks, three B-level), in a
+    tokenization policy that must survive the adapter's pinned shell:false, and in one
+    cross-module compile-time ripple (adding a "validations" RunStage member breaks history's
+    _AllRunStagesCovered exhaustiveness guard).
+  confidence: medium
+  recorded_at: "2026-08-23T04:05:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. A medium-breadth read-only exploration at proposal stage was
+      sufficient and conclusive: src/core/run/ (run-review.ts, run-errors.ts,
+      ports/process-runner.ts, process-run-request.ts, index.ts), repos/ports/config-schemas.ts
+      and config-store.ts, review/assemble-prompt.ts, history/ports/run-store.ts and
+      run-metadata-schemas.ts, the merged exec adapter, PRD sections 3.1-E and 4, the backlog's
+      E5 block, and the predecessor's spec.md all read directly. Both downstream constraints the
+      predecessor recorded were verified empirically against main rather than trusted.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-23T03:50:00Z"
+    completed_at: "2026-08-23T04:05:00Z"
+    notes: >-
+      proposal.md written and grounded in direct code inspection. Key empirical findings:
+      (1) RepoEntry.validations already exists as z.array(z.string()).optional() and is
+      completely unread by production code -- the declaration is inert; (2) assemblePrompt
+      already renders a <validation-output> block from a validationOutput string[], and
+      runReview already forwards request.validationOutput verbatim past a literal stage-5
+      comment placeholder, so the injection socket is pre-wired; (3) RunRecord.validationOutput
+      is persisted one file per array element as validations/NNN.log, which makes the array's
+      granularity a frozen on-disk format decision; (4) the exec adapter pins shell:false
+      (process-runner-exec.ts:66), confirming the predecessor's tokenization constraint;
+      (5) classifyFailure (run-review.ts:423-439) still omits InvalidProcessRequestError and
+      ProcessSpawnError, so both fall through to engine-error -- the predecessor's recorded gap
+      is confirmed present on main; (6) NEW, not recorded upstream: adding a "validations"
+      member to RunStage breaks typecheck in history/ports/run-metadata-schemas.ts:54 via the
+      _AllRunStagesCovered Expect<Exclude<...>> guard over a hand-maintained RUN_STAGES list;
+      (7) neither RepoEntry nor GlobalConfig has any timeout field, so #32's "per-script
+      timeout" has no home in the shipped config schema. Seven decision candidates recorded,
+      three B-level.
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/state.yaml
+  proposal: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/proposal.md
+  spec: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/spec.md
+  design: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/design.md
+  plan: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/plan.md
+  execution_log: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e5-f1-h2-declared-validations/qa-report.md
+checkpoints:
+  - id: cp-proposal-validation
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md carries seven decision candidates, three of them B-level (DC-1 where the
+      validations run, DC-2 where the per-script timeout comes from given the shipped config
+      schema has no timeout field, DC-3 how a declared string becomes (command, args) under the
+      adapter's pinned shell:false, DC-4 whether a validation failure ever influences the
+      terminal state). DC-2, DC-3 and DC-7 each freeze a format that later stories inherit.
+    question: >-
+      Approve the proposal and continue to sddl-spec (which must resolve DC-1 through DC-4 as
+      firm acceptance criteria), revise this phase, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-23T04:05:00Z"
+decisions: []
+open_risks:
+  - id: risk-001
+    summary: >-
+      #32 requires a "per-script timeout" but the merged config schema has no timeout field
+      anywhere (neither RepoEntry nor GlobalConfig). Spec must either add one additively or
+      explicitly re-scope the criterion to "per-script application of a shared budget" -- and
+      say which, rather than letting the acceptance criterion quietly go unmet. Choosing to
+      widen validations from string[] to a union also re-litigates a public config format one
+      story after it shipped.
+    severity: high
+  - id: risk-002
+    summary: >-
+      Turning a declared string like "npm test" into (command, args) with the adapter pinned to
+      shell:false is the story's security- and correctness-load-bearing line. Injection is
+      structurally impossible, but SILENT MISINTERPRETATION is not: "npm test 2>&1" or "a && b"
+      would be passed as literal arguments under a naive whitespace split and fail confusingly.
+      A tokenization policy with explicit rejection of what it cannot honor is needed, not a
+      .split(" ").
+    severity: high
+  - id: risk-003
+    summary: >-
+      The validationOutput array's granularity is already a frozen on-disk format: RunStore's fs
+      adapter writes one validations/NNN.log per array element, and assemblePrompt joins the
+      elements inside a single <validation-output> block. Whatever this story puts in an element
+      becomes the persisted run layout that [E5.F2.H1]'s "readable without the tool" criterion
+      is judged against.
+    severity: medium
+  - id: risk-004
+    summary: >-
+      Cross-module compile-time ripple, discovered by reading rather than by compiling: adding a
+      "validations" member to RunStage breaks typecheck at history/ports/run-metadata-schemas.ts:54,
+      where _AllRunStagesCovered is an Expect<Exclude<RunStage, ...>> guard over a hand-maintained
+      RUN_STAGES list that [E5.F2.H2]'s AC-15 deliberately pinned in place. Either the story
+      accepts an intentional two-module diff, or failure.stage misreports validation faults as
+      "request" into metadata.json forever.
+    severity: medium
+  - id: risk-005
+    summary: >-
+      The exec adapter's default capture budget is 1,000,000 characters PER STREAM, PER SCRIPT
+      (process-runner-exec.ts:27) -- sized for capture, not for a token-budgeted prompt. Without
+      a prompt-facing truncation policy in this story, two verbose validations can dwarf the
+      entire diff in the assembled prompt and in every persisted prompt.md.
+    severity: medium
+  - id: risk-006
+    summary: >-
+      [E5.F1.H1] risk-007 becomes reachable for the first time here: the merged adapter kills
+      only the immediate child pid, never a process group, and a declared "npm test" is exactly
+      the forking command that risk described. Fixing it means changing merged adapter code
+      (detached / kill strategy) with its own test surface, so it is out of scope -- but spec
+      should decide consciously between inherit-and-record and escalating it to its own backlog
+      item, rather than letting it fall between two stories.
+    severity: medium
+  - id: risk-007
+    summary: >-
+      A declared script that prints its environment leaks secrets into both the assembled prompt
+      and validations/*.log. [E5.F1.H1]'s spec explicitly deferred this to THIS story's decision
+      about what reaches the prompt. No detection heuristic is proposed (the codebase has
+      avoided them everywhere); the mitigation available is the truncation/marker policy of DC-6
+      plus documenting the exposure. Recorded so it is an accepted risk, not an oversight.
+    severity: low
+next_action:
+  kind: wait_for_approval
+  target: sddl-spec
+  summary: >-
+    Await resolution of checkpoint cp-proposal-validation, then run sddl-spec. Spec must convert
+    DC-1 through DC-4 into firm acceptance criteria and must state a position on risk-001
+    (per-script timeout has no config home) and risk-006 (process-group kill) rather than
+    inheriting either silently.
+created_at: "2026-08-23T03:50:00Z"
+updated_at: "2026-08-23T04:05:00Z"

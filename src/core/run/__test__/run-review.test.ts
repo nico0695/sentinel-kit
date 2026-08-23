@@ -29,6 +29,8 @@ import {
   EngineInvocationError,
   EngineTimeoutError,
   InvalidRunRequestError,
+  InvalidValidationDeclarationError,
+  ProcessSpawnError,
   runReview,
 } from "../index.js";
 import {
@@ -37,8 +39,10 @@ import {
   buildHarnessDeps,
   buildRequest,
   buildValidationFailingHarnessDeps,
+  createFakeProcessRunner,
   createHangingEngine,
   createManualScheduler,
+  okResult,
   TIMEOUT_MS,
 } from "./run-review-fixtures.js";
 
@@ -664,6 +668,285 @@ describe("runReview", () => {
       const result = await runReview(buildRequest(), buildDeps());
 
       expect("engineName" in result).toBe(false);
+    });
+  });
+
+  describe("declared validations ([E5.F1.H2] #32)", () => {
+    describe("byte-identical no-op (AC-1)", () => {
+      it("calls the runner zero times when no validations are declared", async () => {
+        const runner = createFakeProcessRunner([]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(buildRequest(), deps);
+
+        expect(runner.calls).toHaveLength(0);
+        expect(result.state).toBe("ok");
+        expect(result.prompt).not.toContain("<validation-output>");
+      });
+
+      it("calls the runner zero times when validations is an empty array", async () => {
+        const runner = createFakeProcessRunner([]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(buildRequest({ validations: [] }), deps);
+
+        expect(runner.calls).toHaveLength(0);
+        expect(result.state).toBe("ok");
+      });
+
+      it("is a no-op when deps.processRunner is absent, even with validations declared", async () => {
+        const result = await runReview(
+          buildRequest({ validations: ["npm test"] }),
+          buildDeps(),
+        );
+
+        expect(result.state).toBe("ok");
+        expect(result.prompt).not.toContain("<validation-output>");
+      });
+    });
+
+    describe("stage-5 wiring (AC-2, AC-3)", () => {
+      it("runs declared validations sequentially against the worktree cwd", async () => {
+        const git = buildGit();
+        const runner = createFakeProcessRunner([
+          { kind: "resolve", result: okResult({ stdout: "lint clean\n" }) },
+          { kind: "resolve", result: okResult({ stdout: "12 passed\n" }) },
+        ]);
+        const deps = buildDeps({ git, processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm run lint", "npm test"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        expect(runner.calls).toHaveLength(2);
+        expect(runner.calls[0]?.command).toBe("npm");
+        expect(runner.calls[0]?.args).toEqual(["run", "lint"]);
+        expect(runner.calls[1]?.command).toBe("npm");
+        expect(runner.calls[1]?.args).toEqual(["test"]);
+        for (const call of runner.calls) {
+          expect(call.cwd).toBe(result.worktreePath);
+          expect(call.cwd).not.toBe(git.addCalls[0]?.repoPath ?? "");
+        }
+      });
+    });
+
+    describe("never-abort runtime paths (AC-11, AC-12, AC-13)", () => {
+      it("continues to ok on a non-zero exit", async () => {
+        const runner = createFakeProcessRunner([
+          {
+            kind: "resolve",
+            result: okResult({ exitCode: 1, stdout: "1 failing" }),
+          },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm test"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        expect(result.prompt).toContain("1 failing");
+      });
+
+      it("continues to ok on a spawn failure and still runs the next entry", async () => {
+        const runner = createFakeProcessRunner([
+          {
+            kind: "reject",
+            error: new ProcessSpawnError("spawn nonexistent-bin ENOENT"),
+          },
+          { kind: "resolve", result: okResult({ stdout: "ok\n" }) },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["nonexistent-bin", "npm test"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        expect(runner.calls).toHaveLength(2);
+        expect(result.prompt).toContain("spawn-failed");
+        expect(result.prompt).toContain("spawn nonexistent-bin ENOENT");
+      });
+
+      it("continues to ok on a timed-out entry", async () => {
+        const runner = createFakeProcessRunner([
+          {
+            kind: "resolve",
+            result: okResult({
+              timedOut: true,
+              signal: "SIGKILL",
+              stdout: "started…",
+            }),
+          },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm run slow"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        expect(result.prompt).toContain("timedOut=true");
+        expect(result.prompt).toContain("started…");
+      });
+
+      it("does not catch anything other than ProcessSpawnError — an unexpected throwable becomes engine-error at stage validations", async () => {
+        const runner = createFakeProcessRunner([
+          { kind: "reject", error: new Error("boom") },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm test"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("engine-error");
+        expect(result.failure?.stage).toBe("validations");
+        expect(result.failure?.error).toBeInstanceOf(Error);
+        const failureError = result.failure?.error as Error;
+        expect(failureError.message).toBe("boom");
+      });
+    });
+
+    describe("hoisted pre-flight (AC-4, AC-10)", () => {
+      it("rejects a malformed declaration before any worktree is created", async () => {
+        const git = buildGit();
+        const runner = createFakeProcessRunner([]);
+        const deps = buildDeps({ git, processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm test 2>&1"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("validation-failed");
+        expect(result.failure?.stage).toBe("request");
+        expect(result.failure?.error).toBeInstanceOf(
+          InvalidValidationDeclarationError,
+        );
+        expect(result.cleanup).toEqual({ attempted: false });
+        expect(git.addCalls).toHaveLength(0);
+        expect(runner.calls).toHaveLength(0);
+      });
+
+      it("skips the malformed-declaration check when deps.processRunner is absent (AC-1)", async () => {
+        const git = buildGit();
+        const deps = buildDeps({ git });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm test 2>&1"] }),
+          deps,
+        );
+
+        // No runner wired: the hoisted check never fires, so the run
+        // proceeds exactly as it would with no validations at all.
+        expect(result.state).toBe("ok");
+        expect(git.addCalls).toHaveLength(1);
+      });
+
+      it("rejects validationTimeoutMs <= 0 before any worktree is created", async () => {
+        const git = buildGit();
+        const runner = createFakeProcessRunner([]);
+        const deps = buildDeps({ git, processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({
+            validations: ["npm test"],
+            validationTimeoutMs: 0,
+          }),
+          deps,
+        );
+
+        expect(result.state).toBe("validation-failed");
+        expect(result.failure?.stage).toBe("request");
+        expect(result.failure?.error).toBeInstanceOf(InvalidRunRequestError);
+        expect(git.addCalls).toHaveLength(0);
+        expect(runner.calls).toHaveLength(0);
+      });
+
+      it("rejects a validationTimeoutMs above Node's setTimeout upper bound", async () => {
+        const git = buildGit();
+        const runner = createFakeProcessRunner([]);
+        const deps = buildDeps({ git, processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({
+            validations: ["npm test"],
+            validationTimeoutMs: 2_147_483_648,
+          }),
+          deps,
+        );
+
+        expect(result.state).toBe("validation-failed");
+        expect(result.failure?.stage).toBe("request");
+        expect(result.failure?.error).toBeInstanceOf(InvalidRunRequestError);
+        expect(git.addCalls).toHaveLength(0);
+      });
+
+      it("forwards a valid validationTimeoutMs to every captured request", async () => {
+        const runner = createFakeProcessRunner([
+          { kind: "resolve", result: okResult() },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        await runReview(
+          buildRequest({
+            validations: ["npm test"],
+            validationTimeoutMs: 5_000,
+          }),
+          deps,
+        );
+
+        expect(runner.calls[0]?.timeoutMs).toBe(5_000);
+      });
+    });
+
+    describe("validationOutput ordering (AC-16)", () => {
+      it("puts caller-supplied entries first and computed entries after", async () => {
+        const runner = createFakeProcessRunner([
+          { kind: "resolve", result: okResult({ stdout: "computed-1\n" }) },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({
+            validationOutput: ["pre"],
+            validations: ["npm test"],
+          }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        const preIndex = result.prompt?.indexOf("pre") ?? -1;
+        const computedIndex = result.prompt?.indexOf("computed-1") ?? -1;
+        expect(preIndex).toBeGreaterThanOrEqual(0);
+        expect(computedIndex).toBeGreaterThan(preIndex);
+      });
+    });
+
+    describe("prompt visibility (AC-17)", () => {
+      it("renders the computed validation evidence inside <validation-output>", async () => {
+        const runner = createFakeProcessRunner([
+          { kind: "resolve", result: okResult({ stdout: "lint clean\n" }) },
+        ]);
+        const deps = buildDeps({ processRunner: runner });
+
+        const result = await runReview(
+          buildRequest({ validations: ["npm run lint"] }),
+          deps,
+        );
+
+        expect(result.state).toBe("ok");
+        expect(result.prompt).toContain("<validation-output>");
+        expect(result.prompt).toContain("$ npm run lint");
+        expect(result.prompt).toContain("lint clean");
+      });
     });
   });
 });

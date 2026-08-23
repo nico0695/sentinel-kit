@@ -179,6 +179,23 @@ stages:
       truncated=true assertion failed. All three reverted, re-confirmed clean. Independently
       re-verified by the orchestrator: git diff confined to the 5 named files, npm run check clean,
       npx vitest -t "run-validations" 71/71 passed. No deviation from plan/spec/design.
+      ST-3 completed: run-review.ts wired -- RunReviewRequest gains validations?/validationTimeoutMs?,
+      RunReviewDeps gains processRunner?, stage 1 gains the D-4 hoisted guard (conditional on
+      processRunner !== undefined && declarations.length > 0, byte-identical no-op otherwise), stage 5
+      calls runValidations over the worktree cwd with AC-16 ordering, classifyFailure gains
+      InvalidValidationDeclarationError/InvalidProcessRequestError in the validation-failed branch,
+      deliberately omitting ProcessSpawnError. RunStage/RUN_STAGES gained "validations" in lockstep
+      (landed as one unit per design's hard sequencing constraint). 15 new tests discharge AC-1, AC-3,
+      AC-4 (guard half), AC-9..AC-13, AC-16, AC-17, AC-19. Mutation testing: (1) removing the
+      RUN_STAGES entry made tsc fail on _AllRunStagesCovered as required, reverted clean; (2) adding
+      ProcessSpawnError to classifyFailure's branch had NO observable effect on any test -- verified
+      by direct code reading that runValidations catches every ProcessSpawnError internally and never
+      rethrows it, so it structurally cannot reach classifyFailure regardless of that function's
+      branch list; the code carries a comment recording this invariant. Recorded as a finding, not a
+      defect -- the coupling is enforced one layer down, already proven by ST-2's own mutation round.
+      Independently re-verified by the orchestrator: git diff confined to the 4 named files, npm run
+      check clean, full npm test 494/494 (up from 479), and the classifyFailure invariant re-confirmed
+      by direct source read. No deviation from plan/spec/design.
   sddl-qa-review:
     status: pending
 artifacts:

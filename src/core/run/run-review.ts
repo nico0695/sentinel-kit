@@ -45,8 +45,18 @@ import {
   runEngineWithTimeout,
   type TimeoutScheduler,
 } from "./engine-timeout.js";
+import type { ProcessRunner } from "./ports/process-runner.js";
 import type { ReviewEngine, ReviewUsage } from "./ports/review-engine.js";
-import { EngineTimeoutError, InvalidRunRequestError } from "./run-errors.js";
+import {
+  EngineTimeoutError,
+  InvalidProcessRequestError,
+  InvalidRunRequestError,
+  InvalidValidationDeclarationError,
+} from "./run-errors.js";
+import {
+  runValidations,
+  validateValidationDeclarations,
+} from "./run-validations.js";
 import type { TerminalState } from "./terminal-state.js";
 import type { Verdict, VerdictParser } from "./verdict.js";
 
@@ -77,10 +87,24 @@ export interface RunReviewRequest {
     readonly maxTokens: number;
   };
   /**
-   * E5 seam. Forwarded verbatim to `assemblePrompt`; this story runs no
-   * validations of its own and imports nothing from E5.
+   * Caller-supplied validation evidence, forwarded verbatim ahead of any
+   * evidence this run computes itself (AC-16's ordering) — the seam
+   * `[E4.F1.H1]` introduced before declared validations existed.
    */
   readonly validationOutput?: readonly string[];
+  /**
+   * Declared validation strings (`RepoEntry.validations`), run at stage 5
+   * through `deps.processRunner` when both it and this list are non-empty
+   * (`[E5.F1.H2]`, #32). Absent or empty is a byte-identical no-op — no
+   * stage-1 check fires and stage 5 stays skipped (AC-1).
+   */
+  readonly validations?: readonly string[];
+  /**
+   * Per-script wall-clock budget forwarded to `runValidations`. Range-checked
+   * at stage 1 (AC-4) only when validations will actually run; omitted means
+   * `runValidations`' own `DEFAULT_VALIDATION_TIMEOUT_MS`.
+   */
+  readonly validationTimeoutMs?: number;
   /**
    * Opaque echo, not inspected or validated by `runReview` — a caller that
    * already resolved which engine `deps.engine` implements (`resolveEngine`,
@@ -104,6 +128,12 @@ export interface RunReviewDeps {
   readonly parseVerdict?: VerdictParser;
   /** Timeout scheduling seam; defaults to the global-timer scheduler. */
   readonly scheduleTimeout?: TimeoutScheduler;
+  /**
+   * Declared-validation execution seam (`[E5.F1.H2]`, #32). Absent means
+   * stage 5 never runs, regardless of `request.validations` — the
+   * composition root wires this only once an adapter exists (E6).
+   */
+  readonly processRunner?: ProcessRunner;
 }
 
 /**
@@ -118,6 +148,7 @@ export type RunStage =
   | "harness"
   | "worktree"
   | "diff"
+  | "validations"
   | "prompt"
   | "engine"
   | "parse";
@@ -323,6 +354,33 @@ async function executePipeline(
       );
     }
 
+    // Hoisted declared-validations pre-flight (design.md D-4). Conditional on
+    // validations actually running at stage 5 — when no runner is wired or
+    // no validations are declared, this is a byte-identical no-op (AC-1).
+    // `declarations` is computed once here and reused at stage 5 so the two
+    // sites can never see different lists.
+    const declarations = request.validations ?? [];
+    const validationsWillRun =
+      deps.processRunner !== undefined && declarations.length > 0;
+    if (validationsWillRun) {
+      if (request.validationTimeoutMs !== undefined) {
+        if (
+          !Number.isFinite(request.validationTimeoutMs) ||
+          request.validationTimeoutMs <= 0
+        ) {
+          throw new InvalidRunRequestError(
+            "validationTimeoutMs must be a finite number greater than 0",
+          );
+        }
+        if (request.validationTimeoutMs > MAX_TIMEOUT_MS) {
+          throw new InvalidRunRequestError(
+            `validationTimeoutMs must not exceed ${MAX_TIMEOUT_MS} (Node's setTimeout upper bound)`,
+          );
+        }
+      }
+      validateValidationDeclarations(declarations);
+    }
+
     /* --- 2. harness (hoisted: an unknown harness leaves no orphan) --- */
     stage = "harness";
     const harnesses = await loadHarnesses(deps.harnesses);
@@ -360,16 +418,31 @@ async function executePipeline(
     );
     draft.diff = diff;
 
-    /* --- 5. (E5 validations seam — `validationOutput` passes through) --- */
+    /* --- 5. validations (optional; a runtime outcome is evidence, never a fault) --- */
+    let validationOutput: readonly string[] | undefined =
+      request.validationOutput;
+    const processRunner = deps.processRunner;
+    if (processRunner !== undefined && declarations.length > 0) {
+      stage = "validations";
+      const computed = await runValidations(
+        {
+          declarations,
+          cwd: worktree.path,
+          ...(request.validationTimeoutMs !== undefined
+            ? { timeoutMs: request.validationTimeoutMs }
+            : {}),
+        },
+        { processRunner },
+      );
+      validationOutput = [...(request.validationOutput ?? []), ...computed]; // AC-16 order
+    }
 
     /* --- 6. prompt --- */
     stage = "prompt";
     const prompt = assemblePrompt({
       resolvedHarness,
       diff,
-      ...(request.validationOutput !== undefined
-        ? { validationOutput: request.validationOutput }
-        : {}),
+      ...(validationOutput !== undefined ? { validationOutput } : {}),
     });
     draft.prompt = prompt;
 
@@ -431,10 +504,15 @@ function classifyFailure(error: unknown): TerminalState {
     error instanceof HarnessNotFoundError ||
     error instanceof SkillNotFoundError ||
     error instanceof HarnessValidationError ||
-    error instanceof ContextModeNotSupportedError
+    error instanceof ContextModeNotSupportedError ||
+    error instanceof InvalidValidationDeclarationError ||
+    error instanceof InvalidProcessRequestError
   ) {
     return "validation-failed";
   }
+  // `ProcessSpawnError` is deliberately absent from this branch: AC-12
+  // guarantees `runValidations` catches it per entry and records it as
+  // evidence, so it can never reach this classifier.
   return "engine-error";
 }
 

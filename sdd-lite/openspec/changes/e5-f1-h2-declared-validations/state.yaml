@@ -98,7 +98,38 @@ stages:
       word-expansion; PRD 3.1-E conformance verified verbatim). No ratified decision reopened;
       zero Q-class items. Orchestrator independently re-ran the zod probe and confirmed R2-2.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-23T06:00:00Z"
+    completed_at: "2026-08-23T06:45:00Z"
+    notes: >-
+      design.md written with seven numbered decisions (D-1..D-7), each with the alternative
+      considered and its rejection rationale, plus an affected-areas table with line estimates
+      and a per-AC coverage map over all 21 criteria. Every signature was re-derived from the
+      working tree rather than from spec paraphrase. Core decisions: D-1 one production file
+      (src/core/run/run-validations.ts) holding the use case plus three module-private pure
+      functions (tokenizeDeclaration, windowStream, formatOutcomeElement /
+      formatSpawnFailureElement) -- a 2-3 file split was rejected because AC-18's hint pins the
+      new test to "run-validations.js and a local fake"; D-2 validateValidationDeclarations is
+      literally "tokenize each entry and discard", so the hoisted stage-1 check and the stage-5
+      per-entry split cannot drift, and it runs over the WHOLE list before the loop so AC-8/AC-10's
+      "before any spawn" holds for a bad entry at any index; D-3 the AC-7 rejection set is a
+      literal Set plus a codepoint predicate (tab exempted, U+0000-U+001F and U+007F rejected),
+      never a regex, with the rejection message template pinned so "contains the character" holds
+      for control characters too; D-4 the stage-1 hoist is one block appended after every existing
+      guard, gated on (deps.processRunner !== undefined && declarations.length > 0), with
+      declarations derived once via ?? [] and reused at stage 5 -- no aliased-condition narrowing
+      relied on, byte-identical when no runner is wired (AC-1/R2-3); D-5 windowing lives inside
+      the formatter and returns { text, elided } so AC-14's truncated flag has one source and
+      AC-15's window composes without double-processing; D-6 element assembly is explicit
+      concatenation with a terminated() helper because R2-5's "newline iff not already present"
+      rule is not expressible as parts.join("\n"); D-7 the ProcessRunner fake gets its own
+      src/core/run/__test__/fake-process-runner.ts, since run-review-fixtures.ts imports the
+      adapters engine fake and the review/workspace fakes that AC-18 forbids in the new test.
+      All 21 ACs judged provable as specified; AC-1's "no package.json/Makefile inspection in the
+      diff" is the only one proven by grep rather than an executable assertion, which is inherent
+      to it being a provenance property of the diff. One file beyond the spec's In Scope table:
+      the test-only fake-process-runner.ts, inside src/core/run/ which AC-20 does not pin.
+      Zero blocking open technical questions.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -318,15 +349,18 @@ open_risks:
       E6 should consider surfacing "validations declared but no runner wired" as a visible warning.
     severity: medium
 next_action:
-  kind: wait_for_approval
-  target: sddl-design
+  kind: run_stage
+  target: sddl-plan
   summary: >-
-    Await resolution of checkpoint cp-spec-validation, then run sddl-design. spec.md is complete
-    at 21 acceptance criteria with the four ratified decisions encoded and DC-5/DC-6/DC-7 settled
-    at A level (dec-005..dec-007). Design must honor the pinned values verbatim -- AC-7's
-    metacharacter rejection set, AC-14's evidence element format, dec-006's window constants and
-    DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 -- and must place runValidations as a use case at
-    src/core/run/run-validations.ts (a sibling of run-review.ts), NOT as a new port and NOT under
-    ports/, since src/core/run/ports/process-run-request.ts does not exist (spec.md E1).
+    Run sddl-plan against design.md. The design is complete with zero blocking open technical
+    questions: seven decisions (D-1..D-7), exact signatures for runValidations /
+    validateValidationDeclarations / the three private pure functions, the stage-1 hoist and
+    stage-5 call sites written out, the validationTimeoutMs flow traced from zod through to
+    ProcessRunRequest.timeoutMs, an affected-areas table (11 files: 3 new, 8 modified) with line
+    estimates, and a per-AC coverage map. Planning should stage the work so the cross-module
+    compile-time ripple (RunStage + RUN_STAGES, AC-19) lands together with the run-review.ts edit
+    in one stage -- typecheck is red between the two -- and should keep the pure-function stage
+    (run-validations.ts + its unit suite) ahead of the runReview wiring stage, since the wiring
+    tests consume the fake and the evidence format the first stage establishes.
 created_at: "2026-08-23T03:50:00Z"
-updated_at: "2026-08-23T04:55:00Z"
+updated_at: "2026-08-23T06:45:00Z"

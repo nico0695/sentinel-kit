@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -175,7 +175,40 @@ stages:
   sddl-judgment-day:
     status: pending
   sddl-qa-review:
-    status: pending
+    status: completed
+    mode: stage
+    verdict: pass
+    started_at: "2026-08-24T05:00:00Z"
+    completed_at: "2026-08-24T05:00:00Z"
+    report_path: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
+    notes: >-
+      Stage-mode review of the closed batch-s1-s4 (commits f0de92a, a20dd5a, bd97131, 40a6deb).
+      Verdict pass: 0 blockers, 0 high, 0 medium, 3 low findings recorded as info. Gates re-run
+      independently rather than quoted from the execution log -- npm run check exit 0 (biome 124
+      files, tsc clean, depcruise 84 modules / 183 dependencies, 0 violations) and npm test exit 0
+      (551 tests / 31 files), both matching the expected baseline. AC-5, AC-8, AC-9 and AC-14
+      verified against the code and tests rather than test names: persistRun composes every
+      RunRecord field per design's table and reduces diff and failure as required; the
+      reviewTimeoutMs field is optional with no zod default (mutation-guard test) and the
+      flag > config > constant cascade has one test per level; runtime dependencies read exactly
+      commander, execa, yaml, zod with the lockfile change limited to promoting the already
+      transitive commander@15.0.0; no pre-existing test file lost a single line (numstat +47/-0,
+      +38/-0, +67/-0). S2's precedence table and S4's RunRecord table match design verbatim, with
+      cleanupPolicy omitted and every optional field conditionally spread for
+      exactOptionalPropertyTypes. Decisions D1, D3, D4, D5 and D7 all honoured -- in particular
+      toRunStorageKey is absent from history/index.ts and persistRun is present. Architecture
+      guards confirmed by reading every new core import, not only by depcruise's exit code: the
+      new files import nothing, a same-module file, or the other module's public index.js. The S3
+      behaviour change left [E5.F2.H2]'s suites meaningful (their separator-free aliases exercise
+      the pass-through branch and still assert the exact store argument) and untouched, and the
+      adapter-side separator rejection in RunStore.contract.ts / run-store-fs.test.ts is intact.
+      Findings: F-1 low -- persist-run.test.ts's `not.toContain(diffBody)` assertion is vacuous
+      because JSON.stringify escapes the newlines, though the sibling `not.toContain("src/a.ts")`
+      assertion is sound and does cover AC-5; F-2 low -- the commander engines mismatch already
+      tracked as risk-e6h1-008; F-3 low -- the risk-e6h1-006 entry in this file has no status
+      field. risk-e6h1-009 and risk-e6h1-006 were both confirmed not worsened by S1-S4, and S5-S7
+      are safe to build on this foundation. Stage mode: the change stays implementing.
+      Details in qa-report.md.
 artifacts:
   state: sdd-lite/openspec/changes/e6-f1-h1-cli-base/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f1-h1-cli-base/proposal.md
@@ -593,15 +626,20 @@ open_risks:
       the first time; integration mismatches between core request shapes and adapter factories
       surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
     severity: medium
+    status: open
 next_action:
-  kind: run_stage
-  target: sddl-qa-review
+  kind: request_approval
+  target: sddl-executor
   summary: >-
-    S4 is complete and green (npm run check exit 0, depcruise 84 modules / 183 dependencies with 0
-    violations; npm test exit 0, 551 tests / 31 files with all 543 pre-existing tests intact),
-    which closes the approved batch-s1-s4. S5-S11 have no approval and were not started. Run
-    sddl-qa-review in stage mode over S1-S4 (tooling, resolveReviewRequest, the D7 normaliser and
-    persistRun), then take a fresh stage_approval to the user for S5 (CLI shell). QA should carry
-    risk-e6h1-009 forward: it is deliberately left open and assigned to the S6/S7 renderers.
+    sddl-qa-review (stage mode) closed batch-s1-s4 with verdict pass: gates re-run independently
+    are green (npm run check exit 0, depcruise 84 modules / 183 dependencies, 0 violations; npm
+    test exit 0, 551 tests / 31 files), AC-5/AC-8/AC-9/AC-14 are met against the code, design
+    conformance is verbatim for both the precedence and RunRecord tables, and the three findings
+    are low/info with no correction round required. Stage mode does not close the change. Next:
+    take a fresh stage_approval to the user for S5 (CLI shell -- createCli, CliDeps,
+    error/version/root-help behaviour), then run sddl-executor for S5 alone. S6/S7 must carry
+    risk-e6h1-009 (render the alias the user typed, never the stored owner__repo repoName) and
+    must parse commander's --timeout string into a number before it reaches
+    ResolveReviewRequestFlags.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T04:00:00Z"
+updated_at: "2026-08-24T05:00:00Z"

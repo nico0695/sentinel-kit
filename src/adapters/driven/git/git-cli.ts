@@ -158,7 +158,12 @@ export function createGitCliAdapter(): GitPort {
       // managed clone, which PRD §5.1 forbids (ephemeral worktree per
       // review, never a checkout in the clone) and which would make two
       // concurrent reviews of the same branch collide.
-      const revision = await resolveCommitish(repoPath, commitish);
+      const revision = await resolveCommitish(
+        repoPath,
+        commitish,
+        GitWorktreeError,
+        "worktree add",
+      );
       try {
         await execa(
           "git",
@@ -205,11 +210,28 @@ export function createGitCliAdapter(): GitPort {
       commitA,
       commitB,
     }: MergeBaseRequest): Promise<string> {
+      // Same resolution rule as `worktreeAdd` (dec-011): a caller-supplied
+      // ref may exist only as `refs/remotes/<remote>/<name>`, which plain
+      // `git merge-base` rejects with `Not a valid object name`. Resolving
+      // both operands here keeps the adapter uniform — a remote-only branch
+      // works on every `GitPort` method or fails clearly on every one.
+      const revisionA = await resolveCommitish(
+        repoPath,
+        commitA,
+        GitMergeBaseError,
+        "merge-base",
+      );
+      const revisionB = await resolveCommitish(
+        repoPath,
+        commitB,
+        GitMergeBaseError,
+        "merge-base",
+      );
       let stdout: string;
       try {
         const result = await execa(
           "git",
-          ["-C", repoPath, "merge-base", commitA, commitB],
+          ["-C", repoPath, "merge-base", revisionA, revisionB],
           EXECA_BASE,
         );
         stdout = result.stdout;
@@ -220,12 +242,35 @@ export function createGitCliAdapter(): GitPort {
     },
 
     async diff({ repoPath, from, to }: DiffRequest): Promise<DiffResult> {
+      // Resolved ONCE and reused by both invocations below (dec-011): the
+      // raw + numstat passes must describe the exact same revision pair,
+      // and a remote-only branch is unusable as a bare `git diff` operand.
+      const fromRevision = await resolveCommitish(
+        repoPath,
+        from,
+        GitDiffError,
+        "diff",
+      );
+      const toRevision = await resolveCommitish(
+        repoPath,
+        to,
+        GitDiffError,
+        "diff",
+      );
       let raw: string;
       let numstatOut: string;
       try {
         const result = await execa(
           "git",
-          ["-C", repoPath, "diff", "--no-ext-diff", "--no-color", from, to],
+          [
+            "-C",
+            repoPath,
+            "diff",
+            "--no-ext-diff",
+            "--no-color",
+            fromRevision,
+            toRevision,
+          ],
           EXECA_BASE,
         );
         raw = result.stdout;
@@ -235,7 +280,15 @@ export function createGitCliAdapter(): GitPort {
       try {
         const result = await execa(
           "git",
-          ["-C", repoPath, "diff", "--numstat", "--no-ext-diff", from, to],
+          [
+            "-C",
+            repoPath,
+            "diff",
+            "--numstat",
+            "--no-ext-diff",
+            fromRevision,
+            toRevision,
+          ],
           EXECA_BASE,
         );
         numstatOut = result.stdout;
@@ -278,23 +331,40 @@ function parseBranches(stdout: string): readonly BranchRef[] {
 }
 
 /**
- * Build a `GitError` subclass instance, preserving the raw failure in
- * `cause`. Reuses the core-exported `GitErrorOptions` shape as the single
- * source of truth for the constructor signature.
+ * Constructor shape shared by every `GitError` subclass. Reuses the
+ * core-exported `GitErrorOptions` as the single source of truth for the
+ * signature, so `wrapAs` and `resolveCommitish` can both be parameterized
+ * over "which port error does THIS method throw".
  */
-function wrapAs<
-  ErrorClass extends new (
-    message: string,
-    options?: GitErrorOptions,
-  ) => Error,
->(ErrorClass: ErrorClass, message: string, cause: unknown) {
+type GitErrorConstructor = new (
+  message: string,
+  options?: GitErrorOptions,
+) => Error;
+
+/**
+ * Build a `GitError` subclass instance, preserving the raw failure in
+ * `cause`.
+ */
+function wrapAs<ErrorClass extends GitErrorConstructor>(
+  ErrorClass: ErrorClass,
+  message: string,
+  cause: unknown,
+) {
   const asError = cause instanceof Error ? cause : new Error(String(cause));
   return new ErrorClass(`${message}: ${asError.message}`, { cause: asError });
 }
 
 /**
- * Resolve a `commitish` to a concrete 40-hex commit SHA inside `repoPath`,
- * so `git worktree add --detach` always receives an unambiguous revision.
+ * Resolve a caller-supplied `commitish` to a concrete 40-hex commit SHA
+ * inside `repoPath`, so every git invocation that takes a revision receives
+ * an unambiguous one.
+ *
+ * This is the SINGLE resolution path for the whole adapter (dec-011,
+ * risk-e6h1-014): `worktreeAdd`, `mergeBase` and `diff` all funnel through
+ * it, so a remote-only branch behaves identically everywhere instead of
+ * working in one method and dying in the next. `ErrorClass` and `context`
+ * keep the rejection typed per method — a `mergeBase` failure surfaces as
+ * `GitMergeBaseError`, never as `GitWorktreeError`.
  *
  * Two ordered steps, mirroring git's own precedence:
  *
@@ -306,7 +376,7 @@ function wrapAs<
  * 2. Only when step 1 finds nothing: look for a remote-tracking branch
  *    `refs/remotes/<remote>/<commitish>`. Exactly ONE match is required.
  *    Zero matches and two-or-more matches (the same branch name on two
- *    remotes) both reject with `GitWorktreeError` — reviewing the wrong
+ *    remotes) both reject with `ErrorClass` — reviewing the wrong
  *    revision silently would be far worse than failing loudly.
  *
  * The step-1 failure is carried as the `cause` of the rejection so the
@@ -315,6 +385,8 @@ function wrapAs<
 async function resolveCommitish(
   repoPath: string,
   commitish: string,
+  ErrorClass: GitErrorConstructor,
+  context: string,
 ): Promise<string> {
   let directFailure: unknown = new Error(
     `git rev-parse --verify ${commitish} returned no revision`,
@@ -347,8 +419,8 @@ async function resolveCommitish(
     listed = stdout;
   } catch (raw) {
     throw wrapAs(
-      GitWorktreeError,
-      `worktree add: cannot resolve commitish '${commitish}' in ${repoPath}`,
+      ErrorClass,
+      `${context}: cannot resolve commitish '${commitish}' in ${repoPath}`,
       raw,
     );
   }
@@ -360,15 +432,15 @@ async function resolveCommitish(
   }
   if (matches.length === 0) {
     throw wrapAs(
-      GitWorktreeError,
-      `worktree add: cannot resolve commitish '${commitish}' in ${repoPath} (no local ref, tag or remote-tracking branch matches)`,
+      ErrorClass,
+      `${context}: cannot resolve commitish '${commitish}' in ${repoPath} (no local ref, tag or remote-tracking branch matches)`,
       directFailure,
     );
   }
   const remotes = matches.map((m) => m.remote).join(", ");
   throw wrapAs(
-    GitWorktreeError,
-    `worktree add: commitish '${commitish}' is ambiguous in ${repoPath} — it matches a branch on several remotes (${remotes}); qualify it as '<remote>/${commitish}'`,
+    ErrorClass,
+    `${context}: commitish '${commitish}' is ambiguous in ${repoPath} — it matches a branch on several remotes (${remotes}); qualify it as '<remote>/${commitish}'`,
     directFailure,
   );
 }

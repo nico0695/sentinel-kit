@@ -128,6 +128,7 @@ stages:
       - S9
       - S9b
       - S10b
+      - S10c
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -401,8 +402,34 @@ stages:
       dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 668 tests
       across 38 files, up from 661/38, all 661 pre-existing tests still passing. Nothing under
       src/core/**, src/adapters/driving/** or src/main/** was touched and the GitPort interface is
-      unchanged. S10's smoke was NOT re-run -- the orchestrator reserved that transcript. Details
-      in execution-log.md.
+      unchanged. S10's smoke was NOT re-run -- the orchestrator reserved that transcript. S10c
+      completed the same fix across the WHOLE adapter: S10b was correct but scoped to worktreeAdd,
+      so the re-run smoke cleared the worktree stage and died at the next one with the identical
+      root cause (`git merge-base main feature` -> `fatal: Not a valid object name feature`).
+      resolveCommitish was parameterized (not duplicated) with an ErrorClass + context label -- the
+      GitErrorConstructor type was extracted from wrapAs's inline generic so both name the same
+      shape -- and is now the single resolution path for worktreeAdd, mergeBase (both operands) and
+      diff (from/to, resolved once and reused by the raw AND --numstat passes, which must describe
+      the same revision pair). Resolution semantics are byte-for-byte S10b's. Per-method error
+      types are preserved: mergeBase rejects as GitMergeBaseError and diff as GitDiffError, never
+      as GitWorktreeError, asserted explicitly with rejects.not.toBeInstanceOf(GitWorktreeError).
+      The whole file was audited, not just the three named sites: clone's url, fetch's remote NAME,
+      defaultBranch's remote (used to build refs/remotes/<remote>/HEAD for symbolic-ref -- resolving
+      it to a SHA would destroy the branch name the method returns) and worktreeRemove's filesystem
+      path are deliberately left unresolved, with reasons in execution-log.md. Cost considered
+      deliberately: 5 extra `git rev-parse` spawns per review at ~5 ms each, under 0.1 % of a
+      review's wall time; cross-call caching rejected as a staleness risk for no measurable gain.
+      GitPort.contract.ts gains 6 cases (remote-only, local-over-remote precedence and two-remote
+      rejection, for each of mergeBase and diff); git-cli.test.ts needed NO change since S10b's
+      harness already provisions feat-remote-only / feat-ambiguous / feat-both. Before/after proof:
+      swapping HEAD's adapter back in makes the 2 remote-only cases fail (2 failed | 38 passed),
+      with the merge-base one reproducing the smoke's exact stderr; with the fix all 40 pass. The
+      other 4 new cases pass on both implementations by design -- regression guards pinning that
+      the refactor did not start preferring the remote ref, and pinning the per-method error type.
+      Gates after S10c: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules /
+      226 dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 674 tests
+      across 38 files, up from 668/38, all 668 pre-existing tests still passing. S10's product
+      smoke was again NOT run -- still reserved for the orchestrator. Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -998,6 +1025,15 @@ open_risks:
     severity: medium
     status: resolved
     resolution: Settled by D5 (resolveReviewRequest in core/run).
+  - id: risk-e6h1-015
+    summary: >-
+      Cosmetic, found by S10's smoke. After a review completes, the per-repo parent directory
+      under worktrees/ is left behind empty (e.g. $SENTINEL_HOME/worktrees/repo2). The worktree
+      itself is correctly removed -- cleanup works -- but its parent is not pruned. Harmless
+      litter, no leak, no growth per run beyond one directory per repo.
+    severity: low
+    status: open
+    owner_stage: follow-up
   - id: risk-e6h1-008
     summary: >-
       Engines mismatch introduced by S1: commander@15.0.0 declares engines.node ">=22.12.0" while
@@ -1065,7 +1101,11 @@ open_risks:
       with fakes. This is precisely the risk-e6h1-006 failure class; S10's smoke is what would
       catch it.
     severity: medium
-    status: open
+    status: resolved
+    resolution: >-
+      Discharged by S9's construction and CONFIRMED by S10's smoke: `repo add` cloned into
+      $SENTINEL_HOME/clones/smoke/repo2 and `review` resolved the same path, producing a real
+      1-file diff. The two clonesDir consumers demonstrably agree at runtime, not just by reading.
     owner_stage: S9
   - id: risk-e6h1-014
     summary: >-
@@ -1084,7 +1124,9 @@ open_risks:
       by the same transcript.
       The defect is in [E2.F1.H2]'s git adapter, not in this story's code.
     severity: high
-    status: open
+    status: resolved
+    resolution: >-
+      Resolved by S10b + S10c and CONFIRMED by the re-run smoke: a remote-only branch now clears worktree, merge-base and diff. Full flow ok/request-changes against a real engine.
     owner_stage: user decision (C-level scope call)
   - id: risk-e6h1-006
     summary: >-
@@ -1092,18 +1134,16 @@ open_risks:
       the first time; integration mismatches between core request shapes and adapter factories
       surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
     severity: medium
-    status: open
+    status: resolved
+    resolution: >-
+      Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    S10b landed the D11 fix: the git adapter now resolves a commitish to a concrete revision
-    before `worktree add --detach`, and the remote-only case is covered by the shared GitPort
-    contract suite (661 -> 668 tests, both gates green). Next: re-run S10's end-to-end smoke --
-    reserved for the orchestrator, not run by S10b -- to confirm `sentinel review <repo> <branch>`
-    now reaches a terminal state for a remote-only branch, then S11's closeout, where D1, D5, D7
-    and D11 must all be declared together in the PR description and the history entry. A
-    stage-mode sddl-qa-review over S10b before S11 is recommended since it changes merged E2 code.
+    S10's smoke passed end to end after S10b+S10c, discharging risk-e6h1-006 and resolving
+    risk-e6h1-014. Run sddl-qa-review in stage mode over S8, S9, S9b, S10b and S10c, then S11's
+    closeout declaring D1, D5, D7 and D11 together.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T06:30:00Z"
+updated_at: "2026-08-24T06:00:00Z"

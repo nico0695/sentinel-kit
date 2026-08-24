@@ -514,6 +514,54 @@ export function gitPortContract(
         expect(sha).toBe(fixture.forkPointSha);
       });
 
+      // ---------------------------------------------------------------
+      // commitish resolution (risk-e6h1-014)
+      //
+      // `merge-base` takes caller-supplied refs exactly like `worktreeAdd`,
+      // so it must resolve them the same way: `git merge-base main feature`
+      // dies with `Not a valid object name` when `feature` exists only as
+      // `refs/remotes/origin/feature`. Same rules, per-method error type.
+      // ---------------------------------------------------------------
+
+      it("resolves an operand that exists ONLY as origin/<name>", async () => {
+        const sha = await git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: `origin/${fixture.defaultBranch}`,
+          commitB: fixture.remoteOnlyBranch,
+        });
+        expect(sha).toMatch(/^[0-9a-f]{40}$/);
+        // Identical to the explicitly qualified form — resolution must not
+        // change WHICH commit is reported, only make the bare name usable.
+        const qualified = await git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: `origin/${fixture.defaultBranch}`,
+          commitB: `origin/${fixture.remoteOnlyBranch}`,
+        });
+        expect(sha).toBe(qualified);
+      });
+
+      it("prefers the LOCAL ref when a name is both local and remote", async () => {
+        expect(fixture.ambiguousLocalSha).not.toBe(fixture.ambiguousRemoteSha);
+        const sha = await git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: fixture.ambiguousBranch,
+          commitB: `origin/${fixture.defaultBranch}`,
+        });
+        expect(sha).toBe(fixture.ambiguousLocalSha);
+      });
+
+      it("rejects a name carried by two remotes as GitMergeBaseError", async () => {
+        const rejection = git.mergeBase({
+          repoPath: fixture.clonePath,
+          commitA: `origin/${fixture.defaultBranch}`,
+          commitB: fixture.multiRemoteBranch,
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitMergeBaseError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        // The per-method error type survives the shared resolution path.
+        await expect(rejection).rejects.not.toBeInstanceOf(GitWorktreeError);
+      });
+
       it("wraps unresolvable ref as GitMergeBaseError with cause", async () => {
         const rejection = git.mergeBase({
           repoPath: fixture.clonePath,
@@ -577,6 +625,57 @@ export function gitPortContract(
         expect(paths).toContain("file-a.txt");
         expect(paths).toContain("file-b.txt");
         expect(paths).not.toContain("file-c.txt");
+      });
+
+      // ---------------------------------------------------------------
+      // commitish resolution (risk-e6h1-014) — same rules as worktreeAdd /
+      // mergeBase, with `GitDiffError` as the per-method error type.
+      // ---------------------------------------------------------------
+
+      it("diffs a target that exists ONLY as origin/<name>", async () => {
+        const result = await git.diff({
+          repoPath: fixture.clonePath,
+          from: fixture.forkPointSha,
+          to: fixture.remoteOnlyBranch,
+        });
+        expect(result.raw).toContain("diff --git");
+        expect(result.stats.map((s) => s.path)).toContain(
+          "file-remote-only.txt",
+        );
+        const qualified = await git.diff({
+          repoPath: fixture.clonePath,
+          from: fixture.forkPointSha,
+          to: `origin/${fixture.remoteOnlyBranch}`,
+        });
+        expect(result.raw).toBe(qualified.raw);
+        expect(result.stats).toEqual(qualified.stats);
+      });
+
+      it("prefers the LOCAL ref when a name is both local and remote", async () => {
+        expect(fixture.ambiguousLocalSha).not.toBe(fixture.ambiguousRemoteSha);
+        const result = await git.diff({
+          repoPath: fixture.clonePath,
+          from: fixture.ambiguousBranch,
+          to: `origin/${fixture.defaultBranch}`,
+        });
+        const local = await git.diff({
+          repoPath: fixture.clonePath,
+          from: fixture.ambiguousLocalSha,
+          to: `origin/${fixture.defaultBranch}`,
+        });
+        expect(result.raw).toBe(local.raw);
+        expect(result.stats).toEqual(local.stats);
+      });
+
+      it("rejects a name carried by two remotes as GitDiffError", async () => {
+        const rejection = git.diff({
+          repoPath: fixture.clonePath,
+          from: `origin/${fixture.defaultBranch}`,
+          to: fixture.multiRemoteBranch,
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitDiffError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        await expect(rejection).rejects.not.toBeInstanceOf(GitWorktreeError);
       });
 
       it("wraps unresolvable ref as GitDiffError with cause", async () => {

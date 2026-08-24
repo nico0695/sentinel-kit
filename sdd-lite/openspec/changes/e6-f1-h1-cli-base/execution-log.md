@@ -22,6 +22,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S9b | Addendum (D10): fix `npm run dev` + the four documents describing it | yes | completed |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
 | S10b | Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014) | yes | completed |
+| S10c | Complete the remote-only ref fix across the whole `GitPort` adapter (D11 / risk-e6h1-014) | yes | completed |
 | S11 | Closeout: declare the authorised deviations | no | pending |
 
 ## S1 — Tooling prerequisites
@@ -1725,3 +1726,169 @@ the session scratchpad. The orchestrator should now re-run S10 end to end to con
 S11's closeout, where **D1, D5, D7 and D11** must all be declared together in the PR description
 and the history entry. A stage-mode `sddl-qa-review` over S10b is worthwhile before S11 given it
 changes merged E2 code, though the diff is small and fully covered by the contract suite.
+
+
+## S10c — complete the remote-only ref fix across the whole `GitPort` adapter
+
+- status: completed
+- approval: orchestrator handoff, S10c — same `cp-plan-stage-approval` line as S10b (D11 /
+  `risk-e6h1-014`), widened from `worktreeAdd` alone to every `GitPort` method taking a
+  caller-supplied ref.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `98793de` (S10b), working tree clean,
+  `npm run check` exit 0 (biome 143 files, tsc clean, depcruise **97 modules / 226 dependencies**,
+  0 violations) and `npm test` exit 0 with **668 tests across 38 files** — independently
+  re-verified before the stage.
+
+### Why this stage exists
+
+S10b's fix was correct but scoped to the symptom's location. Re-running S10's product smoke after
+it showed the flow clearing the worktree stage and dying at the **next** one with the identical
+root cause:
+
+```
+failureStage    diff
+git merge-base main feature → fatal: Not a valid object name feature
+```
+
+`resolveCommitish` was called at exactly one site (`git-cli.ts:161`, `worktreeAdd`). `mergeBase`
+and `diff` handed caller-supplied refs straight to git. The rule S10c establishes: **every
+`GitPort` method that accepts a caller-supplied ref resolves it through the same path**, so a
+remote-only branch works everywhere or fails clearly everywhere.
+
+### Full audit of ref-taking call sites
+
+Every `execa` invocation in `git-cli.ts` was inspected, not just the three named in the handoff.
+
+| Method | Caller-supplied value | Decision |
+|---|---|---|
+| `worktreeAdd` | `commitish` | **already resolved** (S10b) — call site kept, now passes `GitWorktreeError` + `"worktree add"` |
+| `mergeBase` | `commitA`, `commitB` | **now resolved** — `GitMergeBaseError` + `"merge-base"` |
+| `diff` (raw) | `from`, `to` | **now resolved** — `GitDiffError` + `"diff"` |
+| `diff` (`--numstat`) | `from`, `to` | **now resolved** — reuses the SAME two resolved SHAs as the raw pass |
+| `clone` | `url` | left alone — a remote URL, not a revision; nothing to resolve against a local object database |
+| `fetch` | `options.remote` | left alone — a **remote name**, not a ref; `git fetch <remote>` is not a revision argument |
+| `defaultBranch` | `remote` | left alone — used to build `refs/remotes/<remote>/HEAD` for `symbolic-ref`, which must stay a *symbolic* lookup; resolving it to a SHA would destroy the very information the method returns (the branch NAME), and its `GitNoDefaultBranchError` path depends on `symbolic-ref`'s own failure signal |
+| `branches`, `worktreeList` | `repoPath` only | no ref argument |
+| `worktreeRemove` | `worktreePath` | a filesystem path, not a ref |
+
+No further ref-taking site exists in the file.
+
+### Design: one resolution path, per-method error type
+
+`resolveCommitish` was **parameterized, not duplicated** — the handoff's rule 2 ("do not invent a
+second, subtly different resolution path"). It now takes `ErrorClass: GitErrorConstructor` and a
+`context: string` label alongside `repoPath` / `commitish`. Its two ordered steps are byte-for-byte
+S10b's semantics: `git rev-parse --verify <ref>^{commit}` first (local-over-remote precedence,
+bare SHAs, tags, `origin/<name>`, revision expressions), then — only on nothing — a unique
+`refs/remotes/` match, rejecting on zero and on two-or-more, carrying the step-1 git error as
+`cause`.
+
+The `GitErrorConstructor` type was extracted from `wrapAs`'s inline generic constraint so both
+helpers name the same constructor shape; `wrapAs` is otherwise unchanged.
+
+**Per-method error typing is preserved** (handoff rule 3): each method passes its own error class,
+so a `mergeBase` resolution failure rejects as `GitMergeBaseError` and a `diff` one as
+`GitDiffError` — never as `GitWorktreeError`. Two new contract cases assert this explicitly with
+`rejects.not.toBeInstanceOf(GitWorktreeError)`, which is the assertion that would catch a lazy
+"just reuse the worktree error" implementation. The user-facing message keeps its shape with the
+context swapped: `merge-base: cannot resolve commitish 'feature' in <path> (no local ref, tag or
+remote-tracking branch matches)`.
+
+### Cost, considered deliberately
+
+`diff` now runs 2 extra `git rev-parse` spawns and `mergeBase` 2 more, so a single review that does
+`mergeBase` + `diff` + `worktreeAdd` adds **5 `rev-parse` invocations** where it previously had 1.
+Each is a local object-database lookup in the low single-digit milliseconds (the fixture runs put
+them at ~5 ms), against a review whose engine call takes seconds to minutes — well under 0.1 % of
+wall time. Caching resolved refs across a run was **considered and rejected**: it would introduce a
+staleness window between `fetch` and the diff for no measurable gain, and the `GitPort` interface
+is stateless by design. `diff` does resolve each ref once and reuse both SHAs across its raw and
+`--numstat` passes — that one is not an optimisation but a **correctness** requirement, since the
+two passes must describe the same revision pair.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driven/git/git-cli.ts` | `resolveCommitish` parameterized with `ErrorClass` + `context`; new `GitErrorConstructor` type extracted from `wrapAs`; `mergeBase` resolves both operands, `diff` resolves `from`/`to` once and reuses them in both invocations; `worktreeAdd`'s call site updated to the new signature. |
+| `src/adapters/driven/git/__test__/GitPort.contract.ts` | **6 new cases** — `mergeBase`: remote-only operand, local-over-remote precedence, two-remote rejection typed `GitMergeBaseError`; `diff`: remote-only target, local-over-remote precedence, two-remote rejection typed `GitDiffError`. |
+
+`git-cli.test.ts` needed **no change**: S10b's harness already provisions `feat-remote-only`,
+`feat-ambiguous` and `feat-both` with the matching `GitFixture` fields. The new behaviour lives in
+the shared contract suite, not an adapter-specific test — every `GitPort` implementation must have
+it.
+
+### Before/after evidence — the new tests fail against the current (S10b) implementation
+
+The S10c adapter was swapped for `git show HEAD:src/adapters/driven/git/git-cli.ts` (working-tree
+file swap only; no git history action), the extended suite run, then the fix restored:
+
+```
+=== NEW CONTRACT CASES AGAINST S10b (HEAD) git-cli.ts ===
+ FAIL  … > mergeBase > resolves an operand that exists ONLY as origin/<name>
+GitMergeBaseError: git merge-base failed: Command failed with exit code 128:
+  git -C /tmp/sentinel-git-Pw7sY7/clone merge-base origin/main feat-remote-only
+fatal: Not a valid object name feat-remote-only
+
+ FAIL  … > diff > diffs a target that exists ONLY as origin/<name>
+GitDiffError: git diff failed: Command failed with exit code 128:
+  git -C /tmp/sentinel-git-OgSKi3/clone diff --no-ext-diff --no-color <sha> feat-remote-only
+fatal: ambiguous argument 'feat-remote-only': unknown revision or path not in the working tree.
+
+ Test Files  1 failed | 16 skipped (17)
+      Tests  2 failed | 38 passed | 285 skipped (325)
+```
+
+The `merge-base` failure reproduces the smoke's exact stderr (`fatal: Not a valid object name`),
+which is the point: it is the product defect, at the contract level.
+
+With S10c in place, the same invocation:
+
+```
+ Test Files  1 passed | 16 skipped (17)
+      Tests  40 passed | 285 skipped (325)
+```
+
+Honest accounting of the other 4 new cases: the two **local-over-remote precedence** cases and the
+two **two-remote rejection** cases pass on both implementations. They are regression guards, not
+reproductions — the precedence pair pins that routing `mergeBase`/`diff` through `resolveCommitish`
+did not silently start preferring the remote ref (a real way this refactor could have broken
+behaviour), and the rejection pair pins the per-method error type. Only the 2 remote-only cases
+above are true before/after reproductions, and they are the ones that mattered.
+
+### Quick checks
+
+- `npm run check` → exit **0**
+  ```
+  Checked 143 files in 167ms. No fixes applied.
+
+  ✔ no dependency violations found (97 modules, 226 dependencies cruised)
+  ```
+  Identical to the baseline — 143 files, **97 modules / 226 dependencies**, 0 violations. The stage
+  adds no module and no dependency edge.
+- `npm test` → exit **0**
+  ```
+  Test Files  38 passed (38)
+       Tests  674 passed (674)
+  ```
+  **668 → 674**: all 668 pre-existing tests still pass, +6 new contract cases, same 38 files.
+- `biome check --write` was run once on `src/adapters/driven/git/` after the edits (one wrapped
+  call expression); no other file was reformatted.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion. The diff is one adapter file
+plus the shared contract suite. `src/core/**`, `src/adapters/driving/**` and `src/main/**` are
+untouched, and the `GitPort` interface, its request types and its error classes are unchanged —
+this stage needed no core change, so the `partial` escape hatch was not taken.
+
+### Next action
+
+S10c is complete. **S10's product smoke was again NOT run here** — the handoff explicitly reserves
+that transcript for the orchestrator, so no `repo add`, no `review` and no scratch clone were
+executed by this stage. The orchestrator should re-run S10 end to end: with `worktreeAdd`,
+`mergeBase` and `diff` all resolving refs uniformly, a remote-only branch should now clear the
+worktree **and** diff stages and reach a terminal state. Then S11's closeout, where **D1, D5, D7
+and D11** must all be declared together in the PR description and the history entry. A stage-mode
+`sddl-qa-review` covering S10b **and** S10c together is worthwhile before S11 — the two stages are
+one logical fix to merged E2 code.

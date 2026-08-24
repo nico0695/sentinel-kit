@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -271,37 +271,74 @@ stages:
     status: completed
     mode: stage
     verdict: pass
-    started_at: "2026-08-24T05:00:00Z"
-    completed_at: "2026-08-24T05:00:00Z"
+    started_at: "2026-08-24T06:00:00Z"
+    completed_at: "2026-08-24T06:00:00Z"
     report_path: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
+    reviews:
+      - target: batch-s1-s4
+        mode: stage
+        verdict: pass
+        reviewed_at: "2026-08-24T05:00:00Z"
+        summary: >-
+          0 blockers, 3 low findings recorded as info (F-1 vacuous stringify assertion,
+          F-2 commander engines mismatch, F-3 missing status on risk-e6h1-006). Gates re-run
+          independently: npm run check exit 0, npm test exit 0 (551 tests / 31 files). Full
+          detail in the first section of qa-report.md.
+      - target: batch-s5-s7
+        mode: stage
+        verdict: pass
+        reviewed_at: "2026-08-24T06:00:00Z"
+        summary: >-
+          Stage-mode review of S5, S6 and S7 (commits 41421c9, c00e210, 81cab90; frozen diff
+          18 files, +2488/-5). Verdict pass: 0 blockers, 0 high, 0 medium, 2 low findings
+          recorded as info. Gates re-run independently rather than quoted from the execution
+          log -- npm run check exit 0 (biome 140 files, tsc clean, depcruise 94 modules /
+          209 dependencies, 0 violations) and npm test exit 0 (638 tests / 37 files), both
+          matching the expected numbers exactly. AC-1 verified mechanically by reading every
+          command body: each parses arguments, calls one thunk (two for review, per D1) and
+          delegates rendering; no derivation, filtering, sorting or merging of a domain fact
+          anywhere, and all 87 adapter tests run on a capturing CliIo plus throwing thunk
+          fakes with no driven adapter, no filesystem and no process. AC-2 asserted at all
+          eight help levels including option descriptions and the SENTINEL_HOME /
+          SENTINEL_OPENCODE_MODEL footer. AC-3 exactly five leaf paths, one use case each.
+          AC-6 exactly-once verified rather than trusted -- a single unconditional persistRun
+          call site, identity assertions on the request and result objects, length 1 for
+          every completed invocation including four non-ok states, length 0 for every path
+          that produced no run. AC-10 streams asserted separately with whole-array equality.
+          AC-12 confirmed structurally -- no exit-code table exists, the only .state reads
+          outside tests are three renderer display fields, and exit codes come solely from
+          CommanderError.exitCode or the catch-all's literal 1. AC-13 all ten real core error
+          classes thrown through the real run path, each rendering exactly one stderr line
+          equal to its message with no stack and no name prefix. AC-4 and AC-11 met for this
+          batch; their remaining halves are S9's, as plan.md's coverage row declares.
+          Mutation-verification claims were not taken on trust: three were reproduced from
+          scratch and matched the log exactly -- inserting a terminal-state exit decision
+          gave Tests 6 failed | 22 passed (28), and rendering the stored repoName in both
+          format-review and format-runs gave Tests 3 failed | 84 passed (87). Both mutations
+          were reverted and the tree is byte-identical. risk-e6h1-009 upheld across S6 and
+          S7: no renderer reads RunSummary.repoName / RunRecord.repoName, and S7's runDir
+          exclusion is narrow (one line filtered, nine fields still asserted, guard still
+          fires under mutation). Architecture guards confirmed by reading rather than by
+          depcruise's exit code alone, since src/main is still empty: the CLI adapter imports
+          only commander and four core barrels, and constructs nothing but its own commander
+          Command and an InvalidArgumentError. D6 and D4 upheld -- no --json surface, runtime
+          dependencies still exactly commander, execa, yaml, zod, no colour library, no ANSI
+          escape. Prior findings F-1 and F-3 are resolved; F-2 stays tracked as
+          risk-e6h1-008. New findings: F-4 low -- repo add prints "-" instead of the resolved
+          clone path because registerRepo returns localPath only when --local-path was given,
+          a divergence from spec's behaviour table whose clean fix is unauthorised core
+          surface; F-5 low -- review's outcome block omits the run id, so runs show requires
+          reading it out of runDir. S7's carry-forward for S9 was checked and is coherent:
+          loadContext, clonesDir and now are all supplied by design's container/paths split,
+          with the one caution that a single sentinelPaths result must feed both
+          RegisterRepoDeps.clonesDir and CliDeps.clonesDir, since registerRepo and
+          resolveReviewRequest concatenate identical path strings. Stage mode: the change
+          stays implementing. Details in qa-report.md.
     notes: >-
-      Stage-mode review of the closed batch-s1-s4 (commits f0de92a, a20dd5a, bd97131, 40a6deb).
-      Verdict pass: 0 blockers, 0 high, 0 medium, 3 low findings recorded as info. Gates re-run
-      independently rather than quoted from the execution log -- npm run check exit 0 (biome 124
-      files, tsc clean, depcruise 84 modules / 183 dependencies, 0 violations) and npm test exit 0
-      (551 tests / 31 files), both matching the expected baseline. AC-5, AC-8, AC-9 and AC-14
-      verified against the code and tests rather than test names: persistRun composes every
-      RunRecord field per design's table and reduces diff and failure as required; the
-      reviewTimeoutMs field is optional with no zod default (mutation-guard test) and the
-      flag > config > constant cascade has one test per level; runtime dependencies read exactly
-      commander, execa, yaml, zod with the lockfile change limited to promoting the already
-      transitive commander@15.0.0; no pre-existing test file lost a single line (numstat +47/-0,
-      +38/-0, +67/-0). S2's precedence table and S4's RunRecord table match design verbatim, with
-      cleanupPolicy omitted and every optional field conditionally spread for
-      exactOptionalPropertyTypes. Decisions D1, D3, D4, D5 and D7 all honoured -- in particular
-      toRunStorageKey is absent from history/index.ts and persistRun is present. Architecture
-      guards confirmed by reading every new core import, not only by depcruise's exit code: the
-      new files import nothing, a same-module file, or the other module's public index.js. The S3
-      behaviour change left [E5.F2.H2]'s suites meaningful (their separator-free aliases exercise
-      the pass-through branch and still assert the exact store argument) and untouched, and the
-      adapter-side separator rejection in RunStore.contract.ts / run-store-fs.test.ts is intact.
-      Findings: F-1 low -- persist-run.test.ts's `not.toContain(diffBody)` assertion is vacuous
-      because JSON.stringify escapes the newlines, though the sibling `not.toContain("src/a.ts")`
-      assertion is sound and does cover AC-5; F-2 low -- the commander engines mismatch already
-      tracked as risk-e6h1-008; F-3 low -- the risk-e6h1-006 entry in this file has no status
-      field. risk-e6h1-009 and risk-e6h1-006 were both confirmed not worsened by S1-S4, and S5-S7
-      are safe to build on this foundation. Stage mode: the change stays implementing.
-      Details in qa-report.md.
+      Two stage-mode reviews so far, both pass: batch-s1-s4 (3 low findings) and batch-s5-s7
+      (2 low findings). No blocker, no high, no medium, no architecture-guard violation in
+      either. Stage mode never closes the change -- S8-S11 are unimplemented and unapproved,
+      and only a final-mode review may set completed.
 artifacts:
   state: sdd-lite/openspec/changes/e6-f1-h1-cli-base/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f1-h1-cli-base/proposal.md
@@ -776,6 +813,39 @@ open_risks:
     severity: low
     status: open
     owner_stage: user decision, candidate for S9 or a follow-up story
+  - id: risk-e6h1-011
+    summary: >-
+      QA finding F-4, confirmed by the orchestrator. `repo add` on a CLONED repo prints `-` where
+      spec's behaviour table promised the resolved local path. register-repo.ts:84 computes
+      `${deps.clonesDir}/${alias}` into a local variable and clones there, but the persisted
+      RepoEntry carries `localPath` only when --local-path was supplied. S6 was right not to
+      re-derive the path in a renderer -- that cascade belongs to core -- so the clean fix would
+      be further core surface, which is unauthorised. Verify in S10's smoke, raise at S11.
+    severity: low
+    status: open
+    owner_stage: S10 evidence, S11 decision
+  - id: risk-e6h1-012
+    summary: >-
+      QA finding F-5. `review`'s outcome block omits the run id, so a user following up with
+      `runs show` must read it out of runDir's last path segment. Spec-conformant as written --
+      AC-6 requires the run directory, not the id -- so this is a usability note, not a defect.
+      Recorded for [E6.F1.H2] (#37) and [E7.F2.H1] (user documentation).
+    severity: low
+    status: open
+    owner_stage: E6.F1.H2 / E7.F2.H1
+  - id: risk-e6h1-013
+    summary: >-
+      QA carry-forward for S9, confirmed by the orchestrator against both sources. register-repo.ts:84
+      (`${deps.clonesDir}/${alias}`) and resolve-review-request.ts:117
+      (`entry.localPath ?? ${input.clonesDir}/${input.repoAlias}`) concatenate identical path
+      strings independently. The composition root MUST feed one single sentinelPaths(...) result
+      to both RegisterRepoDeps.clonesDir and CliDeps.clonesDir. If they diverge, `repo add` clones
+      to one directory and `review` looks in another -- silent, and invisible to every unit test
+      with fakes. This is precisely the risk-e6h1-006 failure class; S10's smoke is what would
+      catch it.
+    severity: medium
+    status: open
+    owner_stage: S9
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
@@ -785,11 +855,16 @@ open_risks:
     status: open
 next_action:
   kind: run_stage
-  target: sddl-qa-review
+  target: sddl-executor
   summary: >-
-    The cp-stage-approval-s5-s7 batch is closed: S5, S6 and S7 are committed and green (638 tests
-    across 37 files). D9 settled risk-e6h1-010 as accepted-for-now. Run sddl-qa-review in stage
-    mode over the S5-S7 batch, then take a fresh stage_approval before S8.
+    Stage-mode QA over the S5-S7 batch returned pass: 0 blockers, 2 low findings recorded as
+    info (F-4 repo add prints "-" for a cloned repo's path; F-5 review omits the run id), both
+    non-blocking and neither fixable inside this story's authorised scope. Both gates re-run
+    independently and green (npm run check exit 0; npm test exit 0, 638 tests / 37 files), and
+    three of the batch's mutation-verification claims were reproduced exactly. Take a fresh
+    stage_approval to the user for S8 (src/main/paths.ts) and then run sddl-executor for S8
+    alone. When S9 is planned, wire one sentinelPaths result into both RegisterRepoDeps.clonesDir
+    and CliDeps.clonesDir -- they must be the same string.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T02:00:00Z"
+updated_at: "2026-08-24T06:00:00Z"

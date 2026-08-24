@@ -816,6 +816,35 @@ decisions:
     consequences: >-
       risk-e6h1-010 stays open past this story's close and must appear in the PR description's
       known-limitations note and in the history entry, so it is not silently inherited.
+  - id: D10
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: "`npm run dev` becomes `tsup --silent && node dist/cli.js`"
+    context: >-
+      Escalated by S9 and reproduced by the orchestrator. `npm run dev` now fails with
+      ERR_MODULE_NOT_FOUND on src/adapters/driving/cli/index.js: Node's --experimental-strip-types
+      does not rewrite `.js` specifiers to sibling `.ts` files, and the repo uses `.js` everywhere
+      per NodeNext. The [E0.F1.H3] stub never imported source code, so the breakage surfaces
+      exactly at S9, the first cli.ts with real imports. This refutes a documented assumption in
+      four files (docs/setup-tecnico-sentinel.md §5.1, CLAUDE.md, README.md, CONTRIBUTING.md),
+      which makes it C-level under the project's A/B/C protocol -- reality contradicting the docs,
+      not a design fork.
+    decision: >-
+      Change the `dev` script to `tsup --silent && node dist/cli.js` and update the four documents
+      that describe it. No new dependency: tsup is already installed and already backs `build`.
+    rationale: >-
+      Measured rebuild is ~0.7s, and `npm run dev -- --help` still forwards arguments, so the
+      developer experience is materially unchanged. Adding tsx was rejected as a new devDependency
+      the technical setup does not contemplate, in a story that already touched package.json for
+      commander (D4). Migrating ~97 modules to `.ts` specifiers was rejected by S9 itself as a
+      repo-wide change that abandons the NodeNext convention. Deferring was rejected because it
+      leaves four documents asserting something false.
+    consequences: >-
+      package.json is touched a second time in this story, after D4's commander addition. Four
+      documents change. Executed as addendum stage S9b so the diff stays isolated and reviewable
+      rather than being folded into S9's commit. S10's smoke can then use `npm run dev` as the
+      docs promise, which is itself a check on this decision.
 open_risks:
   - id: risk-e6h1-001
     summary: >-
@@ -956,26 +985,11 @@ open_risks:
     severity: medium
     status: open
 next_action:
-  kind: ask_user
-  target: sddl-orchestrator
+  kind: run_stage
+  target: sddl-executor
   summary: >-
-    S9 (container.ts + cli.ts) is complete and both gates are green (npm run check exit 0, biome 143
-    files, depcruise 97 modules / 226 dependencies, 0 violations; npm test exit 0, 661 tests / 38
-    files, unchanged). risk-e6h1-013 is closed by construction (one sentinelPaths object feeds every
-    consumer, no path concatenation in container.ts), AC-7 and AC-11 are completed, D8 is
-    implemented, and the eager-vs-lazy question S8 left open was decided after verification: lazy
-    everywhere, plus a mkdir -p of the home ROOT inside the registerRepo thunk, because
-    ConfigStore.writeRepos uses writeFile and would otherwise fail on a machine with no ~/.sentinel.
-    This closes the cp-stage-approval-s8-s9 batch; S10 and S11 are unapproved and were not started,
-    and the end-to-end smoke was deliberately not run so its transcript reaches the user directly.
-    Two things need the user before S10: (1) a C-level decision -- `npm run dev` can no longer run
-    the CLI, because Node's --experimental-strip-types does not rewrite .js specifiers to sibling
-    .ts files, which refutes what setup-tecnico 5.1, CLAUDE.md, README and CONTRIBUTING all
-    document; recommendation (a) "dev": "tsup --silent && node dist/cli.js", with the same one-line
-    update in setup-tecnico 5.1 and CLAUDE.md; alternatives are a tsx devDependency or a repo-wide
-    switch to .ts specifiers (rejected). AC-4 was verified through the built entrypoint instead
-    (node dist/cli.js --version -> 0.0.0, exit 0). (2) a fresh stage approval for S10's manual
-    smoke, which must invoke `npm run build && node dist/cli.js ...` until (1) is decided. A
-    stage-mode sddl-qa-review over S8-S9 together is the sensible review point.
+    D10 settled the `npm run dev` contradiction S9 escalated. Run sddl-executor on addendum stage
+    S9b (the dev script plus the four documents that describe it), then take stage approval for
+    S10's manual smoke.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T09:00:00Z"
+updated_at: "2026-08-24T04:00:00Z"

@@ -17,7 +17,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S5 | CLI shell: factory, deps contract, error/version/root-help behaviour | yes | completed |
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | completed |
 | S7 | `review` command | yes | completed |
-| S8 | Sentinel home resolution (D2/AC-7) | yes | pending |
+| S8 | Sentinel home resolution (D2/AC-7) | yes | completed |
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | pending |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
 | S11 | Closeout: declare the authorised deviations | no | pending |
@@ -938,3 +938,212 @@ to the user and take a fresh `stage_approval` before S8 (`src/main/paths.ts`). A
 `sddl-qa-review` over the S5-S7 batch is the recommended next stage, since the CLI adapter is now
 complete and is the largest single surface of this change; S8-S9 build the composition root on top
 of it.
+
+## S8 — sentinel home resolution (`src/main/paths.ts`)
+
+- status: completed
+- approval: `cp-stage-approval-s8-s9` (user, S8-S9 approved as a batch, one stage per executor
+  invocation). S10 (manual smoke) and S11 (closeout) are **not** approved and were not started.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `f11f99a`, working tree clean at stage
+  start; `npm run check` exit 0 (biome 140 files, tsc clean, depcruise 94 modules / 209
+  dependencies, 0 violations) and `npm test` exit 0 (638 tests / 37 files), matching S7's closing
+  numbers.
+
+### Planned scope (plan.md, S8 row)
+
+`src/main/paths.ts` (`resolveSentinelHome`, `sentinelPaths`, `resolvePackageRoot`) and
+`src/main/__test__/paths.test.ts`. Explicitly out of scope and untouched: `src/main/cli.ts` (still
+the `[E0.F1.H3]` `--version` stub — S9 replaces it), `src/main/container.ts` (does not exist yet —
+S9 creates it), everything under `src/core/**` and `src/adapters/**`, and every config file
+(`vitest.config.ts`'s widened include already landed in S1).
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/main/paths.ts` | New. `PathEnv` type, `SentinelPaths` interface, and the three functions design fixed: `resolveSentinelHome(env, homeDir)`, `sentinelPaths(root)`, `resolvePackageRoot(startPath?)`. Node builtins used: `node:fs` (`existsSync`, `statSync`), `node:path`, `node:url` — legal in `src/main/`, banned in core. |
+| `src/main/__test__/paths.test.ts` | New. 23 tests. First file in `src/main/__test__/`, which this stage created. |
+
+No other file was created, modified or deleted (`git status --short` shows exactly
+`?? src/main/__test__/` and `?? src/main/paths.ts`).
+
+### How the output shape defuses `risk-e6h1-013`
+
+The risk is that `register-repo.ts:84` (`${deps.clonesDir}/${alias}`) and
+`resolve-review-request.ts:117` (`entry.localPath ?? ${input.clonesDir}/${input.repoAlias}`) get
+*different* clones directories from the composition root, so `repo add` clones into one place and
+`review` looks in another — silently, and invisibly to every fake-based unit test.
+
+`sentinelPaths(root)` returns **one cohesive frozen-by-type object**, never loose strings a caller
+must reassemble:
+
+```ts
+interface SentinelPaths {
+  root; configFile; reposFile; harnessesDir; skillsDir; clonesDir; worktreesDir; runsDir;
+}
+```
+
+Consequences for S9:
+
+- there is exactly **one** `clonesDir` in existence per `sentinelPaths(...)` call, so
+  `RegisterRepoDeps.clonesDir` and `CliDeps.clonesDir` can only diverge if `container.ts`
+  deliberately calls `sentinelPaths` twice with different roots — a visible, reviewable act, not an
+  accidental one. Handing the same object to both is the path of least resistance.
+- no consumer is invited to concatenate: every directory the wiring needs is already a field, so
+  `join(root, "clones")` never needs to be written a second time anywhere in the repo.
+- `sentinelPaths` resolves its root internally, so no field can be relative even if S9 hands it a
+  relative string, and every consumer's absolute-path precondition
+  (`createReviewWorktree` rejects a non-absolute `worktreesDir`) is satisfied by construction.
+- the module doc-comment states the constraint in the source S9 will read: *"`container.ts` calls
+  `sentinelPaths()` **once** and hands the single resulting object to every consumer."*
+
+`risk-e6h1-013` stays **open and owned by S9** — S8 can only make the wrong wiring harder to write,
+not impossible; the wiring itself is S9's, and S10's smoke is what would catch a divergence.
+
+### The two roots, kept distinct
+
+`resolvePackageRoot()` is separate from the home layout on purpose and is **not** a field of
+`SentinelPaths`: the factory `harnesses/` and `skills/` ship inside the npm package, while
+`<root>/harnesses` and `<root>/skills` are the user's. Merging them into one object would invite S9
+to point `createHarnessLoaderAdapter` at the wrong one. The walk is upward to the nearest
+`package.json` rather than a fixed `../..`, because `npm run dev` runs `src/main/cli.ts` (two levels
+down) while the bundle is `dist/cli.js` (one level down); a fixed relative hop is wrong for one of
+them in every possible choice.
+
+### Decisions taken in this stage
+
+- **A-level — `resolvePackageRoot` takes an optional `startPath`.** Design fixed the signature as
+  `resolvePackageRoot()`; the parameter is purely additive (the no-argument call design specified
+  still works and defaults to `fileURLToPath(import.meta.url)`) and it is what makes the upward walk
+  testable against a temp tree instead of only against this repository, where every walk trivially
+  succeeds at the real root. The handoff explicitly invited keeping the filesystem seam injectable.
+- **A-level — `sentinelPaths` re-`resolve`s its root.** A no-op for `resolveSentinelHome`'s output,
+  but it makes "every returned path is absolute" a property of the function rather than a
+  precondition on its caller, which is the AC-7 wording.
+- **A-level — `configFile` and `reposFile` are fields even though `createConfigStoreAdapter(root)`
+  derives them itself.** They are rows of design's home-layout table; exposing them makes the layout
+  assertable in one `toEqual` and gives diagnostics a name to print. No consumer is expected to pass
+  them to an adapter.
+- **A-level — a blank or whitespace-only `SENTINEL_HOME` falls back to `~/.sentinel`.** Design says
+  "trimmed and non-empty"; the plan's coverage row names "set-but-blank" explicitly. `export
+  SENTINEL_HOME=` in a shell profile is the realistic way this happens and treating it as the CWD
+  would be the worst possible interpretation.
+- **A-level — `PathEnv = Readonly<Record<string, string | undefined>>` rather than
+  `NodeJS.ProcessEnv`.** `process.env` satisfies it, the tests build literals with no casts, and the
+  module stays free of a global type dependency.
+
+### Quick checks
+
+Planned validation (plan.md, S8 row): unit tests in the widened `adapters` project covering
+`SENTINEL_HOME` set / unset / set-but-blank, returned paths absolute, the derived layout matching
+design's table, and `resolvePackageRoot` finding the nearest `package.json` upward.
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 142 files in 171ms. No fixes applied.
+
+  ✔ no dependency violations found (96 modules, 212 dependencies cruised)
+  ```
+  140 → **142 files**, 94 → **96 modules**, 209 → **212 dependencies**, still **0 violations**.
+  `depcruise` clean in particular for `core-no-adapters` (this stage adds nothing to core) and
+  `wiring-only-in-main` (the module is *in* `src/main/` and instantiates no adapter at all — it only
+  computes strings). Biome required one formatting pass (`biome check --write src/main`); no lint
+  rule was suppressed and `tsc` reported no error under `exactOptionalPropertyTypes` /
+  `noUncheckedIndexedAccess`.
+- `npm test` → exit **0**:
+  ```
+  > vitest run
+
+   Test Files  38 passed (38)
+        Tests  661 passed (661)
+   Duration  9.57s
+  ```
+  638 → **661 tests** (+23) across 37 → **38 files**. **All 638 pre-existing tests still pass** — no
+  pre-existing file was modified by this stage, so no existing assertion could change.
+- **Collection confirmed, not assumed:** `npx vitest run --project adapters src/main` → exit 0,
+  `Test Files  1 passed (1)`, `Tests  23 passed (23)`. The file count moving 37 → 38 in the
+  aggregate run is the second, independent confirmation that S1's widened `adapters` include
+  (`src/main/**/__test__/**/*.test.ts`) actually collects it.
+
+### Mutation verification of the load-bearing guards
+
+Each mutation was applied to `src/main/paths.ts`, the suite run, and the mutation reverted; `diff`
+against a pre-mutation copy confirms the file is byte-identical to its pre-mutation state, and both
+gates were re-run green afterwards.
+
+1. Accepting a blank `SENTINEL_HOME` (`configured !== undefined` instead of also `!== ""`):
+   `Tests  2 failed | 21 passed (23)` — the set-but-blank and whitespace-only cases.
+2. Dropping `resolve()` inside `sentinelPaths` (`const base = root`):
+   `Tests  1 failed | 22 passed (23)` — "returns absolute paths even when handed a relative root".
+3. Walking to the **outermost** `package.json` instead of the nearest:
+   `Tests  1 failed | 22 passed (23)` — "stops at the nearest package.json, not the outermost one".
+
+A fourth attempted mutation (checking the parent before the current directory) was *not* killed —
+correctly, because it is behaviour-preserving for this walk; it is recorded here so the list is not
+read as three-for-three luck.
+
+### Test coverage against the plan's S8 row, test by test
+
+- **`SENTINEL_HOME` set / unset / blank (AC-7)** — 9 tests: set wins; unset → `<homeDir>/.sentinel`;
+  empty string, whitespace-only and an explicit `undefined` all fall back; surrounding whitespace is
+  trimmed off a real value; a relative value resolves to absolute; `..` segments are normalised; and
+  one test sets a *real* `process.env.SENTINEL_HOME` to a poison value and asserts the function
+  ignores it (restoring the previous value in a `finally`), which pins the "takes its inputs rather
+  than reading globals" property the handoff asked for.
+- **The derived layout (design's table)** — one `toEqual` against all eight fields with a
+  `satisfies SentinelPaths`, so adding a field without a test becomes a type-level reminder; plus
+  every field absolute, every field prefixed by `root`, absolute even from a relative root, two
+  calls agreeing on `clonesDir`, and two composition tests (`~/.sentinel` default and a
+  `SENTINEL_HOME` override, the latter also asserting nothing lands under the home directory).
+- **`resolvePackageRoot`** — 7 tests: the start directory itself; an upward walk from three levels
+  down; a file path (starts from its directory); a **non-existent** file path, which is the real
+  `dist/cli.js` shape when a bundle path is computed but not stat-able; nearest-wins against an
+  outer `package.json`; the no-argument call returning this repository's root and agreeing with an
+  explicit walk from `src/main`; and the no-`package.json`-anywhere error, `skipIf`-guarded on
+  `existsSync("/package.json")` since that path only exists on a host whose filesystem root has no
+  manifest — an honest guard rather than a test that would fail for an environmental reason.
+
+Skipped: nothing beyond the environment-guarded case above. `e2e/**` stays empty (AC-14). No
+integration evidence was produced — `risk-e6h1-006` and `risk-e6h1-013` both remain invisible to
+fake-based unit tests, which is exactly why S10 exists.
+
+### Notes and observations
+
+- **AC-7 is half-satisfied by this stage.** The resolver exists, is absolute-by-construction and is
+  tested with the variable set and unset. The other half — *"all four adapter path inputs and
+  `runReview`'s `clonesDir`/`worktreesDir` derive from it, resolved in `src/main/` and nowhere
+  else"* — is a property of `container.ts` and is S9's to establish. The plan's coverage row already
+  reads `AC-7 S8+S9`.
+- **Carry-forward for S9 (in addition to `risk-e6h1-013`).** `container.ts` should call
+  `resolveSentinelHome(process.env, homedir())` and `sentinelPaths(...)` exactly once each, keep the
+  resulting object in a single `const`, and read `resolvePackageRoot()` separately for the factory
+  harness loader. `createConfigStoreAdapter` and the *user* `createHarnessLoaderAdapter` both take
+  `paths.root`; `createRunStoreFsAdapter` takes `paths.runsDir`; `RegisterRepoDeps.clonesDir`,
+  `CliDeps.clonesDir` and `resolveReviewRequest`'s `clonesDir` all take `paths.clonesDir`;
+  `RunReviewDeps.worktreesDir` takes `paths.worktreesDir`.
+- **Open question S9 will have to answer, not a blocker for S8:** nothing in this stage creates any
+  directory on disk. Whether the home layout is created eagerly at startup or lazily by each driven
+  adapter is a `container.ts` concern — `createRunStoreFsAdapter` already `mkdir -p`s its own tree,
+  and `createConfigStoreAdapter` surfaces a typed `ConfigReadError` on a missing file, so the likely
+  answer is "lazily, unchanged". Flagged so S9 decides it deliberately rather than by omission, and
+  so S10's smoke checks it against a fresh `mktemp -d`.
+- **`risk-e6h1-010` untouched.** This stage renders nothing.
+- No git side effects: no commit, stage, stash or branch operation.
+
+### Blockers
+
+None.
+
+### Next action
+
+S8 is complete and both gates are green (`npm run check` exit 0; `npm test` exit 0, **661 tests /
+38 files**, the new file confirmed collected). S9 (`container.ts` + `cli.ts`) is the second half of
+the approved `cp-stage-approval-s8-s9` batch and is the orchestrator's next executor invocation; it
+must honour `risk-e6h1-013` by feeding one `sentinelPaths(...)` object to every consumer. Per that
+approval, stop after S9 and present the state before S10's manual smoke. A stage-mode
+`sddl-qa-review` over S8-S9 together is the sensible review point — S8 alone is a small, fully
+unit-tested pure module, while S9 is the hot-path assembly that gives it meaning.

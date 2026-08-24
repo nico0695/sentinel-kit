@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: implementing
-current_stage: sddl-qa-review
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -124,6 +124,7 @@ stages:
       - S5
       - S6
       - S7
+      - S8
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -263,6 +264,46 @@ stages:
       cast away (RunCleanupReason has no "policy" member; verdict: undefined violates
       exactOptionalPropertyTypes). No file under src/core/**, src/adapters/driven/** or src/main/**
       was touched. S8-S11 were NOT started and are not approved. Details in execution-log.md.
+      S8 (src/main/paths.ts) completed under cp-stage-approval-s8-s9, the first half of that
+      batch. New src/main/paths.ts with design's three functions -- resolveSentinelHome(env,
+      homeDir) implementing D2 (SENTINEL_HOME when set and non-blank, else <homeDir>/.sentinel,
+      both inputs as parameters so the resolver reads no global and needs no env mutation in
+      tests), sentinelPaths(root) returning the eight-field SentinelPaths object for design's home
+      layout (root, configFile, reposFile, harnessesDir, skillsDir, clonesDir, worktreesDir,
+      runsDir), and resolvePackageRoot(startPath?) walking up to the nearest package.json for the
+      factory harnesses/skills that ship with the npm package rather than living under the home
+      root. Every returned path is absolute by construction: sentinelPaths re-resolves its root, so
+      absoluteness is a property of the function rather than a precondition on S9. The single
+      cohesive return object is the direct answer to risk-e6h1-013: there is exactly one clonesDir
+      per sentinelPaths call and no consumer is invited to concatenate one, so RegisterRepoDeps.
+      clonesDir and CliDeps.clonesDir can only diverge if container.ts deliberately calls
+      sentinelPaths twice with different roots -- a visible act, not an accidental one -- and the
+      module doc-comment states that constraint in the source S9 will read. The risk stays open and
+      owned by S9, since S8 can make the wrong wiring harder to write but not impossible.
+      resolvePackageRoot is deliberately NOT a field of SentinelPaths, keeping the package root and
+      the home root distinct so S9 cannot point createHarnessLoaderAdapter at the wrong one.
+      A-level calls: an optional startPath parameter on resolvePackageRoot (purely additive to
+      design's signature, and what makes the upward walk testable against a temp tree); sentinelPaths
+      re-resolving its root; configFile/reposFile exposed as fields although the config store derives
+      them itself, so design's layout table is assertable in one toEqual; a blank or whitespace-only
+      SENTINEL_HOME falling back to ~/.sentinel; and PathEnv typed as Readonly<Record<string, string
+      | undefined>> rather than NodeJS.ProcessEnv. 23 new tests in the new src/main/__test__/
+      directory, collected by S1's widened adapters include -- confirmed directly (npx vitest run
+      --project adapters src/main: 1 file, 23 tests) and by the aggregate file count moving 37 to 38,
+      not assumed. Three guards mutation-verified and reverted (blank SENTINEL_HOME accepted: 2
+      failed; sentinelPaths without resolve: 1 failed; walking to the outermost package.json: 1
+      failed), with a fourth attempted mutation recorded as not killed because it was
+      behaviour-preserving. Gates after S8: npm run check exit 0 (biome 142 files, tsc clean,
+      depcruise 96 modules / 212 dependencies, 0 violations) and npm test exit 0 with 661 tests
+      across 38 files, up from 638/37, all 638 pre-existing tests still passing -- no pre-existing
+      file was modified, git status shows only the two new untracked paths. AC-7's second half
+      (every adapter path input deriving from this resolver in src/main and nowhere else) is S9's,
+      as plan.md's coverage row declares. Carried forward to S9 beyond risk-e6h1-013: whether the
+      home layout is created eagerly at startup or lazily by each driven adapter is an unmade
+      container.ts decision (the likely answer is lazily, unchanged, since createRunStoreFsAdapter
+      already mkdir -p's its tree), flagged so S9 decides it deliberately and S10's smoke checks it
+      against a fresh mktemp -d. S9-S11 were NOT started; S10 and S11 are not approved. Details in
+      execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -878,10 +919,16 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    cp-stage-approval-s8-s9 resolved: S8 and S9 approved as a batch. Run sddl-executor on S8
-    (src/main/paths.ts), then S9 (container.ts + cli.ts), one stage per invocation, each ending
-    green on `npm run check` + `npm test`. S9 must honour risk-e6h1-013. Stop after S9 and present
-    the state before S10's manual smoke.
+    S8 (src/main/paths.ts) is complete and both gates are green (npm run check exit 0; npm test
+    exit 0, 661 tests / 38 files, the new test file confirmed collected by the widened adapters
+    project). S9 (container.ts + cli.ts) is the second, still-approved half of
+    cp-stage-approval-s8-s9 and is the next executor invocation: it must call resolveSentinelHome
+    and sentinelPaths exactly once each and feed that single SentinelPaths object to every
+    consumer -- RegisterRepoDeps.clonesDir, CliDeps.clonesDir and resolveReviewRequest all take
+    paths.clonesDir -- which is what closes risk-e6h1-013, still open and owned by S9. It must also
+    decide deliberately whether the home layout is created eagerly or lazily. Stop after S9 and
+    present the state before S10's manual smoke; S10 and S11 remain unapproved. A stage-mode
+    sddl-qa-review over S8-S9 together is the sensible review point.
 
 created_at: "2026-08-23T00:00:00Z"
 updated_at: "2026-08-24T03:00:00Z"

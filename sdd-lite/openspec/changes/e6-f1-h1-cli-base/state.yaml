@@ -125,6 +125,7 @@ stages:
       - S6
       - S7
       - S8
+      - S9
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -302,8 +303,47 @@ stages:
       home layout is created eagerly at startup or lazily by each driven adapter is an unmade
       container.ts decision (the likely answer is lazily, unchanged, since createRunStoreFsAdapter
       already mkdir -p's its tree), flagged so S9 decides it deliberately and S10's smoke checks it
-      against a fresh mktemp -d. S9-S11 were NOT started; S10 and S11 are not approved. Details in
+      against a fresh mktemp -d. S9-S11 were NOT started at that point. Details in
       execution-log.md.
+      S9 (container.ts + cli.ts) completed under cp-stage-approval-s8-s9, closing that batch. New
+      src/main/container.ts is the only module in the codebase that instantiates an adapter: it
+      builds git, config-store, run-store, exec process-runner and the {factory, user} harness
+      loader pair, binds the six CliUseCases thunks, and supplies loadContext (design A-5, reading
+      config.yaml and repos.yaml concurrently through ConfigStore), now, version, clonesDir and a
+      real-stream CliIo. src/main/cli.ts replaced the [E0.F1.H3] stub with a ~7-line entrypoint
+      that keeps the package.json import attribute for the version (AC-4) and assigns the returned
+      code to process.exitCode rather than calling process.exit, so pending stdout writes are not
+      truncated. risk-e6h1-013 closed by construction: resolveSentinelHome and sentinelPaths are
+      each called exactly once and the single SentinelPaths object feeds RegisterRepoDeps.clonesDir,
+      CliDeps.clonesDir, RunReviewDeps.worktreesDir, createConfigStoreAdapter(root),
+      createRunStoreFsAdapter(runsDir) and the user harness loader; the file contains no join, no
+      resolve and no path concatenation, and resolvePackageRoot() is read separately for the factory
+      harness loader only. AC-11 completed: createExecProcessRunner wired into
+      RunReviewDeps.processRunner, without which [E5.F1.H2] would stay dead code with no failing
+      test. AC-7 completed: every adapter path input derives from paths.ts, in src/main and nowhere
+      else. D8 implemented: SENTINEL_OPENCODE_MODEL read per invocation inside the engine factory
+      (A-6), unset or blank throwing a one-line message naming the variable; no model id hardcoded,
+      no schema touched. S8's open eager-vs-lazy question decided A-level after verification, not
+      assumption: creation stays lazy everywhere (run store mkdir -p's, git clone and worktree add
+      create parents, harness loader and config reads treat ENOENT as empty), with one addition --
+      ConfigStore.writeRepos uses writeFile, which does NOT create parent directories (verified
+      directly with a node one-liner), so the container mkdir -p's the home ROOT inside the
+      registerRepo thunk only. That keeps --help, --version and every read path free of filesystem
+      side effects, confirmed by ~/.sentinel still not existing after all sanity invocations. No
+      test was added (design's explicit choice for container.ts). No signature mismatch was found
+      between design's assumptions and the real adapter factories. Gates after S9: npm run check
+      exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 226 dependencies, 0 violations)
+      and npm test exit 0 with 661 tests across 38 files -- unchanged, all pre-existing tests still
+      passing. One contradiction escalated instead of fixed: `npm run dev` (node
+      --experimental-strip-types) can no longer run the CLI, because Node's type stripping does not
+      rewrite a .js import specifier to the sibling .ts file, and the whole repo uses .js specifiers
+      per NodeNext; the stub never imported source, so this surfaces exactly now. AC-4 was therefore
+      verified through the built entrypoint (npm run build && node dist/cli.js --version -> 0.0.0,
+      exit 0), which works completely. That refutes a documented assumption (setup-tecnico 5.1,
+      CLAUDE.md, README, CONTRIBUTING all publish npm run dev), so it is C-level and left to the
+      user; recommendation (a) "dev": "tsup --silent && node dist/cli.js". S10's smoke must invoke
+      the built entrypoint until that is decided; it is not blocked. S10 and S11 remain unapproved
+      and were not started -- the end-to-end smoke was deliberately not run.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -916,19 +956,26 @@ open_risks:
     severity: medium
     status: open
 next_action:
-  kind: run_stage
-  target: sddl-executor
+  kind: ask_user
+  target: sddl-orchestrator
   summary: >-
-    S8 (src/main/paths.ts) is complete and both gates are green (npm run check exit 0; npm test
-    exit 0, 661 tests / 38 files, the new test file confirmed collected by the widened adapters
-    project). S9 (container.ts + cli.ts) is the second, still-approved half of
-    cp-stage-approval-s8-s9 and is the next executor invocation: it must call resolveSentinelHome
-    and sentinelPaths exactly once each and feed that single SentinelPaths object to every
-    consumer -- RegisterRepoDeps.clonesDir, CliDeps.clonesDir and resolveReviewRequest all take
-    paths.clonesDir -- which is what closes risk-e6h1-013, still open and owned by S9. It must also
-    decide deliberately whether the home layout is created eagerly or lazily. Stop after S9 and
-    present the state before S10's manual smoke; S10 and S11 remain unapproved. A stage-mode
-    sddl-qa-review over S8-S9 together is the sensible review point.
-
+    S9 (container.ts + cli.ts) is complete and both gates are green (npm run check exit 0, biome 143
+    files, depcruise 97 modules / 226 dependencies, 0 violations; npm test exit 0, 661 tests / 38
+    files, unchanged). risk-e6h1-013 is closed by construction (one sentinelPaths object feeds every
+    consumer, no path concatenation in container.ts), AC-7 and AC-11 are completed, D8 is
+    implemented, and the eager-vs-lazy question S8 left open was decided after verification: lazy
+    everywhere, plus a mkdir -p of the home ROOT inside the registerRepo thunk, because
+    ConfigStore.writeRepos uses writeFile and would otherwise fail on a machine with no ~/.sentinel.
+    This closes the cp-stage-approval-s8-s9 batch; S10 and S11 are unapproved and were not started,
+    and the end-to-end smoke was deliberately not run so its transcript reaches the user directly.
+    Two things need the user before S10: (1) a C-level decision -- `npm run dev` can no longer run
+    the CLI, because Node's --experimental-strip-types does not rewrite .js specifiers to sibling
+    .ts files, which refutes what setup-tecnico 5.1, CLAUDE.md, README and CONTRIBUTING all
+    document; recommendation (a) "dev": "tsup --silent && node dist/cli.js", with the same one-line
+    update in setup-tecnico 5.1 and CLAUDE.md; alternatives are a tsx devDependency or a repo-wide
+    switch to .ts specifiers (rejected). AC-4 was verified through the built entrypoint instead
+    (node dist/cli.js --version -> 0.0.0, exit 0). (2) a fresh stage approval for S10's manual
+    smoke, which must invoke `npm run build && node dist/cli.js ...` until (1) is decided. A
+    stage-mode sddl-qa-review over S8-S9 together is the sensible review point.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T03:00:00Z"
+updated_at: "2026-08-24T09:00:00Z"

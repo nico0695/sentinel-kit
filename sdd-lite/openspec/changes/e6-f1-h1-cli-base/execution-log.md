@@ -18,7 +18,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S6 | `repo add`/`repo list` and `runs list`/`runs show` commands + formatters | yes | completed |
 | S7 | `review` command | yes | completed |
 | S8 | Sentinel home resolution (D2/AC-7) | yes | completed |
-| S9 | Composition root (`container.ts`, `cli.ts`) | yes | pending |
+| S9 | Composition root (`container.ts`, `cli.ts`) | yes | completed |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
 | S11 | Closeout: declare the authorised deviations | no | pending |
 
@@ -1147,3 +1147,273 @@ must honour `risk-e6h1-013` by feeding one `sentinelPaths(...)` object to every 
 approval, stop after S9 and present the state before S10's manual smoke. A stage-mode
 `sddl-qa-review` over S8-S9 together is the sensible review point — S8 alone is a small, fully
 unit-tested pure module, while S9 is the hot-path assembly that gives it meaning.
+
+## S9 — composition root (`src/main/container.ts` + `src/main/cli.ts`)
+
+- status: completed (code + gates green) with one **finding escalated to the user**: `npm run dev`
+  cannot run the CLI any more (see "The one contradiction" below). No source fix was improvised.
+- approval: `cp-stage-approval-s8-s9` (user, S8-S9 approved as a batch, one stage per executor
+  invocation). **S10 (manual smoke) and S11 (closeout) are not approved and were not started** — in
+  particular the end-to-end smoke was deliberately NOT run: the user reserved its transcript.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `db9499f`, working tree clean at stage
+  start; `npm run check` exit 0 (biome 142 files, tsc clean, depcruise 96 modules / 212
+  dependencies, 0 violations) and `npm test` exit 0 (661 tests / 38 files), matching S8's closing
+  numbers.
+
+### Planned scope (plan.md, S9 row)
+
+`src/main/container.ts` (adapter instantiation, `loadContext` thunk A-5, per-invocation engine
+factory A-6 including D8's `SENTINEL_OPENCODE_MODEL` guard, `createExecProcessRunner` wired into
+`RunReviewDeps.processRunner`) and `src/main/cli.ts` (replacing the `[E0.F1.H3]` stub, setting
+`process.exitCode`). Everything else untouched: no file under `src/core/**`, `src/adapters/**`,
+no config file, no `package.json`, no test file, no doc.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/main/container.ts` | New. `createCliDeps(options)` → `CliDeps`. Instantiates every driven adapter (the only place in the codebase that may), binds the six use-case thunks, provides `loadContext`, `now`, `version`, `clonesDir` and the real-stream `CliIo`. Module-private `createEngine(engineName, env)` implements A-6 + D8. |
+| `src/main/cli.ts` | Replaced the `--version` stub with the ~7-line entrypoint: `createCli(createCliDeps({ version: pkg.version }))`, `process.exitCode = await cli.run(process.argv)`. Keeps the shebang and the `package.json` import attribute the stub already used (AC-4). |
+
+`git status --short` after the stage: `M src/main/cli.ts`, `?? src/main/container.ts`. Nothing
+else. `dist/` is gitignored and was produced only as evidence (see below).
+
+### How `risk-e6h1-013` was closed
+
+`resolveSentinelHome(env, homeDir)` and `sentinelPaths(...)` are each called **exactly once**, on
+one line, and the single `SentinelPaths` object is the only source of every path in the file:
+
+```ts
+const paths = sentinelPaths(resolveSentinelHome(env, homeDir));
+```
+
+- `RegisterRepoDeps.clonesDir` ← `paths.clonesDir`
+- `CliDeps.clonesDir` ← `paths.clonesDir` (the same object property, so `review`'s
+  `resolveReviewRequest` and `repo add`'s `registerRepo` cannot disagree about where a clone lives)
+- `RunReviewDeps.worktreesDir` ← `paths.worktreesDir`
+- `createConfigStoreAdapter(paths.root)`, `createRunStoreFsAdapter(paths.runsDir)`, user
+  `createHarnessLoaderAdapter(paths.root)`
+
+Mechanically checkable: `grep -c "sentinelPaths(" src/main/container.ts` → 1, and the file contains
+no `join(`, no `resolve(` and no path string concatenation at all — every directory it hands out is
+a field of that one object. `resolvePackageRoot()` is read separately and used for **one** thing,
+the *factory* harness loader, which is correct: `harnesses/` and `skills/` ship inside the npm
+package (`package.json`'s `files`), not under the sentinel home.
+
+### The eager-vs-lazy question S8 left open — decided, after verifying rather than assuming
+
+**Decision (A-level): the home layout is created lazily, with exactly one addition — the container
+`mkdir -p`s the home *root* on the `registerRepo` path only.**
+
+S8's read was "likely lazily, unchanged". Verified rather than assumed, and it turned out to be
+almost right, with one real gap:
+
+- `createRunStoreFsAdapter` does `mkdir(repoDir, { recursive: true })` before writing a run
+  (`run-store-fs.ts:211`) — creates `<root>/runs/...` including the root. ✔ lazy
+- `git clone <url> <target>` and `git worktree add <path>` both create their target's parent
+  directories, and the git adapter passes absolute paths straight through. ✔ lazy
+- `createHarnessLoaderAdapter` treats `ENOENT` on `readdir` as "no harnesses" (`[]`). ✔ lazy
+- `ConfigStore.readConfig`/`readRepos` treat `ENOENT` as schema defaults / `{}`. ✔ lazy
+- **`ConfigStore.writeRepos`/`writeConfig` use `writeFile`, which does NOT create parent
+  directories.** Verified directly rather than reasoned about:
+  ```
+  $ node -e "require('node:fs/promises').writeFile('/…/nope-1787535205245/repos.yaml','x')
+      .then(()=>console.log('WROTE')).catch(e=>console.log('FAILED',e.code))"
+  FAILED ENOENT
+  ```
+  So on a machine with no `~/.sentinel`, the *first ever* `sentinel repo add` would fail with a
+  `ConfigWriteError` after having already cloned the repository. S10's smoke would NOT have caught
+  this, because `mktemp -d` creates the directory.
+
+Hence `ensureHomeRoot()` — `mkdirSync(paths.root, { recursive: true })` — called inside the
+`registerRepo` thunk, the only path that writes into the home root. Not at startup: that would make
+`--help` and `--version` create `~/.sentinel` as a side effect. Confirmed empirically: after
+`node dist/cli.js --version`, `--help`, `repo --help`, `runs --help`, `review --help` and a
+`SENTINEL_HOME=$(mktemp -d) … repo list`, `ls -d ~/.sentinel` → *No such file or directory* and the
+temp home was still empty (`total 16`, only `.` and `..`).
+
+### Decisions taken in this stage
+
+- **A-level — `createCliDeps(options)` takes `version`, and optional `env` / `homeDir` / `io`.**
+  Design fixed `cli.ts` as "build the container, run it"; the parameters are additive and default to
+  `process.env`, `homedir()` and the real streams, so the entrypoint stays the ~7 lines design
+  specified while the container keeps a seam a future test (or `[E7.F1.H1]`'s e2e smoke) can drive
+  without touching globals. Per design, `container.ts` itself has **no unit test** — asserting on
+  wiring with fakes would only re-describe the code; the seam exists for the e2e suite, not to
+  invite a tautological test now.
+- **A-level — the entrypoint keeps reading the version through the `package.json` import
+  attribute** the `[E0.F1.H3]` stub already used, rather than moving it into the container. It is
+  the one fact the *entry file's own location* determines, `tsup` inlines it into the bundle, and
+  AC-4 is a regression contract that is cheapest to preserve by not moving it.
+- **A-level — `processIo` writes with `process.stdout.write(line + "\n")` rather than
+  `console.log`.** One write per line, no formatting of `%s`-like sequences in a review's output,
+  and no chance of a decorative newline reaching `stdout` (AC-10).
+- **A-level — `createEngine`'s `default` branch throws instead of falling back to `claude-code`.**
+  `RunReviewRequest.engineName` is typed `string | undefined` (it is an opaque echo), while every
+  value that reaches it through the CLI has already been validated by `resolveEngine`. The branch is
+  therefore unreachable in practice; making it loud means adding a member to `EngineNameSchema`
+  without wiring an adapter fails immediately instead of silently reviewing with the wrong engine.
+- **A-level — `loadContext` reads `config.yaml` and `repos.yaml` concurrently** (`Promise.all`).
+  Two independent reads on the interactive path; no ordering exists between them.
+
+### AC-11 — `processRunner` is wired
+
+`createExecProcessRunner()` is instantiated once in the container and passed as
+`RunReviewDeps.processRunner` in the `runReview` thunk. This is the half of AC-11 S7 could not
+supply: `runReview` treats an absent `processRunner` as "stage 5 never runs regardless of
+`request.validations`", so an unwired container would have left `[E5.F1.H2]` (#32) as dead code with
+no test failing anywhere. S7 already proved `validations`/`validationTimeoutMs` reach the request.
+
+### AC-7 — completed by this stage
+
+Every adapter path input and `runReview`'s `clonesDir`/`worktreesDir` now derive from
+`resolveSentinelHome` + `sentinelPaths`, resolved in `src/main/` and nowhere else. Verified by
+reading: no other module in the repository imports `node:path`'s `join`/`resolve` to build a
+sentinel path, and the CLI adapter receives `clonesDir` as an opaque string.
+
+### Quick checks
+
+Planned validation (plan.md, S9 row): `npm run check` (depcruise: adapters instantiated only here,
+no core → adapters) + `npm test`; `--version` regression (AC-4); code read confirming AC-7 and
+AC-11.
+
+Run, verbatim outcomes:
+
+- `npm run check` → exit **0**:
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+
+  Checked 143 files in 149ms. No fixes applied.
+
+  ✔ no dependency violations found (97 modules, 226 dependencies cruised)
+  ```
+  142 → **143 files**, 96 → **97 modules**, 212 → **226 dependencies** (+14: the container's edges
+  to the four driven adapter barrels, the CLI barrel and the four core barrels, plus what they pull
+  in), still **0 violations**. This is the first run where `wiring-only-in-main` and
+  `core-no-adapters` guard a `src/main/` module that actually imports adapters, and
+  `adapters-isolated` is unaffected because the importer is not an adapter. Biome required one
+  formatting pass (`npx biome check --write src/main`, a multi-line function signature); no lint
+  rule was suppressed and `tsc` reported no error under `exactOptionalPropertyTypes` /
+  `noUncheckedIndexedAccess`.
+- `npm test` → exit **0**:
+  ```
+  > vitest run
+
+   Test Files  38 passed (38)
+        Tests  661 passed (661)
+   Duration  7.60s
+  ```
+  **All 661 pre-existing tests still pass**, unchanged in count: this stage adds no test (design's
+  explicit choice for `container.ts`) and modifies no existing file other than the entrypoint,
+  which no test imports.
+- **`--version` regression (AC-4)** — run, not reasoned about. `npm run dev -- --version` **failed**
+  (see the contradiction below); the built entrypoint is green:
+  ```
+  $ npm run build && node dist/cli.js --version
+  ESM dist/cli.js 102.11 KB
+  ESM ⚡️ Build success in 38ms
+  0.0.0
+  EXIT=0
+  ```
+  `0.0.0` is `package.json`'s current version, so the `[E0.F1.H3]` contract survives the rewrite.
+- **Non-destructive sanity invocations** (no real repo, no clone, no review — the smoke is S10's):
+  - `node dist/cli.js --help` → exit 0, full root help including the `SENTINEL_HOME` /
+    `SENTINEL_OPENCODE_MODEL` footer and all four commands.
+  - `node dist/cli.js repo --help` → exit 0; `runs --help`, `review --help` → exit 0.
+  - `node dist/cli.js bogus` → exit **1** (unknown command, message on stderr).
+  - `SENTINEL_HOME=$(mktemp -d) node dist/cli.js repo list` → exit 0, `No repositories registered.`
+    on **stderr**, **stdout empty** (checked by redirecting each stream separately) — AC-10's empty
+    case through the real streams, and the first evidence that a use-case thunk actually executes
+    end to end through the real config-store adapter, not merely that the module graph loads.
+  - `ls -d ~/.sentinel` → *No such file or directory* after all of the above.
+
+Skipped deliberately: the end-to-end smoke (`repo add` / `review` / `runs show`) — S10's, reserved
+by the user; `e2e/**` stays empty (AC-14).
+
+### The one contradiction — `npm run dev` can no longer run the CLI
+
+```
+$ npm run dev -- --version
+> node --experimental-strip-types src/main/cli.ts --version
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+  '/home/user/sentinel-kit/src/adapters/driving/cli/index.js'
+  imported from /home/user/sentinel-kit/src/main/cli.ts
+EXIT=1
+```
+
+Node's type stripping (`node --experimental-strip-types`, Node 22.22.2) does **not** rewrite a
+`.js` import specifier to the sibling `.ts` file the way `tsc`/esbuild do. The whole repository
+uses `.js` specifiers, which is what `NodeNext` module resolution requires, so the moment
+`src/main/cli.ts` imports anything from `src/`, `npm run dev` cannot resolve it. The stub never
+imported source (only `package.json`), which is why this surfaces exactly now — S9 is the first
+stage where the documented dev command has a real graph to load. `npm run build && node dist/cli.js`
+works completely (esbuild does perform the `.js` → `.ts` rewrite), as every invocation above shows.
+
+This refutes a **documented** assumption — `docs/setup-tecnico-sentinel.md` §5.1 and `CLAUDE.md`
+both publish `npm run dev` as *the* way to run the CLI from source, and `README.md` /
+`CONTRIBUTING.md` repeat it — so per CLAUDE.md's decision protocol it is a **C-level STOP**, not
+something to fix in passing. It also sits outside S9's approved scope (`package.json` was S1's, and
+its row read "nothing else").
+
+Options, with a recommendation:
+
+- **(a) recommended — `"dev": "tsup --silent && node dist/cli.js"`.** No new dependency, ~40 ms
+  build, and `npm run dev -- --help` still forwards arguments correctly (npm appends them to the end
+  of the script). Costs: `dev` is no longer "run from source" literally, and it writes `dist/`.
+- (b) add `tsx` as a devDependency and use `"dev": "tsx src/main/cli.ts"` — true run-from-source
+  with source maps, at the cost of a new tool the setup document does not list.
+- (c) switch every intra-repo import to `.ts` specifiers with `allowImportingTsExtensions` — rejected
+  outright: a repo-wide rewrite that abandons the `NodeNext` convention every module follows.
+
+Whichever is chosen, `docs/setup-tecnico-sentinel.md` §5.1 and `CLAUDE.md`'s command block need the
+same one-line update, and S10's smoke should run against `npm run build && node dist/cli.js …`
+rather than design's `npm run dev` wording. **S10 is not blocked** by this: the built entrypoint is
+fully functional.
+
+### Notes and observations
+
+- **`risk-e6h1-006` is now down to its last mitigation.** This stage is the assembly the risk names;
+  the gates and the sanity invocations above show the graph constructs and that one read path
+  executes end to end, but no clone, worktree, diff, prompt, engine invocation or `persistRun` has
+  ever run against a real repository. That is exactly S10.
+- **Signature mismatches found between design's assumptions and the real factories: none.** Every
+  factory matched what design and the handoff described — `createGitCliAdapter()`,
+  `createExecProcessRunner()`, `createConfigStoreAdapter(basePath)`,
+  `createRunStoreFsAdapter(runsRoot)`, `createHarnessLoaderAdapter(basePath)`,
+  `createClaudeCodeAdapter(options?)`, `createOpenCodeAdapter({ model })`, and both use-case
+  conventions (`useCase(request, deps)`, `listRepos(deps)`). The only wiring subtlety worth naming
+  is that `LoadHarnessesDeps` is the `{ factory, user }` pair and its two members take **different**
+  roots (package root vs. sentinel home) — handled, and the reason `resolvePackageRoot` exists.
+- **`risk-e6h1-011` (repo add printing `-` for the clone path) is untouched** and will be visible in
+  S10's transcript, as planned. **`risk-e6h1-010` and `risk-e6h1-012` are untouched** — this stage
+  renders nothing.
+- **D8 is implemented and is invisible until it fires:** `SENTINEL_OPENCODE_MODEL` is read only when
+  a run resolves to `opencode`, and unset/blank throws a one-line message naming the variable, which
+  the CLI's catch-all renders on stderr with exit 1. No model id is hardcoded and no schema changed.
+  Not exercised at runtime in this stage (it needs a review invocation); S10 may optionally check it
+  with `--engine opencode`.
+- No git side effects: no commit, stage, stash or branch operation. `dist/` was rebuilt as evidence
+  and is gitignored.
+- **`state.yaml`'s `open_risks` were deliberately left untouched**, per the stage handoff's explicit
+  boundary (only this stage's entry, `current_stage`, `next_action` and `updated_at`). So
+  `risk-e6h1-013` still reads `status: open, owner_stage: S9` even though this entry documents how
+  S9 closed it by construction; flipping it is the orchestrator's or QA's call, ideally once S10's
+  smoke has confirmed a clone written by `repo add` is the one `review` reads.
+
+### Blockers
+
+None for the code. One escalation for the user: the `npm run dev` contradiction above (C-level —
+a documented assumption is refuted), which changes S10's invocation command and needs a one-line
+decision on `package.json` + the two docs. No source change was improvised for it.
+
+### Next action
+
+S9 is complete and both gates are green (`npm run check` exit 0, 97 modules / 226 dependencies, 0
+violations; `npm test` exit 0, **661 tests / 38 files**), and `--version` is confirmed working
+through the built entrypoint. This closes the approved `cp-stage-approval-s8-s9` batch: **S10 and
+S11 were not started and are not approved.** The orchestrator should (1) put the `npm run dev`
+decision to the user with option (a) as the recommendation, and (2) take a fresh approval for S10's
+manual smoke, whose transcript the user reserved — noting it must invoke
+`npm run build && node dist/cli.js …` until the `dev` script is fixed. A stage-mode
+`sddl-qa-review` over S8-S9 together is the sensible review point before or alongside S10.

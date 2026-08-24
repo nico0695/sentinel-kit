@@ -316,3 +316,205 @@ Take a fresh `stage_approval` to the user for **S8** (`src/main/paths.ts` — `r
 `sentinelPaths`, `resolvePackageRoot`), then run `sddl-executor` for S8 alone. No correction round
 is required first. When S9 is planned, wire one `sentinelPaths(...)` result into **both**
 `RegisterRepoDeps.clonesDir` and `CliDeps.clonesDir` — they must be the same string.
+
+---
+
+# QA Report — FINAL (whole change)
+
+change_name: e6-f1-h1-cli-base
+mode: final
+review_target: the whole implemented change — `git diff origin/main...HEAD` on `claude/validar-estado-proyecto-rcvz8c`, 25 commits, 56 files, +8612/-68
+reviewed_at: "2026-08-24T21:30:00Z"
+
+## Closeout Digest
+
+- verdict: **pass**
+- blockers: **0** · high: 0 · medium: 0 · low: 3 (all `info`)
+- gates re-run independently: `npm run check` exit **0**, `npm test` exit **0** (674 tests / 38 files),
+  `npm run build` exit **0**, `npm run dev -- --version` exit **0** printing `0.0.0`.
+- all **14 acceptance criteria met**, verified against code and tests rather than test names.
+- **scope integrity: clean.** Every file in the diff traces to spec, to one of D1-D11, or to a
+  recorded risk. **No undeclared fifth widening was found.**
+- **completion allowed: YES.** `lifecycle_status: completed`.
+- S8, S9, S9b, S10b and S10c never received a stage-mode QA; this final review covers them directly.
+
+## Independent Validation (re-run, not quoted from the execution log)
+
+| Command | Exit | Literal output |
+|---|---|---|
+| `npm run check` | **0** | `Checked 143 files in 826ms. No fixes applied.` · `✔ no dependency violations found (97 modules, 226 dependencies cruised)` |
+| `npm test` | **0** | `Test Files 38 passed (38)` · `Tests 674 passed (674)` · `Duration 20.07s` |
+| `npm run build` | **0** | `ESM dist/cli.js 105.05 KB` · `⚡️ Build success in 41ms` |
+| `npm run dev -- --version` | **0** | `tsup --silent && node dist/cli.js --version` → `0.0.0` |
+
+Every number matches the expected baseline exactly. Nothing was skipped. The product smoke was
+deliberately **not** re-run (it clones a repository and invokes a real engine); it is assessed from
+its recorded evidence below. `e2e/` matches no files — deliberate, `[E7.F1.H1]`.
+
+## Acceptance Criteria — All 14
+
+| AC | Status | Evidence (code first, tests second) |
+|---|---|---|
+| AC-1 | **met** | Read all four command modules end to end. `repo-commands.ts`: `toRegisterRequest` is flag→field mapping only; `repo list` iterates `Object.entries` without sorting or filtering. `runs-commands.ts`: no sort, no alias translation, no merge. `review-command.ts`: the body is `loadContext → resolveReviewRequest → runReview → persistRun → render`, with the entire flag→repo→global cascade inside `core/run`. No `RunRecord` is composed in the adapter, no port is called, no adapter is constructed. `parseTimeoutMs` checks shape only and explicitly leaves the upper-bound rule to `runReview`. Renderers are pure `(…) => string`. Mechanically enforced: `depcruise` 0 violations over 97 modules, and every command test drives the command with fake use cases and a capturing `CliIo` alone. |
+| AC-2 | **met** | Every level declares `.description()` on the group, each positional and each option. `ROOT_HELP_FOOTER` documents `SENTINEL_HOME` **and** its `~/.sentinel` default, plus `SENTINEL_OPENCODE_MODEL` (D8). Tests: `help.test.ts` (root exits 0, non-empty usage, `SENTINEL_HOME`, `SENTINEL_OPENCODE_MODEL`, `-h`, routing propagated to subcommands), plus per-group help tests in `repo.test.ts`, `runs.test.ts`, `review.test.ts`. |
+| AC-3 | **met** | Exactly six paths registered by three registrars; one use case per path; `review` the only two-use-case path. `CliUseCases` has exactly six members and every one has a call site. No extra command exists — no `repo branches`, no `open`. |
+| AC-4 | **met** | `.version(deps.version, "-V, --version", …)`; `version.test.ts` asserts exit 0, the injected version on stdout, and **exactly one line with no decoration**. Confirmed live: `npm run dev -- --version` → `0.0.0`. |
+| AC-5 | **met** | `persistRun` in `core/history`, barrel-exported with its three types. `diff` reduced by `toDiffSummary` to counts + warning **messages** (no file bodies); `failure` reduced to `{stage, message}` (no `cause`, no stack, no exception object). Returns `{runDir, record}`. Its only cross-module import is the type-only `../run/index.js`. The vacuous stringify assertion reported as F-1 in the S1-S4 review **has since been fixed** (`persist-run.test.ts` now compares against the escaped form the serializer actually produces). |
+| AC-6 | **met** | `persistRun` is called unconditionally after `runReview` resolves, outside any state branch. Tests: persists exactly one run with the result `runReview` returned; persists a non-`ok` terminal state; prints the run directory; **persists nothing when `runReview` throws** and nothing for an unregistered alias. |
+| AC-7 | **met** | `resolveSentinelHome(env, homeDir)` is pure (both inputs are parameters), trims, treats blank as unset, and `resolve()`s. `sentinelPaths(root)` derives all eight fields from one root, all absolute. `container.ts` calls `sentinelPaths(...)` **once** and nothing else in the file concatenates a path. 24 tests in `paths.test.ts`, including "does not read `process.env`" and "derives every field from the single root it was given". |
+| AC-8 | **met** | `reviewTimeoutMs: z.number().optional()` — literal, no `.default()`. `DEFAULT_REVIEW_TIMEOUT_MS = 600_000` in `core/run`. Precedence is the single expression `flags.timeoutMs ?? config.reviewTimeoutMs ?? DEFAULT_REVIEW_TIMEOUT_MS`, one test per level, plus a guard that a document without the field parses to a record where the key is absent. |
+| AC-9 | **met** | `package.json` runtime `dependencies` read back verbatim: `commander`, `execa`, `yaml`, `zod` — exactly four. No `picocolors`, no `@clack/prompts`, no `marked*`. `package-lock.json` diff is 2 lines. |
+| AC-10 | **met** | Results go through `deps.io.stdout`, diagnostics and errors through `deps.io.stderr`; `processIo` uses `process.stdout.write` (one write per line), never `console.log`. Renderers use a fixed field order with a literal `-` for absent fields, exported as `REPO_LINE_FIELDS` / `REGISTER_OUTCOME_FIELDS` / `REVIEW_OUTCOME_FIELDS` / `RUN_SUMMARY_FIELDS` so tests assert the contract rather than a copied string. Tabs/newlines inside a value collapse to spaces, so one record can never split across two lines. Empty registry and empty run list write **nothing** to stdout and a note to stderr. |
+| AC-11 | **met** | `createExecProcessRunner()` is instantiated in `container.ts` and passed as `RunReviewDeps.processRunner`. `resolveReviewRequest` forwards `entry.validations` and the `entry.validationTimeoutMs ?? config.validationTimeoutMs` cascade. Test: "forwards the repository's declared validations and their timeout (AC-11)" asserts both reach the `runReview` fake. `[E5.F1.H2]` is no longer dead code. |
+| AC-12 | **met** | Nothing in the adapter reads `result.state` to decide an exit code — `runProgram` returns 0 on success, the `CommanderError.exitCode` for usage failures, and 1 for a thrown error. Tests: exit **0** for `engine-error`, exit **0** for a `request-changes` verdict, non-zero for an unregistered alias (persisting no run), for an unresolvable harness, and for an unknown engine. No exit-code table exists anywhere in the diff. |
+| AC-13 | **met** | `formatErrorLine` has **no per-error-type branching** — it reduces any throwable to one line, collapsing embedded newlines, with a name fallback. Never touches `stack` or `cause`. Commands do not catch: errors propagate to `createCli`'s single catch-all. Tests: sync and async rejection, multi-line collapse, non-`Error` throwable, "never includes a stack trace", plus one per command group. |
+| AC-14 | **met** | Both gates exit 0. 500 → 674 tests / 28 → 38 files. `git diff --numstat` over every `__test__` path shows **zero deleted lines in any test file** — no pre-existing suite was weakened or removed to make this change pass. New tests live in `<module>/__test__/*.test.ts`; `src/main/**/__test__` was added to the `adapters` project and `docs/testing.md` was updated in the same commit that did it. `e2e/` stays empty. |
+
+## Does It Deliver A Working Product?
+
+Yes, and the evidence supports it — with one honest qualification.
+
+The smoke exercised the full graph against a real repository and a real engine: clone → remote-only
+ref resolution → worktree → 1-file/11-line diff → 220-line prompt → `claude-code` invocation →
+verdict parse (`request-changes`) → persistence of `prompt.md`/`result.md`/`metadata.json` → read-back
+through `runs list` / `runs show`. That is the whole `[E6.F1.H1]` surface except `repo list`, and it
+discharged `risk-e6h1-006` for the reason the risk existed: it found `risk-e6h1-014`, a high-severity
+defect that 661 unit and contract tests could not see. The first run's failure is itself corroborating
+evidence for three ACs — it produced `state: engine-error`, `failureStage: worktree`, **exit 0**, and a
+**persisted run** — which is AC-12, AC-6 and D1 confirmed by a real failure rather than by a fake.
+
+The qualification is F-7 below: the transcript itself was not persisted, and the Stage Overview table
+still marks S10 `pending`. Nothing material about the product is unverified — the two gaps in
+automated coverage are `container.ts` (F-6) and the deliberate absence of `e2e/` (`[E7.F1.H1]`).
+
+## Scope Integrity — No Undeclared Widening
+
+Every one of the 56 files traces:
+
+| Group | Traces to |
+|---|---|
+| `src/adapters/driving/cli/**` (13 files) | spec IN-scope, S5-S7 |
+| `src/main/{cli,container,paths}.ts` + `paths.test.ts` | spec IN-scope, S8-S9, AC-7/AC-11 |
+| `src/core/run/resolve-review-request.ts` + test + barrel | **D5**, AC-8 |
+| `src/core/history/persist-run.ts` + test + barrel | **D1**, AC-5 |
+| `src/core/history/run-storage-key.ts`, `get-run.ts`, `list-runs.ts` + tests | **D7** (+ D9 accepting its error-path leak as `risk-e6h1-010`) |
+| `src/core/repos/ports/config-schemas.ts` + test | **D3**, AC-8 |
+| `src/adapters/driven/git/**` (3 files) | **D11** / `risk-e6h1-014`, S10b + S10c |
+| `package.json`, `package-lock.json`, `vitest.config.ts`, `docs/testing.md` | **D4**, S1 |
+| `CLAUDE.md`, `CONTRIBUTING.md`, `README.md`, `docs/setup-tecnico-sentinel.md` | **D10**, S9b |
+| `sdd-lite/{openspec/config.yaml,project-context.md,skill-catalog.md}` | the two pre-story bootstrap-refresh commits (922b1bd, fdf0477) |
+| `sdd-lite/openspec/changes/e6-f1-h1-cli-base/**` | this change's own artifacts |
+
+`.dependency-cruiser.cjs` is **untouched** — no guard was relaxed to let this change through, which
+is the check that matters most for the extraction guarantee. `tsconfig.json`, `biome.json` and
+`tsup.config.ts` are untouched. No new port, no new driven adapter, no core use-case signature
+changed. **No fifth widening.**
+
+### The four widenings, each verified bounded
+
+- **D1 `persistRun`** — one file, one use case, additive barrel export. Does not touch `runReview`,
+  does not add a dependency to `history`, imports `run` only through its public barrel. Bounded.
+- **D5 `resolveReviewRequest`** — one pure file, no I/O, no `node:path`, additive barrel export.
+  It absorbs a cascade that would otherwise have lived in the adapter, so it makes AC-1 easier to
+  keep rather than widening behaviour. Bounded.
+- **D7 alias normaliser** — 31 lines, module-private (**not** exported from `history/index.ts`,
+  re-verified), idempotent, applied at exactly three input sites. The `[E5.F2.H2]` suites were
+  appended to, never edited; they now exercise the pass-through branch and remain real guards.
+  Its one known consequence is recorded as `risk-e6h1-010`. Bounded.
+- **D11 git ref resolution** — the largest widening and the one changing merged `[E2.F1.H2]` code.
+  Verified: one new private `resolveCommitish`, funnelled from all three ref-taking methods, with
+  the per-method error class passed in so `mergeBase` still fails as `GitMergeBaseError` and never
+  as `GitWorktreeError`. Local refs keep precedence over remote (git's own DWIM order); two remotes
+  carrying the same name **reject** rather than guess; an unresolvable ref still rejects, carrying
+  the original git diagnostic as `cause`. `--detach` was kept, so PRD §5.1 (never a checkout in the
+  managed clone) still holds — and there is a contract test asserting the clone gains no local
+  branch. `GitPort`'s signatures are unchanged. Cost: one to two extra `git` invocations per call.
+  Bounded, and correct.
+
+## Test Quality — Would It Catch A Regression?
+
+Yes, materially better than at the point the smoke embarrassed the suite.
+
+- **The blind fixture that caused `risk-e6h1-014` is closed at the contract level, not patched at
+  the call site.** `GitFixture` gained `remoteOnlyBranch(+Sha)`, `ambiguousBranch(+LocalSha/+RemoteSha)`,
+  `multiRemoteBranch` and `knownCommitSha`, built by a real second remote in the harness, and 13 new
+  contract cases run across `worktreeAdd`, `mergeBase` **and** `diff`. Because they live in
+  `GitPort.contract.ts`, any future `GitPort` implementation inherits them. S10b/S10c recorded that
+  the new tests fail against the pre-fix implementation — the guards were shown capable of failing.
+- **The suites assert properties, not implementation echoes**: `Object.hasOwn` absence checks
+  (which `toEqual` cannot make), idempotency `f(f(x)) === f(x)`, field-count assertions against the
+  exported field-order constants, "preserves the store's ordering rather than re-sorting it",
+  "persists nothing when `runReview` throws", "does not read `process.env`", "prefers the LOCAL ref".
+- **Zero deletions in any pre-existing test file** across the whole change.
+- **Remaining blind spots**, honestly stated: `container.ts` (F-6) and the deliberately empty `e2e/`.
+  I looked for another fixture of the `risk-e6h1-014` shape — a fixture whose setup silently excludes
+  the failing case — and found none in the diff's new suites.
+
+## Findings
+
+| Id | Severity | Area | Finding | Evidence | Next action |
+|---|---|---|---|---|---|
+| F-6 | low (`info`) | test coverage, S9 | **`container.ts` — 218 lines of hot-path composition-root wiring — has no automated test at all.** It is the one module the fake-based suites structurally cannot reach, and it is exactly where `risk-e6h1-006`'s failure class lives. Two behaviours are verified only by reading and by a one-off smoke that used `claude-code`: the `opencode` branch of `createEngine` (its `SENTINEL_OPENCODE_MODEL` unset/blank error message, D8) has **never been executed**, and `ensureHomeRoot`'s lazy `mkdirSync` is exercised only on the `repo add` path. | `src/main/container.ts` has no `__test__` sibling; `grep` finds no importer of `createCliDeps` other than `src/main/cli.ts`. | **Not blocking.** `createCliDeps` already takes `env`, `homeDir` and `io` as injectable options, so this is testable without refactoring, and `[E7.F1.H1]`'s e2e smoke is the story that owns it. Worth one line in the PR description. |
+| F-7 | low (`info`) | artifact honesty | **The S10 smoke has no execution-log entry, and the Stage Overview contradicts the risk register.** The table at `execution-log.md:23` still reads `S10 … pending`, while three `state.yaml` risk resolutions (`risk-e6h1-006`, `-013`, `-014`) state that the smoke ran and passed. The smoke transcript — the single piece of evidence that the assembled product works end to end — was not persisted anywhere; only prose summaries of it exist. | `execution-log.md:23` vs. `state.yaml` `open_risks` entries for `risk-e6h1-006`/`-013`/`-014`. | **Not blocking** — the evidence is specific and internally consistent (exact paths, file counts, line counts, terminal states), and its most load-bearing claim was independently corroborated by the S10b/S10c fix it produced. Recommended: S11 records an S10 entry and flips the Stage Overview row before the PR is opened. |
+| F-8 | low (`info`) | doc consistency | **A third stale bookkeeping mention exists beyond the two S9b recorded.** `sdd-lite/skill-catalog.md` still asserts "`src/adapters/driving/{cli,tui}` are still empty placeholders and `src/main/cli.ts` is still the `--version` stub from `[E0.F1.H3]`". It is false the moment this change merges, and unlike the `paths.ts` and `project-context.md` mentions it was not recorded as known-stale. It matters slightly more than the others because stage workers read `skill-catalog.md` as the runtime standards digest. | `sdd-lite/skill-catalog.md`, added by 3fc1fef/fdf0477. | **Not blocking.** Sweep it together with the `project-context.md` snapshot at the next bootstrap refresh (or in S11). |
+
+No BLOCKER, no CRITICAL, no architecture-guard violation, no security-relevant finding. Nothing
+sensitive is persisted: `persistRun` reduces `failure` to `{stage, message}` and never writes a
+`cause`, a stack or an exception object, and `formatErrorLine` never prints one.
+
+## The Two Known Stale Mentions — Should Either Block?
+
+**No, neither should block the PR.**
+
+- **`src/main/paths.ts:12` and `:101`** — the doc-comments justify `resolvePackageRoot` by "the two
+  entry depths (`src/main/cli.ts` under `npm run dev` vs. `dist/cli.js` when installed)". After D10
+  both *runtime* entrypoints are `dist/cli.js`, so the parenthetical example is stale. **The function
+  itself is still correct and still needed** — `paths.test.ts` loads the module from `src/main/`, and
+  an installed `dist/cli.js` sits at a different depth from the repo checkout, which a fixed `../..`
+  would get wrong. Comment-only, no behaviour, no reader can be misled into a wrong change. A
+  two-line correction, best folded into whichever change next touches the file.
+- **`sdd-lite/project-context.md:21`, `:62`, `:94`** — a bootstrap snapshot explicitly dated
+  `2026-08-23` and labelled "observed in the working tree" at the *start* of `[E6.F1.H1]`. A dated
+  snapshot going stale is what dated snapshots do; the file already names its own refresh trigger
+  ("E6 runtime deps merged"), which this change fires. Refreshing it is the orchestrator's or
+  `sddl-init`'s job, not a code reviewer's blocker.
+
+## The Six Open Risks — Open By Decision, Not Neglect
+
+Each was checked against its owner stage's record; all six carry an explicit reason for staying open,
+and all six are things the PR reviewer should be told:
+
+| Risk | Sev | Why it is open, not neglected | Tell the reviewer? |
+|---|---|---|---|
+| `risk-e6h1-008` | low | `commander@15` declares `engines.node >=22.12.0` vs. the package's `>=22`. S1's scope was "`package.json` … nothing else", and `engines` is *published* metadata. CI (node 22/24) unaffected; only a consumer on 22.0-22.11 would see `EBADENGINE`. Owner: `[E7.F2.H3]` (first publish). | Yes — it is a consequence of D4. |
+| `risk-e6h1-009` | medium | D7 authorises **input** normalisation only, so stored objects still carry `owner__repo` in their own `repoName`. Mitigated by construction: every renderer echoes the caller's alias, with three dedicated tests. Open because the *stored field* is still the storage key. | Yes — it constrains any future renderer. |
+| `risk-e6h1-010` | low | The same leak on the error path: `RunNotFoundError`'s message is composed in the driven adapter, which only ever sees the storage key, so a failed `runs show owner/repo x` prints `owner__repo/x`. Explicitly decided by **D9** (the two fixes are a fourth core behaviour change or per-error branching that AC-13 forbids). | Yes — it is a user-visible string, decided deliberately. |
+| `risk-e6h1-011` | low | `repo add` on a **cloned** repo prints `-` where the spec's Expected-Behavior row promised the resolved local path, because `registerRepo` persists `localPath` only when `--local-path` was given. Not an AC; the clean fix is more core surface, which is unauthorised. This is the change's one literal deviation from the spec's behaviour table. | **Yes — this one especially.** It is the only place the shipped behaviour differs from a spec table row. |
+| `risk-e6h1-012` | low | `review`'s outcome block omits the run id (the user must read it off `runDir`'s last segment). Spec-conformant as written — AC-6 requires the directory, not the id. Usability note for `[E6.F1.H2]` / `[E7.F2.H1]`. | Yes, briefly. |
+| `risk-e6h1-015` | low | The per-repo parent directory under `worktrees/` is left behind empty after cleanup. The worktree itself is correctly removed; harmless, bounded at one directory per repo, no growth per run. Found by the smoke. | Yes, briefly. |
+
+## Verdict
+
+**pass.** All 14 acceptance criteria are met against code and tests, not against test names. All four
+gates are green on independent re-run at exactly the expected numbers. The architecture guards hold
+by construction and not merely by exit code — `.dependency-cruiser.cjs` was never touched, `src/core`
+imports no Node builtin, no npm package outside `zod`, no adapter and no `src/main`, and every adapter
+is instantiated in exactly one file. Scope is intact: every file traces to spec, to D1-D11 or to a
+recorded risk, each of the four widenings is as bounded as claimed, and there is no undeclared fifth.
+The product is demonstrated working end to end by the smoke, whose most valuable output was finding a
+high-severity defect that the test suite has since been taught to catch at the port-contract level.
+The three findings are informational, the two known stale mentions are cosmetic, and the six open
+risks are each open by a recorded decision.
+
+**Completion is allowed, and this review marks the change `completed`** — `lifecycle_status: completed`.
+What remains (`S11`'s closeout declaration, the PR description declaring D1/D5/D7/D11, the mandatory
+`history/` entry) is session bookkeeping the workflow contract owns, not implementation.
+
+## Next Action
+
+Close out and open the PR: `[E6.F1.H1] Base command CLI`, `Closes #36`. The description must declare
+the **four** authorised widenings (D1 `persistRun`, D5 `resolveReviewRequest`, D7 the alias normaliser
+changing `[E5.F2.H2]`'s observable behaviour, D11 the git ref-resolution fix to `[E2.F1.H2]`'s merged
+code), list the six open risks — calling out `risk-e6h1-011` as the one deviation from a spec
+behaviour row — and note F-6 (`container.ts` is untested) and F-7 (record the S10 entry / flip the
+Stage Overview row first). Then write the `history/` entry. Never merge the PR.

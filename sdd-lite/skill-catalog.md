@@ -95,8 +95,10 @@ When validating a stage, check the work against these docs + the guard file.
   improvise scope.
 - E0 through E5 have landed on `main`. All four scripts (`check`, `test`, `build`, `dev`) are runnable and
   green — verified 2026-08-23 against `main` @ `1e7cf01` (`check` clean, `npm test` 500/500 across 28 files).
-- `src/adapters/driving/{cli,tui}` are still empty placeholders and `src/main/cli.ts` is still the `--version`
-  stub from `[E0.F1.H3]`. E6 is the epic that fills them; `main/cli.ts` is the composition root and hot-path.
+- `[E6.F1.H1]` filled `src/adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands,
+  renderers) and replaced the `[E0.F1.H3]` stub: `src/main/` now holds `cli.ts`, `container.ts` and
+  `paths.ts`, and is the only place adapters are instantiated. `src/adapters/driving/tui/` is still
+  `export {}` — the TUI is `[E6.F2.x]`. `main/` wiring stays hot-path.
 
 ### testing
 

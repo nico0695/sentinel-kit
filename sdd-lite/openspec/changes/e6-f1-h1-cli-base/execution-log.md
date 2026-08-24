@@ -20,7 +20,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S8 | Sentinel home resolution (D2/AC-7) | yes | completed |
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | completed |
 | S9b | Addendum (D10): fix `npm run dev` + the four documents describing it | yes | completed |
-| S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
+| S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | completed |
 | S10b | Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014) | yes | completed |
 | S10c | Complete the remote-only ref fix across the whole `GitPort` adapter (D11 / risk-e6h1-014) | yes | completed |
 | S11 | Closeout: declare the authorised deviations | no | pending |
@@ -1566,6 +1566,84 @@ use `npm run dev -- …` exactly as `CONTRIBUTING.md` and `README.md` say, with 
 node dist/cli.js …` no longer required as a workaround. A stage-mode `sddl-qa-review` over
 S8 + S9 + S9b is the sensible review point before or alongside S10; this stage on its own is a
 five-file, zero-source diff and does not need one.
+
+## S10 — Manual smoke for `risk-e6h1-006` (mandatory)
+
+**Executed by**: the orchestrator inline, not a delegated worker. The user explicitly reserved this
+transcript for themselves at `cp-stage-approval-s8-s9`, so delegating would have returned a summary
+of a summary. Recorded late (after S10c) — the gap was caught by the final QA review as F-7.
+
+**Status**: completed, in two passes. The first pass exposed `risk-e6h1-014`; the second, after
+S10b + S10c, passed end to end.
+
+### Pass 1 — exposed the defect
+
+Throwaway repo with `lib.js`, `main` and a `feature` branch adding an `eval()` call. Registered
+from a `file://` URL into a `SENTINEL_HOME` that did **not** exist beforehand (deliberately not
+`mktemp -d`, which would have created the directory and hidden S9's `writeRepos` finding).
+
+| Step | Result |
+|---|---|
+| `repo add` | exit 0 — cloned, detected base branch, wrote `repos.yaml` |
+| `repo list` | exit 0 — alias, url, base branch |
+| `runs list` | exit 0 — "No runs recorded", stdout empty |
+| `review` | **exit 0, state `engine-error`, failureStage `worktree`** |
+
+`git merge-base`/`worktree add` failed on a branch present only as `remotes/origin/feature`.
+Root-caused to `git worktree add --detach <path> <branch>`: `--detach` suppresses git's DWIM
+resolution of a remote-only branch. Raised as `risk-e6h1-014` (high) and settled by D11.
+
+An earlier throwaway run had passed with `state: ok` only because its source repo's HEAD sat on
+`feature`, so `baseRef == targetRef` and the diff was empty — the engine approved nothing. Recorded
+because it is the more instructive result: a smoke can pass and still prove very little.
+
+### Pass 2 — after S10b + S10c, full flow green
+
+Fresh `SENTINEL_HOME`, same repo, `feature` present in the clone **only** as `remotes/origin/feature`
+(`git branch` lists just `main`).
+
+```
+$ node dist/cli.js repo add "file://<repo>"          → exit 0
+$ node dist/cli.js repo list                         → exit 0   smoke/repo2  file://…  main  -
+$ node dist/cli.js runs list smoke/repo2             → exit 0   No runs recorded (stderr)
+$ node dist/cli.js review smoke/repo2 feature \
+      --type security --timeout 180000               → exit 0
+  state ok · verdict request-changes · engine claude-code · durationMs 10268
+$ node dist/cli.js runs list smoke/repo2             → exit 0   one row, verdict request-changes
+$ node dist/cli.js runs show smoke/repo2 <id>        → exit 0
+  diffFileCount 1 · diffTotalLines 11 · promptLineCount 220 · usageTotalTokens 412
+```
+
+**Verified on disk**: `prompt.md`, `result.md`, `metadata.json` under
+`runs/smoke__repo2/<ts>/`; `metadata.json` carries `baseRef: main`, `targetRef: feature`,
+`diff.fileCount: 1` — a real `merge-base(main, feature)..feature` comparison, not an empty diff.
+
+**The engine found the planted vulnerability**, which is the strongest single signal that the whole
+pipeline is wired correctly:
+
+> `VERDICT: request-changes`
+> `[SEV: blocker] lib.js:5 — eval(input) executes arbitrary attacker-controlled code`
+
+**Cross-checks**:
+- Alias rendered `smoke/repo2` everywhere while the run directory is `smoke__repo2` — D7 and
+  `risk-e6h1-009` confirmed at runtime, not just by construction.
+- `~/.sentinel` was never created — AC-7 / D2 confirmed against a real filesystem.
+- `repo add` and `review` used the same clone directory — `risk-e6h1-013` confirmed at runtime.
+- `exit 0` for a `request-changes` verdict — AC-12 confirmed on the path that matters most.
+- `repo add` printed `-` for the local path of a cloned repo — `risk-e6h1-011` observed exactly as
+  the QA review predicted.
+- An empty `worktrees/<repo>/` parent directory survives cleanup — recorded as `risk-e6h1-015`.
+
+### What the smoke proved that 661 tests could not
+
+`risk-e6h1-014` was a high-severity defect that made this story's headline command unusable for its
+primary use case, and it survived the entire unit and contract suite. The reason is precise:
+`GitPort.contract.ts` defined its fixture branch as one existing **both** locally and as
+`origin/<name>` — the only shape where `--detach` works. Every `worktreeAdd` assertion was true and
+the product was broken. That gap is now closed at the port-contract level, so every future
+`GitPort` implementation inherits the coverage.
+
+---
 
 ## S10b — Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014)
 

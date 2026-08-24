@@ -18,8 +18,8 @@ complexity_assessment:
     RunStore dep and nothing calls store.save()).
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -127,6 +127,7 @@ stages:
       - S8
       - S9
       - S9b
+      - S10
       - S10b
       - S10c
     notes: >-
@@ -436,10 +437,10 @@ stages:
     status: pending
   sddl-qa-review:
     status: completed
-    mode: stage
+    mode: final
     verdict: pass
     started_at: "2026-08-24T06:00:00Z"
-    completed_at: "2026-08-24T06:00:00Z"
+    completed_at: "2026-08-24T21:30:00Z"
     report_path: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
     reviews:
       - target: batch-s1-s4
@@ -501,6 +502,36 @@ stages:
           RegisterRepoDeps.clonesDir and CliDeps.clonesDir, since registerRepo and
           resolveReviewRequest concatenate identical path strings. Stage mode: the change
           stays implementing. Details in qa-report.md.
+      - target: final-whole-change
+        mode: final
+        verdict: pass
+        reviewed_at: "2026-08-24T21:30:00Z"
+        summary: >-
+          Final closeout review of the whole change (git diff origin/main...HEAD, 25 commits,
+          56 files, +8612/-68). Verdict pass: 0 blockers, 0 high, 0 medium, 3 low findings
+          recorded as info (F-6 container.ts has no automated test and the opencode branch of
+          createEngine has never executed; F-7 the S10 smoke has no execution-log entry and the
+          Stage Overview still marks S10 pending while three risk resolutions say it passed;
+          F-8 skill-catalog.md carries a third stale bookkeeping mention beyond the two S9b
+          recorded). All four gates re-run independently rather than quoted: npm run check exit
+          0 (biome 143 files, depcruise 97 modules / 226 dependencies, 0 violations), npm test
+          exit 0 (674 tests / 38 files), npm run build exit 0 (dist/cli.js 105.05 KB), and
+          npm run dev -- --version exit 0 printing 0.0.0 (D10 confirmed). All 14 acceptance
+          criteria verified against code and tests rather than test names, AC-1 by reading
+          every command body and AC-12 by the exit-0 tests plus the smoke's own engine-error
+          run. Scope integrity clean: all 56 files trace to spec, to D1-D11 or to a recorded
+          risk; .dependency-cruiser.cjs, tsconfig.json, biome.json and tsup.config.ts are
+          untouched; zero deleted lines in any pre-existing test file; no undeclared fifth
+          widening. Each of the four widenings verified bounded, D11 most closely: one private
+          resolveCommitish funnelled from all three ref-taking methods, per-method error class
+          preserved, --detach kept so PRD 5.1 still holds, local-over-remote precedence, and
+          ambiguity rejected rather than guessed. The risk-e6h1-014 blind fixture is closed at
+          the GitPort contract level (13 new cases across worktreeAdd, mergeBase and diff), so
+          every future GitPort implementation inherits the coverage. The two known stale
+          mentions (paths.ts doc-comments, project-context.md snapshot) are cosmetic and should
+          NOT block. The six open risks each carry a recorded reason; risk-e6h1-011 is the one
+          literal deviation from a spec behaviour-table row and must be named in the PR.
+          Completion allowed: lifecycle_status set to completed. Full detail in qa-report.md.
     notes: >-
       Two stage-mode reviews so far, both pass: batch-s1-s4 (3 low findings) and batch-s5-s7
       (2 low findings). No blocker, no high, no medium, no architecture-guard violation in
@@ -1138,12 +1169,17 @@ open_risks:
     resolution: >-
       Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
 next_action:
-  kind: run_stage
-  target: sddl-qa-review
+  kind: complete
+  target: S11 closeout + PR
   summary: >-
-    S10's smoke passed end to end after S10b+S10c, discharging risk-e6h1-006 and resolving
-    risk-e6h1-014. Run sddl-qa-review in stage mode over S8, S9, S9b, S10b and S10c, then S11's
-    closeout declaring D1, D5, D7 and D11 together.
+    Final QA passed: 14/14 acceptance criteria met, all four gates green on independent re-run,
+    scope intact with no undeclared widening, 3 low findings recorded as info. The change is
+    marked completed. What remains is session bookkeeping, not implementation: S11's closeout
+    declaring D1, D5, D7 and D11; the PR "[E6.F1.H1] Base command CLI" (Closes #36) whose
+    description must declare the four widenings, list the six open risks calling out
+    risk-e6h1-011 as the one deviation from a spec behaviour row, and note F-6 and F-7; then
+    the mandatory history/ entry. Recommended before opening the PR: add the missing S10 entry
+    to execution-log.md and flip its Stage Overview row (F-7). Never merge the PR.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T06:00:00Z"
+updated_at: "2026-08-24T07:00:00Z"

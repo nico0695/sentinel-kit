@@ -21,6 +21,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | completed |
 | S9b | Addendum (D10): fix `npm run dev` + the four documents describing it | yes | completed |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
+| S10b | Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014) | yes | completed |
 | S11 | Closeout: declare the authorised deviations | no | pending |
 
 ## S1 — Tooling prerequisites
@@ -1564,3 +1565,163 @@ use `npm run dev -- …` exactly as `CONTRIBUTING.md` and `README.md` say, with 
 node dist/cli.js …` no longer required as a workaround. A stage-mode `sddl-qa-review` over
 S8 + S9 + S9b is the sensible review point before or alongside S10; this stage on its own is a
 five-file, zero-source diff and does not need one.
+
+## S10b — Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014)
+
+- status: completed
+- approval: decision **D11** (level C, `claude->user`, decided_by `user`) — fix `risk-e6h1-014`
+  inside this story as stage S10b, together with the missing contract-suite coverage. D11's
+  `approach_guidance` is binding and was followed literally (see "Resolution mechanism" below).
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c`, working tree clean, S1-S9 + S9b
+  committed. `npm run check` exit 0 (143 files, 97 modules / 226 dependencies, 0 violations);
+  `npm test` exit 0, **661 tests / 38 files**.
+- scope note: this is the **fourth authorised widening** of `[E6.F1.H1]` and the second against
+  code merged by an earlier epic — the defect lives in `[E2.F1.H2]`'s git adapter. Nothing under
+  `src/core/**`, `src/adapters/driving/**` or `src/main/**` was touched; the `GitPort` contract
+  itself is unchanged, so `createReviewWorktree` in `src/core/workspace/` needed no edit.
+
+### The defect, reproduced at the git level before any code was written
+
+A throwaway clone whose only local branch is `main`, with `feature` present only as
+`origin/feature` — literal transcript:
+
+```
+--- local branches in clone:
+* main
+--- remote branches in clone:
+  origin/HEAD -> origin/main
+  origin/feature
+  origin/main
+--- A) current adapter command: worktree add --detach <p> feature
+fatal: invalid reference: feature
+exit=128
+```
+
+The two-step resolution that replaces it, on the same clone:
+
+```
+--- B) rev-parse --verify 'feature^{commit}' (direct resolution)
+fatal: Needed a single revision
+exit=128
+--- C) for-each-ref fallback over refs/remotes/
+refs/remotes/origin/HEAD d46c27e58c2f77f6f57f69c97cb29590258a85cb
+refs/remotes/origin/feature a3ffe961bf14bf3a8aaa210f2a7204504a6dc4a7
+refs/remotes/origin/main d46c27e58c2f77f6f57f69c97cb29590258a85cb
+exit=0
+--- D) worktree add --detach <p> <resolved sha>
+resolved sha=a3ffe961bf14bf3a8aaa210f2a7204504a6dc4a7
+Preparing worktree (detached HEAD a3ffe96)
+HEAD is now at a3ffe96 feat
+exit=0
+/…/repro/clone  d46c27e [main]
+/…/repro/wt-d   a3ffe96 (detached HEAD)
+--- E) clone still has only local branch main:
+* main
+```
+
+Step E is the one that matters for D11's guidance: the worktree is detached at the right commit
+and the managed clone gained **no** local branch, so PRD §5.1 (ephemeral worktree per review,
+never a checkout in the managed clone) still holds and two concurrent reviews of the same branch
+cannot collide. Dropping `--detach` would have produced the opposite.
+
+### Resolution mechanism (A-level, per D11's "the exact mechanism is the stage's A-level call")
+
+`worktreeAdd` now resolves `commitish` to a concrete 40-hex SHA and hands **that** to `--detach`,
+via a new module-private `resolveCommitish(repoPath, commitish)`:
+
+1. `git rev-parse --verify <commitish>^{commit}`. This covers a bare SHA, a tag, a local branch,
+   an explicitly qualified `origin/<name>`, and any revision expression (`main~2`). It is also
+   what settles **precedence**: git's own DWIM order puts `refs/heads/<name>` ahead of
+   `refs/remotes/<name>`, so a name that is both a local and a remote branch resolves to the
+   local one — the answer a user expects, and the same answer the old code gave.
+2. Only if step 1 resolves nothing: `git for-each-ref --format='%(refname) %(objectname)'
+   refs/remotes/`, filtered in-process for entries whose name after `refs/remotes/<remote>/`
+   equals `commitish` (split at the FIRST slash, so `feature/foo` matches correctly).
+   **Exactly one** match is required.
+
+Rejection rules, all as `GitWorktreeError` (never a bare `Error`, never an escaping `ExecaError`):
+
+| Case | Outcome |
+|---|---|
+| zero matches | `GitWorktreeError`, `cause` = the step-1 git failure (diagnostic preserved) |
+| two or more matches (same branch name on two remotes) | `GitWorktreeError` naming the remotes and suggesting `<remote>/<name>` |
+| `for-each-ref` itself fails (e.g. not a repo) | `GitWorktreeError` wrapping the raw failure |
+
+The ambiguous-multi-remote case is deliberately a hard failure rather than "pick the first":
+**silently reviewing the wrong revision is far worse than a loud failure**, which is the exact
+trade-off D11 asked to be reasoned about. The existing "wraps bad commitish as GitWorktreeError
+with cause" contract test keeps passing unchanged, because the step-1 `ExecaError` is carried as
+`cause` instead of being discarded.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driven/git/git-cli.ts` | `worktreeAdd` resolves `commitish` first, then `worktree add --detach <path> <sha>`; new module-private `resolveCommitish` + `matchRemoteTrackingRefs` helpers, documented with the PRD §5.1 rationale for not dropping `--detach`. |
+| `src/adapters/driven/git/__test__/GitPort.contract.ts` | `GitFixture` gains `remoteOnlyBranch` / `remoteOnlyBranchSha`, `ambiguousBranch` / `ambiguousLocalSha` / `ambiguousRemoteSha`, `multiRemoteBranch`, `knownCommitSha`; **7 new `worktreeAdd` cases** covering the resolution rules. |
+| `src/adapters/driven/git/__test__/git-cli.test.ts` | Fixture provisions `feat-remote-only` (pushed, never local), `feat-ambiguous` (local at the fork point vs `origin/` at main's tip — different SHAs), `feat-both` (on both remotes, local on neither), plus an `upstream` re-fetch. |
+
+The new behaviour lives in the **shared contract suite**, not in an adapter-specific test — it is
+a behaviour every `GitPort` implementation must have, which is exactly why the gap existed
+(`GitPort.contract.ts` previously defined its worktree fixture branch as one that "exists both
+locally and as `origin/<name>`" — the only case where `--detach` works).
+
+### Before/after evidence — the new tests fail against the old implementation
+
+The fixed adapter was swapped for `git show HEAD:src/adapters/driven/git/git-cli.ts` (working-tree
+file swap only; no git history action), the extended suite re-run, then the fix restored:
+
+```
+=== NEW CONTRACT TESTS AGAINST OLD (HEAD) worktreeAdd ===
+       × checks out a branch that exists ONLY as origin/<name> 593ms
+       × leaves the managed clone with no new local branch (PRD §5.1) 643ms
+ FAIL  … > worktreeAdd > checks out a branch that exists ONLY as origin/<name>
+fatal: invalid reference: feat-remote-only
+Serialized Error: { … exitCode: 128, … stderr: 'fatal: invalid reference: feat-remote-only' … }
+ Test Files  1 failed (1)
+      Tests  2 failed | 32 passed (34)
+=== restored; diff vs fixed should be empty ===
+RESTORED_OK
+```
+
+With the fix in place, the same file: `Test Files 1 passed (1) / Tests 34 passed (34)`.
+The other five new cases (bare SHA, qualified `origin/<name>`, local-vs-remote precedence,
+two-remote ambiguity, unresolvable ref) pass on both implementations by design — they are
+regression guards pinning the resolution rules the fix must not break, not reproductions.
+
+### Quick checks
+
+- `npm run check` → exit **0**
+  ```
+  Checked 143 files in 186ms. No fixes applied.
+
+  ✔ no dependency violations found (97 modules, 226 dependencies cruised)
+  ```
+  Same 143 files / 97 modules / 226 dependencies as the baseline — the fix adds no module and no
+  dependency edge, and `depcruise` is clean (the adapter still imports only `execa`, `node:path`
+  and core port types).
+- `npm test` → exit **0**
+  ```
+  Test Files  38 passed (38)
+       Tests  668 passed (668)
+  ```
+  **661 → 668**: all 661 pre-existing tests still pass, +7 new `worktreeAdd` contract cases.
+- `biome check --write` was run once on `src/adapters/driven/git/` to satisfy the formatter after
+  the test edits; no other file was reformatted.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion — the diff is one adapter method
+plus its shared contract suite and that suite's only harness, exactly the blast radius D11
+predicted. The `GitPort` interface, its error types and every core caller are untouched.
+
+### Next action
+
+S10b is complete. **S10's smoke was deliberately NOT re-run here** — the handoff reserves that
+transcript for the orchestrator, so no `repo add`, no `review` and no scratch clone were executed
+by this stage; the only git activity outside the repo was the throwaway reproduction above under
+the session scratchpad. The orchestrator should now re-run S10 end to end to confirm
+`sentinel review <repo> <branch>` reaches a terminal state for a remote-only branch, then take
+S11's closeout, where **D1, D5, D7 and D11** must all be declared together in the PR description
+and the history entry. A stage-mode `sddl-qa-review` over S10b is worthwhile before S11 given it
+changes merged E2 code, though the diff is small and fully covered by the contract suite.

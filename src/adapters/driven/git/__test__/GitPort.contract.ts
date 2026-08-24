@@ -46,6 +46,31 @@ export interface GitFixture {
   /** A branch that exists both locally and as `origin/<name>`. */
   readonly pushedBranch: string;
   /**
+   * A branch that exists ONLY as `origin/<name>` — no local `refs/heads`
+   * entry. The normal shape of a PR branch in a managed clone, and the case
+   * `git worktree add --detach` cannot DWIM (risk-e6h1-014).
+   */
+  readonly remoteOnlyBranch: string;
+  /** SHA `remoteOnlyBranch` points at on `origin`. */
+  readonly remoteOnlyBranchSha: string;
+  /**
+   * A branch name that exists BOTH as a local ref and as `origin/<name>`,
+   * with the two refs pointing at DIFFERENT commits, so local-vs-remote
+   * precedence is observable.
+   */
+  readonly ambiguousBranch: string;
+  /** SHA the LOCAL `ambiguousBranch` ref points at (must win). */
+  readonly ambiguousLocalSha: string;
+  /** SHA the `origin/<ambiguousBranch>` ref points at (must NOT win). */
+  readonly ambiguousRemoteSha: string;
+  /**
+   * A branch name present on TWO remotes (`origin` and the upstream remote)
+   * and on neither locally — unresolvable without a remote qualifier.
+   */
+  readonly multiRemoteBranch: string;
+  /** A commit SHA reachable in `clonePath` (for the bare-SHA commitish case). */
+  readonly knownCommitSha: string;
+  /**
    * Append a new commit to `barePath` via a throwaway working clone and
    * return the resulting commit SHA (used by the fetch test).
    */
@@ -311,6 +336,107 @@ export function gitPortContract(
           const gitErr = err as GitWorktreeError;
           expect(gitErr.cause).toBeInstanceOf(Error);
         });
+      });
+
+      // ---------------------------------------------------------------
+      // commitish resolution (risk-e6h1-014)
+      //
+      // `--detach` does not DWIM a remote-only branch, so the port must
+      // resolve `commitish` to a concrete revision itself. These cases pin
+      // the resolution rules for EVERY GitPort implementation.
+      // ---------------------------------------------------------------
+
+      it("checks out a branch that exists ONLY as origin/<name>", async () => {
+        const wtPath = `${fixture.clonePath}-wt-remote-only`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: fixture.remoteOnlyBranch,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        const entry = list.find((w) => w.path === wtPath);
+        expect(entry).toBeDefined();
+        expect(entry?.head).toBe(fixture.remoteOnlyBranchSha);
+      });
+
+      it("leaves the managed clone with no new local branch (PRD §5.1)", async () => {
+        const before = await git.branches(fixture.clonePath);
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: `${fixture.clonePath}-wt-no-local-branch`,
+          commitish: fixture.remoteOnlyBranch,
+        });
+        const after = await git.branches(fixture.clonePath);
+        expect(after.filter((r) => r.kind === "local")).toEqual(
+          before.filter((r) => r.kind === "local"),
+        );
+      });
+
+      it("accepts a bare commit SHA as commitish", async () => {
+        const wtPath = `${fixture.clonePath}-wt-sha`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: fixture.knownCommitSha,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.find((w) => w.path === wtPath)?.head).toBe(
+          fixture.knownCommitSha,
+        );
+      });
+
+      it("accepts an explicitly qualified origin/<name> commitish", async () => {
+        const wtPath = `${fixture.clonePath}-wt-qualified`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: `origin/${fixture.remoteOnlyBranch}`,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.find((w) => w.path === wtPath)?.head).toBe(
+          fixture.remoteOnlyBranchSha,
+        );
+      });
+
+      it("prefers the LOCAL ref when a name is both local and remote", async () => {
+        expect(fixture.ambiguousLocalSha).not.toBe(fixture.ambiguousRemoteSha);
+        const wtPath = `${fixture.clonePath}-wt-ambiguous`;
+        await git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: fixture.ambiguousBranch,
+        });
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.find((w) => w.path === wtPath)?.head).toBe(
+          fixture.ambiguousLocalSha,
+        );
+      });
+
+      it("rejects a name carried by two remotes instead of guessing", async () => {
+        const rejection = git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: `${fixture.clonePath}-wt-multi-remote`,
+          commitish: fixture.multiRemoteBranch,
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        await expect(rejection).rejects.toBeInstanceOf(GitError);
+        // …and no worktree was created for it.
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(
+          list.some((w) => w.path === `${fixture.clonePath}-wt-multi-remote`),
+        ).toBe(false);
+      });
+
+      it("still rejects an unresolvable ref instead of picking a commit", async () => {
+        const wtPath = `${fixture.clonePath}-wt-unresolvable`;
+        const rejection = git.worktreeAdd({
+          repoPath: fixture.clonePath,
+          targetPath: wtPath,
+          commitish: "no/such/branch",
+        });
+        await expect(rejection).rejects.toBeInstanceOf(GitWorktreeError);
+        const list = await git.worktreeList(fixture.clonePath);
+        expect(list.some((w) => w.path === wtPath)).toBe(false);
       });
     });
 

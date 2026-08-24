@@ -150,18 +150,19 @@ export function createGitCliAdapter(): GitPort {
           `worktreeAdd: targetPath must be absolute (received: ${targetPath})`,
         );
       }
+      // Resolve to a concrete SHA FIRST (dec-011). `--detach` suppresses
+      // git's DWIM, so passing a branch that only exists as
+      // `refs/remotes/<remote>/<name>` — the normal case for a PR branch in
+      // a managed clone — dies with `fatal: invalid reference`. Dropping
+      // `--detach` is NOT the fix: it would create a local branch in the
+      // managed clone, which PRD §5.1 forbids (ephemeral worktree per
+      // review, never a checkout in the clone) and which would make two
+      // concurrent reviews of the same branch collide.
+      const revision = await resolveCommitish(repoPath, commitish);
       try {
         await execa(
           "git",
-          [
-            "-C",
-            repoPath,
-            "worktree",
-            "add",
-            "--detach",
-            targetPath,
-            commitish,
-          ],
+          ["-C", repoPath, "worktree", "add", "--detach", targetPath, revision],
           EXECA_BASE,
         );
       } catch (raw) {
@@ -289,6 +290,116 @@ function wrapAs<
 >(ErrorClass: ErrorClass, message: string, cause: unknown) {
   const asError = cause instanceof Error ? cause : new Error(String(cause));
   return new ErrorClass(`${message}: ${asError.message}`, { cause: asError });
+}
+
+/**
+ * Resolve a `commitish` to a concrete 40-hex commit SHA inside `repoPath`,
+ * so `git worktree add --detach` always receives an unambiguous revision.
+ *
+ * Two ordered steps, mirroring git's own precedence:
+ *
+ * 1. `git rev-parse --verify <commitish>^{commit}` — resolves a bare SHA, a
+ *    tag, a local branch, an explicit `origin/<name>`, and any revision
+ *    expression (`main~2`). Git's DWIM order puts `refs/heads/<name>` before
+ *    `refs/remotes/<name>`, so a name that is BOTH a local and a remote
+ *    branch resolves to the local one — the precedence a user expects.
+ * 2. Only when step 1 finds nothing: look for a remote-tracking branch
+ *    `refs/remotes/<remote>/<commitish>`. Exactly ONE match is required.
+ *    Zero matches and two-or-more matches (the same branch name on two
+ *    remotes) both reject with `GitWorktreeError` — reviewing the wrong
+ *    revision silently would be far worse than failing loudly.
+ *
+ * The step-1 failure is carried as the `cause` of the rejection so the
+ * underlying git diagnostic is never lost.
+ */
+async function resolveCommitish(
+  repoPath: string,
+  commitish: string,
+): Promise<string> {
+  let directFailure: unknown = new Error(
+    `git rev-parse --verify ${commitish} returned no revision`,
+  );
+  try {
+    const { stdout } = await execa(
+      "git",
+      ["-C", repoPath, "rev-parse", "--verify", `${commitish}^{commit}`],
+      EXECA_BASE,
+    );
+    const sha = stdout.trim();
+    if (sha !== "") return sha;
+  } catch (raw) {
+    directFailure = raw;
+  }
+
+  let listed: string;
+  try {
+    const { stdout } = await execa(
+      "git",
+      [
+        "-C",
+        repoPath,
+        "for-each-ref",
+        "--format=%(refname) %(objectname)",
+        REFS_REMOTES_PREFIX,
+      ],
+      EXECA_BASE,
+    );
+    listed = stdout;
+  } catch (raw) {
+    throw wrapAs(
+      GitWorktreeError,
+      `worktree add: cannot resolve commitish '${commitish}' in ${repoPath}`,
+      raw,
+    );
+  }
+
+  const matches = matchRemoteTrackingRefs(listed, commitish);
+  const [only] = matches;
+  if (matches.length === 1 && only !== undefined) {
+    return only.sha;
+  }
+  if (matches.length === 0) {
+    throw wrapAs(
+      GitWorktreeError,
+      `worktree add: cannot resolve commitish '${commitish}' in ${repoPath} (no local ref, tag or remote-tracking branch matches)`,
+      directFailure,
+    );
+  }
+  const remotes = matches.map((m) => m.remote).join(", ");
+  throw wrapAs(
+    GitWorktreeError,
+    `worktree add: commitish '${commitish}' is ambiguous in ${repoPath} — it matches a branch on several remotes (${remotes}); qualify it as '<remote>/${commitish}'`,
+    directFailure,
+  );
+}
+
+/**
+ * Select the `refs/remotes/<remote>/<name>` entries of a
+ * `for-each-ref --format="%(refname) %(objectname)"` dump whose `<name>`
+ * equals `branch`. The remote is the FIRST path segment after the prefix,
+ * so branch names containing slashes (`feature/foo`) match correctly.
+ */
+function matchRemoteTrackingRefs(
+  stdout: string,
+  branch: string,
+): readonly { readonly remote: string; readonly sha: string }[] {
+  const matches: { remote: string; sha: string }[] = [];
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    const sep = trimmed.lastIndexOf(" ");
+    if (sep < 0) continue;
+    const refname = trimmed.slice(0, sep);
+    const sha = trimmed.slice(sep + 1);
+    if (!refname.startsWith(REFS_REMOTES_PREFIX)) continue;
+    const rest = refname.slice(REFS_REMOTES_PREFIX.length);
+    const slash = rest.indexOf("/");
+    if (slash < 0) continue;
+    const remote = rest.slice(0, slash);
+    const name = rest.slice(slash + 1);
+    if (name === branch) matches.push({ remote, sha });
+  }
+  return matches;
 }
 
 /**

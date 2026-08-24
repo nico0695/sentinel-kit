@@ -127,6 +127,7 @@ stages:
       - S8
       - S9
       - S9b
+      - S10b
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -374,6 +375,34 @@ stages:
       S11 remain unapproved and were NOT started -- no repo add, no review, no clone, so S10's
       end-to-end evidence is untouched and its transcript can now use `npm run dev -- ...` exactly
       as the docs promise. Details in execution-log.md.
+      S10b (D11 / risk-e6h1-014) completed: the remote-only-branch worktree defect is fixed in
+      the driven git adapter, with the contract coverage that let it through. worktreeAdd no
+      longer hands a raw commitish to `git worktree add --detach` -- a new module-private
+      resolveCommitish() resolves it to a concrete SHA first, via `git rev-parse --verify
+      <commitish>^{commit}` (bare SHA, tag, local branch, explicit origin/<name>, revision
+      expressions, and git's own local-before-remote precedence) falling back, only when that
+      resolves nothing, to a `git for-each-ref refs/remotes/` scan requiring EXACTLY ONE
+      matching remote-tracking branch. Zero matches and two-or-more matches (same branch name on
+      two remotes) both reject as GitWorktreeError -- silently reviewing the wrong revision would
+      be worse than the loud failure -- and the step-1 git error is carried as `cause`, so the
+      pre-existing bad-commitish contract test passes unchanged. `--detach` was deliberately kept
+      (D11's binding approach_guidance): dropping it would create local branches in the managed
+      clone, contradicting PRD 5.1's ephemeral-worktree design and serialising concurrent reviews
+      of the same branch. Verified at the git level on a throwaway clone whose only local branch
+      was main: the old command gave `fatal: invalid reference: feature` (exit 128), the new path
+      detaches at the right commit and the clone still lists only `main` locally.
+      GitPort.contract.ts gains 7 worktreeAdd cases (remote-only checkout, no-new-local-branch,
+      bare SHA, qualified origin/<name>, local-over-remote precedence, two-remote ambiguity
+      rejected, unresolvable ref still rejected) plus the fixture fields they need, and the
+      git-cli harness provisions feat-remote-only / feat-ambiguous / feat-both. Before/after
+      proof: swapping HEAD's adapter back in makes 2 of the new tests fail with `fatal: invalid
+      reference: feat-remote-only` (2 failed | 32 passed); with the fix all 34 pass. Gates after
+      S10b: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 226
+      dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 668 tests
+      across 38 files, up from 661/38, all 661 pre-existing tests still passing. Nothing under
+      src/core/**, src/adapters/driving/** or src/main/** was touched and the GitPort interface is
+      unchanged. S10's smoke was NOT re-run -- the orchestrator reserved that transcript. Details
+      in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -1068,9 +1097,13 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    D11 settled risk-e6h1-014: fix inside this story as stage S10b (git adapter commitish
-    resolution + the missing remote-only contract test). After it lands, re-run S10's smoke to
-    confirm the full flow end to end, then S11's closeout.
+    S10b landed the D11 fix: the git adapter now resolves a commitish to a concrete revision
+    before `worktree add --detach`, and the remote-only case is covered by the shared GitPort
+    contract suite (661 -> 668 tests, both gates green). Next: re-run S10's end-to-end smoke --
+    reserved for the orchestrator, not run by S10b -- to confirm `sentinel review <repo> <branch>`
+    now reaches a terminal state for a remote-only branch, then S11's closeout, where D1, D5, D7
+    and D11 must all be declared together in the PR description and the history entry. A
+    stage-mode sddl-qa-review over S10b before S11 is recommended since it changes merged E2 code.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T05:00:00Z"
+updated_at: "2026-08-24T06:30:00Z"

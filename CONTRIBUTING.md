@@ -19,11 +19,16 @@ npm ci
 ## Commands
 
 ```bash
-npm run dev     # run the CLI from source
+npm run dev     # rebuild with tsup, then run the CLI
 npm run build   # bundle the binary (tsup)
 npm run check   # biome + tsc --noEmit + depcruise src  — the quality gate
 npm test        # vitest run
 ```
+
+`npm run dev` bundles with tsup and runs `dist/cli.js`, because the source
+uses NodeNext `.js` import specifiers and Node's `--experimental-strip-types`
+does not resolve those to their sibling `.ts` files. Arguments pass through:
+`npm run dev -- --help`.
 
 `npm run check` is the quality gate: lint/format, typecheck, **and the
 architecture guards, in one command**. Both `check` and `test` must pass locally

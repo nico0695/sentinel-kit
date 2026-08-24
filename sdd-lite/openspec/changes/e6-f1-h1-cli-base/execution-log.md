@@ -19,6 +19,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S7 | `review` command | yes | completed |
 | S8 | Sentinel home resolution (D2/AC-7) | yes | completed |
 | S9 | Composition root (`container.ts`, `cli.ts`) | yes | completed |
+| S9b | Addendum (D10): fix `npm run dev` + the four documents describing it | yes | completed |
 | S10 | Manual smoke for `risk-e6h1-006` (mandatory) | no | pending |
 | S11 | Closeout: declare the authorised deviations | no | pending |
 
@@ -1417,3 +1418,149 @@ decision to the user with option (a) as the recommendation, and (2) take a fresh
 manual smoke, whose transcript the user reserved — noting it must invoke
 `npm run build && node dist/cli.js …` until the `dev` script is fixed. A stage-mode
 `sddl-qa-review` over S8-S9 together is the sensible review point before or alongside S10.
+
+## S9b — Addendum (D10): `npm run dev` and the documents that describe it
+
+- status: completed
+- approval: decision **D10** (C-level, `claude→user`, resolved by the user) — an approved addendum
+  stage, scoped to the `dev` script plus the four documents that publish it. S10 and S11 remain
+  unapproved and were **not** started: no `repo add`, no `review`, no clone, no end-to-end smoke.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c` @ `a54e97e`, working tree clean,
+  `npm run check` exit 0 (biome 143 files, depcruise 97 modules / 226 dependencies, 0 violations)
+  and `npm test` exit 0 (661 tests / 38 files) before the stage.
+
+### Planned scope (D10)
+
+`package.json` `scripts.dev` → `tsup --silent && node dist/cli.js` (no new dependency — `tsup`
+8.5.1 is already a devDependency and already backs `build`), plus
+`docs/setup-tecnico-sentinel.md` §5.1, `CLAUDE.md`, `README.md` and `CONTRIBUTING.md`.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `package.json` | `scripts.dev`: `node --experimental-strip-types src/main/cli.ts` → `tsup --silent && node dist/cli.js`. Nothing else — `dependencies` still read exactly `commander`, `execa`, `yaml`, `zod` (AC-9), `devDependencies` unchanged, `package-lock.json` untouched. |
+| `docs/setup-tecnico-sentinel.md` (§5.1, line 82) | The `dev` line of the essential-`package.json` jsonc block, with a trailing `//` clause naming the cause: NodeNext `.js` specifiers rule out `--experimental-strip-types`. |
+| `CLAUDE.md` (Commands, line 28) | `npm run dev     # tsup --silent && node dist/cli.js — rebuild (~1s), then run the bundle`, keeping the block's "command # what it runs" shape. |
+| `README.md` (Quick start, line 27) | Comment now reads `# rebuild with tsup, then run the CLI` instead of `# run the CLI from source`, which is no longer literally what happens. |
+| `CONTRIBUTING.md` (Commands, lines 22 and 28-31) | Same comment change, plus one short paragraph between the command block and the existing `npm run check` paragraph stating the `.js`-specifier reason and that arguments pass through (`npm run dev -- --help`). This is the one contributor-facing document that explains *why*, so the clause lives here. |
+
+No source file, test, config or lockfile was touched. `git status --short` after the stage lists
+exactly five modified paths and nothing else; `dist/` is gitignored (`git check-ignore -v dist` →
+`.gitignore:5:dist/`), so the rebuilds this stage performed leave nothing to commit.
+
+### Quick checks
+
+Run, verbatim outcomes:
+
+- `npm run dev -- --version` → exit **0** — the whole point of the stage:
+  ```
+  > @nico0695/sentinel@0.0.0 dev
+  > tsup --silent && node dist/cli.js --version
+
+  0.0.0
+  ```
+- `npm run dev -- --help` → exit **0**, confirming npm appends the forwarded arguments after
+  `node dist/cli.js` (not somewhere inside the `&&`):
+  ```
+  > tsup --silent && node dist/cli.js --help
+
+  Usage: sentinel [options] [command]
+
+  AI-powered code review orchestrator
+
+  Options:
+    -V, --version                     print the sentinel version
+    -h, --help                        display help for command
+
+  Commands:
+    repo                              register and inspect the repositories
+                                      sentinel reviews
+    review [options] <repo> <branch>  review a branch of a registered repository
+    runs                              inspect the review history of a repository
+    help [command]                    display help for command
+
+  Environment variables:
+    SENTINEL_HOME            Root directory for sentinel state — config, repo
+                             clones, worktrees and run history.
+                             Defaults to ~/.sentinel when unset or empty.
+    SENTINEL_OPENCODE_MODEL  Model id (provider/model) passed to the opencode
+                             engine. Required only when a review resolves to
+                             the opencode engine.
+  ```
+  `--silent` does what it promises: tsup prints nothing, so the CLI's own output is the only thing
+  on the stream and `npm run dev -- --help | …` stays pipeable.
+- `npm run check` → exit **0**
+  ```
+  > biome check . && tsc --noEmit && depcruise src
+  Checked 143 files in 151ms. No fixes applied.
+  ✔ no dependency violations found (97 modules, 226 dependencies cruised)
+  ```
+  Identical to the pre-stage baseline — 143 files, 97 modules, 226 dependencies — as expected from
+  a stage that changed no source.
+- `npm test` → exit **0**
+  ```
+  Test Files  38 passed (38)
+       Tests  661 passed (661)
+  ```
+  **661/38, unchanged.** S9b adds no test, and the count must not move.
+- `npm run build` → exit **0**, still working independently of `dev`:
+  ```
+  CLI tsup v8.5.1
+  CLI Target: node22
+  ESM dist/cli.js 102.10 KB
+  ESM ⚡️ Build success in 40ms
+  ```
+
+### Grep evidence — no document still describes the old command
+
+Three greps over the repo, excluding `node_modules/`, `dist/`, `.git/` and this change's own
+`sdd-lite/openspec/` artifacts:
+
+1. `grep -rn -- "--experimental-strip-types"` — four hits remain, none of them a false claim:
+   - `docs/setup-tecnico-sentinel.md:82` and `CONTRIBUTING.md:29` are the **new** clauses, which
+     name the flag precisely to say it cannot be used here;
+   - `docs/todo/E4/manual-verification.md:56` suggests the flag for an uncommitted scratch script
+     that imports an adapter by its **`.ts`** path — that works, since the breakage is specifically
+     `.js` specifiers, so the instruction is still correct and was left alone;
+   - `sdd-lite/project-context.md:21` and `:62` — see "Out of scope" below.
+2. `grep -rn "npm run dev"` — every remaining hit is either one of the four updated documents,
+   an immutable `history/entries/*` record of a past session (correctly not rewritten), the two
+   `src/main/paths.ts` doc-comments or `sdd-lite/project-context.md`.
+3. `grep -n "dev" CLAUDE.md README.md CONTRIBUTING.md docs/setup-tecnico-sentinel.md` — read in
+   full to catch a mention that avoids the exact phrase. The only other candidate is
+   `docs/setup-tecnico-sentinel.md:23` ("TS | Native (type stripping) for dev; build for
+   distribution"), a row of the Node/Bun/Deno comparison table describing what the **runtime**
+   supports, not what `npm run dev` does. Still true of Node; left unchanged.
+
+### Out of scope — two stale mentions deliberately not touched
+
+Both are outside D10's enumerated write set. Neither breaks anything; both are recorded so they are
+not silently inherited:
+
+- `src/main/paths.ts:12` and `:101` — doc-comments justifying `resolvePackageRoot` by "the two entry
+  depths (`src/main/cli.ts` under `npm run dev` vs. `dist/cli.js` when installed)". After D10 both
+  *runtime* entry points are `dist/cli.js`, so the example is stale, though the function is still
+  needed: `src/main/__test__/paths.test.ts` and any future direct-`.ts` execution still load the
+  module from `src/main/`. This is source, not a document, and editing it would reopen S9's diff;
+  the fix is a two-line comment correction for the orchestrator, QA or S11 to place.
+- `sdd-lite/project-context.md:21`, `:62` and `:94` — the sdd-lite bootstrap snapshot still says
+  `npm run dev` uses `--experimental-strip-types` and "only prints the version". D4's consequences
+  already record that `config.yaml` and `project-context.md` need a refresh once this story merges;
+  D10 gives that refresh a second line to fix.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion: the stage touched exactly the
+five files D10 names, added no dependency, and left both gates at their pre-stage numbers.
+
+### Next action
+
+S9b is complete and `npm run dev` is the command the documents promise again. **S10 (the manual
+smoke) and S11 (the closeout) remain unapproved and were not started** — no `repo add`, no
+`review`, no clone was run, so the end-to-end evidence the user reserved for S10 is still
+untouched. The orchestrator should take a fresh stage approval for S10, whose transcript can now
+use `npm run dev -- …` exactly as `CONTRIBUTING.md` and `README.md` say, with `npm run build &&
+node dist/cli.js …` no longer required as a workaround. A stage-mode `sddl-qa-review` over
+S8 + S9 + S9b is the sensible review point before or alongside S10; this stage on its own is a
+five-file, zero-source diff and does not need one.

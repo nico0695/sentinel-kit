@@ -79,7 +79,7 @@ Total runtime dependencies: **7** (commander, clack, execa, zod, yaml, picocolor
   "bin": { "sentinel": "./dist/cli.js", "snt": "./dist/cli.js" },
   "files": ["dist", "harnesses", "skills"],   // factory harnesses ship in the package
   "scripts": {
-    "dev": "node --experimental-strip-types src/main/cli.ts",
+    "dev": "tsup --silent && node dist/cli.js",   // NodeNext `.js` specifiers rule out --experimental-strip-types
     "build": "tsup",
     "check": "biome check . && tsc --noEmit && depcruise src",
     "test": "vitest run"

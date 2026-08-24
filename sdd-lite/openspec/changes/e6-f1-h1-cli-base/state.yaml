@@ -126,6 +126,7 @@ stages:
       - S7
       - S8
       - S9
+      - S9b
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -344,6 +345,35 @@ stages:
       user; recommendation (a) "dev": "tsup --silent && node dist/cli.js". S10's smoke must invoke
       the built entrypoint until that is decided; it is not blocked. S10 and S11 remain unapproved
       and were not started -- the end-to-end smoke was deliberately not run.
+      S9b (addendum, D10) completed under decision D10 rather than a plan stage, closing the
+      `npm run dev` contradiction S9 escalated. package.json's `dev` script became
+      `tsup --silent && node dist/cli.js` -- no new dependency, since tsup 8.5.1 already backs
+      `build`; runtime dependencies still read exactly commander, execa, yaml, zod (AC-9) and
+      package-lock.json was not touched. The four documents that published the old command were
+      updated so none keeps asserting something false: docs/setup-tecnico-sentinel.md §5.1 (the
+      jsonc `dev` line, with a trailing clause naming the cause), CLAUDE.md's Commands block,
+      README.md's quick start and CONTRIBUTING.md, which also gains one short paragraph explaining
+      the `.js`-specifier reason and that arguments pass through. No source, test, config or
+      lockfile was touched -- git status shows exactly five modified paths, and dist/ is gitignored.
+      Verified by running, not by reasoning: `npm run dev -- --version` exit 0 printing 0.0.0 and
+      `npm run dev -- --help` exit 0 printing the full root help, which is what confirms npm appends
+      forwarded arguments after `node dist/cli.js` rather than inside the `&&`; `npm run build`
+      still works independently. Gates after S9b: npm run check exit 0 (biome 143 files, tsc clean,
+      depcruise 97 modules / 226 dependencies, 0 violations) and npm test exit 0 with 661 tests
+      across 38 files -- every number identical to the pre-stage baseline, as a stage that changes
+      no source must be. Three greps confirm no document still describes the old command; the four
+      remaining `--experimental-strip-types` hits are the two new explanatory clauses, an E4
+      manual-verification note about a scratch script that imports a `.ts` path (still correct, the
+      breakage is `.js` specifiers only) and sdd-lite/project-context.md. Two stale mentions were
+      deliberately left out of scope and recorded instead: src/main/paths.ts:12 and :101 justify
+      resolvePackageRoot by "src/main/cli.ts under npm run dev vs. dist/cli.js when installed",
+      an example D10 makes stale although the function is still needed for the module's own tests
+      (source, not a document -- a two-line comment fix for QA or S11); and
+      sdd-lite/project-context.md:21/:62/:94, the bootstrap snapshot D4 already flagged for a
+      refresh once this story merges. No contradiction, drift or blast-radius expansion. S10 and
+      S11 remain unapproved and were NOT started -- no repo add, no review, no clone, so S10's
+      end-to-end evidence is untouched and its transcript can now use `npm run dev -- ...` exactly
+      as the docs promise. Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -985,11 +1015,15 @@ open_risks:
     severity: medium
     status: open
 next_action:
-  kind: run_stage
+  kind: user_decision
   target: sddl-executor
   summary: >-
-    D10 settled the `npm run dev` contradiction S9 escalated. Run sddl-executor on addendum stage
-    S9b (the dev script plus the four documents that describe it), then take stage approval for
-    S10's manual smoke.
+    S9b closed D10: `npm run dev` runs the CLI again (`tsup --silent && node dist/cli.js`) and the
+    four documents that describe it are true. Both gates unchanged at check exit 0 and 661 tests /
+    38 files. Next: take stage approval for S10, the mandatory manual smoke for risk-e6h1-006,
+    whose transcript the user reserved -- it can now invoke `npm run dev -- ...` as the docs
+    promise. A stage-mode sddl-qa-review over S8 + S9 + S9b is the sensible review point before or
+    alongside S10.
+
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T04:00:00Z"
+updated_at: "2026-08-24T05:00:00Z"

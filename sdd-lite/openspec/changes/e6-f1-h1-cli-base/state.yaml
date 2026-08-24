@@ -499,6 +499,27 @@ checkpoints:
       JSON.stringify escapes newlines, which the orchestrator reproduced independently. AC-5's
       property stays covered by the sibling file-path assertion either way, so this is test
       honesty, not a coverage gap.
+  - id: cp-stage-approval-s8-s9
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Stage QA over S5-S7 returned `pass` (0 blockers/high/medium, 2 low info) with both gates
+      re-run independently and three mutation-verification claims reproduced from scratch. S8
+      (src/main/paths.ts) and S9 (composition root) are the remaining code stages; S9 concentrates
+      the blast radius and is the first assembly of the full dependency graph.
+    question: >-
+      Run S8 and S9 as a batch, S8 alone, everything through S11, or stop?
+    status: resolved
+    resolution: batch-s8-s9
+    resolved_at: "2026-08-24T03:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved S8 and S9 as one batch, with an explicit stop before S10. Rationale recorded
+      at the checkpoint: S10's manual smoke is the only real evidence that the CLI works end to
+      end, and its transcript should reach the user directly rather than being summarised inside
+      a longer run. risk-e6h1-013 travels to S9 as a hard constraint: ONE sentinelPaths result
+      must feed both RegisterRepoDeps.clonesDir and CliDeps.clonesDir. S10 and S11 remain
+      unapproved.
 decisions:
   - id: D1
     level: C
@@ -857,14 +878,10 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    Stage-mode QA over the S5-S7 batch returned pass: 0 blockers, 2 low findings recorded as
-    info (F-4 repo add prints "-" for a cloned repo's path; F-5 review omits the run id), both
-    non-blocking and neither fixable inside this story's authorised scope. Both gates re-run
-    independently and green (npm run check exit 0; npm test exit 0, 638 tests / 37 files), and
-    three of the batch's mutation-verification claims were reproduced exactly. Take a fresh
-    stage_approval to the user for S8 (src/main/paths.ts) and then run sddl-executor for S8
-    alone. When S9 is planned, wire one sentinelPaths result into both RegisterRepoDeps.clonesDir
-    and CliDeps.clonesDir -- they must be the same string.
+    cp-stage-approval-s8-s9 resolved: S8 and S9 approved as a batch. Run sddl-executor on S8
+    (src/main/paths.ts), then S9 (container.ts + cli.ts), one stage per invocation, each ending
+    green on `npm run check` + `npm test`. S9 must honour risk-e6h1-013. Stop after S9 and present
+    the state before S10's manual smoke.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T06:00:00Z"
+updated_at: "2026-08-24T03:00:00Z"

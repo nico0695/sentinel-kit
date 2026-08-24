@@ -875,6 +875,37 @@ decisions:
       documents change. Executed as addendum stage S9b so the diff stays isolated and reviewable
       rather than being folded into S9's commit. S10's smoke can then use `npm run dev` as the
       docs promise, which is itself a check on this decision.
+  - id: D11
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: Fix the remote-only-branch worktree defect inside [E6.F1.H1]
+    context: >-
+      risk-e6h1-014, found by S10's smoke and root-caused by the orchestrator. `git worktree add
+      --detach <path> <branch>` fails with `fatal: invalid reference` when the branch exists only
+      as remotes/origin/<name> -- the normal case for a PR branch in a managed clone. So `sentinel
+      review`, this story's headline command, is unusable for its primary use case. The defect
+      lives in [E2.F1.H2]'s git adapter, merged long before this story.
+    decision: >-
+      Fix it inside [E6.F1.H1] as stage S10b, together with the missing contract-suite coverage
+      for the remote-only case.
+    rationale: >-
+      `review` is the command [E6.F1.H1] exists to deliver; merging it broken for the case it was
+      built for would be shipping something that does not work. Routing the fix to a new E2 issue
+      was rejected as either leaving main with a broken review or blocking this PR on another one.
+      Documenting the limitation was rejected outright for the same reason. The fix is small and
+      its blast radius is one adapter method.
+    approach_guidance: >-
+      Preserve the ephemeral-worktree design intent: PRD §5.1 requires an ephemeral worktree per
+      review and explicitly never a checkout in the managed clone, so simply dropping `--detach`
+      is the wrong fix -- it would create local branches in the clone and make two concurrent
+      reviews of the same branch collide. Resolve the commitish to a concrete revision first
+      (local ref, else the unique remote-tracking ref) and hand that to `--detach`. The exact
+      mechanism is the stage's A-level call.
+    consequences: >-
+      Fourth authorised widening of this story, and the second against code merged by an earlier
+      epic (after D7). D1, D5, D7 and now this must all be declared together in the PR description
+      and the history entry. S10's smoke must be re-run after the fix to confirm end to end.
 open_risks:
   - id: risk-e6h1-001
     summary: >-
@@ -1034,15 +1065,12 @@ open_risks:
     severity: medium
     status: open
 next_action:
-  kind: user_decision
+  kind: run_stage
   target: sddl-executor
   summary: >-
-    S9b closed D10: `npm run dev` runs the CLI again (`tsup --silent && node dist/cli.js`) and the
-    four documents that describe it are true. Both gates unchanged at check exit 0 and 661 tests /
-    38 files. Next: take stage approval for S10, the mandatory manual smoke for risk-e6h1-006,
-    whose transcript the user reserved -- it can now invoke `npm run dev -- ...` as the docs
-    promise. A stage-mode sddl-qa-review over S8 + S9 + S9b is the sensible review point before or
-    alongside S10.
+    D11 settled risk-e6h1-014: fix inside this story as stage S10b (git adapter commitish
+    resolution + the missing remote-only contract test). After it lands, re-run S10's smoke to
+    confirm the full flow end to end, then S11's closeout.
 
 created_at: "2026-08-23T00:00:00Z"
 updated_at: "2026-08-24T05:00:00Z"

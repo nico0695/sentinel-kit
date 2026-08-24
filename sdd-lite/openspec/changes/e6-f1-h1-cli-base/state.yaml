@@ -1007,6 +1007,25 @@ open_risks:
     severity: medium
     status: open
     owner_stage: S9
+  - id: risk-e6h1-014
+    summary: >-
+      FOUND BY S10's SMOKE -- the failure risk-e6h1-006 predicted, now concrete. `sentinel review
+      <repo> <branch>` fails at the worktree stage for any branch that exists only on the remote,
+      which in a managed clone is the normal case for a PR branch. Root cause isolated by the
+      orchestrator: git-cli.ts:157-165 runs `git worktree add --detach <path> <commitish>`, and
+      `--detach` suppresses git's DWIM resolution of a remote-only branch. Demonstrated on a real
+      clone: `--detach <path> feature` -> `fatal: invalid reference: feature` (exit 128); the same
+      command without `--detach` succeeds via DWIM; `--detach <path> origin/feature` also succeeds.
+      Why 661 tests missed it: GitPort.contract.ts:46 defines its fixture branch as one that
+      "exists both locally and as origin/<name>" -- the only case where --detach works. The
+      remote-only case has no coverage.
+      The CLI behaves correctly around the failure: state engine-error, failureStage "worktree",
+      exit 0 per AC-12, and the run IS persisted -- so D1, AC-6 and AC-12 are all confirmed working
+      by the same transcript.
+      The defect is in [E2.F1.H2]'s git adapter, not in this story's code.
+    severity: high
+    status: open
+    owner_stage: user decision (C-level scope call)
   - id: risk-e6h1-006
     summary: >-
       src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for

@@ -2169,5 +2169,8 @@ Two things for QA to weigh, neither a blocker:
 - D13 makes a persistence failure print **two** stderr lines (the command's diagnostic, then the
   catch-all's rendering of the cause). AC-13's "one line per core error" still holds — the second
   line *is* that one line; the first is a diagnostic, which AC-10 puts on stderr by right.
-- `spec.md`'s AC-12 wording still predates D13's boundary case (D13's own `consequences` says it
-  "gains this boundary case"). Updating spec text was not in S12's artifact scope.
+- `spec.md`'s AC-12 was amended by the orchestrator in this same commit to record D13's boundary
+  case, per D13's own `consequences`. This note originally said the wording still predated D13 and
+  that spec text was outside S12's artifact scope — true when the stage wrote it, false by the time
+  the commit landed. Corrected after the final QA re-review flagged the contradiction (F-9): an
+  audit trail that disagrees with its own commit is worse than a missing note.

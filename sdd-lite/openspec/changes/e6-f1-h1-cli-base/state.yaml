@@ -18,8 +18,8 @@ complexity_assessment:
     RunStore dep and nothing calls store.save()).
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -490,7 +490,7 @@ stages:
     mode: final
     verdict: pass
     started_at: "2026-08-24T06:00:00Z"
-    completed_at: "2026-08-24T21:30:00Z"
+    completed_at: "2026-08-25T07:00:00Z"
     report_path: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
     reviews:
       - target: batch-s1-s4
@@ -582,11 +582,63 @@ stages:
           NOT block. The six open risks each carry a recorded reason; risk-e6h1-011 is the one
           literal deviation from a spec behaviour-table row and must be named in the PR.
           Completion allowed: lifecycle_status set to completed. Full detail in qa-report.md.
+      - target: final-s12-fix-round
+        mode: final
+        verdict: pass
+        reviewed_at: "2026-08-25T07:00:00Z"
+        summary: >-
+          Second final-mode review, after the change was reopened by D12 for the PR #73 fix
+          round. Target: commit 2633f51 (git diff f6c6e00..HEAD, 13 files, +669/-63); the rest
+          of the change was re-validated only where S12 could have disturbed it. Verdict pass:
+          0 blockers, 0 high, 0 medium, 5 low findings recorded as info (F-9 the S12 execution
+          log states the AC-12 spec text was NOT updated while the same commit amends it; F-10
+          the amended AC-12 sentence leaves the old parenthetical trailing after D13's clause
+          and its verification column still names only the two original tests; F-11 the two
+          stderr lines are partly redundant and the second discloses the attempted run
+          directory while stdout shows runDir -; F-12 renderRecord binds by length rather than
+          by key, unlike format-review's renderOutcome; F-13 artifacts.review_ledger points at
+          a file that never existed). All four gates re-run independently, all matching the
+          expected numbers exactly: npm run check exit 0 (biome 143 files, depcruise 97 modules
+          / 229 dependencies, 0 violations), npm test exit 0 (681 tests / 38 files), npm run
+          build exit 0 (dist/cli.js 107.36 KB), and the GitPort contract suite 40/40. The
+          product smoke was not re-run, per the handoff. R4-001 verified correct rather than
+          merely present: the happy path is byte-identical (formatReviewOutcome builds the same
+          scalars and defers to a renderOutcome that is the previous body verbatim; 674/674
+          pre-existing tests pass), nothing fabricates a runDir, result.state is still never
+          read for an exit decision, and the unconditional rethrow does reach createCli's
+          catch-all for exit 1. The unpersisted renderer mirrors persistRun's own derivations
+          exactly (engine, harness, durationMs), which R2-003's single shared clock is what
+          makes comparable. AC-13 explicitly judged NOT violated: AC-13 constrains how a core
+          typed error renders -- one line, no stack, no raw object -- which the rethrown
+          RunPersistenceError still does and the tests assert; the first line is a diagnostic,
+          which AC-10 puts on stderr by right, and a reading that capped a command's total
+          stderr output would also forbid commander's multi-line usage errors that AC-2
+          requires. The AC-12 amendment is honest: every clause of the new text matches the
+          code, TerminalState is untouched and src/core has an empty diff, and D13 records the
+          decision with decided_by user -- but the execution log contradicts it (F-9). R2-004
+          is behaviour-preserving by construction: revParseCommit reproduces both branches of
+          the old body including the synthetic "returned no revision" error, and local-over-
+          remote precedence, single-match ambiguity rejection, per-method error class and
+          --detach receiving a resolved SHA all survive; no contract case was edited. The
+          R2-001/R2-002 tests were verified by four mutations rather than trusted -- a constant
+          reorder, a renderer value swap, dropping the rethrow and fabricating a runDir each
+          produced Tests 1 failed, and the tree was restored byte-identical. No regression and
+          no scope creep: git diff of src/core is empty, no config file and no dependency was
+          touched, the three new dependency edges are exactly the claimed ones and all point
+          inward or within the same driving adapter. F-6 remains open for [E7.F1.H1] and its
+          shape grew by one line -- R2-003's shared clock binding is also verified only by
+          reading. Completion allowed: lifecycle_status returned to completed. Full detail in
+          the fourth section of qa-report.md.
     notes: >-
-      Two stage-mode reviews so far, both pass: batch-s1-s4 (3 low findings) and batch-s5-s7
-      (2 low findings). No blocker, no high, no medium, no architecture-guard violation in
-      either. Stage mode never closes the change -- S8-S11 are unimplemented and unapproved,
-      and only a final-mode review may set completed.
+      Four reviews: two stage-mode (batch-s1-s4, batch-s5-s7) and two final-mode -- the
+      whole-change closeout of 2026-08-24 and this re-review of the S12 fix round after D12
+      reopened the change. All four pass; no blocker, no high, no medium and no
+      architecture-guard violation in any of them. This second final review returns the change
+      to completed: the five PR #73 findings are genuinely fixed, the happy path is provably
+      undisturbed, AC-13 is not violated by D13's two stderr lines and the AC-12 amendment is
+      honest. Five low findings recorded as info; F-9 (the execution log contradicting the spec
+      edit in its own commit) is the only one worth correcting before the PR threads are
+      answered.
 artifacts:
   state: sdd-lite/openspec/changes/e6-f1-h1-cli-base/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f1-h1-cli-base/proposal.md
@@ -1177,6 +1229,37 @@ open_risks:
     severity: low
     status: open
     owner_stage: follow-up
+  - id: risk-e6h1-016
+    summary: >-
+      QA F-11 (low). After S12, a post-review persistence failure emits TWO stderr lines: the
+      command's diagnostic and the catch-all's one-line rendering of the cause. The final QA judged
+      this NOT an AC-13 violation -- AC-13 governs how a core typed error renders (one line, no
+      stack), which still holds, and AC-10 puts diagnostics on stderr by right; a reading where
+      AC-13 capped total stderr output would also forbid the multi-line commander usage errors AC-2
+      requires. Two qualifications remain: the lines are partly redundant, and the second discloses
+      the attempted run directory while stdout reports `runDir -`. A tidy for `[E6.F1.H2]`.
+    severity: low
+    status: open
+    owner_stage: E6.F1.H2
+  - id: risk-e6h1-017
+    summary: >-
+      QA F-12 (low). `renderRecord` in format-repos.ts / format-runs.ts binds values to fields by
+      LENGTH, unlike format-review.ts's `renderOutcome`, which binds by key. Field-order drift is
+      still caught by the new tests, but an extra value with no declared field would be silently
+      dropped rather than failing. Tightening it to key-binding would make the three renderers
+      uniform.
+    severity: low
+    status: open
+    owner_stage: follow-up
+  - id: risk-e6h1-018
+    summary: >-
+      QA F-13 (low, pre-existing). `state.yaml`'s `artifacts.review_ledger` points at
+      `review-ledger.md`, which never existed for this change -- no `sddl-code-review` or
+      `sddl-judgment-day` protocol ran, so per the orchestrator guardrails the file correctly does
+      not exist. The stale path predates S12 and is a template artifact, not a missing deliverable.
+    severity: low
+    status: open
+    owner_stage: follow-up
   - id: risk-e6h1-008
     summary: >-
       Engines mismatch introduced by S1: commander@15.0.0 declares engines.node ">=22.12.0" while
@@ -1281,13 +1364,16 @@ open_risks:
     resolution: >-
       Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
 next_action:
-  kind: run_stage
-  target: sddl-qa-review
+  kind: complete
+  target: e6-f1-h1-cli-base
   summary: >-
-    S12 completed: all five PR #73 findings fixed, gates green (check exit 0, 681 tests across 38
-    files, 674 pre-existing still passing). Run final-mode sddl-qa-review over the whole change
-    before it returns to `completed` (D12), paying particular attention to D13's boundary case --
-    the verdict on stdout, the two-line stderr sequence and the non-zero exit when persistRun
-    throws. Then answer and resolve the five review threads on PR #73.
+    Final QA re-run after S12 returned `pass`: gates green and matching exactly (check exit 0,
+    97 modules / 229 dependencies, 681 tests across 38 files, build 107.36 KB, GitPort contract
+    40/40), all five PR #73 fixes verified correct rather than merely present, AC-13 judged not
+    violated by D13's two stderr lines, and the AC-12 amendment confirmed honest. The change is
+    `completed`. Remaining work is session bookkeeping, not implementation: answer and resolve
+    the five PR #73 review threads, correct F-9 (the S12 execution-log bullet claims the AC-12
+    spec text was not updated while its own commit amends it), and write the `history/` entry.
+    Never merge the PR.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-25T06:00:00Z"
+updated_at: "2026-08-25T07:00:00Z"

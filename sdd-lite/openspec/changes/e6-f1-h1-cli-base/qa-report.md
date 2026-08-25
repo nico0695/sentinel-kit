@@ -518,3 +518,181 @@ changing `[E5.F2.H2]`'s observable behaviour, D11 the git ref-resolution fix to 
 code), list the six open risks — calling out `risk-e6h1-011` as the one deviation from a spec
 behaviour row — and note F-6 (`container.ts` is untested) and F-7 (record the S10 entry / flip the
 Stage Overview row first). Then write the `history/` entry. Never merge the PR.
+
+---
+
+# QA Report — FINAL (re-run after S12, the PR #73 fix round)
+
+- **Mode**: `final` (second final-mode run; the change was reopened from `completed` by D12)
+- **Change**: `e6-f1-h1-cli-base`
+- **Primary target**: commit `2633f51` — `git diff f6c6e00..HEAD`, 13 files, +669/-63
+  (3 source, 3 render, 1 deps, 1 container, 3 test files, 3 artifacts)
+- **Reviewed at**: 2026-08-25
+- **Verdict**: `pass` — **completion is allowed; this review returns the change to `completed`**
+
+## Closeout Digest
+
+S12 answers five verified human review findings. All five are genuinely fixed, not merely
+present. The one user-impacting fix (`R4-001`) is correct on the path that matters: the happy
+path is byte-identical, no `runDir` is fabricated, `result.state` is still never read for an exit
+decision, and the rethrow does reach `createCli`'s catch-all. The two questions S12 itself flagged
+for QA are answered below: **the two stderr lines do NOT violate AC-13**, and the AC-12 amendment
+**is** honest and matches the code — but the execution log says the opposite of what the commit
+did, which is this round's only real finding. `R2-004` is behaviour-preserving by construction and
+by evidence. The new `R2-001`/`R2-002` tests genuinely catch drift — verified by four independent
+mutations, not by reading the claim. No blocker, no high, no medium; five low findings recorded as
+info. Nothing under `src/core/**` was touched (`git diff f6c6e00..HEAD -- src/core/` is empty).
+
+## Independent Validation (re-run, not quoted from the execution log)
+
+| Command | Exit | Literal outcome | Expected | Match |
+|---|---|---|---|---|
+| `npm run check` | **0** | `Checked 143 files in 162ms. No fixes applied.` · `✔ no dependency violations found (97 modules, 229 dependencies cruised)` | 143 / 97 / 229 / 0 violations | exact |
+| `npm test` | **0** | `Test Files 38 passed (38)` · `Tests 681 passed (681)` (30.78s) | 681 across 38 | exact |
+| `npm run build` | **0** | `ESM dist/cli.js 107.36 KB` · `Build success in 59ms` | success | yes (105.05 → 107.36 KB, the second renderer) |
+| `npx vitest run --project adapters src/adapters/driven/git` | **0** | `Tests 40 passed (40)` | 40/40 | exact |
+
+Product smoke deliberately not re-run (handoff instruction; the change is adapter-local and
+`R2-004`'s only behavioural surface is the GitPort contract suite, re-run above).
+
+**681 = 674 + 7.** Every pre-existing test still passes and the seven new ones are the claimed
+four (`R4-001`) + two (`R2-001`) + one (`R2-002`). The happy path was not disturbed.
+
+**226 → 229 dependencies**, same 97 modules. The three new edges are exactly the ones claimed:
+`format-review.ts` → `core/run` (request/result types), `format-review.ts` → `format-error.ts`
+(intra-adapter, not adapter-to-adapter), `review-command.ts` → `core/history`
+(`PersistRunResult` type). All three point inward or sideways within the same driving adapter;
+0 guard violations, and the guards were the enforcement, not the assertion.
+
+## 1. Is `R4-001`'s fix actually correct?
+
+| Property | Verdict | Evidence |
+|---|---|---|
+| Happy path byte-identical | **yes** | `formatReviewOutcome` builds the identical `scalars` array and now defers to `renderOutcome`, which is the previous body moved verbatim (`REVIEW_OUTCOME_FIELDS.map((key, i) => \`${key}\t${field(scalars[i])}\`)`). No scalar changed, no field added. The 674 pre-existing tests confirm it. |
+| Nothing fabricates a `runDir` | **yes** | `formatUnpersistedReviewOutcome` passes `undefined` as the tenth scalar; `field(undefined)` → `-`. Mutation: replacing it with `"/runs/fabricated"` fails the guarding test. |
+| `result.state` never read for an exit decision | **yes** | `review-command.ts` reads `result` only to render. The rethrow is unconditional — the same error, whatever the terminal state. No branch on `state`, no exit-code table. |
+| The rethrow reaches the catch-all | **yes** | `throw error` inside the action handler rejects `parseAsync`; the error is not a `CommanderError`, so `runProgram` renders it via `formatErrorLine` and returns `1`. Mutation: replacing `throw error` with `return` fails the exit-code test. |
+| The unpersisted fields equal what `persistRun` would have recorded | **yes** | `persist-run.ts` derives `engine = result.engineName ?? runRequest.engineName`, `harness = runRequest.harnessType`, `durationMs = Math.max(0, now() - startedAtEpochMs)` — the renderer mirrors all three exactly, and `R2-003` now guarantees the same clock feeds both ends. |
+| The stderr diagnostic is truthful | **yes** | `run-store-fs.ts` stages into a temp dir and `rename`s atomically, with best-effort `rm` of the staging dir in its own catch. On failure nothing is visible under the final dir, so "no history was written and `sentinel runs show` will not find it" is literally accurate. |
+
+## 2. AC-13 and the two stderr lines — explicit judgement
+
+**Not a violation.** AC-13 constrains *how a core typed error renders*: "one-line messages on
+stderr with no stack trace and no raw exception object". The rethrown `RunPersistenceError` renders
+as exactly one line through `formatErrorLine`, with no stack, no `cause` chain and no raw object —
+the guarantee is intact and asserted (`err[1]` is compared with `toBe(writeFailed.message)`).
+AC-13 says nothing about how many stderr lines a *command* may write, and AC-10 explicitly assigns
+"diagnostics, warnings and error messages" to stderr, which is exactly what the first line is. A
+reading in which AC-13 caps a command's total stderr output would also forbid `commander`'s own
+multi-line usage errors, which AC-2 requires. S12's reading is the correct one.
+
+Two qualifications, neither blocking (recorded as F-11 below): the two lines are partly
+redundant — `RunPersistenceError`'s message already says the run could not be persisted — and the
+second line discloses the attempted run directory while stdout shows `runDir -`. A user reading
+both is told a path exists and does not exist. It is defensible (the path was *attempted*), but it
+is the kind of thing `[E6.F1.H2]`'s exit-code/diagnostic pass should tidy.
+
+## 3. Is the AC-12 amendment honest?
+
+**The amended text matches the code**, clause by clause: outcome rendered on stdout (yes),
+`runDir` shows `-` (yes), one diagnostic on stderr (yes), exit non-zero (yes, `1`), no sixth
+terminal state (yes — `TerminalState` is untouched, `src/core/` has an empty diff). The decision is
+recorded as **D13** (level B, `decided_by: user`) with context, rationale and consequences, and the
+consequence line explicitly anticipates the spec edit. Amending an AC mid-change is therefore
+recorded, not silent — the correct handling.
+
+**But the audit trail contradicts itself** (F-9): the same commit's execution-log entry closes with
+"`spec.md`'s AC-12 wording still predates D13's boundary case … Updating spec text was not in S12's
+artifact scope", while that commit *does* amend AC-12. A reader of the log would believe the spec
+is stale when it is not.
+
+## 4. Is `R2-004` behaviour-preserving?
+
+Yes, and by construction rather than by assertion. The old body initialised `directFailure` to a
+synthetic "returned no revision" `Error`, overwrote it in `catch`, and fell through to the remote
+scan. The split reproduces both branches exactly: `revParseCommit` returns `{ sha }` only for a
+non-empty `stdout`, returns the *same* synthetic error for an empty one, returns the raw throwable
+from `catch`, and never throws. `resolveCommitish` then calls `resolveRemoteTrackingCommit` with
+that failure as `cause`. Semantics verified individually:
+
+- **Local-over-remote precedence** — unchanged: still `git rev-parse --verify <commitish>^{commit}`
+  first, git's own DWIM order untouched.
+- **Ambiguity rejected, not guessed** — unchanged: step 2 still requires exactly one
+  `refs/remotes/<remote>/<name>` match; zero and 2+ both reject.
+- **Per-method error class** — unchanged: `ErrorClass`/`context` travel into step 2, which is the
+  only thrower.
+- **`--detach` receives a resolved SHA** — unchanged: `worktreeAdd` still resolves first, then
+  passes `revision` to `worktree add --detach`.
+- No contract case edited (`git diff --stat` lists only `git-cli.ts` under `driven/git`), 40/40
+  contract tests pass on re-run.
+
+## 5. Would the new `R2-001`/`R2-002` tests catch drift?
+
+Yes — verified by mutation, in both directions, rather than by reading the claim. Tree restored
+byte-identical after each (`git status --porcelain` empty).
+
+| Mutation | Result |
+|---|---|
+| Swap `"url"`/`"baseBranch"` in `REPO_LINE_FIELDS` (constant drifts) | `Tests 1 failed` |
+| Swap `field(summary.baseRef)`/`field(summary.targetRef)` in `formatRunSummaryLine` (renderer drifts) | `Tests 1 failed` |
+| Replace `throw error` with `return` in `review-command.ts` | `Tests 1 failed` |
+| Fabricate `"/runs/fabricated"` as the tenth scalar | `Tests 1 failed` |
+
+The reviewer's complaint is answered: the assertions bind each declared field *name* to the value
+at its position, so neither side can move alone. Adding a field to a constant is caught even
+earlier — the tests' `Record<(typeof FIELDS)[number], string>` makes it a `tsc` error, so
+`npm run check` fails before the test does.
+
+## 6. Regression and scope
+
+- `git diff f6c6e00..HEAD -- src/core/` → **empty**. No core file, no `TerminalState`, no port.
+- No config file touched: `.dependency-cruiser.cjs`, `tsconfig.json`, `biome.json`,
+  `tsup.config.ts`, `package.json` are all absent from the diff. No dependency added.
+- No pre-existing test assertion deleted. The one assertion dropped during authoring
+  (`not.toContain("at ")`) was in a *new* test and is disclosed in the log; it was dropped for a
+  real reason (the fixture message literally contains " at ") and the whole-array equality around
+  it is stronger.
+- `R2-003` is exactly one shared `now` in `container.ts`, handed to both `persistRun`'s deps and
+  `CliDeps.now`. Correct, and it is what makes the unpersisted `durationMs` comparable.
+
+## Findings
+
+All `low`, all recorded as **info**. None blocks completion.
+
+| Id | Severity | Finding | Evidence |
+|---|---|---|---|
+| F-9 | low | The S12 execution-log entry states AC-12's spec text was *not* updated and that doing so "was not in S12's artifact scope", but the same commit amends AC-12. The audit trail contradicts the commit it documents. | `execution-log.md` last bullet vs `git diff f6c6e00..HEAD -- .../spec.md` |
+| F-10 | low | The amended AC-12 sentence appends D13's clause *before* the pre-existing parenthetical, so `(unknown command/flag, unregistered repo, unreadable config, unknown engine/harness)` now reads as enumerating the persistence case rather than "usage or invocation failure". The row's verification column also still names only the two original tests, not the four new ones. | `spec.md` AC-12 |
+| F-11 | low | A persistence failure prints two partly redundant stderr lines, the second disclosing the attempted run directory while stdout shows `runDir -`. Not an AC-13 violation (see §2); a UX tidy for `[E6.F1.H2]`. | `review-command.ts` diagnostic + `RunPersistenceError` message |
+| F-12 | low | `renderRecord` in `format-repos.ts` and the mapping in `format-runs.ts` bind values to fields by *length* only, unlike `format-review.ts`'s `renderOutcome`, which uses the key. Drift is still caught (by `tsc` and the new tests, both verified), but a value added without a declared field is silently dropped rather than failing. | `format-repos.ts` `renderRecord`, `format-runs.ts` |
+| F-13 | low | `state.yaml`'s `artifacts.review_ledger` points at `review-ledger.md`, which has never existed for this change — the five findings came from PR threads, not a ledger run. Pre-existing, not S12's doing. | `ls` in the change directory |
+
+**Carried forward**: F-6 (`container.ts` has no automated test; the `opencode` branch of
+`createEngine` has never executed) remains open for `[E7.F1.H1]`. Its shape grew by one line —
+`R2-003`'s shared clock binding lives in `container.ts` and is likewise verified only by reading.
+F-7 and F-8 are unaffected by S12.
+
+## Known Open Risks
+
+Unchanged by S12: 9 resolved, 6 open by recorded decision (`-008`, `-009`, `-010`, `-011`, `-012`,
+`-015`). S12 touched no risk surface — it added no new external behaviour beyond D13's documented
+boundary case, which is itself a recorded decision rather than a risk.
+
+## Verdict
+
+`pass`. The fix round fixes what it claims to fix, and it did not break the thing a fix round
+usually breaks: the happy path is provably untouched (674/674 pre-existing tests, an unchanged
+renderer body, an empty core diff) and the newly complex error path is pinned by four tests that
+were each shown to fail under mutation. The two questions S12 escalated are answered — AC-13 holds,
+and the AC-12 amendment is honest — leaving one documentation contradiction (F-9) and four cosmetic
+notes, none of which is a defect in shipped behaviour.
+
+**Completion is allowed, and this review returns the change to `completed`** —
+`lifecycle_status: completed`.
+
+## Next Action
+
+Answer and resolve the five PR #73 review threads (the orchestrator's job — this stage posted
+nothing to GitHub and performed no git action), quoting the evidence above for `R4-001` and
+`R2-004`. Fix F-9 while doing so: the S12 execution-log bullet should say the AC-12 amendment
+*was* made, per D13. Then update the `history/` entry for this session. Never merge the PR.

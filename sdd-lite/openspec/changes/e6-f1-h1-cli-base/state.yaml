@@ -18,7 +18,7 @@ complexity_assessment:
     RunStore dep and nothing calls store.save()).
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
-lifecycle_status: completed
+lifecycle_status: implementing
 current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
@@ -718,6 +718,22 @@ checkpoints:
       a longer run. risk-e6h1-013 travels to S9 as a hard constraint: ONE sentinelPaths result
       must feed both RegisterRepoDeps.clonesDir and CliDeps.clonesDir. S10 and S11 remain
       unapproved.
+  - id: cp-stage-approval-s12
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Five verified review findings from PR #73, one of them a real correctness issue. Fix routed
+      through a new plan stage S12 rather than direct edits, per the review fix-routing rule.
+    question: >-
+      Which findings to act on, and what exit code should a post-review persistence failure produce?
+    status: resolved
+    resolution: fix-all-five
+    resolved_at: "2026-08-25T04:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved fixing all five (D12) and settled the exit-code question as verdict-on-stdout /
+      diagnostic-on-stderr / non-zero exit, with no new terminal state (D13). S12 is authorised;
+      final QA must re-run before the change returns to `completed`.
 decisions:
   - id: D1
     level: C
@@ -993,6 +1009,52 @@ decisions:
       Fourth authorised widening of this story, and the second against code merged by an earlier
       epic (after D7). D1, D5, D7 and now this must all be declared together in the PR description
       and the history entry. S10's smoke must be re-run after the fix to confirm end to end.
+  - id: D12
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Act on all five PR #73 review findings before merge
+    context: >-
+      The repo owner posted five COMMENTED review threads on PR #73 (R4-001 Resilience WARNING,
+      R2-001/R2-002/R2-004 Readability WARNING, R2-003 SUGGESTION). The orchestrator verified all
+      five against the source: none is a false positive. Under the project's own severity floor,
+      WARNING/SUGGESTION are recorded as info and never block -- so acting on them is a choice,
+      not an obligation.
+    decision: >-
+      Fix all five in a plan-routed fix stage (S12) before the PR is merged, then answer and
+      resolve each thread.
+    rationale: >-
+      R4-001 is correctness with real user impact: a persistRun throw discards a completed
+      multi-minute review's verdict entirely. R2-003 is a one-line seam inconsistency
+      (startedAtEpochMs and durationMs come from two different clocks). R2-001/R2-002 close a
+      whole drift class by copying a correct pattern that already exists in the same directory
+      (format-review.ts derives its line from its constant). R2-004 is the most taste-driven, but
+      it is local and covered by 13 contract cases. Cheap to fix, and they came from the human
+      reviewer.
+    consequences: >-
+      The change reopens from `completed` back to `implementing`; final QA must re-run before it
+      can be marked completed again. `review-command.ts`, `cli-deps.ts`, `container.ts`,
+      `format-repos.ts`, `format-runs.ts` and `git-cli.ts` are touched.
+  - id: D13
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: A persistence failure prints the verdict and exits non-zero
+    context: >-
+      R4-001's fix needs an exit-code rule that AC-12 does not cover: what happens when the review
+      itself completes but persistRun then throws. The reviewer suggested "a distinct state".
+    decision: >-
+      Render the review outcome on stdout regardless, emit the persistence failure as a diagnostic
+      on stderr, and exit non-zero. No new terminal state.
+    rationale: >-
+      AC-12 guarantees exit 0 for a COMPLETED invocation; a run whose record never reached disk did
+      not fully complete, so the guarantee is not violated. The user still sees the verdict they
+      waited minutes for, and a script can still detect that no history was written. A sixth
+      terminal state was rejected outright: the five in PRD §4 are a domain contract, and adding
+      one from an adapter concern would be a level-C change to the core model.
+    consequences: >-
+      spec.md's AC-12 wording gains this boundary case. The exit-code table remains [E6.F1.H2]'s;
+      this is a single documented exception, not a table.
 open_risks:
   - id: risk-e6h1-001
     summary: >-
@@ -1169,17 +1231,13 @@ open_risks:
     resolution: >-
       Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
 next_action:
-  kind: complete
-  target: S11 closeout + PR
+  kind: run_stage
+  target: sddl-executor
   summary: >-
-    Final QA passed: 14/14 acceptance criteria met, all four gates green on independent re-run,
-    scope intact with no undeclared widening, 3 low findings recorded as info. The change is
-    marked completed. What remains is session bookkeeping, not implementation: S11's closeout
-    declaring D1, D5, D7 and D11; the PR "[E6.F1.H1] Base command CLI" (Closes #36) whose
-    description must declare the four widenings, list the six open risks calling out
-    risk-e6h1-011 as the one deviation from a spec behaviour row, and note F-6 and F-7; then
-    the mandatory history/ entry. Recommended before opening the PR: add the missing S10 entry
-    to execution-log.md and flip its Stage Overview row (F-7). Never merge the PR.
+    cp-stage-approval-s12 resolved. Run sddl-executor on S12: R4-001 (persistence failure must not
+    discard the verdict, per D13), R2-003 (forward `now` to persistRun so both clocks agree),
+    R2-001/R2-002 (derive the rendered line from the exported field constants) and R2-004 (split
+    resolveCommitish). Then re-run final QA and answer/resolve the five threads.
 
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-24T07:00:00Z"
+updated_at: "2026-08-25T04:00:00Z"

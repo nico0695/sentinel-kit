@@ -16,6 +16,7 @@ import {
 } from "../../../../core/history/index.js";
 import { createCli } from "../create-cli.js";
 import {
+  formatRunSummaryLine,
   RUN_RECORD_FIELDS,
   RUN_SUMMARY_FIELDS,
 } from "../render/format-runs.js";
@@ -349,5 +350,48 @@ describe("runs help (AC-2)", () => {
 
     expect(help).toContain("repository alias");
     expect(help).toContain("run id");
+  });
+});
+
+/**
+ * `R2-002`: `RUN_SUMMARY_FIELDS` was referenced only from a doc comment while
+ * `formatRunSummaryLine` duplicated the eleven-field order by hand, so the
+ * two could drift apart silently. Asserting the column COUNT cannot catch a
+ * reordering; every value below is distinct and bound to its declared field
+ * name, so a swap on either side fails here.
+ */
+describe("runs rendering — the field constant is the contract (R2-002)", () => {
+  it("renders a runs list line in RUN_SUMMARY_FIELDS order", () => {
+    const summary: RunSummary = {
+      id: "20260824-000000-abc",
+      repoName: "owner__repo",
+      startedAtEpochMs: 1_700_000_000_000,
+      status: "partial",
+      state: "ambiguous",
+      verdict: "request-changes",
+      harness: "pr-review",
+      engine: "claude-code",
+      baseRef: "main",
+      targetRef: "feature",
+      durationMs: 4200,
+    };
+
+    const expected: Record<(typeof RUN_SUMMARY_FIELDS)[number], string> = {
+      repo: "owner/repo",
+      id: "20260824-000000-abc",
+      startedAtEpochMs: "1700000000000",
+      status: "partial",
+      state: "ambiguous",
+      verdict: "request-changes",
+      harness: "pr-review",
+      engine: "claude-code",
+      baseRef: "main",
+      targetRef: "feature",
+      durationMs: "4200",
+    };
+
+    expect(formatRunSummaryLine("owner/repo", summary).split("\t")).toEqual(
+      RUN_SUMMARY_FIELDS.map((k) => expected[k]),
+    );
   });
 });

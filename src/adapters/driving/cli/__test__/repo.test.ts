@@ -15,6 +15,8 @@ import {
 } from "../../../../core/repos/index.js";
 import { createCli } from "../create-cli.js";
 import {
+  formatRegisterOutcome,
+  formatRepoLine,
   REGISTER_OUTCOME_FIELDS,
   REPO_LINE_FIELDS,
 } from "../render/format-repos.js";
@@ -262,5 +264,53 @@ describe("repo help (AC-2)", () => {
 
     expect(help).toContain("add");
     expect(help).toContain("list");
+  });
+});
+
+/**
+ * `R2-001`: the exported field-order constants used to be decorative — the
+ * renderers hand-built their arrays, so a field added to a constant without a
+ * matching value (or a reordering of one side only) changed nothing and no
+ * test noticed. Counting the tab-separated columns cannot catch that; these
+ * assertions bind each declared field NAME to the value that must appear at
+ * its position, so any divergence between constant and renderer fails here.
+ */
+describe("repo rendering — the field constants are the contract (R2-001)", () => {
+  it("renders a repo list line in REPO_LINE_FIELDS order", () => {
+    const expected: Record<(typeof REPO_LINE_FIELDS)[number], string> = {
+      alias: "owner/repo",
+      url: "https://github.com/owner/repo.git",
+      baseBranch: "develop",
+      harness: "quick",
+    };
+
+    const line = formatRepoLine(expected.alias, {
+      url: expected.url,
+      baseBranch: expected.baseBranch,
+      defaultHarness: expected.harness,
+    });
+
+    expect(line.split("\t")).toEqual(REPO_LINE_FIELDS.map((k) => expected[k]));
+  });
+
+  it("renders a repo add outcome in REGISTER_OUTCOME_FIELDS order", () => {
+    const expected: Record<(typeof REGISTER_OUTCOME_FIELDS)[number], string> = {
+      alias: "owner/repo",
+      status: "already-registered",
+      localPath: "/srv/repo",
+    };
+
+    const line = formatRegisterOutcome({
+      alias: expected.alias,
+      alreadyRegistered: true,
+      entry: {
+        url: "https://github.com/owner/repo.git",
+        localPath: expected.localPath,
+      },
+    });
+
+    expect(line.split("\t")).toEqual(
+      REGISTER_OUTCOME_FIELDS.map((k) => expected[k]),
+    );
   });
 });

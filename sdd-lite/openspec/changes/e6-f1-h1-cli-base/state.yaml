@@ -19,7 +19,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-23T00:00:00Z"
 lifecycle_status: implementing
-current_stage: sddl-qa-review
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -130,6 +130,7 @@ stages:
       - S10
       - S10b
       - S10c
+      - S12
     notes: >-
       S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
       storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
@@ -431,6 +432,55 @@ stages:
       226 dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 674 tests
       across 38 files, up from 668/38, all 668 pre-existing tests still passing. S10's product
       smoke was again NOT run -- still reserved for the orchestrator. Details in execution-log.md.
+      S12 (D12 / D13) acted on the five verified PR #73 review findings under
+      cp-stage-approval-s12. R4-001 (the only one with user impact): persistRun is now wrapped in
+      try/catch inside review-command.ts, and a write failure no longer discards the verdict of a
+      completed multi-minute review -- the failure path renders the SAME field block from the
+      RunReviewRequest and RunReviewResult the command still holds, via a new
+      formatUnpersistedReviewOutcome beside formatReviewOutcome in format-review.ts, writes one
+      stderr diagnostic naming the consequence, and rethrows so createCli's catch-all renders the
+      underlying error and resolves exit 1 (D13). No sixth terminal state was introduced and
+      nothing reads result.state to decide anything, so AC-12 and the PRD 4 domain contract stand;
+      runDir renders as the `-` absence marker rather than a fabricated path, since nothing was
+      written. Both renderers now go through one private renderOutcome() mapping over
+      REVIEW_OUTCOME_FIELDS, so the happy path is byte-identical (same function, same arguments,
+      same output) and the two blocks cannot drift apart. Two derived values recorded as A-level:
+      engine = result.engineName ?? request.engineName (the same echo rule, a two-term fallback,
+      not a domain policy) and failureMessage = formatErrorLine(result.failure.error), reusing the
+      adapter's OWN one-line reduction of an unknown throwable rather than restating persistRun's.
+      R2-003: container.ts now declares one `const now = () => Date.now()` and binds it to BOTH
+      persistRun's deps and CliDeps.now, so startedAtEpochMs and durationMs can no longer come from
+      two clocks; cli-deps.ts's doc-comment states the seam. R2-001/R2-002: REPO_LINE_FIELDS,
+      REGISTER_OUTCOME_FIELDS and RUN_SUMMARY_FIELDS were decorative -- exported as contracts while
+      their renderers hand-built the arrays -- and now index by their constant, copying
+      format-review.ts's existing pattern rather than inventing a third; all five exported
+      field-order constants in render/ were audited and none remains decorative (RUN_RECORD_FIELDS
+      and REVIEW_OUTCOME_FIELDS already were correct). Output is byte-identical, since the values
+      arrays hold already-rendered strings. R2-004: resolveCommitish split into revParseCommit
+      (step 1, never throws, returns the sha or the git failure) and resolveRemoteTrackingCommit
+      (step 2, exactly one refs/remotes match, both rejections), with the 28-line narrating comment
+      reduced to the invariant; local-over-remote precedence, ambiguity rejected rather than
+      guessed, per-method error class and --detach receiving a resolved SHA are all unchanged, and
+      NO contract case was edited -- src/adapters/driven/git/__test__/ shows no diff and its 40
+      cases pass. Evidence, not assertion: the four new R4-001 tests were run against HEAD's
+      review-command.ts and gave `Tests 4 failed | 28 passed (32)`, all four failing, then passed
+      32/32 once the fixed file was restored; and the two field-order tests were proved to catch
+      real drift by swapping baseBranch/harness in REPO_LINE_FIELDS and baseRef/targetRef in
+      RUN_SUMMARY_FIELDS with the renderers untouched -- `Tests 2 failed | 92 passed (94)`, exactly
+      the two new tests, while every pre-existing toHaveLength(FIELDS.length) assertion survived
+      the mutation, which is the reviewer's complaint reproduced. Both mutations reverted. Gates
+      after S12: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 229
+      dependencies, 0 violations -- 226 to 229 is exactly three new import edges: format-review to
+      core/run and to format-error, review-command to core/history) and npm test exit 0 with 681
+      tests across 38 files, up from 674/38, all 674 pre-existing tests still passing. Nothing
+      under src/core/** was touched, no public core signature changed and no test file lost a line.
+      Final sddl-qa-review must re-run before the change returns to completed (D12), and the
+      orchestrator -- not this stage -- answers and resolves the five PR #73 threads; S12 performed
+      no git action and posted nothing to GitHub. Two items for QA, neither a blocker: a
+      persistence failure now prints TWO stderr lines (the command's diagnostic, then the
+      catch-all's single-line rendering of the cause, which is the line AC-13 governs), and
+      spec.md's AC-12 wording still predates D13's boundary case, as D13's own consequences note.
+      Details in execution-log.md.
   sddl-code-review:
     status: pending
   sddl-judgment-day:
@@ -1232,12 +1282,12 @@ open_risks:
       Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-qa-review
   summary: >-
-    cp-stage-approval-s12 resolved. Run sddl-executor on S12: R4-001 (persistence failure must not
-    discard the verdict, per D13), R2-003 (forward `now` to persistRun so both clocks agree),
-    R2-001/R2-002 (derive the rendered line from the exported field constants) and R2-004 (split
-    resolveCommitish). Then re-run final QA and answer/resolve the five threads.
-
+    S12 completed: all five PR #73 findings fixed, gates green (check exit 0, 681 tests across 38
+    files, 674 pre-existing still passing). Run final-mode sddl-qa-review over the whole change
+    before it returns to `completed` (D12), paying particular attention to D13's boundary case --
+    the verdict on stdout, the two-line stderr sequence and the non-zero exit when persistRun
+    throws. Then answer and resolve the five review threads on PR #73.
 created_at: "2026-08-23T00:00:00Z"
-updated_at: "2026-08-25T04:00:00Z"
+updated_at: "2026-08-25T06:00:00Z"

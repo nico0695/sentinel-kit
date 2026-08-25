@@ -36,14 +36,28 @@ export const REPO_LINE_FIELDS = [
   "harness",
 ] as const;
 
+/**
+ * Renders one tab-separated record. The single place a field order is
+ * applied: every record below indexes its already-rendered values by the
+ * exported constant that declares the order, so the constant is the contract
+ * rather than a description of one (`R2-001`). Same shape as
+ * `format-review.ts`'s `renderOutcome`.
+ */
+function renderRecord(
+  fields: readonly string[],
+  values: readonly string[],
+): string {
+  return fields.map((_key, index) => values[index] ?? ABSENT).join("\t");
+}
+
 /** One `repo list` record: `alias<TAB>url<TAB>baseBranch<TAB>harness`. */
 export function formatRepoLine(alias: string, entry: RepoEntry): string {
-  return [
+  return renderRecord(REPO_LINE_FIELDS, [
     alias,
     entry.url,
     field(entry.baseBranch),
     field(entry.defaultHarness),
-  ].join("\t");
+  ]);
 }
 
 /** Field order of the single record `repo add` prints on success. */
@@ -70,5 +84,9 @@ export const REGISTER_OUTCOME_FIELDS = [
 export function formatRegisterOutcome(result: RegisterRepoResult): string {
   const status = result.alreadyRegistered ? "already-registered" : "registered";
 
-  return [result.alias, status, field(result.entry.localPath)].join("\t");
+  return renderRecord(REGISTER_OUTCOME_FIELDS, [
+    result.alias,
+    status,
+    field(result.entry.localPath),
+  ]);
 }

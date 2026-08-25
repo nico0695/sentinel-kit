@@ -24,6 +24,7 @@ Derived from `plan.md` (Stage Plan table). Status is updated as stages are attem
 | S10b | Fix the remote-only-branch worktree defect (D11 / risk-e6h1-014) | yes | completed |
 | S10c | Complete the remote-only ref fix across the whole `GitPort` adapter (D11 / risk-e6h1-014) | yes | completed |
 | S11 | Closeout: declare the authorised deviations | no | pending |
+| S12 | Act on the five verified PR #73 review findings (D12 / D13) | yes | completed |
 
 ## S1 — Tooling prerequisites
 
@@ -1970,3 +1971,203 @@ worktree **and** diff stages and reach a terminal state. Then S11's closeout, wh
 and D11** must all be declared together in the PR description and the history entry. A stage-mode
 `sddl-qa-review` covering S10b **and** S10c together is worthwhile before S11 — the two stages are
 one logical fix to merged E2 code.
+
+
+## S12 — the five verified PR #73 review findings (D12 / D13)
+
+- status: completed
+- approval: `cp-stage-approval-s12`, resolution `fix-all-five` (user, 2026-08-25). D12 authorises
+  all five findings; **D13 is binding** on R4-001's behaviour.
+- baseline: branch `claude/validar-estado-proyecto-rcvz8c`, working tree clean, PR #73 open;
+  `npm run check` exit 0 (biome 143 files, tsc clean, depcruise **97 modules / 226 dependencies**,
+  0 violations) and `npm test` exit 0 with **674 tests across 38 files** — as stated in the
+  handoff and confirmed by the post-stage numbers below.
+
+### R4-001 — a persistence failure no longer discards the verdict (D13)
+
+`review-command.ts:127` awaited `persistRun` and fed its `{ runDir, record }` straight to the
+renderer. A throw (disk full, permissions) reached `createCli`'s catch-all, one generic `stderr`
+line was printed, and **the completed review's verdict never appeared at all** — minutes of engine
+work lost with no record and no output.
+
+The wrinkle the handoff named: `formatReviewOutcome(repoAlias, record, runDir)` takes two values
+that only `persistRun` can produce. When it fails there is no record and no run directory.
+
+**Decision (A-level).** A second renderer, `formatUnpersistedReviewOutcome(repoAlias, request,
+result, durationMs)`, sits beside the first in `format-review.ts` and composes the **same field
+block** from what the command still holds — the `RunReviewRequest` it built and the
+`RunReviewResult` `runReview` resolved with. Both renderers now go through one private
+`renderOutcome(scalars)` that maps over `REVIEW_OUTCOME_FIELDS`, so the two blocks cannot drift
+apart in shape. Alternatives rejected:
+
+- **fabricating a `runDir`** — it would point a user at a directory that does not exist. `runDir`
+  renders as the `-` absence marker, which is the literal truth.
+- **changing `formatReviewOutcome`'s signature to a view model** — it would rewrite the happy
+  path to fix the failure path. The happy path is byte-identical: same function, same arguments,
+  same output, now routed through the shared `renderOutcome`.
+- **a sixth terminal state** — refused outright per D13. The five states in PRD §4 are a domain
+  contract and this is an adapter concern. Nothing in the adapter reads `result.state` to decide
+  anything (AC-12 still holds).
+
+Two field values are derived rather than read, and deliberately so:
+
+- `engine` = `result.engineName ?? request.engineName` — the same echo rule `persistRun` applies;
+  a two-term fallback, not a domain policy.
+- `failureMessage` = `formatErrorLine(result.failure.error)`. `RunFailure.error` is `unknown` by
+  design, and `formatErrorLine` is **this adapter's own** one-line reduction of any throwable
+  (AC-13), so no core reduction rule is restated in the renderer.
+
+`durationMs` is `Math.max(0, deps.now() - startedAtEpochMs)` — the same quantity `persistRun`
+would have recorded, measured with the same clock seam (see R2-003 below), clamped the same way
+against a non-monotonic clock.
+
+Control flow in the command: `persistRun` is wrapped in `try`/`catch`; the `catch` renders the
+outcome on `stdout`, writes **one** diagnostic on `stderr` ("The review completed but its run
+could not be persisted: no history was written and `sentinel runs show` will not find it."), and
+**rethrows the original error**, so `createCli`'s catch-all renders the underlying failure as its
+own single line and resolves exit **1**. No new error class, no per-error-type branching (AC-13),
+no exit-code table (AC-12). `persistRun` is still called exactly once, unconditionally, with the
+same request/result identities (AC-6).
+
+### R2-003 — one clock, not two
+
+`cli-deps.ts:80` documented `now` as "the run's start instant for `persistRun`", but
+`container.ts:205` bound `persistRun(request, { store: runStore })` **without** `now`, so
+`startedAtEpochMs` came from `deps.now()` while `persistRun` derived `durationMs` from its own
+`Date.now` default. `container.ts` now declares a single `const now = (): number => Date.now();`
+and passes it to **both** `persistRun`'s deps and `CliDeps.now`; `cli-deps.ts`'s doc-comment states
+the seam. Harmless in production, nonsense under an injected fake clock — now impossible.
+
+### R2-001 / R2-002 — the field constants became the contract
+
+`REPO_LINE_FIELDS`, `REGISTER_OUTCOME_FIELDS` (`format-repos.ts`) and `RUN_SUMMARY_FIELDS`
+(`format-runs.ts`) were exported as single-source field-order contracts while their renderers
+hand-built the arrays — the two could diverge silently. `format-review.ts`'s
+`REVIEW_OUTCOME_FIELDS.map((key, i) => ...)` and `format-runs.ts`'s `RUN_RECORD_FIELDS` already
+did it correctly; **that pattern was copied, not replaced**. `format-repos.ts` gains one private
+`renderRecord(fields, values)`, `formatRunSummaryLine` maps its values over `RUN_SUMMARY_FIELDS`.
+Output is byte-identical: the values array holds already-rendered strings, so no field changed
+its `field()` treatment.
+
+**Every exported field-order constant in `render/` was audited.** There are five:
+`REPO_LINE_FIELDS`, `REGISTER_OUTCOME_FIELDS`, `RUN_SUMMARY_FIELDS`, `RUN_RECORD_FIELDS`,
+`REVIEW_OUTCOME_FIELDS`. The first three were decorative and are now load-bearing; the last two
+already were. None remains decorative.
+
+### R2-004 — `resolveCommitish` split, behaviour unchanged
+
+`git-cli.ts:385` held three responsibilities under a 28-line doc comment that restated the
+algorithm step by step. Split into two named helpers with the arbitration left in the caller:
+
+- `revParseCommit(repoPath, commitish)` — step 1, `git rev-parse --verify <ref>^{commit}`. Never
+  throws; returns `{ sha }` or `{ failure }` so step 2 can run and carry the diagnostic as `cause`.
+- `resolveRemoteTrackingCommit(repoPath, commitish, ErrorClass, context, directFailure)` — step 2,
+  the `refs/remotes/` scan requiring exactly one match, with the zero-match and ambiguity
+  rejections.
+- `resolveCommitish` is now eight lines and its comment states the **invariant** ("exactly one
+  revision, or an error") instead of narrating the algorithm.
+
+Nothing else moved: local-over-remote precedence still comes from git's own DWIM order in step 1,
+ambiguity is still rejected rather than guessed, each method still passes its own `ErrorClass`, and
+`worktreeAdd` still receives a resolved SHA for `--detach`. `matchRemoteTrackingRefs` and `wrapAs`
+are untouched. **No contract case was edited** — see the gates below.
+
+### Actual changes
+
+| File | Change |
+|---|---|
+| `src/adapters/driving/cli/commands/review-command.ts` | `persistRun` wrapped in try/catch; failure path renders the outcome, writes one stderr diagnostic and rethrows (D13). Doc-comment property 2 extended. |
+| `src/adapters/driving/cli/render/format-review.ts` | new private `renderOutcome`; new exported `formatUnpersistedReviewOutcome`; `formatReviewOutcome` unchanged in signature and output. |
+| `src/adapters/driving/cli/render/format-repos.ts` | new private `renderRecord`; both renderers index by their constants. |
+| `src/adapters/driving/cli/render/format-runs.ts` | `formatRunSummaryLine` maps over `RUN_SUMMARY_FIELDS`. |
+| `src/adapters/driving/cli/cli-deps.ts` | `now` doc-comment states the single-clock seam. |
+| `src/main/container.ts` | one `now` bound to both `persistRun` and `CliDeps.now`. |
+| `src/adapters/driven/git/git-cli.ts` | `resolveCommitish` split into `revParseCommit` + `resolveRemoteTrackingCommit`. |
+| `src/adapters/driving/cli/__test__/review.test.ts` | `persistRunFails` harness option + **4 new tests** for R4-001. |
+| `src/adapters/driving/cli/__test__/repo.test.ts` | **2 new tests** binding each declared field name to its rendered value. |
+| `src/adapters/driving/cli/__test__/runs.test.ts` | **1 new test**, same shape, for `RUN_SUMMARY_FIELDS`. |
+
+Nothing under `src/core/**` was touched. No public core signature changed. No test file lost a line.
+
+### Before/after evidence — the R4-001 tests fail against the current implementation
+
+`review-command.ts` was reverted to `HEAD`'s version (`git show HEAD:… > …`) with the new tests in
+place:
+
+```
+     × still prints the review outcome on stdout 11ms
+     × reports no run directory rather than fabricating one 2ms
+     × explains the persistence failure on stderr and exits non-zero 2ms
+     × renders a failed run's failure from the result, not from a record 1ms
+      Tests  4 failed | 28 passed (32)
+```
+
+All four fail on the pre-fix command and the 28 pre-existing cases in the file still pass. The
+fixed file was restored and the same suite returns `Tests 32 passed (32)`.
+
+### Before/after evidence — the R2-001/R2-002 tests actually catch drift
+
+The handoff's objection to `.split("\t").length` was tested directly. `"baseBranch"`/`"harness"`
+were swapped in `REPO_LINE_FIELDS` and `"baseRef"`/`"targetRef"` in `RUN_SUMMARY_FIELDS` — a pure
+constant-vs-renderer divergence, with the renderers untouched:
+
+```
+ FAIL  |adapters| …/repo.test.ts > repo rendering — the field constants are the contract (R2-001) > renders a repo list line in REPO_LINE_FIELDS order
+ FAIL  |adapters| …/runs.test.ts > runs rendering — the field constant is the contract (R2-002) > renders a runs list line in RUN_SUMMARY_FIELDS order
+      Tests  2 failed | 92 passed (94)
+```
+
+Exactly the two new tests fire; **every pre-existing `toHaveLength(FIELDS.length)` assertion
+passes through the mutation unharmed**, which is the reviewer's complaint reproduced as evidence.
+Both mutations were reverted (`cp` from the pre-mutation copies) and the suite returns to green.
+
+### R2-004 is behaviour-preserving
+
+`npx vitest run --project adapters src/adapters/driven/git` → `Tests 40 passed (40)`, with
+`src/adapters/driven/git/__test__/` showing **no diff** (`git diff --stat` lists only
+`git-cli.ts`). The 13 ref-resolution contract cases S10b/S10c added pass untouched; no contract
+case was edited, so the behaviour did not change.
+
+### Quick checks
+
+- `npm run check` → exit **0**
+  ```
+  Checked 143 files in 178ms. No fixes applied.
+
+  ✔ no dependency violations found (97 modules, 229 dependencies cruised)
+  ```
+  **226 → 229 dependencies**, same 97 modules: exactly three new import edges —
+  `format-review.ts` → `core/run` (the request/result types) and → `format-error.ts`, and
+  `review-command.ts` → `core/history` (the `PersistRunResult` type). 0 guard violations; the
+  driving adapter still imports no driven adapter and no `src/main/**`.
+- `npm test` → exit **0**
+  ```
+  Test Files  38 passed (38)
+       Tests  681 passed (681)
+  ```
+  **674 → 681**: all 674 pre-existing tests still pass, +7 new (4 R4-001, 2 R2-001, 1 R2-002),
+  same 38 files.
+- `biome check --write` was run on the edited files after each batch of edits (import ordering and
+  two wrapped call expressions); no unedited file was reformatted.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion. One assertion in a *new* test
+was dropped during authoring — `expect(err.join("\n")).not.toContain("at ")` matched the literal
+path in the fixture message `Failed to persist run at /runs/owner__repo`; the two-line whole-array
+equality that surrounds it pins the stderr content exactly, and the no-stack guarantee already has
+its own case elsewhere in the file. No pre-existing assertion was touched.
+
+### Next action
+
+S12 is complete. **Final `sddl-qa-review` must re-run** before the change returns to `completed`
+(D12's own consequence). The orchestrator then answers and resolves the five PR #73 threads — this
+stage posted nothing to GitHub and performed no git action. The product smoke was not re-run; the
+change is adapter-local and the git contract suite covers R2-004's only behavioural surface.
+
+Two things for QA to weigh, neither a blocker:
+- D13 makes a persistence failure print **two** stderr lines (the command's diagnostic, then the
+  catch-all's rendering of the cause). AC-13's "one line per core error" still holds — the second
+  line *is* that one line; the first is a diagnostic, which AC-10 puts on stderr by right.
+- `spec.md`'s AC-12 wording still predates D13's boundary case (D13's own `consequences` says it
+  "gains this boundary case"). Updating spec text was not in S12's artifact scope.

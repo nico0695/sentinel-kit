@@ -23,7 +23,10 @@
  *    the terminal state** (AC-6). A failed run is precisely the run a user
  *    later wants to read back; dropping it would resurrect the gap D1 exists
  *    to close. It is not called at all when the invocation fails *before*
- *    the run — an unregistered alias persists nothing.
+ *    the run — an unregistered alias persists nothing. When it *throws*, the
+ *    outcome is still rendered on `stdout` and the failure is reported on
+ *    `stderr` with a non-zero exit (D13); a finished review is never
+ *    discarded because a write failed.
  * 3. **Nothing reads `result.state` to decide an exit code** (AC-12). A
  *    completed invocation resolves to 0 through `createCli`'s normal path
  *    regardless of terminal state; the terminal-state → exit-code mapping is
@@ -39,12 +42,16 @@
  */
 
 import { type Command, InvalidArgumentError } from "commander";
+import type { PersistRunResult } from "../../../../core/history/index.js";
 import {
   type ResolveReviewRequestFlags,
   resolveReviewRequest,
 } from "../../../../core/run/index.js";
 import type { CliDeps } from "../cli-deps.js";
-import { formatReviewOutcome } from "../render/format-review.js";
+import {
+  formatReviewOutcome,
+  formatUnpersistedReviewOutcome,
+} from "../render/format-review.js";
 
 interface ReviewOptions {
   readonly type?: string;
@@ -123,15 +130,46 @@ export function registerReviewCommand(program: Command, deps: CliDeps): void {
       const startedAtEpochMs = deps.now();
       const result = await deps.useCases.runReview(request);
 
-      // Unconditional: every completed run is persisted, `ok` or not (AC-6).
-      const { runDir, record } = await deps.useCases.persistRun({
-        repoName: repo,
-        startedAtEpochMs,
-        request,
-        result,
-      });
+      let persisted: PersistRunResult;
 
-      for (const line of formatReviewOutcome(repo, record, runDir)) {
+      try {
+        // Unconditional: every completed run is persisted, `ok` or not (AC-6).
+        persisted = await deps.useCases.persistRun({
+          repoName: repo,
+          startedAtEpochMs,
+          request,
+          result,
+        });
+      } catch (error) {
+        // D13 / `R4-001`: the review itself is finished — minutes of engine
+        // work — and its verdict must not be swallowed because the record
+        // could not be written. The outcome is rendered from the request and
+        // the result, `runDir` renders as `-` because no directory exists,
+        // one diagnostic says so on `stderr`, and the original failure is
+        // rethrown so `createCli`'s catch-all renders it and resolves a
+        // non-zero exit code. No terminal state is invented: the five in
+        // PRD §4 are a domain contract and this is an adapter concern.
+        for (const line of formatUnpersistedReviewOutcome(
+          repo,
+          request,
+          result,
+          Math.max(0, deps.now() - startedAtEpochMs),
+        )) {
+          deps.io.stdout(line);
+        }
+
+        deps.io.stderr(
+          "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
+        );
+
+        throw error;
+      }
+
+      for (const line of formatReviewOutcome(
+        repo,
+        persisted.record,
+        persisted.runDir,
+      )) {
         deps.io.stdout(line);
       }
     });

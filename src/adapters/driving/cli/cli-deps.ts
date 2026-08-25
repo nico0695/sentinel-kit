@@ -77,7 +77,12 @@ export interface CliDeps {
   readonly io: CliIo;
   /** Loads `config.yaml`/`repos.yaml`; called only by the `review` command. */
   readonly loadContext: () => Promise<ReviewContext>;
-  /** Clock seam — the run's start instant for `persistRun`. */
+  /**
+   * Clock seam — the run's start instant for `persistRun`, and the elapsed
+   * time reported when persistence fails (D13). `src/main/` binds the SAME
+   * function to `persistRun`'s own `now` dep, so both ends of a run's
+   * duration are measured by one clock (`R2-003`).
+   */
   readonly now: () => number;
   /** `package.json`'s version, resolved in `src/main/` (AC-4). */
   readonly version: string;

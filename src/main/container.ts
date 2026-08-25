@@ -184,6 +184,16 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
     return { config, repos };
   };
 
+  /**
+   * The single clock the review path reads (`R2-003`). It is handed BOTH to
+   * `CliDeps.now` — which the `review` command reads for the run's start
+   * instant — and to `persistRun`, which derives `durationMs` from it. Left
+   * unbound, `persistRun` would fall back to its own `Date.now` default and
+   * the two ends of the same measurement would come from two different
+   * clocks: harmless in production, nonsense under an injected fake clock.
+   */
+  const now = (): number => Date.now();
+
   const useCases: CliUseCases = {
     registerRepo: (request) => {
       ensureHomeRoot();
@@ -202,7 +212,7 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
         worktreesDir: paths.worktreesDir,
         processRunner,
       }),
-    persistRun: (request) => persistRun(request, { store: runStore }),
+    persistRun: (request) => persistRun(request, { store: runStore, now }),
     listRuns: (request) => listRuns(request, { store: runStore }),
     getRun: (request) => getRun(request, { store: runStore }),
   };
@@ -211,7 +221,7 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
     useCases,
     io: options.io ?? processIo,
     loadContext,
-    now: () => Date.now(),
+    now,
     version: options.version,
     clonesDir: paths.clonesDir,
   };

@@ -355,42 +355,20 @@ function wrapAs<ErrorClass extends GitErrorConstructor>(
 }
 
 /**
- * Resolve a caller-supplied `commitish` to a concrete 40-hex commit SHA
- * inside `repoPath`, so every git invocation that takes a revision receives
- * an unambiguous one.
+ * Step 1 of {@link resolveCommitish}: ask git directly.
  *
- * This is the SINGLE resolution path for the whole adapter (dec-011,
- * risk-e6h1-014): `worktreeAdd`, `mergeBase` and `diff` all funnel through
- * it, so a remote-only branch behaves identically everywhere instead of
- * working in one method and dying in the next. `ErrorClass` and `context`
- * keep the rejection typed per method — a `mergeBase` failure surfaces as
- * `GitMergeBaseError`, never as `GitWorktreeError`.
+ * Resolves a bare SHA, a tag, a local branch, an explicit `origin/<name>`
+ * and any revision expression (`main~2`), following git's own DWIM order —
+ * `refs/heads/<name>` before `refs/remotes/<name>` — which is what gives a
+ * local branch precedence over a same-named remote one.
  *
- * Two ordered steps, mirroring git's own precedence:
- *
- * 1. `git rev-parse --verify <commitish>^{commit}` — resolves a bare SHA, a
- *    tag, a local branch, an explicit `origin/<name>`, and any revision
- *    expression (`main~2`). Git's DWIM order puts `refs/heads/<name>` before
- *    `refs/remotes/<name>`, so a name that is BOTH a local and a remote
- *    branch resolves to the local one — the precedence a user expects.
- * 2. Only when step 1 finds nothing: look for a remote-tracking branch
- *    `refs/remotes/<remote>/<commitish>`. Exactly ONE match is required.
- *    Zero matches and two-or-more matches (the same branch name on two
- *    remotes) both reject with `ErrorClass` — reviewing the wrong
- *    revision silently would be far worse than failing loudly.
- *
- * The step-1 failure is carried as the `cause` of the rejection so the
- * underlying git diagnostic is never lost.
+ * Never throws: a failure is returned so step 2 can run and, if it also
+ * finds nothing, report this diagnostic as the `cause`.
  */
-async function resolveCommitish(
+async function revParseCommit(
   repoPath: string,
   commitish: string,
-  ErrorClass: GitErrorConstructor,
-  context: string,
-): Promise<string> {
-  let directFailure: unknown = new Error(
-    `git rev-parse --verify ${commitish} returned no revision`,
-  );
+): Promise<{ readonly sha: string } | { readonly failure: unknown }> {
   try {
     const { stdout } = await execa(
       "git",
@@ -398,11 +376,35 @@ async function resolveCommitish(
       EXECA_BASE,
     );
     const sha = stdout.trim();
-    if (sha !== "") return sha;
+    if (sha !== "") {
+      return { sha };
+    }
+    return {
+      failure: new Error(
+        `git rev-parse --verify ${commitish} returned no revision`,
+      ),
+    };
   } catch (raw) {
-    directFailure = raw;
+    return { failure: raw };
   }
+}
 
+/**
+ * Step 2 of {@link resolveCommitish}: the remote-tracking fallback.
+ *
+ * Requires EXACTLY ONE `refs/remotes/<remote>/<commitish>` match. Zero
+ * matches and two-or-more matches (the same branch name on two remotes) both
+ * reject with `ErrorClass` — silently reviewing the wrong revision would be
+ * far worse than failing loudly. `directFailure` (step 1's git diagnostic)
+ * travels as the rejection's `cause` so it is never lost.
+ */
+async function resolveRemoteTrackingCommit(
+  repoPath: string,
+  commitish: string,
+  ErrorClass: GitErrorConstructor,
+  context: string,
+  directFailure: unknown,
+): Promise<string> {
   let listed: string;
   try {
     const { stdout } = await execa(
@@ -442,6 +444,45 @@ async function resolveCommitish(
     ErrorClass,
     `${context}: commitish '${commitish}' is ambiguous in ${repoPath} — it matches a branch on several remotes (${remotes}); qualify it as '<remote>/${commitish}'`,
     directFailure,
+  );
+}
+
+/**
+ * Resolve a caller-supplied `commitish` to a concrete 40-hex commit SHA
+ * inside `repoPath`, so every git invocation that takes a revision receives
+ * an unambiguous one.
+ *
+ * The invariant, in both steps: **exactly one revision, or an error.** Git
+ * itself answers first ({@link revParseCommit}, which honours local-over-
+ * remote precedence); only when it resolves nothing does the remote-tracking
+ * scan run ({@link resolveRemoteTrackingCommit}, which requires a single
+ * match). Nothing is ever guessed.
+ *
+ * This is the SINGLE resolution path for the whole adapter (dec-011,
+ * risk-e6h1-014): `worktreeAdd`, `mergeBase` and `diff` all funnel through
+ * it, so a remote-only branch behaves identically everywhere instead of
+ * working in one method and dying in the next. `ErrorClass` and `context`
+ * keep the rejection typed per method — a `mergeBase` failure surfaces as
+ * `GitMergeBaseError`, never as `GitWorktreeError`.
+ */
+async function resolveCommitish(
+  repoPath: string,
+  commitish: string,
+  ErrorClass: GitErrorConstructor,
+  context: string,
+): Promise<string> {
+  const direct = await revParseCommit(repoPath, commitish);
+
+  if ("sha" in direct) {
+    return direct.sha;
+  }
+
+  return resolveRemoteTrackingCommit(
+    repoPath,
+    commitish,
+    ErrorClass,
+    context,
+    direct.failure,
   );
 }
 

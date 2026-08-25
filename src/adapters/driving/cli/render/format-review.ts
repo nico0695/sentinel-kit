@@ -24,6 +24,11 @@
  */
 
 import type { RunRecord } from "../../../../core/history/index.js";
+import type {
+  RunReviewRequest,
+  RunReviewResult,
+} from "../../../../core/run/index.js";
+import { formatErrorLine } from "./format-error.js";
 
 /** Rendered in place of a field the record does not carry. */
 const ABSENT = "-";
@@ -64,6 +69,19 @@ export const REVIEW_OUTCOME_FIELDS = [
 ] as const;
 
 /**
+ * Renders one outcome block. The single place the field order is applied:
+ * both renderers below index their scalars by {@link REVIEW_OUTCOME_FIELDS},
+ * so the exported constant is the contract rather than a description of one.
+ */
+function renderOutcome(
+  scalars: ReadonlyArray<string | number | undefined>,
+): readonly string[] {
+  return REVIEW_OUTCOME_FIELDS.map(
+    (key, index) => `${key}\t${field(scalars[index])}`,
+  );
+}
+
+/**
  * The outcome of one completed review: the persisted record's facts plus the
  * absolute run directory `persistRun` resolved (AC-6).
  *
@@ -89,7 +107,55 @@ export function formatReviewOutcome(
     runDir,
   ];
 
-  return REVIEW_OUTCOME_FIELDS.map(
-    (key, index) => `${key}\t${field(scalars[index])}`,
-  );
+  return renderOutcome(scalars);
+}
+
+/**
+ * The same block for a review that completed but whose record never reached
+ * disk (D13, `R4-001`).
+ *
+ * `persistRun` throwing used to discard the outcome entirely: the record and
+ * the run directory are both *its* return values, so the happy-path renderer
+ * has nothing to render. Rather than fabricate a `runDir` — which would
+ * point a user at a directory that does not exist — this renderer produces
+ * the identical field block from what the command still holds: the request
+ * it built and the result `runReview` resolved with. `runDir` renders as the
+ * `-` absence marker, which is the literal truth.
+ *
+ * It shares {@link REVIEW_OUTCOME_FIELDS} and {@link renderOutcome} with the
+ * persisted renderer, so the two blocks cannot drift apart in shape.
+ *
+ * @param repoAlias the alias the caller typed.
+ * @param request the request `runReview` was invoked with.
+ * @param result the result `runReview` resolved with.
+ * @param durationMs elapsed wall-clock time, measured by the command's clock
+ *   seam — the same quantity `persistRun` would have recorded.
+ */
+export function formatUnpersistedReviewOutcome(
+  repoAlias: string,
+  request: RunReviewRequest,
+  result: RunReviewResult,
+  durationMs: number,
+): readonly string[] {
+  const scalars: Array<string | number | undefined> = [
+    repoAlias,
+    request.targetRef,
+    result.state,
+    result.verdict,
+    // The engine the run reports, falling back to the one it was asked for.
+    result.engineName ?? request.engineName,
+    request.harnessType,
+    durationMs,
+    result.failure?.stage,
+    // `RunFailure.error` is `unknown` by design; `formatErrorLine` is this
+    // adapter's own reduction of any throwable to one line, so no core
+    // reduction rule is restated here.
+    result.failure === undefined
+      ? undefined
+      : formatErrorLine(result.failure.error),
+    // Never fabricated: nothing was written, so there is no directory.
+    undefined,
+  ];
+
+  return renderOutcome(scalars);
 }

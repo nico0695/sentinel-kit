@@ -68,7 +68,7 @@ export function formatRunSummaryLine(
   repoAlias: string,
   summary: RunSummary,
 ): string {
-  return [
+  const values = [
     field(repoAlias),
     field(summary.id),
     field(summary.startedAtEpochMs),
@@ -80,7 +80,14 @@ export function formatRunSummaryLine(
     field(summary.baseRef),
     field(summary.targetRef),
     field(summary.durationMs),
-  ].join("\t");
+  ];
+
+  // Indexed by the exported constant, so the declared order IS the rendered
+  // order and the two cannot drift apart (`R2-002`) — the same pattern
+  // `formatRunRecordBlock` below and `format-review.ts` already use.
+  return RUN_SUMMARY_FIELDS.map((_key, index) => values[index] ?? ABSENT).join(
+    "\t",
+  );
 }
 
 /**

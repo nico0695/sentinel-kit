@@ -94,6 +94,7 @@ function harness(
     readonly result?: RunReviewResult;
     readonly record?: RunRecord;
     readonly runReviewFails?: unknown;
+    readonly persistRunFails?: unknown;
     readonly registry?: RepoRegistry;
   } = {},
 ): ReviewHarness {
@@ -114,6 +115,9 @@ function harness(
       },
       persistRun: (request: PersistRunRequest): Promise<PersistRunResult> => {
         persistRunRequests.push(request);
+        if (options.persistRunFails !== undefined) {
+          return Promise.reject(options.persistRunFails);
+        }
         return Promise.resolve({
           runDir: RUN_DIR,
           record: options.record ?? okRecord,
@@ -301,6 +305,78 @@ describe("review — persistence (AC-6)", () => {
     expect(code).toBe(1);
     expect(h.persistRunRequests).toHaveLength(0);
     expect(h.deps.io.err).toEqual(["worktree exploded"]);
+  });
+});
+
+describe("review — persistence failure (R4-001, D13)", () => {
+  /**
+   * The regression this suite exists for: `persistRun` used to be awaited
+   * with its result feeding the renderer, so a write failure (disk full,
+   * permissions) threw straight into `createCli`\'s catch-all and the verdict
+   * of a multi-minute review was never printed at all.
+   */
+  const writeFailed = new Error("Failed to persist run at /runs/owner__repo");
+
+  it("still prints the review outcome on stdout", async () => {
+    const h = harness({ persistRunFails: writeFailed });
+
+    await h.run("review", "owner/repo", "feature");
+
+    expect(h.deps.io.out.map((line) => line.split("\t")[0])).toEqual([
+      ...REVIEW_OUTCOME_FIELDS,
+    ]);
+    const fields = fieldsOf(h.deps.io.out);
+    expect(fields.get("repo")).toBe("owner/repo");
+    expect(fields.get("state")).toBe("ok");
+    expect(fields.get("verdict")).toBe("approve");
+    expect(fields.get("engine")).toBe("claude-code");
+    expect(fields.get("harness")).toBe("pr-review");
+    expect(fields.get("targetRef")).toBe("feature");
+  });
+
+  it("reports no run directory rather than fabricating one", async () => {
+    const h = harness({ persistRunFails: writeFailed });
+
+    await h.run("review", "owner/repo", "feature");
+
+    expect(fieldsOf(h.deps.io.out).get("runDir")).toBe("-");
+  });
+
+  it("explains the persistence failure on stderr and exits non-zero", async () => {
+    const h = harness({ persistRunFails: writeFailed });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    expect(code).not.toBe(0);
+    expect(h.deps.io.err).toHaveLength(2);
+    expect(h.deps.io.err[0]).toContain("could not be persisted");
+    // The underlying failure still renders through the catch-all (AC-13).
+    expect(h.deps.io.err[1]).toBe(writeFailed.message);
+  });
+
+  it("renders a failed run's failure from the result, not from a record", async () => {
+    const h = harness({
+      persistRunFails: writeFailed,
+      result: {
+        state: "engine-error",
+        cleanup: { attempted: false },
+        failure: {
+          stage: "engine",
+          error: new Error("engine binary not found\nis it installed?"),
+        },
+      },
+    });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    const fields = fieldsOf(h.deps.io.out);
+    expect(code).not.toBe(0);
+    expect(fields.get("state")).toBe("engine-error");
+    expect(fields.get("verdict")).toBe("-");
+    expect(fields.get("failureStage")).toBe("engine");
+    expect(fields.get("failureMessage")).toBe(
+      "engine binary not found is it installed?",
+    );
   });
 });
 

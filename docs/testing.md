@@ -11,7 +11,7 @@ in [`vitest.config.ts`](../vitest.config.ts):
 | Project | What | Placement |
 |---|---|---|
 | `core` | unit tests with in-memory port fakes (no I/O) | `src/core/**/__test__/**/*.test.ts` |
-| `adapters` | contract tests: the shared suite per port | `src/adapters/**/__test__/**/*.test.ts` |
+| `adapters` | contract tests: the shared suite per port — and composition-root unit tests, which run here rather than in a project of their own | `src/adapters/**/__test__/**/*.test.ts`, `src/main/**/__test__/**/*.test.ts` |
 | `e2e` | smoke of the full flow with FakeEngine | `e2e/**/*.test.ts` |
 
 Test files live in **co-located `__test__/` folders** and are excluded from the

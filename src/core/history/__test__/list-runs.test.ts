@@ -63,3 +63,41 @@ describe("listRuns", () => {
     await expect(listRuns({ repoName: "x" }, deps)).rejects.toBe(failure);
   });
 });
+
+describe("listRuns storage-key normalisation (D7)", () => {
+  it("normalises an `owner/repo` alias before calling store.list", async () => {
+    let receivedRepoName: string | undefined;
+    const store = createFakeRunStore((repoName) => {
+      receivedRepoName = repoName;
+      return Promise.resolve([]);
+    });
+
+    await listRuns({ repoName: "owner/repo" }, { store });
+
+    expect(receivedRepoName).toBe("owner__repo");
+  });
+
+  it("passes an alias with no separator through unchanged", async () => {
+    let receivedRepoName: string | undefined;
+    const store = createFakeRunStore((repoName) => {
+      receivedRepoName = repoName;
+      return Promise.resolve([]);
+    });
+
+    await listRuns({ repoName: "sentinel-kit" }, { store });
+
+    expect(receivedRepoName).toBe("sentinel-kit");
+  });
+
+  it("is idempotent — an already normalised key is not normalised twice", async () => {
+    let receivedRepoName: string | undefined;
+    const store = createFakeRunStore((repoName) => {
+      receivedRepoName = repoName;
+      return Promise.resolve([]);
+    });
+
+    await listRuns({ repoName: "owner__repo" }, { store });
+
+    expect(receivedRepoName).toBe("owner__repo");
+  });
+});

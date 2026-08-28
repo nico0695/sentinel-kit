@@ -25,7 +25,7 @@ The repo has **no commits and no source code yet** — no `package.json`, no `sr
 Defined in `docs/setup-tecnico-sentinel.md` §5.1 — they become real with `[E0.F1.H1]`:
 
 ```bash
-npm run dev     # node --experimental-strip-types src/main/cli.ts
+npm run dev     # tsup --silent && node dist/cli.js — rebuild (~1s), then run the bundle
 npm run build   # tsup — ESM bundle of the bin
 npm run check   # biome check . && tsc --noEmit && depcruise src
 npm test        # vitest run

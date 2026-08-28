@@ -6,7 +6,8 @@
  * the `RunRecordPathFieldsSchema`/`RunQueryFieldsSchema` zod schemas
  * validating path-sensitive input, `RunMetadataSchema` validating the
  * persisted `metadata.json` document on read, the module's typed error
- * family, and the `listRuns`/`getRun` use cases (`[E5.F2.H2]`).
+ * family, the `listRuns`/`getRun` use cases (`[E5.F2.H2]`) and the
+ * `persistRun` use case that composes and stores a run (`[E6.F1.H1]`, D1).
  */
 
 export type {
@@ -21,6 +22,12 @@ export type {
   ListRunsResult,
 } from "./list-runs.js";
 export { listRuns } from "./list-runs.js";
+export type {
+  PersistRunDeps,
+  PersistRunRequest,
+  PersistRunResult,
+} from "./persist-run.js";
+export { persistRun } from "./persist-run.js";
 export {
   type RunMetadata,
   RunMetadataSchema,

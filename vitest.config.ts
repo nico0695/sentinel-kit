@@ -21,7 +21,10 @@ export default defineConfig({
         test: {
           name: "adapters",
           environment: "node",
-          include: ["src/adapters/**/__test__/**/*.test.ts"],
+          include: [
+            "src/adapters/**/__test__/**/*.test.ts",
+            "src/main/**/__test__/**/*.test.ts",
+          ],
         },
       },
       {

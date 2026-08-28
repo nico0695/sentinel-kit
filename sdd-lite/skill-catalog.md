@@ -93,8 +93,12 @@ When validating a stage, check the work against these docs + the guard file.
 - Record changed files, checks run, blockers, and next action in `execution-log.md`.
 - If a story conflicts with the PRD, or reality contradicts a documented assumption: stop and ask. Do not
   improvise scope.
-- E0, E1, E2 and E3 have landed on `main`. All four scripts (`check`, `test`, `build`, `dev`) are runnable and
-  green — verified 2026-08-09 against `main` @ `f294af2` (`check` clean, `npm test` 163/163).
+- E0 through E5 have landed on `main`. All four scripts (`check`, `test`, `build`, `dev`) are runnable and
+  green — verified 2026-08-23 against `main` @ `1e7cf01` (`check` clean, `npm test` 500/500 across 28 files).
+- `[E6.F1.H1]` filled `src/adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands,
+  renderers) and replaced the `[E0.F1.H3]` stub: `src/main/` now holds `cli.ts`, `container.ts` and
+  `paths.ts`, and is the only place adapters are instantiated. `src/adapters/driving/tui/` is still
+  `export {}` — the TUI is `[E6.F2.x]`. `main/` wiring stays hot-path.
 
 ### testing
 
@@ -102,11 +106,11 @@ When validating a stage, check the work against these docs + the guard file.
 - Final review should start from configured quality commands, then narrow or expand as evidence requires.
 - If a useful automated check cannot run, say so explicitly and record the gap.
 - Quality gate is `npm run check` plus `npm test`. Both must pass before opening a PR. Both are runnable and
-  green today (`check` = `biome check . && tsc --noEmit && depcruise src`; `npm test` = vitest, 163 tests).
+  green today (`check` = `biome check . && tsc --noEmit && depcruise src`; `npm test` = vitest, 500 tests).
 - Test placement: core = unit with in-memory port fakes; driven adapters = shared contract suite per port;
   e2e = smoke of the full flow with FakeEngine. Test files live in `<module>/__test__/*.test.ts`.
 - Vitest projects: `core` (`src/core/**/__test__/**`), `adapters` (`src/adapters/**/__test__/**`), `e2e`
-  (`e2e/**` — still empty). Single project: `npx vitest run --project core`; single test: `npx vitest run -t "<name>"`.
+  (`e2e/**` — still empty; the smoke suite is `[E7.F1.H1]`). Single project: `npx vitest run --project core`; single test: `npx vitest run -t "<name>"`.
 - Real engine output fixtures live in `fixtures/{claude-code,opencode}/` (E1.F1.H3) and are the input for the
   E4 adapter contract suites — never invent engine output shapes.
 

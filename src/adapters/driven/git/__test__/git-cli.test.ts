@@ -156,8 +156,54 @@ const harness: GitPortContractHarness = {
     ]);
     await git(["-C", seedPath, "push", "origin", "main"]);
 
+    // `feat-remote-only`: pushed to origin, NEVER materialised as a local
+    // branch in `clonePath` — the shape of a PR branch in a managed clone
+    // and the case `worktree add --detach` cannot DWIM (risk-e6h1-014).
+    await git(["-C", seedPath, "checkout", "-q", "-b", "feat-remote-only"]);
+    writeFileSync(join(seedPath, "file-remote-only.txt"), "remote-only\n");
+    await git(["-C", seedPath, "add", "file-remote-only.txt"]);
+    await git([
+      "-C",
+      seedPath,
+      ...GIT_IDENTITY,
+      "commit",
+      "-m",
+      "add file-remote-only",
+    ]);
+    await git(["-C", seedPath, "push", "-u", "origin", "feat-remote-only"]);
+    const { stdout: remoteOnlySha } = await git([
+      "-C",
+      seedPath,
+      "rev-parse",
+      "HEAD",
+    ]);
+    await git(["-C", seedPath, "checkout", "-q", "main"]);
+
+    // `feat-ambiguous`: pushed to origin at main's tip; a LOCAL ref of the
+    // same name is created below at the fork point, so the two refs differ
+    // and local-vs-remote precedence is observable.
+    await git(["-C", seedPath, "branch", "feat-ambiguous"]);
+    await git(["-C", seedPath, "push", "origin", "feat-ambiguous"]);
+    const { stdout: ambiguousRemote } = await git([
+      "-C",
+      seedPath,
+      "rev-parse",
+      "feat-ambiguous",
+    ]);
+
+    // `feat-both`: same branch name on BOTH remotes, local on neither —
+    // unresolvable without a `<remote>/` qualifier.
+    await git(["-C", seedPath, "branch", "feat-both"]);
+    await git(["-C", seedPath, "push", "origin", "feat-both"]);
+    await git(["-C", upstreamSeedPath, "branch", "feat-both"]);
+    await git(["-C", upstreamSeedPath, "push", "origin", "feat-both"]);
+
     // Re-fetch in the working clone to pick up both divergent branches.
     await git(["-C", clonePath, "fetch", "--quiet", "origin"]);
+    await git(["-C", clonePath, "fetch", "--quiet", "upstream"]);
+
+    // The local half of the ambiguous pair, pinned to the fork point.
+    await git(["-C", clonePath, "branch", "feat-ambiguous", forkPointSha]);
 
     // Empty repo: init only, no remote configured → no `refs/remotes/*/HEAD`.
     await git(["init", "-b", "main", emptyRepoPath]);
@@ -176,6 +222,13 @@ const harness: GitPortContractHarness = {
       defaultBranch: "main",
       localOnlyBranch: "feat-local",
       pushedBranch: "feat-shared",
+      remoteOnlyBranch: "feat-remote-only",
+      remoteOnlyBranchSha: remoteOnlySha.trim(),
+      ambiguousBranch: "feat-ambiguous",
+      ambiguousLocalSha: forkPointSha,
+      ambiguousRemoteSha: ambiguousRemote.trim(),
+      multiRemoteBranch: "feat-both",
+      knownCommitSha: forkPointSha,
       featureBranch: "feat-diverge",
       forkPointSha,
       featureBranchChangedFiles: 2,

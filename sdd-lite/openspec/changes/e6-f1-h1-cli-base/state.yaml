@@ -1,0 +1,1379 @@
+version: "0.1"
+change_name: e6-f1-h1-cli-base
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F1.H1] (issue #36), first story of the E6 milestone: replace the [E0.F1.H3]
+    --version stub in src/main/cli.ts with the real composition root and build the CLI driving
+    adapter (repo add|list, review, runs list|show, --version, --help). Bounded scope span --
+    one driving adapter plus the composition root. Low ambiguity on the command surface: the
+    backlog story and PRD §3.2 fix it, and every core use case it must call already exists with
+    an explicit request/deps/result signature. Blast radius is real but contained: src/main/cli.ts
+    is hot-path wiring and this is the first time the full dependency graph is assembled. Risk
+    profile is medium: the change introduces the first runtime dependency since E0 (a B-level
+    decision), and proposal-stage exploration surfaced three unowned integration facts -- the
+    sentinel home path root, review's timeoutMs source, and run persistence (runReview has no
+    RunStore dep and nothing calls store.save()).
+  confidence: medium
+  recorded_at: "2026-08-23T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown requiring deep investigation. Lightweight proposal-stage exploration
+      of the five core module indexes, the driven adapter factories, package.json and the stub
+      composition root was sufficient to frame the change. The open items are decisions for the
+      user, not facts to discover in the codebase.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-23T00:00:00Z"
+    completed_at: "2026-08-23T00:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of src/core/{repos,run,history,review,
+      workspace}/index.ts (use-case signatures), src/core/repos/ports/config-schemas.ts
+      (GlobalConfig has validationTimeoutMs but no review timeout), src/core/run/run-review.ts
+      (RunReviewRequest/RunReviewDeps -- no RunStore, timeoutMs mandatory), the driven adapter
+      factories in src/adapters/driven/*/index.ts, src/main/cli.ts (the stub), package.json
+      (runtime deps: execa, yaml, zod) and docs/backlog-mvp-sentinel.md §E6 /
+      docs/setup-tecnico-sentinel.md §4-§5.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-23T22:00:00Z"
+    completed_at: "2026-08-23T22:00:00Z"
+    notes: >-
+      spec.md written with D1-D4 treated as fixed inputs and formalized into acceptance criteria
+      (AC-5 persistRun, AC-7 SENTINEL_HOME, AC-8 reviewTimeoutMs + --timeout precedence, AC-9
+      commander as sole new dependency). 14 numbered acceptance criteria covering the six command
+      paths, per-command --help (AC-2), the zero-logic rule (AC-1), stdout/stderr separation
+      (AC-10) and the quality gate (AC-14). Two A-level items decided in this stage: the H1/H2
+      boundary (AC-12 -- H1 owns review's full argument surface and exits 0 for any completed
+      invocation; H2 owns the terminal-state-to-exit-code mapping, its configurability and the
+      no-TTY guarantee) and processRunner wiring (AC-11 -- createExecProcessRunner is wired and
+      declared validations run through the CLI review path). Two B-level questions are recorded
+      unresolved for the user: OQ-1 (a --json output surface, recommendation = defer) and OQ-2
+      (who composes the RunReviewRequest cascade, recommendation = a pure resolveReviewRequest
+      helper exported from core/run, sibling to resolveEngine). Repo evidence re-verified for the
+      spec: GlobalConfigSchema (validationTimeoutMs optional, no review timeout),
+      DEFAULT_VALIDATION_TIMEOUT_MS = 120_000 in run-validations.ts (the pattern AC-8 mirrors with
+      DEFAULT_REVIEW_TIMEOUT_MS = 600_000), RunRecord/RunSummary/RunStore shapes, RunReviewRequest/
+      RunReviewDeps/RunReviewResult, the exported use-case request shapes, and that listBranches
+      lives in core/repos with no command in this story.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-23T23:00:00Z"
+    completed_at: "2026-08-23T23:00:00Z"
+    notes: >-
+      design.md written with D1-D6 as fixed inputs. Fixes the CLI adapter structure
+      (createCli(deps) -> SentinelCli { run(argv): Promise<number> }, exitOverride +
+      configureOutput bound to an injected CliIo, three command modules, four pure render
+      modules), the composition root split (src/main/{cli,container,paths}.ts), the sentinel
+      home layout under D2's root (config.yaml, repos.yaml, harnesses/, skills/, clones/,
+      worktrees/, runs/) with resolveSentinelHome/sentinelPaths/resolvePackageRoot, persistRun's
+      signature and RunRecord composition rules (diff reduced to RunDiffSummary via warning
+      messages, failure reduced to {stage,message}), and resolveReviewRequest's signature with a
+      per-field precedence table that calls resolveEngine internally. Six A-level decisions
+      recorded (A-1 run(argv) facade, A-2 bound use-case thunks, A-3 throw instead of defaulting
+      the harness, A-4 widen the adapters vitest include to src/main/**/__test__, A-5 loadContext
+      thunk in container.ts rather than a third core use case, A-6 per-invocation engine
+      construction). Status is partial because design surfaced OQ-D1, a real integration mismatch
+      that gates safe planning: registerRepo's alias is `owner/repo` while
+      RunRecordPathFieldsSchema/RunQueryFieldsSchema reject any repoName containing a path
+      separator (RunStore.contract.ts AC-19), so review/runs would fail on every registered repo
+      until someone owns the normalisation. Recommended option (a) normalises inside core/history
+      with a module-private helper used by persistRun, listRuns and getRun -- no new public
+      export, no signature change, but a behaviour change to two existing use cases, hence
+      B-level. OQ-D2 (opencode's mandatory `model` with no config source; recommendation:
+      SENTINEL_OPENCODE_MODEL read in container.ts) is non-blocking for planning.
+    orchestrator_note: >-
+      Returned partial on OQ-D1/OQ-D2; both resolved by the user at
+      cp-design-integration-decisions as D7 and D8, so the stage is complete for routing purposes.
+      design.md itself needs no rewrite: plan.md carries D7 and D8 as fixed inputs.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-24T00:00:00Z"
+    completed_at: "2026-08-24T00:00:00Z"
+    notes: >-
+      plan.md written against design.md with D1-D8 as fixed inputs. Eleven ordered stages:
+      S1 tooling staged alone (commander in package.json, the widened adapters vitest include
+      from design A-4, the one-line docs/testing.md update) so those touches never hide inside a
+      feature diff; S2 core review-request resolution (reviewTimeoutMs field,
+      DEFAULT_REVIEW_TIMEOUT_MS, resolveReviewRequest + barrel); S3 D7's module-private alias
+      normaliser applied to listRuns/getRun, isolated in its own stage because it changes the
+      observable behaviour of two use cases merged by [E5.F2.H2], with idempotency and
+      no-separator tests; S4 persistRun on top of S3; S5-S7 the CLI adapter bottom-up (shell and
+      error/help/version, then repo+runs commands, then review); S8 src/main/paths.ts alone
+      (unit-testable, rides S1's widened include); S9 container.ts + cli.ts last, so a failure in
+      the hot-path assembly points at wiring rather than logic; S10 the mandatory manual smoke for
+      risk-e6h1-006 with its transcript recorded in execution-log.md; S11 a non-code closeout that
+      declares D1, D5 and D7 as user-authorised widenings in the PR description and the history
+      entry. Every stage must end with npm run check and npm test green and the existing 500 tests
+      intact. Acceptance-criteria coverage is mapped stage by stage in the validation strategy;
+      e2e/** stays empty per AC-14. S1-S9 each require stage_approval.
+  sddl-executor:
+    status: in_progress
+    started_at: "2026-08-24T00:00:00Z"
+    stages_completed:
+      - S1
+      - S2
+      - S3
+      - S4
+      - S5
+      - S6
+      - S7
+      - S8
+      - S9
+      - S9b
+      - S10
+      - S10b
+      - S10c
+      - S12
+    notes: >-
+      S1 (tooling prerequisites), S2 (review-request resolution in core) and S3 (D7 alias ->
+      storage-key normalisation) completed under the batch-s1-s4 stage approval, one stage per
+      invocation. S1: commander ^15.0.0 added to package.json dependencies (runtime deps now
+      exactly commander, execa, yaml, zod -- AC-9), package-lock.json regenerated, the adapters
+      vitest project include widened to also cover src/main/**/__test__/**/*.test.ts (design A-4),
+      docs/testing.md updated; no source touched. S2 (D3 + D5): GlobalConfigSchema gains
+      reviewTimeoutMs as z.number().optional() with no zod default (RepoEntrySchema untouched);
+      new pure src/core/run/resolve-review-request.ts exports resolveReviewRequest plus
+      DEFAULT_REVIEW_TIMEOUT_MS = 600_000 beside resolve-engine.ts, implementing design's per-field
+      precedence table verbatim (timeout: --timeout > config > constant), doing the registry lookup
+      itself (RepoNotFoundError via repos' public barrel) and calling resolveEngine internally so
+      UnknownEngineError surfaces before any git or engine work; missing harness throws
+      InvalidRunRequestError (design A-3, no invented default); the run barrel exports the function,
+      the constant and its two input types (D5). 31 new core unit tests. S3 (D7): new
+      module-private src/core/history/run-storage-key.ts exporting toRunStorageKey, which replaces
+      every forward slash and backslash with a double underscore and is idempotent by construction;
+      applied by list-runs.ts and get-run.ts to request.repoName only (run id untouched, signatures
+      and result shapes unchanged); deliberately NOT exported from src/core/history/index.ts -- the
+      rejected alternative in D7 -- so the storage-key rule stays inside the module owning the
+      persistence contract. 12 new core unit tests (owner/repo to owner__repo, separator-free
+      pass-through, idempotency, backslashes, multi-segment, empty string) and no pre-existing test
+      edited; persist-run.ts was NOT created (that is S4) and RunStore.contract.ts was read but left
+      untouched. Observation carried to S6/S7: RunSummary/RunRecord returned by the store still
+      carry the normalised owner__repo in their own repoName field, so the renderer should echo the
+      alias the user typed rather than that field. Gates after S3: npm run check exit 0 (biome 122
+      files, tsc clean, depcruise 83 modules / 178 dependencies, 0 violations) and npm test exit 0
+      with 543 tests across 30 files, up from 531/29, all 531 pre-existing tests still passing. S4
+      (D1/AC-5): new src/core/history/persist-run.ts exporting persistRun with design's signature
+      (PersistRunRequest{repoName, startedAtEpochMs, request, result}, PersistRunDeps{store, now?},
+      PersistRunResult{runDir, record}); composes the RunRecord per design's rules -- harness/
+      baseRef/targetRef from the request, state/verdict/prompt/engineOutput/usage from the result,
+      engine = result.engineName ?? request.engineName, validationOutput from the request,
+      durationMs = Math.max(0, now() - startedAtEpochMs), diff reduced to RunDiffSummary (counts
+      plus warning messages, never a diff body) and failure reduced to {stage, message} with no
+      cause, stack or exception object -- then calls RunStore.save() and returns the run directory.
+      repoName is normalised through S3's module-private toRunStorageKey (A-level: RunRecord's
+      repoName is the storage key the store's schema requires; risk-e6h1-009's user-facing echo
+      stays a S6/S7 rendering concern). Exported from src/core/history/index.ts -- unlike S3's
+      helper this one is public core API, since the CLI calls it. The only cross-module import is
+      the type-only ../run/index.js, keeping core-modules-via-index clean. Two further A-level
+      calls: PersistRunResult carries the composed record so review needs no getRun round-trip,
+      and durationMs is clamped at 0 against a non-monotonic injected clock. 8 new core unit tests
+      with a capturing in-memory RunStore fake. Gates after S4: npm run check exit 0 (biome 124
+      files, tsc clean, depcruise 84 modules / 183 dependencies, 0 violations) and npm test exit 0
+      with 551 tests across 31 files, up from 543/30, all 543 pre-existing tests still passing.
+      This closes the approved batch-s1-s4; S5-S11 were not started.
+      Details in execution-log.md. QA review still deferred until the S1-S4 batch is complete;
+      S4 (persistRun) is next under the same approval.
+      S5 (CLI shell) completed under cp-stage-approval-s5-s7, together with the user-approved
+      F-1 addendum. New src/adapters/driving/cli/cli-deps.ts (CliIo, ReviewContext, CliUseCases,
+      CliDeps), create-cli.ts (createCli(deps) returning SentinelCli.run(argv) -> Promise<number>,
+      exitOverride and configureOutput bound to the injected CliIo and set before any subcommand so
+      commander copies them, root name/description/-V --version and an addHelpText footer, plus the
+      catch-all mapping CommanderError to err.exitCode and any other throwable to one rendered
+      stderr line and exit 1), render/format-error.ts (formatErrorLine: message only, no stack, no
+      cause, no per-error-type branching) and the index.ts barrel replacing export {}. run never
+      calls process.exit and the adapter contains no executable reference to process at all -- only
+      comments -- so every test drives it with a capturing CliIo and no global stubbing. 29 new
+      adapter tests across help/version/errors plus one shared test-doubles module. A-level calls:
+      createCli takes an optional second parameter (registrars, defaulting to the empty
+      commandRegistrars) as the seam S6/S7 plug their command groups into and as the only way to
+      exercise AC-13's catch-all while no command exists; formatErrorLine collapses newlines and
+      falls back to the error name for an empty message; commander's multi-line output chunks are
+      split into single CliIo lines; one test-support module instead of three copies. F-1: the
+      vacuous not.toContain(diffBody) assertion in persist-run.test.ts was replaced by a comparison
+      against JSON.stringify(diffBody).slice(1, -1) and verified to genuinely fail -- persist-run.ts
+      was temporarily mutated to leak diff.files with the sibling toEqual neutralised, the new
+      assertion failed on exactly that line, and both mutations were reverted. No other assertion
+      touched and the file's test count is unchanged. Gates after S5: npm run check exit 0 (biome
+      131 files, tsc clean, depcruise 88 modules / 192 dependencies, 0 violations) and npm test exit
+      0 with 580 tests across 34 files, up from 551/31, all 551 pre-existing tests still passing.
+      Carried forward: S7 must parse commander's string --timeout into a number before it type-checks
+      against ResolveReviewRequestFlags.timeoutMs (no review option is declared in S5), and
+      risk-e6h1-009 stays with the S6/S7 renderers since format-error.ts renders no repo name.
+      S6-S11 were not started. Details in execution-log.md.
+      S6 (repo + runs command groups) completed under the same cp-stage-approval-s5-s7 batch. New
+      commands/repo-commands.ts (repo add -> registerRepo, repo list -> listRepos) and
+      commands/runs-commands.ts (runs list -> listRuns, runs show -> getRun), new
+      render/format-repos.ts (formatRepoLine: alias, url, baseBranch, harness; formatRegisterOutcome:
+      alias, registered|already-registered, localPath) and render/format-runs.ts
+      (formatRunSummaryLine: 11 fields; formatRunRecordBlock: 20 scalar key/value lines then
+      count-prefixed diffWarnings / validationOutput / engineOutput sections), all tab-separated with
+      a literal - for absent optionals and no colour and no --json (D4/D6). Both groups registered by
+      turning commandRegistrars into [registerRepoCommands, registerRunsCommands] -- create-cli.ts is
+      the only pre-existing file modified and its signature, exitOverride/configureOutput ordering and
+      catch-all are untouched. 30 new adapter tests reusing S5's cli-test-doubles.ts, no new double.
+      risk-e6h1-009 handled by construction: the renderers take the requested alias as a parameter and
+      never read RunSummary.repoName / RunRecord.repoName (grep confirms repoName appears only on the
+      request side), no denormalising helper was added and D7's input-only scope is unchanged; two
+      regression guards assert owner__repo never reaches stdout and were mutation-verified (reading
+      the stored field made exactly those tests fail; the mutation was reverted). A-level calls: repo
+      add prints entry.localPath with - when absent rather than reconstructing ${clonesDir}/${alias}
+      (that cascade is core's); the repo add record carries a status field so already-registered is
+      honest and still machine-readable; runs show reports promptLineCount instead of dumping the
+      prompt; multi-line values use count-prefixed sections rather than banners; neither command
+      sorts or filters; an empty result prints nothing on stdout and one note on stderr, exit 0.
+      Observation carried to QA/S7: RunNotFoundError's message is composed in core from the storage
+      key, so a failed runs show renders Run not found: owner__repo/<id> on stderr -- a core
+      message-composition concern outside S6's scope and not papered over in the adapter, since AC-13
+      forbids per-error-type branching there. Gates after S6: npm run check exit 0 (biome 137 files,
+      tsc clean, depcruise 92 modules / 203 dependencies, 0 violations) and npm test exit 0 with 610
+      tests across 36 files, up from 580/34, all 580 pre-existing tests still passing. S7-S11 were not
+      started. Details in execution-log.md.
+      S7 (review command) completed under the same cp-stage-approval-s5-s7 batch, closing it. New
+      commands/review-command.ts (review <repo> <branch> --type --engine --timeout) and
+      render/format-review.ts (formatReviewOutcome -> the REVIEW_OUTCOME_FIELDS key/value block:
+      repo, targetRef, state, verdict, engine, harness, durationMs, failureStage, failureMessage,
+      runDir, with - for absent fields), registered by adding registerReviewCommand to
+      commandRegistrars. The command body is a parse-and-delegate shell: loadContext ->
+      resolveReviewRequest (core run barrel, D5) -> runReview -> persistRun (once, unconditionally,
+      D1/AC-6) -> render; it holds no cascade, no registry lookup, no RunRecord composition and no
+      process access. The four traps were handled explicitly: --timeout is parsed by a commander
+      parseArg callback that throws InvalidArgumentError for anything that is not a positive whole
+      number, so no NaN can reach ResolveReviewRequestFlags and an unusable value is a usage error
+      with no use case called (trap 1); no terminal state is read for exit purposes anywhere in the
+      adapter and no exit-code table was introduced -- the exit code still comes from commander or
+      createCli's catch-all, and five tests pin exit 0 across engine-error, ambiguous, timeout,
+      validation-failed and a request-changes verdict (trap 2 / AC-12); persistRun is called exactly
+      once with the very request handed to runReview and the very result it returned (identity
+      assertions) and is skipped only when no run was produced (trap 3 / AC-6); and the renderer
+      takes the requested alias as a parameter and never reads record.repoName, with a guard
+      asserting owner__repo appears in no rendered field except runDir, which is a genuine
+      filesystem path derived from the storage key (trap 4 / risk-e6h1-009). AC-11 is covered on the
+      command side: validations and validationTimeoutMs from the repo entry reach the runReview fake,
+      with the config-level fallback tested too; wiring processRunner is S9's half. Four A-level
+      calls: the outcome renders as a key/value block matching runs show rather than a one-line
+      record; failureStage/failureMessage are fields rather than a stderr diagnostic so a piped
+      consumer sees why a run failed; parseTimeoutMs also rejects 0, negatives and non-integers; and
+      createTestDeps gained three optional overrides (loadContext, now, clonesDir) with byte-identical
+      defaults instead of a second builder. All four guards were mutation-verified (state-derived exit
+      code: 6 failed; skipping persistence for non-ok: 6 failed; unchecked Number(): 5 failed;
+      rendering record.repoName: 1 failed) and every mutation reverted, with both gates re-run green.
+      Gates after S7: npm run check exit 0 (biome 140 files, tsc clean, depcruise 94 modules / 209
+      dependencies, 0 violations) and npm test exit 0 with 638 tests across 37 files, up from 610/36,
+      all 610 pre-existing tests still passing. Two tsc errors in new fixtures were fixed rather than
+      cast away (RunCleanupReason has no "policy" member; verdict: undefined violates
+      exactOptionalPropertyTypes). No file under src/core/**, src/adapters/driven/** or src/main/**
+      was touched. S8-S11 were NOT started and are not approved. Details in execution-log.md.
+      S8 (src/main/paths.ts) completed under cp-stage-approval-s8-s9, the first half of that
+      batch. New src/main/paths.ts with design's three functions -- resolveSentinelHome(env,
+      homeDir) implementing D2 (SENTINEL_HOME when set and non-blank, else <homeDir>/.sentinel,
+      both inputs as parameters so the resolver reads no global and needs no env mutation in
+      tests), sentinelPaths(root) returning the eight-field SentinelPaths object for design's home
+      layout (root, configFile, reposFile, harnessesDir, skillsDir, clonesDir, worktreesDir,
+      runsDir), and resolvePackageRoot(startPath?) walking up to the nearest package.json for the
+      factory harnesses/skills that ship with the npm package rather than living under the home
+      root. Every returned path is absolute by construction: sentinelPaths re-resolves its root, so
+      absoluteness is a property of the function rather than a precondition on S9. The single
+      cohesive return object is the direct answer to risk-e6h1-013: there is exactly one clonesDir
+      per sentinelPaths call and no consumer is invited to concatenate one, so RegisterRepoDeps.
+      clonesDir and CliDeps.clonesDir can only diverge if container.ts deliberately calls
+      sentinelPaths twice with different roots -- a visible act, not an accidental one -- and the
+      module doc-comment states that constraint in the source S9 will read. The risk stays open and
+      owned by S9, since S8 can make the wrong wiring harder to write but not impossible.
+      resolvePackageRoot is deliberately NOT a field of SentinelPaths, keeping the package root and
+      the home root distinct so S9 cannot point createHarnessLoaderAdapter at the wrong one.
+      A-level calls: an optional startPath parameter on resolvePackageRoot (purely additive to
+      design's signature, and what makes the upward walk testable against a temp tree); sentinelPaths
+      re-resolving its root; configFile/reposFile exposed as fields although the config store derives
+      them itself, so design's layout table is assertable in one toEqual; a blank or whitespace-only
+      SENTINEL_HOME falling back to ~/.sentinel; and PathEnv typed as Readonly<Record<string, string
+      | undefined>> rather than NodeJS.ProcessEnv. 23 new tests in the new src/main/__test__/
+      directory, collected by S1's widened adapters include -- confirmed directly (npx vitest run
+      --project adapters src/main: 1 file, 23 tests) and by the aggregate file count moving 37 to 38,
+      not assumed. Three guards mutation-verified and reverted (blank SENTINEL_HOME accepted: 2
+      failed; sentinelPaths without resolve: 1 failed; walking to the outermost package.json: 1
+      failed), with a fourth attempted mutation recorded as not killed because it was
+      behaviour-preserving. Gates after S8: npm run check exit 0 (biome 142 files, tsc clean,
+      depcruise 96 modules / 212 dependencies, 0 violations) and npm test exit 0 with 661 tests
+      across 38 files, up from 638/37, all 638 pre-existing tests still passing -- no pre-existing
+      file was modified, git status shows only the two new untracked paths. AC-7's second half
+      (every adapter path input deriving from this resolver in src/main and nowhere else) is S9's,
+      as plan.md's coverage row declares. Carried forward to S9 beyond risk-e6h1-013: whether the
+      home layout is created eagerly at startup or lazily by each driven adapter is an unmade
+      container.ts decision (the likely answer is lazily, unchanged, since createRunStoreFsAdapter
+      already mkdir -p's its tree), flagged so S9 decides it deliberately and S10's smoke checks it
+      against a fresh mktemp -d. S9-S11 were NOT started at that point. Details in
+      execution-log.md.
+      S9 (container.ts + cli.ts) completed under cp-stage-approval-s8-s9, closing that batch. New
+      src/main/container.ts is the only module in the codebase that instantiates an adapter: it
+      builds git, config-store, run-store, exec process-runner and the {factory, user} harness
+      loader pair, binds the six CliUseCases thunks, and supplies loadContext (design A-5, reading
+      config.yaml and repos.yaml concurrently through ConfigStore), now, version, clonesDir and a
+      real-stream CliIo. src/main/cli.ts replaced the [E0.F1.H3] stub with a ~7-line entrypoint
+      that keeps the package.json import attribute for the version (AC-4) and assigns the returned
+      code to process.exitCode rather than calling process.exit, so pending stdout writes are not
+      truncated. risk-e6h1-013 closed by construction: resolveSentinelHome and sentinelPaths are
+      each called exactly once and the single SentinelPaths object feeds RegisterRepoDeps.clonesDir,
+      CliDeps.clonesDir, RunReviewDeps.worktreesDir, createConfigStoreAdapter(root),
+      createRunStoreFsAdapter(runsDir) and the user harness loader; the file contains no join, no
+      resolve and no path concatenation, and resolvePackageRoot() is read separately for the factory
+      harness loader only. AC-11 completed: createExecProcessRunner wired into
+      RunReviewDeps.processRunner, without which [E5.F1.H2] would stay dead code with no failing
+      test. AC-7 completed: every adapter path input derives from paths.ts, in src/main and nowhere
+      else. D8 implemented: SENTINEL_OPENCODE_MODEL read per invocation inside the engine factory
+      (A-6), unset or blank throwing a one-line message naming the variable; no model id hardcoded,
+      no schema touched. S8's open eager-vs-lazy question decided A-level after verification, not
+      assumption: creation stays lazy everywhere (run store mkdir -p's, git clone and worktree add
+      create parents, harness loader and config reads treat ENOENT as empty), with one addition --
+      ConfigStore.writeRepos uses writeFile, which does NOT create parent directories (verified
+      directly with a node one-liner), so the container mkdir -p's the home ROOT inside the
+      registerRepo thunk only. That keeps --help, --version and every read path free of filesystem
+      side effects, confirmed by ~/.sentinel still not existing after all sanity invocations. No
+      test was added (design's explicit choice for container.ts). No signature mismatch was found
+      between design's assumptions and the real adapter factories. Gates after S9: npm run check
+      exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 226 dependencies, 0 violations)
+      and npm test exit 0 with 661 tests across 38 files -- unchanged, all pre-existing tests still
+      passing. One contradiction escalated instead of fixed: `npm run dev` (node
+      --experimental-strip-types) can no longer run the CLI, because Node's type stripping does not
+      rewrite a .js import specifier to the sibling .ts file, and the whole repo uses .js specifiers
+      per NodeNext; the stub never imported source, so this surfaces exactly now. AC-4 was therefore
+      verified through the built entrypoint (npm run build && node dist/cli.js --version -> 0.0.0,
+      exit 0), which works completely. That refutes a documented assumption (setup-tecnico 5.1,
+      CLAUDE.md, README, CONTRIBUTING all publish npm run dev), so it is C-level and left to the
+      user; recommendation (a) "dev": "tsup --silent && node dist/cli.js". S10's smoke must invoke
+      the built entrypoint until that is decided; it is not blocked. S10 and S11 remain unapproved
+      and were not started -- the end-to-end smoke was deliberately not run.
+      S9b (addendum, D10) completed under decision D10 rather than a plan stage, closing the
+      `npm run dev` contradiction S9 escalated. package.json's `dev` script became
+      `tsup --silent && node dist/cli.js` -- no new dependency, since tsup 8.5.1 already backs
+      `build`; runtime dependencies still read exactly commander, execa, yaml, zod (AC-9) and
+      package-lock.json was not touched. The four documents that published the old command were
+      updated so none keeps asserting something false: docs/setup-tecnico-sentinel.md §5.1 (the
+      jsonc `dev` line, with a trailing clause naming the cause), CLAUDE.md's Commands block,
+      README.md's quick start and CONTRIBUTING.md, which also gains one short paragraph explaining
+      the `.js`-specifier reason and that arguments pass through. No source, test, config or
+      lockfile was touched -- git status shows exactly five modified paths, and dist/ is gitignored.
+      Verified by running, not by reasoning: `npm run dev -- --version` exit 0 printing 0.0.0 and
+      `npm run dev -- --help` exit 0 printing the full root help, which is what confirms npm appends
+      forwarded arguments after `node dist/cli.js` rather than inside the `&&`; `npm run build`
+      still works independently. Gates after S9b: npm run check exit 0 (biome 143 files, tsc clean,
+      depcruise 97 modules / 226 dependencies, 0 violations) and npm test exit 0 with 661 tests
+      across 38 files -- every number identical to the pre-stage baseline, as a stage that changes
+      no source must be. Three greps confirm no document still describes the old command; the four
+      remaining `--experimental-strip-types` hits are the two new explanatory clauses, an E4
+      manual-verification note about a scratch script that imports a `.ts` path (still correct, the
+      breakage is `.js` specifiers only) and sdd-lite/project-context.md. Two stale mentions were
+      deliberately left out of scope and recorded instead: src/main/paths.ts:12 and :101 justify
+      resolvePackageRoot by "src/main/cli.ts under npm run dev vs. dist/cli.js when installed",
+      an example D10 makes stale although the function is still needed for the module's own tests
+      (source, not a document -- a two-line comment fix for QA or S11); and
+      sdd-lite/project-context.md:21/:62/:94, the bootstrap snapshot D4 already flagged for a
+      refresh once this story merges. No contradiction, drift or blast-radius expansion. S10 and
+      S11 remain unapproved and were NOT started -- no repo add, no review, no clone, so S10's
+      end-to-end evidence is untouched and its transcript can now use `npm run dev -- ...` exactly
+      as the docs promise. Details in execution-log.md.
+      S10b (D11 / risk-e6h1-014) completed: the remote-only-branch worktree defect is fixed in
+      the driven git adapter, with the contract coverage that let it through. worktreeAdd no
+      longer hands a raw commitish to `git worktree add --detach` -- a new module-private
+      resolveCommitish() resolves it to a concrete SHA first, via `git rev-parse --verify
+      <commitish>^{commit}` (bare SHA, tag, local branch, explicit origin/<name>, revision
+      expressions, and git's own local-before-remote precedence) falling back, only when that
+      resolves nothing, to a `git for-each-ref refs/remotes/` scan requiring EXACTLY ONE
+      matching remote-tracking branch. Zero matches and two-or-more matches (same branch name on
+      two remotes) both reject as GitWorktreeError -- silently reviewing the wrong revision would
+      be worse than the loud failure -- and the step-1 git error is carried as `cause`, so the
+      pre-existing bad-commitish contract test passes unchanged. `--detach` was deliberately kept
+      (D11's binding approach_guidance): dropping it would create local branches in the managed
+      clone, contradicting PRD 5.1's ephemeral-worktree design and serialising concurrent reviews
+      of the same branch. Verified at the git level on a throwaway clone whose only local branch
+      was main: the old command gave `fatal: invalid reference: feature` (exit 128), the new path
+      detaches at the right commit and the clone still lists only `main` locally.
+      GitPort.contract.ts gains 7 worktreeAdd cases (remote-only checkout, no-new-local-branch,
+      bare SHA, qualified origin/<name>, local-over-remote precedence, two-remote ambiguity
+      rejected, unresolvable ref still rejected) plus the fixture fields they need, and the
+      git-cli harness provisions feat-remote-only / feat-ambiguous / feat-both. Before/after
+      proof: swapping HEAD's adapter back in makes 2 of the new tests fail with `fatal: invalid
+      reference: feat-remote-only` (2 failed | 32 passed); with the fix all 34 pass. Gates after
+      S10b: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 226
+      dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 668 tests
+      across 38 files, up from 661/38, all 661 pre-existing tests still passing. Nothing under
+      src/core/**, src/adapters/driving/** or src/main/** was touched and the GitPort interface is
+      unchanged. S10's smoke was NOT re-run -- the orchestrator reserved that transcript. S10c
+      completed the same fix across the WHOLE adapter: S10b was correct but scoped to worktreeAdd,
+      so the re-run smoke cleared the worktree stage and died at the next one with the identical
+      root cause (`git merge-base main feature` -> `fatal: Not a valid object name feature`).
+      resolveCommitish was parameterized (not duplicated) with an ErrorClass + context label -- the
+      GitErrorConstructor type was extracted from wrapAs's inline generic so both name the same
+      shape -- and is now the single resolution path for worktreeAdd, mergeBase (both operands) and
+      diff (from/to, resolved once and reused by the raw AND --numstat passes, which must describe
+      the same revision pair). Resolution semantics are byte-for-byte S10b's. Per-method error
+      types are preserved: mergeBase rejects as GitMergeBaseError and diff as GitDiffError, never
+      as GitWorktreeError, asserted explicitly with rejects.not.toBeInstanceOf(GitWorktreeError).
+      The whole file was audited, not just the three named sites: clone's url, fetch's remote NAME,
+      defaultBranch's remote (used to build refs/remotes/<remote>/HEAD for symbolic-ref -- resolving
+      it to a SHA would destroy the branch name the method returns) and worktreeRemove's filesystem
+      path are deliberately left unresolved, with reasons in execution-log.md. Cost considered
+      deliberately: 5 extra `git rev-parse` spawns per review at ~5 ms each, under 0.1 % of a
+      review's wall time; cross-call caching rejected as a staleness risk for no measurable gain.
+      GitPort.contract.ts gains 6 cases (remote-only, local-over-remote precedence and two-remote
+      rejection, for each of mergeBase and diff); git-cli.test.ts needed NO change since S10b's
+      harness already provisions feat-remote-only / feat-ambiguous / feat-both. Before/after proof:
+      swapping HEAD's adapter back in makes the 2 remote-only cases fail (2 failed | 38 passed),
+      with the merge-base one reproducing the smoke's exact stderr; with the fix all 40 pass. The
+      other 4 new cases pass on both implementations by design -- regression guards pinning that
+      the refactor did not start preferring the remote ref, and pinning the per-method error type.
+      Gates after S10c: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules /
+      226 dependencies, 0 violations -- identical to baseline) and npm test exit 0 with 674 tests
+      across 38 files, up from 668/38, all 668 pre-existing tests still passing. S10's product
+      smoke was again NOT run -- still reserved for the orchestrator. Details in execution-log.md.
+      S12 (D12 / D13) acted on the five verified PR #73 review findings under
+      cp-stage-approval-s12. R4-001 (the only one with user impact): persistRun is now wrapped in
+      try/catch inside review-command.ts, and a write failure no longer discards the verdict of a
+      completed multi-minute review -- the failure path renders the SAME field block from the
+      RunReviewRequest and RunReviewResult the command still holds, via a new
+      formatUnpersistedReviewOutcome beside formatReviewOutcome in format-review.ts, writes one
+      stderr diagnostic naming the consequence, and rethrows so createCli's catch-all renders the
+      underlying error and resolves exit 1 (D13). No sixth terminal state was introduced and
+      nothing reads result.state to decide anything, so AC-12 and the PRD 4 domain contract stand;
+      runDir renders as the `-` absence marker rather than a fabricated path, since nothing was
+      written. Both renderers now go through one private renderOutcome() mapping over
+      REVIEW_OUTCOME_FIELDS, so the happy path is byte-identical (same function, same arguments,
+      same output) and the two blocks cannot drift apart. Two derived values recorded as A-level:
+      engine = result.engineName ?? request.engineName (the same echo rule, a two-term fallback,
+      not a domain policy) and failureMessage = formatErrorLine(result.failure.error), reusing the
+      adapter's OWN one-line reduction of an unknown throwable rather than restating persistRun's.
+      R2-003: container.ts now declares one `const now = () => Date.now()` and binds it to BOTH
+      persistRun's deps and CliDeps.now, so startedAtEpochMs and durationMs can no longer come from
+      two clocks; cli-deps.ts's doc-comment states the seam. R2-001/R2-002: REPO_LINE_FIELDS,
+      REGISTER_OUTCOME_FIELDS and RUN_SUMMARY_FIELDS were decorative -- exported as contracts while
+      their renderers hand-built the arrays -- and now index by their constant, copying
+      format-review.ts's existing pattern rather than inventing a third; all five exported
+      field-order constants in render/ were audited and none remains decorative (RUN_RECORD_FIELDS
+      and REVIEW_OUTCOME_FIELDS already were correct). Output is byte-identical, since the values
+      arrays hold already-rendered strings. R2-004: resolveCommitish split into revParseCommit
+      (step 1, never throws, returns the sha or the git failure) and resolveRemoteTrackingCommit
+      (step 2, exactly one refs/remotes match, both rejections), with the 28-line narrating comment
+      reduced to the invariant; local-over-remote precedence, ambiguity rejected rather than
+      guessed, per-method error class and --detach receiving a resolved SHA are all unchanged, and
+      NO contract case was edited -- src/adapters/driven/git/__test__/ shows no diff and its 40
+      cases pass. Evidence, not assertion: the four new R4-001 tests were run against HEAD's
+      review-command.ts and gave `Tests 4 failed | 28 passed (32)`, all four failing, then passed
+      32/32 once the fixed file was restored; and the two field-order tests were proved to catch
+      real drift by swapping baseBranch/harness in REPO_LINE_FIELDS and baseRef/targetRef in
+      RUN_SUMMARY_FIELDS with the renderers untouched -- `Tests 2 failed | 92 passed (94)`, exactly
+      the two new tests, while every pre-existing toHaveLength(FIELDS.length) assertion survived
+      the mutation, which is the reviewer's complaint reproduced. Both mutations reverted. Gates
+      after S12: npm run check exit 0 (biome 143 files, tsc clean, depcruise 97 modules / 229
+      dependencies, 0 violations -- 226 to 229 is exactly three new import edges: format-review to
+      core/run and to format-error, review-command to core/history) and npm test exit 0 with 681
+      tests across 38 files, up from 674/38, all 674 pre-existing tests still passing. Nothing
+      under src/core/** was touched, no public core signature changed and no test file lost a line.
+      Final sddl-qa-review must re-run before the change returns to completed (D12), and the
+      orchestrator -- not this stage -- answers and resolves the five PR #73 threads; S12 performed
+      no git action and posted nothing to GitHub. Two items for QA, neither a blocker: a
+      persistence failure now prints TWO stderr lines (the command's diagnostic, then the
+      catch-all's single-line rendering of the cause, which is the line AC-13 governs), and
+      spec.md's AC-12 wording still predates D13's boundary case, as D13's own consequences note.
+      Details in execution-log.md.
+  sddl-code-review:
+    status: pending
+  sddl-judgment-day:
+    status: pending
+  sddl-qa-review:
+    status: completed
+    mode: final
+    verdict: pass
+    started_at: "2026-08-24T06:00:00Z"
+    completed_at: "2026-08-25T07:00:00Z"
+    report_path: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
+    reviews:
+      - target: batch-s1-s4
+        mode: stage
+        verdict: pass
+        reviewed_at: "2026-08-24T05:00:00Z"
+        summary: >-
+          0 blockers, 3 low findings recorded as info (F-1 vacuous stringify assertion,
+          F-2 commander engines mismatch, F-3 missing status on risk-e6h1-006). Gates re-run
+          independently: npm run check exit 0, npm test exit 0 (551 tests / 31 files). Full
+          detail in the first section of qa-report.md.
+      - target: batch-s5-s7
+        mode: stage
+        verdict: pass
+        reviewed_at: "2026-08-24T06:00:00Z"
+        summary: >-
+          Stage-mode review of S5, S6 and S7 (commits 41421c9, c00e210, 81cab90; frozen diff
+          18 files, +2488/-5). Verdict pass: 0 blockers, 0 high, 0 medium, 2 low findings
+          recorded as info. Gates re-run independently rather than quoted from the execution
+          log -- npm run check exit 0 (biome 140 files, tsc clean, depcruise 94 modules /
+          209 dependencies, 0 violations) and npm test exit 0 (638 tests / 37 files), both
+          matching the expected numbers exactly. AC-1 verified mechanically by reading every
+          command body: each parses arguments, calls one thunk (two for review, per D1) and
+          delegates rendering; no derivation, filtering, sorting or merging of a domain fact
+          anywhere, and all 87 adapter tests run on a capturing CliIo plus throwing thunk
+          fakes with no driven adapter, no filesystem and no process. AC-2 asserted at all
+          eight help levels including option descriptions and the SENTINEL_HOME /
+          SENTINEL_OPENCODE_MODEL footer. AC-3 exactly five leaf paths, one use case each.
+          AC-6 exactly-once verified rather than trusted -- a single unconditional persistRun
+          call site, identity assertions on the request and result objects, length 1 for
+          every completed invocation including four non-ok states, length 0 for every path
+          that produced no run. AC-10 streams asserted separately with whole-array equality.
+          AC-12 confirmed structurally -- no exit-code table exists, the only .state reads
+          outside tests are three renderer display fields, and exit codes come solely from
+          CommanderError.exitCode or the catch-all's literal 1. AC-13 all ten real core error
+          classes thrown through the real run path, each rendering exactly one stderr line
+          equal to its message with no stack and no name prefix. AC-4 and AC-11 met for this
+          batch; their remaining halves are S9's, as plan.md's coverage row declares.
+          Mutation-verification claims were not taken on trust: three were reproduced from
+          scratch and matched the log exactly -- inserting a terminal-state exit decision
+          gave Tests 6 failed | 22 passed (28), and rendering the stored repoName in both
+          format-review and format-runs gave Tests 3 failed | 84 passed (87). Both mutations
+          were reverted and the tree is byte-identical. risk-e6h1-009 upheld across S6 and
+          S7: no renderer reads RunSummary.repoName / RunRecord.repoName, and S7's runDir
+          exclusion is narrow (one line filtered, nine fields still asserted, guard still
+          fires under mutation). Architecture guards confirmed by reading rather than by
+          depcruise's exit code alone, since src/main is still empty: the CLI adapter imports
+          only commander and four core barrels, and constructs nothing but its own commander
+          Command and an InvalidArgumentError. D6 and D4 upheld -- no --json surface, runtime
+          dependencies still exactly commander, execa, yaml, zod, no colour library, no ANSI
+          escape. Prior findings F-1 and F-3 are resolved; F-2 stays tracked as
+          risk-e6h1-008. New findings: F-4 low -- repo add prints "-" instead of the resolved
+          clone path because registerRepo returns localPath only when --local-path was given,
+          a divergence from spec's behaviour table whose clean fix is unauthorised core
+          surface; F-5 low -- review's outcome block omits the run id, so runs show requires
+          reading it out of runDir. S7's carry-forward for S9 was checked and is coherent:
+          loadContext, clonesDir and now are all supplied by design's container/paths split,
+          with the one caution that a single sentinelPaths result must feed both
+          RegisterRepoDeps.clonesDir and CliDeps.clonesDir, since registerRepo and
+          resolveReviewRequest concatenate identical path strings. Stage mode: the change
+          stays implementing. Details in qa-report.md.
+      - target: final-whole-change
+        mode: final
+        verdict: pass
+        reviewed_at: "2026-08-24T21:30:00Z"
+        summary: >-
+          Final closeout review of the whole change (git diff origin/main...HEAD, 25 commits,
+          56 files, +8612/-68). Verdict pass: 0 blockers, 0 high, 0 medium, 3 low findings
+          recorded as info (F-6 container.ts has no automated test and the opencode branch of
+          createEngine has never executed; F-7 the S10 smoke has no execution-log entry and the
+          Stage Overview still marks S10 pending while three risk resolutions say it passed;
+          F-8 skill-catalog.md carries a third stale bookkeeping mention beyond the two S9b
+          recorded). All four gates re-run independently rather than quoted: npm run check exit
+          0 (biome 143 files, depcruise 97 modules / 226 dependencies, 0 violations), npm test
+          exit 0 (674 tests / 38 files), npm run build exit 0 (dist/cli.js 105.05 KB), and
+          npm run dev -- --version exit 0 printing 0.0.0 (D10 confirmed). All 14 acceptance
+          criteria verified against code and tests rather than test names, AC-1 by reading
+          every command body and AC-12 by the exit-0 tests plus the smoke's own engine-error
+          run. Scope integrity clean: all 56 files trace to spec, to D1-D11 or to a recorded
+          risk; .dependency-cruiser.cjs, tsconfig.json, biome.json and tsup.config.ts are
+          untouched; zero deleted lines in any pre-existing test file; no undeclared fifth
+          widening. Each of the four widenings verified bounded, D11 most closely: one private
+          resolveCommitish funnelled from all three ref-taking methods, per-method error class
+          preserved, --detach kept so PRD 5.1 still holds, local-over-remote precedence, and
+          ambiguity rejected rather than guessed. The risk-e6h1-014 blind fixture is closed at
+          the GitPort contract level (13 new cases across worktreeAdd, mergeBase and diff), so
+          every future GitPort implementation inherits the coverage. The two known stale
+          mentions (paths.ts doc-comments, project-context.md snapshot) are cosmetic and should
+          NOT block. The six open risks each carry a recorded reason; risk-e6h1-011 is the one
+          literal deviation from a spec behaviour-table row and must be named in the PR.
+          Completion allowed: lifecycle_status set to completed. Full detail in qa-report.md.
+      - target: final-s12-fix-round
+        mode: final
+        verdict: pass
+        reviewed_at: "2026-08-25T07:00:00Z"
+        summary: >-
+          Second final-mode review, after the change was reopened by D12 for the PR #73 fix
+          round. Target: commit 2633f51 (git diff f6c6e00..HEAD, 13 files, +669/-63); the rest
+          of the change was re-validated only where S12 could have disturbed it. Verdict pass:
+          0 blockers, 0 high, 0 medium, 5 low findings recorded as info (F-9 the S12 execution
+          log states the AC-12 spec text was NOT updated while the same commit amends it; F-10
+          the amended AC-12 sentence leaves the old parenthetical trailing after D13's clause
+          and its verification column still names only the two original tests; F-11 the two
+          stderr lines are partly redundant and the second discloses the attempted run
+          directory while stdout shows runDir -; F-12 renderRecord binds by length rather than
+          by key, unlike format-review's renderOutcome; F-13 artifacts.review_ledger points at
+          a file that never existed). All four gates re-run independently, all matching the
+          expected numbers exactly: npm run check exit 0 (biome 143 files, depcruise 97 modules
+          / 229 dependencies, 0 violations), npm test exit 0 (681 tests / 38 files), npm run
+          build exit 0 (dist/cli.js 107.36 KB), and the GitPort contract suite 40/40. The
+          product smoke was not re-run, per the handoff. R4-001 verified correct rather than
+          merely present: the happy path is byte-identical (formatReviewOutcome builds the same
+          scalars and defers to a renderOutcome that is the previous body verbatim; 674/674
+          pre-existing tests pass), nothing fabricates a runDir, result.state is still never
+          read for an exit decision, and the unconditional rethrow does reach createCli's
+          catch-all for exit 1. The unpersisted renderer mirrors persistRun's own derivations
+          exactly (engine, harness, durationMs), which R2-003's single shared clock is what
+          makes comparable. AC-13 explicitly judged NOT violated: AC-13 constrains how a core
+          typed error renders -- one line, no stack, no raw object -- which the rethrown
+          RunPersistenceError still does and the tests assert; the first line is a diagnostic,
+          which AC-10 puts on stderr by right, and a reading that capped a command's total
+          stderr output would also forbid commander's multi-line usage errors that AC-2
+          requires. The AC-12 amendment is honest: every clause of the new text matches the
+          code, TerminalState is untouched and src/core has an empty diff, and D13 records the
+          decision with decided_by user -- but the execution log contradicts it (F-9). R2-004
+          is behaviour-preserving by construction: revParseCommit reproduces both branches of
+          the old body including the synthetic "returned no revision" error, and local-over-
+          remote precedence, single-match ambiguity rejection, per-method error class and
+          --detach receiving a resolved SHA all survive; no contract case was edited. The
+          R2-001/R2-002 tests were verified by four mutations rather than trusted -- a constant
+          reorder, a renderer value swap, dropping the rethrow and fabricating a runDir each
+          produced Tests 1 failed, and the tree was restored byte-identical. No regression and
+          no scope creep: git diff of src/core is empty, no config file and no dependency was
+          touched, the three new dependency edges are exactly the claimed ones and all point
+          inward or within the same driving adapter. F-6 remains open for [E7.F1.H1] and its
+          shape grew by one line -- R2-003's shared clock binding is also verified only by
+          reading. Completion allowed: lifecycle_status returned to completed. Full detail in
+          the fourth section of qa-report.md.
+    notes: >-
+      Four reviews: two stage-mode (batch-s1-s4, batch-s5-s7) and two final-mode -- the
+      whole-change closeout of 2026-08-24 and this re-review of the S12 fix round after D12
+      reopened the change. All four pass; no blocker, no high, no medium and no
+      architecture-guard violation in any of them. This second final review returns the change
+      to completed: the five PR #73 findings are genuinely fixed, the happy path is provably
+      undisturbed, AC-13 is not violated by D13's two stderr lines and the AC-12 amendment is
+      honest. Five low findings recorded as info; F-9 (the execution log contradicting the spec
+      edit in its own commit) is the only one worth correcting before the PR threads are
+      answered.
+artifacts:
+  state: sdd-lite/openspec/changes/e6-f1-h1-cli-base/state.yaml
+  proposal: sdd-lite/openspec/changes/e6-f1-h1-cli-base/proposal.md
+  spec: sdd-lite/openspec/changes/e6-f1-h1-cli-base/spec.md
+  design: sdd-lite/openspec/changes/e6-f1-h1-cli-base/design.md
+  plan: sdd-lite/openspec/changes/e6-f1-h1-cli-base/plan.md
+  execution_log: sdd-lite/openspec/changes/e6-f1-h1-cli-base/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e6-f1-h1-cli-base/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e6-f1-h1-cli-base/review-ledger.md
+checkpoints:
+  - id: cp-proposal-b-decisions
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec, but three B-level decisions are deliberately unresolved and
+      spec should not invent answers to them: (1) adopt commander as the first runtime CLI
+      dependency, and whether picocolors belongs in this story or in [E6.F2.H2]; (2) who persists
+      a run after review, given runReview has no RunStore dep and nothing calls store.save();
+      (3) where the sentinel home path root comes from (~/.sentinel, SENTINEL_HOME, a global flag).
+    question: >-
+      Approve the proposal and continue to sddl-spec (carrying the three B-level questions to a
+      decision checkpoint there), revise this phase, or stop?
+    options:
+      - id: approve
+        label: Approve and continue to sddl-spec
+        description: >-
+          Proposal framing accepted; the B-level questions travel to spec, which must present
+          them for decision rather than resolve them.
+        recommended: true
+      - id: revise
+        label: Revise the proposal
+        description: Reframe the problem, scope sketch, or open questions before spec.
+      - id: stop
+        label: Stop
+        description: >-
+          Halt the change -- e.g. if the run-persistence gap should be settled as a backlog
+          question with the user before any further stage runs.
+    free_input_allowed: true
+    created_at: "2026-08-23T00:00:00Z"
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T21:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Proposal approved and all four open decisions settled at the checkpoint rather than being
+      carried into spec. The orchestrator independently confirmed the risk-e6h1-001 evidence
+      before escalating (RunReviewDeps has no RunStore member; `grep -rn "\\.save("` over src
+      excluding __test__ returns zero non-test callers; RunStore.save exists at
+      src/core/history/ports/run-store.ts:88). See decisions D1-D4.
+  - id: cp-spec-output-decisions
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is complete and definitive on everything D1-D4 settled, plus two A-level decisions
+      taken in this stage (AC-12 H1/H2 boundary, AC-11 processRunner wiring). Two B-level questions
+      remain deliberately unresolved because both are public-surface commitments: OQ-1 -- whether
+      the listing and review commands get a --json flag (spec recommends deferring it; AC-10
+      already guarantees stable line-oriented stdout with diagnostics on stderr); OQ-2 -- who
+      composes the RunReviewRequest cascade (spec recommends a pure resolveReviewRequest helper
+      exported from core/run's barrel, sibling to the already-exported resolveEngine; the
+      alternative is leaving the cascade in the adapter as pure option-defaulting).
+    question: >-
+      Decide OQ-1 (--json now or deferred) and OQ-2 (resolveReviewRequest in core/run, or the
+      cascade in the CLI adapter), then approve spec.md and continue to sddl-design?
+    options:
+      - id: approve-recommendations
+        label: Approve spec and take both recommendations (defer --json; resolveReviewRequest in core/run)
+        description: >-
+          AC-10's line-oriented stdout is the pipe contract for now, and the request cascade moves
+          into core beside resolveEngine, keeping the review command a parse-and-delegate shell.
+        recommended: true
+      - id: decide-differently
+        label: Approve spec but decide OQ-1 and/or OQ-2 differently
+        description: >-
+          e.g. commit to --json in this story, or accept the cascade inside the CLI adapter as
+          below AC-1's threshold. Free input carries the chosen answers into design.
+      - id: revise
+        label: Revise the spec
+        description: Change scope boundaries or acceptance criteria before design.
+      - id: stop
+        label: Stop
+        description: Halt the change.
+    free_input_allowed: true
+    created_at: "2026-08-23T22:00:00Z"
+    status: open
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T22:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Both open questions settled by the user. OQ-1 deferred, OQ-2 accepted as new core surface.
+      Before escalating OQ-2 the orchestrator independently confirmed its premise: RunReviewRequest
+      carries ten fields spanning flags, RepoEntry and GlobalConfig, and core/repos exports no
+      getRepo/resolveRepo -- only listRepos, listBranches, registerRepo and the config schemas.
+      See decisions D5-D6.
+  - id: cp-design-integration-decisions
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md is complete and concrete enough to plan against, but returned partial on two
+      integration findings it refused to decide alone: OQ-D1, the repo alias (`owner/repo` from
+      registerRepo's deriveAlias) versus RunStore's repoName path-segment constraint, which as
+      designed would fail every review inside persistRun and every `runs list` inside listRuns;
+      and OQ-D2, createOpenCodeAdapter's mandatory `model` with no config field supplying one.
+    question: >-
+      Where is the alias/path-segment mismatch fixed, and where does the opencode model come from?
+    status: resolved
+    resolution: approve
+    resolved_at: "2026-08-23T22:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      Both settled as D7 and D8. The orchestrator independently confirmed OQ-D1's premise before
+      escalating: PathSegmentSchema in src/core/history/ports/run-store-schemas.ts refines against
+      "/" and "\\", while deriveAlias in src/core/repos/register-repo.ts returns
+      `${owner}/${repo}` for any URL with two or more non-empty segments. The two contracts are
+      genuinely incompatible, not a misreading.
+  - id: cp-stage-approval-s1-s4
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      plan.md's eleven stages presented with their dependency order, the acceptance criteria each
+      satisfies, and the note that S9 (composition root) concentrates the blast radius and is
+      mitigated by sequencing rather than by tests of its own.
+    question: >-
+      How should the eleven execution stages be run -- one at a time, the core batch S1-S4, all
+      code stages S1-S9, or stop here?
+    status: resolved
+    resolution: batch-s1-s4
+    resolved_at: "2026-08-23T23:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User pre-authorised S1, S2, S3 and S4 as one approved batch: tooling prerequisites plus the
+      three core additions, each independently unit-testable and each required to end green on
+      `npm run check` + `npm test`. sddl-executor still runs ONE stage per invocation; the
+      batch removes the per-stage confirmation pause, not the per-stage execution boundary. The
+      orchestrator shows the accumulated diff before requesting approval for S5 (CLI adapter).
+      Stages S5-S11 remain unapproved.
+  - id: cp-stage-approval-s5-s7
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Stage QA over S1-S4 returned `pass` (0 blockers, 0 high, 0 medium; three low/info findings)
+      with both gates re-run independently: check exit 0, 551 tests across 31 files. QA confirmed
+      S5-S7 are safe to build on the S1-S4 foundation.
+    question: >-
+      How should the CLI adapter stages run, and should QA's F-1 (a vacuous assertion in
+      persist-run.test.ts) be hardened?
+    status: resolved
+    resolution: batch-s5-s7-with-f1-addendum
+    resolved_at: "2026-08-24T00:30:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved S5, S6 and S7 as one batch -- the CLI driving adapter, cut in three by diff
+      size rather than by concern. sddl-executor still runs ONE stage per invocation. S8-S11 stay
+      unapproved; the orchestrator stops after S7 and presents the accumulated diff before the
+      composition root. User also approved hardening F-1 as a small addendum to S5 rather than as
+      its own plan-routed fix stage: the assertion at persist-run.test.ts:193 cannot fail because
+      JSON.stringify escapes newlines, which the orchestrator reproduced independently. AC-5's
+      property stays covered by the sibling file-path assertion either way, so this is test
+      honesty, not a coverage gap.
+  - id: cp-stage-approval-s8-s9
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Stage QA over S5-S7 returned `pass` (0 blockers/high/medium, 2 low info) with both gates
+      re-run independently and three mutation-verification claims reproduced from scratch. S8
+      (src/main/paths.ts) and S9 (composition root) are the remaining code stages; S9 concentrates
+      the blast radius and is the first assembly of the full dependency graph.
+    question: >-
+      Run S8 and S9 as a batch, S8 alone, everything through S11, or stop?
+    status: resolved
+    resolution: batch-s8-s9
+    resolved_at: "2026-08-24T03:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved S8 and S9 as one batch, with an explicit stop before S10. Rationale recorded
+      at the checkpoint: S10's manual smoke is the only real evidence that the CLI works end to
+      end, and its transcript should reach the user directly rather than being summarised inside
+      a longer run. risk-e6h1-013 travels to S9 as a hard constraint: ONE sentinelPaths result
+      must feed both RegisterRepoDeps.clonesDir and CliDeps.clonesDir. S10 and S11 remain
+      unapproved.
+  - id: cp-stage-approval-s12
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Five verified review findings from PR #73, one of them a real correctness issue. Fix routed
+      through a new plan stage S12 rather than direct edits, per the review fix-routing rule.
+    question: >-
+      Which findings to act on, and what exit code should a post-review persistence failure produce?
+    status: resolved
+    resolution: fix-all-five
+    resolved_at: "2026-08-25T04:00:00Z"
+    resolved_by: user
+    resolution_notes: >-
+      User approved fixing all five (D12) and settled the exit-code question as verdict-on-stdout /
+      diagnostic-on-stderr / non-zero exit, with no new terminal state (D13). S12 is authorised;
+      final QA must re-run before the change returns to `completed`.
+decisions:
+  - id: D1
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: Run persistence is owned by a new `persistRun` use case in `core/history`
+    context: >-
+      Neither [E4.F1.H1] (runReview: worktree -> diff -> prompt -> engine -> parse -> terminal
+      state -> cleanup) nor [E5.F2.H1] (RunStore: complete persistence) assigns an owner to the
+      act of composing a RunRecord and calling save(). [E5.F2.H1] deliberately made RunRecord
+      caller-composed so that "history never depends on run's request shape and runReview is
+      never touched by this module's existence" (run-store.ts). The result is a genuine backlog
+      gap, not a design fork: PRD use case 5 and [E5.F2.H2]'s listRuns read a store nothing
+      writes. Escalated as workflow-contract rule 8 (C level).
+    decision: >-
+      Add a thin `persistRun` use case to `core/history` that composes a RunRecord from the
+      RunReviewRequest/RunReviewResult pair and calls RunStore.save(). The CLI adapter calls two
+      use cases in sequence and holds no mapping logic of its own. Accepted inside [E6.F1.H1]
+      rather than deferred to a new E5 story.
+    rationale: >-
+      Preserves this story's AC-1 (zero logic in the command) and honours [E5.F2.H1]'s explicit
+      decision to leave runReview untouched, which the rejected `runStore` in RunReviewDeps
+      option would have reversed. Composing the record in src/main/ was rejected as domain
+      mapping in the composition root, a grey zone against the "use cases are the only core API"
+      guard. Opening a separate E5 story was rejected as an extra PR that delays E6 for no
+      structural gain.
+    consequences: >-
+      [E6.F1.H1] widens beyond the backlog entry's literal text by adding one core/history use
+      case. The deviation is deliberate, user-authorised, and must be declared in the story's PR
+      description and in the history entry. spec.md must carry persistRun as in-scope with its
+      own acceptance criteria and unit tests (core, in-memory RunStore fake).
+  - id: D2
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Sentinel home root is `SENTINEL_HOME` with a `~/.sentinel` default
+    context: >-
+      createConfigStoreAdapter(basePath), createRunStoreFsAdapter(runsRoot),
+      createHarnessLoaderAdapter(basePath) and runReview's clonesDir/worktreesDir all require
+      absolute paths, and no component resolves them. The composition root is the first code
+      forced to decide (risk-e6h1-002).
+    decision: >-
+      Resolve one home root in the composition root: the SENTINEL_HOME environment variable when
+      set, otherwise ~/.sentinel. All adapter paths derive from it.
+    rationale: >-
+      Keeps the [E7.F1.H1] e2e smoke suite able to point at a temp directory without mutating the
+      real HOME, and stays scriptable in CI. A hardcoded ~/.sentinel would force HOME juggling in
+      tests; a global --home flag is noisier to type and does not cover the TUI entry point.
+    consequences: >-
+      SENTINEL_HOME becomes public surface and must be documented in --help and in [E7.F2.H1]
+      user documentation. design.md owns the exact subdirectory layout under the root.
+  - id: D3
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Review timeout comes from a new `reviewTimeoutMs` global config field plus a `--timeout` flag
+    context: >-
+      RunReviewRequest.timeoutMs is mandatory with no default, and GlobalConfigSchema carries only
+      validationTimeoutMs (risk-e6h1-003).
+    decision: >-
+      Add reviewTimeoutMs to GlobalConfigSchema as the default source, overridable per invocation
+      by a --timeout flag on the review command.
+    rationale: >-
+      Mirrors how validationTimeoutMs is already resolved, so the config format stays internally
+      consistent and the effective value stays visible and auditable. A composition-root constant
+      would make an agent-invoking CLI's slowest knob non-configurable; a mandatory flag is hostile
+      to interactive use.
+    consequences: >-
+      This is a config-format change to an existing schema. spec.md must state the default value
+      and the precedence order (flag > config > schema default), and the schema change needs its
+      own test coverage.
+  - id: D4
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Adopt `commander` only; defer `picocolors` to [E6.F2.H2]
+    context: >-
+      First runtime dependency since E0 (risk-e6h1-004). docs/setup-tecnico-sentinel.md §4
+      recommends commander, @clack/prompts, picocolors and optional marked/marked-terminal, but
+      CLAUDE.md makes those recommendations re-evaluable at implementation time with justification.
+    decision: >-
+      Add commander as the only new runtime dependency in this change. picocolors is deferred to
+      [E6.F2.H2] (terminal result rendering), which owns output presentation. @clack/prompts stays
+      with [E6.F2.H1] (TUI). The setup doc's recommendation is ratified, not overridden.
+    rationale: >-
+      Keeps a command-surface story to one new dependency and avoids committing to output styling
+      before the story that owns rendering exists. node:util parseArgs was rejected: hand-rolling
+      subcommands, per-command --help and validation is precisely this story's AC-2, and it would
+      deviate from the setup doc without a benefit that justifies the divergence.
+    consequences: >-
+      package.json runtime deps go from 3 to 4. The bootstrap refresh trigger recorded in
+      config.yaml ("first E6 runtime dependency") is satisfied by this change and config.yaml plus
+      project-context.md need a follow-up touch once it merges.
+  - id: D5
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: RunReviewRequest composition is owned by a pure `resolveReviewRequest` in `core/run`
+    context: >-
+      Surfaced by sddl-spec beyond its brief and logged as risk-e6h1-007 / OQ-2. Nothing owns
+      composing a RunReviewRequest from the flag -> RepoEntry -> GlobalConfig cascade (repoPath,
+      baseRef, targetRef, harnessType, timeoutMs, cleanupPolicy, limits, validations,
+      validationTimeoutMs, engineName). core/repos exports no getRepo/resolveRepo; only
+      resolveEngine exists as a pure exported core helper. Putting the cascade in the review
+      command is the same class of concern D1 removed from the CLI, and [E6.F2.H1]'s TUI would
+      need to duplicate the same precedence rules.
+    decision: >-
+      Export a pure `resolveReviewRequest` from `core/run`'s public barrel, sibling to
+      `resolveEngine`. The CLI passes parsed flags plus the resolved RepoEntry/GlobalConfig and
+      receives a complete RunReviewRequest; the command holds no precedence logic.
+    rationale: >-
+      Consistent with D1 and with AC-1 (zero logic in the command), and resolveEngine already sets
+      the precedent for a pure resolver living in core/run's barrel. Leaving the cascade in the
+      adapter was rejected because the TUI must reuse it; a getRepo use case plus in-CLI merging
+      was rejected as a half fix -- it relocates the lookup but leaves the precedence rules in the
+      command.
+    consequences: >-
+      Second piece of core surface this story adds beyond its literal backlog text, after D1. Both
+      deviations must be declared together in the PR description and the history entry. design.md
+      owns resolveReviewRequest's exact signature and its interaction with resolveEngine; it needs
+      core unit tests covering the precedence order fixed by D3 (flag > config > constant).
+  - id: D6
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: No `--json` flag in this story; stable line format only
+    context: >-
+      OQ-1 from spec.md. The backlog says only "output suitable for terminal and pipes".
+      A --json surface is a public API commitment (payload shape, versioning).
+    decision: >-
+      [E6.F1.H1] ships AC-10 only -- results on stdout, diagnostics on stderr, one stable line per
+      record. The --json question is deferred to [E6.F1.H2] (#37), the non-interactive scripting
+      story that is its natural owner. Not closed off permanently.
+    rationale: >-
+      AC-10 already satisfies "suitable for terminal and pipes". Committing to a JSON payload shape
+      before a real consumer exists to validate it risks freezing the wrong contract; #37 is where
+      TTY-less scripting requirements actually land. Ruling --json out forever was rejected: the
+      PRD's gate mode will likely want it.
+    consequences: >-
+      spec.md's OQ-1 is closed as deferred. design.md must not introduce a JSON serializer, and
+      the output format it fixes should stay easy to extend with one later.
+  - id: D7
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Alias-to-storage-key normalisation lives module-private inside `core/history`
+    context: >-
+      OQ-D1, surfaced by sddl-design and confirmed by the orchestrator against the source.
+      registerRepo's deriveAlias returns `owner/repo`; RunStore's RunRecordPathFieldsSchema and
+      RunQueryFieldsSchema validate repoName through PathSegmentSchema, which refines against any
+      "/" or "\\". As designed, `sentinel review` would fail inside persistRun and `runs list`
+      inside listRuns for every registered repo -- exactly the integration-mismatch class
+      risk-e6h1-006 predicted, caught at design rather than in CI.
+    decision: >-
+      Add a module-private, idempotent normaliser in core/history mapping `owner/repo` to
+      `owner__repo`, applied by persistRun, listRuns and getRun. No new public export, no
+      signature change. The user-facing alias stays `owner/repo` everywhere else, including
+      `repo list` output and the `review <repo>` argument.
+    rationale: >-
+      Keeps the storage-key rule inside the module that owns the persistence contract, so the CLI
+      never learns it and [E6.F2.H1]'s TUI inherits it for free. Exporting a public
+      `toRunRepoName` was rejected as a third piece of core surface that would push a persistence
+      detail into the adapter. Changing deriveAlias to emit `owner__repo` at the root was rejected
+      as a larger blast radius: it reopens [E2.F2.H2], changes the `clones/` directory layout, and
+      degrades the alias the user reads and types.
+    consequences: >-
+      This changes the observable behaviour of listRuns and getRun, two use cases already merged
+      by [E5.F2.H2], which spec.md had declared out of scope. The deviation is user-authorised and
+      must be declared in the PR description and the history entry alongside D1 and D5. plan.md
+      must give it its own execution stage with core unit tests covering idempotency and an alias
+      that needs no normalisation.
+  - id: D8
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: OpenCode model comes from `SENTINEL_OPENCODE_MODEL`, with a clear failure when unset
+    context: >-
+      OQ-D2. createOpenCodeAdapter requires a mandatory `model` (docs/engines/opencode.md: the
+      `-m provider/model` flag is mandatory in practice) and no GlobalConfig field supplies one.
+    decision: >-
+      container.ts reads SENTINEL_OPENCODE_MODEL. When the resolved engine is `opencode` and the
+      variable is unset or empty, fail with a one-line stderr message naming the variable. No
+      model id is hardcoded and GlobalConfigSchema is not touched.
+    rationale: >-
+      Keeps this story to the single config-format change D3 already authorised, and avoids
+      baking a provider/model string into the repo that would drift. A GlobalConfig field is more
+      discoverable but is a second schema change in one story; dropping opencode from the wiring
+      was rejected because it would leave [E4.F2.H2] unreachable from the CLI.
+    consequences: >-
+      SENTINEL_OPENCODE_MODEL joins SENTINEL_HOME as public surface and must appear in root
+      `--help` and in [E7.F2.H1] documentation. A future story may promote it to config.
+  - id: D9
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Accept the D7 normalisation leak on the error path; revisit in E7
+    context: >-
+      risk-e6h1-010, surfaced by S6 and confirmed by the orchestrator. RunNotFoundError is
+      constructed by the driven store adapter (run-store-fs.ts:361, :408), which only ever
+      receives the normalised storage key, so a failed `runs show owner/repo x` prints
+      `Run not found: owner__repo/x` on stderr. The happy path is clean: S6's and S7's renderers
+      echo the requested alias by construction and never read the stored repoName.
+    decision: >-
+      Accept it for now. No code change in [E6.F1.H1]. The risk stays recorded with its three
+      options; the natural moment to decide is [E7.F1.H2] (dogfooding), where it will either
+      prove annoying in practice or prove irrelevant.
+    rationale: >-
+      The leak is cosmetic and confined to an error path. Fixing it in getRun would be this
+      story's FOURTH core behaviour change and the third against code already merged by
+      [E5.F2.H2] -- disproportionate to a stderr string. Branching per error type in the adapter
+      is forbidden by AC-13. Dogfooding is cheap evidence for a decision that does not need to be
+      made now.
+    consequences: >-
+      risk-e6h1-010 stays open past this story's close and must appear in the PR description's
+      known-limitations note and in the history entry, so it is not silently inherited.
+  - id: D10
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: "`npm run dev` becomes `tsup --silent && node dist/cli.js`"
+    context: >-
+      Escalated by S9 and reproduced by the orchestrator. `npm run dev` now fails with
+      ERR_MODULE_NOT_FOUND on src/adapters/driving/cli/index.js: Node's --experimental-strip-types
+      does not rewrite `.js` specifiers to sibling `.ts` files, and the repo uses `.js` everywhere
+      per NodeNext. The [E0.F1.H3] stub never imported source code, so the breakage surfaces
+      exactly at S9, the first cli.ts with real imports. This refutes a documented assumption in
+      four files (docs/setup-tecnico-sentinel.md §5.1, CLAUDE.md, README.md, CONTRIBUTING.md),
+      which makes it C-level under the project's A/B/C protocol -- reality contradicting the docs,
+      not a design fork.
+    decision: >-
+      Change the `dev` script to `tsup --silent && node dist/cli.js` and update the four documents
+      that describe it. No new dependency: tsup is already installed and already backs `build`.
+    rationale: >-
+      Measured rebuild is ~0.7s, and `npm run dev -- --help` still forwards arguments, so the
+      developer experience is materially unchanged. Adding tsx was rejected as a new devDependency
+      the technical setup does not contemplate, in a story that already touched package.json for
+      commander (D4). Migrating ~97 modules to `.ts` specifiers was rejected by S9 itself as a
+      repo-wide change that abandons the NodeNext convention. Deferring was rejected because it
+      leaves four documents asserting something false.
+    consequences: >-
+      package.json is touched a second time in this story, after D4's commander addition. Four
+      documents change. Executed as addendum stage S9b so the diff stays isolated and reviewable
+      rather than being folded into S9's commit. S10's smoke can then use `npm run dev` as the
+      docs promise, which is itself a check on this decision.
+  - id: D11
+    level: C
+    authorship: claude->user
+    decided_by: user
+    title: Fix the remote-only-branch worktree defect inside [E6.F1.H1]
+    context: >-
+      risk-e6h1-014, found by S10's smoke and root-caused by the orchestrator. `git worktree add
+      --detach <path> <branch>` fails with `fatal: invalid reference` when the branch exists only
+      as remotes/origin/<name> -- the normal case for a PR branch in a managed clone. So `sentinel
+      review`, this story's headline command, is unusable for its primary use case. The defect
+      lives in [E2.F1.H2]'s git adapter, merged long before this story.
+    decision: >-
+      Fix it inside [E6.F1.H1] as stage S10b, together with the missing contract-suite coverage
+      for the remote-only case.
+    rationale: >-
+      `review` is the command [E6.F1.H1] exists to deliver; merging it broken for the case it was
+      built for would be shipping something that does not work. Routing the fix to a new E2 issue
+      was rejected as either leaving main with a broken review or blocking this PR on another one.
+      Documenting the limitation was rejected outright for the same reason. The fix is small and
+      its blast radius is one adapter method.
+    approach_guidance: >-
+      Preserve the ephemeral-worktree design intent: PRD §5.1 requires an ephemeral worktree per
+      review and explicitly never a checkout in the managed clone, so simply dropping `--detach`
+      is the wrong fix -- it would create local branches in the clone and make two concurrent
+      reviews of the same branch collide. Resolve the commitish to a concrete revision first
+      (local ref, else the unique remote-tracking ref) and hand that to `--detach`. The exact
+      mechanism is the stage's A-level call.
+    consequences: >-
+      Fourth authorised widening of this story, and the second against code merged by an earlier
+      epic (after D7). D1, D5, D7 and now this must all be declared together in the PR description
+      and the history entry. S10's smoke must be re-run after the fix to confirm end to end.
+  - id: D12
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: Act on all five PR #73 review findings before merge
+    context: >-
+      The repo owner posted five COMMENTED review threads on PR #73 (R4-001 Resilience WARNING,
+      R2-001/R2-002/R2-004 Readability WARNING, R2-003 SUGGESTION). The orchestrator verified all
+      five against the source: none is a false positive. Under the project's own severity floor,
+      WARNING/SUGGESTION are recorded as info and never block -- so acting on them is a choice,
+      not an obligation.
+    decision: >-
+      Fix all five in a plan-routed fix stage (S12) before the PR is merged, then answer and
+      resolve each thread.
+    rationale: >-
+      R4-001 is correctness with real user impact: a persistRun throw discards a completed
+      multi-minute review's verdict entirely. R2-003 is a one-line seam inconsistency
+      (startedAtEpochMs and durationMs come from two different clocks). R2-001/R2-002 close a
+      whole drift class by copying a correct pattern that already exists in the same directory
+      (format-review.ts derives its line from its constant). R2-004 is the most taste-driven, but
+      it is local and covered by 13 contract cases. Cheap to fix, and they came from the human
+      reviewer.
+    consequences: >-
+      The change reopens from `completed` back to `implementing`; final QA must re-run before it
+      can be marked completed again. `review-command.ts`, `cli-deps.ts`, `container.ts`,
+      `format-repos.ts`, `format-runs.ts` and `git-cli.ts` are touched.
+  - id: D13
+    level: B
+    authorship: claude->user
+    decided_by: user
+    title: A persistence failure prints the verdict and exits non-zero
+    context: >-
+      R4-001's fix needs an exit-code rule that AC-12 does not cover: what happens when the review
+      itself completes but persistRun then throws. The reviewer suggested "a distinct state".
+    decision: >-
+      Render the review outcome on stdout regardless, emit the persistence failure as a diagnostic
+      on stderr, and exit non-zero. No new terminal state.
+    rationale: >-
+      AC-12 guarantees exit 0 for a COMPLETED invocation; a run whose record never reached disk did
+      not fully complete, so the guarantee is not violated. The user still sees the verdict they
+      waited minutes for, and a script can still detect that no history was written. A sixth
+      terminal state was rejected outright: the five in PRD §4 are a domain contract, and adding
+      one from an adapter concern would be a level-C change to the core model.
+    consequences: >-
+      spec.md's AC-12 wording gains this boundary case. The exit-code table remains [E6.F1.H2]'s;
+      this is a single documented exception, not a table.
+open_risks:
+  - id: risk-e6h1-001
+    summary: >-
+      Run persistence has no owner: RunReviewDeps excludes RunStore and no code calls
+      store.save(), so sentinel review would write no history and PRD use case 5 (consult a
+      repo's review history) stays dead. Fixing it in the CLI adapter would violate this story's
+      own AC-1 (zero logic in the command); fixing it in core adds surface the backlog entry does
+      not authorize. May be a workflow-rule-8 STOP rather than a design fork.
+    severity: high
+    status: resolved
+    resolution: >-
+      Escalated to the user as a C-level backlog gap and settled by D1: a new `persistRun` use
+      case in core/history, in scope for this change.
+  - id: risk-e6h1-002
+    summary: >-
+      No component resolves the sentinel home root. ConfigStore, HarnessLoader, RunStore and
+      runReview all require injected absolute paths (basePath, runsRoot, clonesDir, worktreesDir)
+      and the composition root is the first code that must decide. Affects config-format
+      expectations and every later story that reads those files.
+    severity: medium
+    status: resolved
+    resolution: Settled by D2.
+  - id: risk-e6h1-003
+    summary: >-
+      RunReviewRequest.timeoutMs is mandatory with no default and GlobalConfigSchema has no
+      review/engine timeout field (only validationTimeoutMs). The review command needs a value
+      from a source that does not exist yet; adding a config field is a config-format change.
+    severity: medium
+    status: resolved
+    resolution: Settled by D3.
+  - id: risk-e6h1-004
+    summary: >-
+      First runtime dependency added since E0 (current deps: execa, yaml, zod). Per CLAUDE.md the
+      setup doc's commander recommendation is re-evaluable on implementation with justification,
+      making adoption a B-level decision the user owns.
+    severity: medium
+    status: resolved
+    resolution: Settled by D4.
+  - id: risk-e6h1-005
+    summary: >-
+      H1/H2 overlap risk: [E6.F1.H2] (#37) owns the review exit-code contract but both stories
+      touch the same command. proposal.md proposes an explicit boundary that spec must confirm.
+    severity: low
+    status: resolved
+    resolution: >-
+      Confirmed at sddl-spec as an A-level decision and fixed as spec.md AC-12. H1 owns review's
+      full argument surface (<repo> <branch> --type --engine --timeout), the runReview + persistRun
+      invocation and the printed result, exiting 0 for any completed invocation regardless of
+      terminal state and non-zero only on usage/invocation failure. H2 adds the terminal-state to
+      exit-code mapping, its configurability and the no-TTY guarantee. Rationale: H1 must define
+      --type regardless, because RunReviewRequest.harnessType is mandatory and has no other source;
+      [E6.F1.H2]'s backlog description restates the command shape as context, and the only surface
+      its acceptance criteria uniquely name is exit codes plus TTY-less usability.
+  - id: risk-e6h1-007
+    summary: >-
+      Composing the RunReviewRequest from the flag -> RepoEntry -> GlobalConfig cascade (repoPath,
+      baseRef, harnessType, timeoutMs, limits, validations, validationTimeoutMs) has no owner. If
+      it lands inside the review command it is the same class of concern D1 removed from the CLI
+      and it duplicates PRD 3.1-D precedence rules outside core, where the TUI ([E6.F2.H1]) will
+      need them again. Recorded as spec.md OQ-2, B-level (additive core surface, like D1).
+    severity: medium
+    status: resolved
+    resolution: Settled by D5 (resolveReviewRequest in core/run).
+  - id: risk-e6h1-015
+    summary: >-
+      Cosmetic, found by S10's smoke. After a review completes, the per-repo parent directory
+      under worktrees/ is left behind empty (e.g. $SENTINEL_HOME/worktrees/repo2). The worktree
+      itself is correctly removed -- cleanup works -- but its parent is not pruned. Harmless
+      litter, no leak, no growth per run beyond one directory per repo.
+    severity: low
+    status: open
+    owner_stage: follow-up
+  - id: risk-e6h1-016
+    summary: >-
+      QA F-11 (low). After S12, a post-review persistence failure emits TWO stderr lines: the
+      command's diagnostic and the catch-all's one-line rendering of the cause. The final QA judged
+      this NOT an AC-13 violation -- AC-13 governs how a core typed error renders (one line, no
+      stack), which still holds, and AC-10 puts diagnostics on stderr by right; a reading where
+      AC-13 capped total stderr output would also forbid the multi-line commander usage errors AC-2
+      requires. Two qualifications remain: the lines are partly redundant, and the second discloses
+      the attempted run directory while stdout reports `runDir -`. A tidy for `[E6.F1.H2]`.
+    severity: low
+    status: open
+    owner_stage: E6.F1.H2
+  - id: risk-e6h1-017
+    summary: >-
+      QA F-12 (low). `renderRecord` in format-repos.ts / format-runs.ts binds values to fields by
+      LENGTH, unlike format-review.ts's `renderOutcome`, which binds by key. Field-order drift is
+      still caught by the new tests, but an extra value with no declared field would be silently
+      dropped rather than failing. Tightening it to key-binding would make the three renderers
+      uniform.
+    severity: low
+    status: open
+    owner_stage: follow-up
+  - id: risk-e6h1-018
+    summary: >-
+      QA F-13 (low, pre-existing). `state.yaml`'s `artifacts.review_ledger` points at
+      `review-ledger.md`, which never existed for this change -- no `sddl-code-review` or
+      `sddl-judgment-day` protocol ran, so per the orchestrator guardrails the file correctly does
+      not exist. The stale path predates S12 and is a template artifact, not a missing deliverable.
+    severity: low
+    status: open
+    owner_stage: follow-up
+  - id: risk-e6h1-008
+    summary: >-
+      Engines mismatch introduced by S1: commander@15.0.0 declares engines.node ">=22.12.0" while
+      package.json declares ">=22". Verified directly in node_modules/commander/package.json. CI is
+      unaffected -- .github/workflows/ci.yml pins node [22, 24], which actions/setup-node resolves
+      to the latest 22.x -- but a consumer installing @nico0695/sentinel on Node 22.0-22.11 would
+      hit EBADENGINE. Deliberately not fixed in passing: S1's scope was "package.json ... nothing
+      else", and engines is published metadata. Decide before [E7.F2.H3] (first publish).
+    severity: low
+    status: open
+  - id: risk-e6h1-009
+    summary: >-
+      Surfaced by S3. D7 authorises INPUT normalisation only, so RunSummary/RunRecord objects
+      returned by the store still carry the normalised `owner__repo` in their own repoName field.
+      If S6/S7's renderers print that field verbatim, the user reads `owner__repo` where they
+      typed `owner/repo`. The renderers must echo the requested alias instead of the stored key.
+      Deliberately not fixed inside S3, whose scope was the helper and its two call sites.
+    severity: medium
+    status: open
+    owner_stage: S6/S7
+  - id: risk-e6h1-010
+    summary: >-
+      Surfaced by S6 and confirmed by the orchestrator. RunNotFoundError composes its message in
+      core as `Run not found: ${repoName}/${id}`, and it is constructed by the DRIVEN adapter
+      (src/adapters/driven/storage/run-store-fs.ts:361 and :408), which only ever receives the
+      normalised storage key -- getRun passes toRunStorageKey(request.repoName) down. So a failed
+      `runs show owner/repo x` prints `Run not found: owner__repo/x` on stderr, leaking D7's
+      normalisation to the user on the error path. The happy path is clean: S6's renderers echo
+      the requested alias by construction and never read the stored repoName.
+      Options if fixed: (a) getRun catches RunNotFoundError and rethrows carrying the original
+      alias -- a fourth core behaviour change, same class as D7; (b) branch per error type in the
+      CLI, which AC-13 forbids; (c) accept it as a cosmetic leak on an error path only.
+      Not fixed in S6: outside its scope, and the choice is the user's.
+    severity: low
+    status: open
+    owner_stage: user decision, candidate for S9 or a follow-up story
+  - id: risk-e6h1-011
+    summary: >-
+      QA finding F-4, confirmed by the orchestrator. `repo add` on a CLONED repo prints `-` where
+      spec's behaviour table promised the resolved local path. register-repo.ts:84 computes
+      `${deps.clonesDir}/${alias}` into a local variable and clones there, but the persisted
+      RepoEntry carries `localPath` only when --local-path was supplied. S6 was right not to
+      re-derive the path in a renderer -- that cascade belongs to core -- so the clean fix would
+      be further core surface, which is unauthorised. Verify in S10's smoke, raise at S11.
+    severity: low
+    status: open
+    owner_stage: S10 evidence, S11 decision
+  - id: risk-e6h1-012
+    summary: >-
+      QA finding F-5. `review`'s outcome block omits the run id, so a user following up with
+      `runs show` must read it out of runDir's last path segment. Spec-conformant as written --
+      AC-6 requires the run directory, not the id -- so this is a usability note, not a defect.
+      Recorded for [E6.F1.H2] (#37) and [E7.F2.H1] (user documentation).
+    severity: low
+    status: open
+    owner_stage: E6.F1.H2 / E7.F2.H1
+  - id: risk-e6h1-013
+    summary: >-
+      QA carry-forward for S9, confirmed by the orchestrator against both sources. register-repo.ts:84
+      (`${deps.clonesDir}/${alias}`) and resolve-review-request.ts:117
+      (`entry.localPath ?? ${input.clonesDir}/${input.repoAlias}`) concatenate identical path
+      strings independently. The composition root MUST feed one single sentinelPaths(...) result
+      to both RegisterRepoDeps.clonesDir and CliDeps.clonesDir. If they diverge, `repo add` clones
+      to one directory and `review` looks in another -- silent, and invisible to every unit test
+      with fakes. This is precisely the risk-e6h1-006 failure class; S10's smoke is what would
+      catch it.
+    severity: medium
+    status: resolved
+    resolution: >-
+      Discharged by S9's construction and CONFIRMED by S10's smoke: `repo add` cloned into
+      $SENTINEL_HOME/clones/smoke/repo2 and `review` resolved the same path, producing a real
+      1-file diff. The two clonesDir consumers demonstrably agree at runtime, not just by reading.
+    owner_stage: S9
+  - id: risk-e6h1-014
+    summary: >-
+      FOUND BY S10's SMOKE -- the failure risk-e6h1-006 predicted, now concrete. `sentinel review
+      <repo> <branch>` fails at the worktree stage for any branch that exists only on the remote,
+      which in a managed clone is the normal case for a PR branch. Root cause isolated by the
+      orchestrator: git-cli.ts:157-165 runs `git worktree add --detach <path> <commitish>`, and
+      `--detach` suppresses git's DWIM resolution of a remote-only branch. Demonstrated on a real
+      clone: `--detach <path> feature` -> `fatal: invalid reference: feature` (exit 128); the same
+      command without `--detach` succeeds via DWIM; `--detach <path> origin/feature` also succeeds.
+      Why 661 tests missed it: GitPort.contract.ts:46 defines its fixture branch as one that
+      "exists both locally and as origin/<name>" -- the only case where --detach works. The
+      remote-only case has no coverage.
+      The CLI behaves correctly around the failure: state engine-error, failureStage "worktree",
+      exit 0 per AC-12, and the run IS persisted -- so D1, AC-6 and AC-12 are all confirmed working
+      by the same transcript.
+      The defect is in [E2.F1.H2]'s git adapter, not in this story's code.
+    severity: high
+    status: resolved
+    resolution: >-
+      Resolved by S10b + S10c and CONFIRMED by the re-run smoke: a remote-only branch now clears worktree, merge-base and diff. Full flow ok/request-changes against a real engine.
+    owner_stage: user decision (C-level scope call)
+  - id: risk-e6h1-006
+    summary: >-
+      src/main/cli.ts is hot-path wiring and this change assembles the full dependency graph for
+      the first time; integration mismatches between core request shapes and adapter factories
+      surface here, with the e2e smoke suite ([E7.F1.H1]) not yet available as a safety net.
+    severity: medium
+    status: resolved
+    resolution: >-
+      Discharged by S10's smoke. The full graph was exercised end to end against a real repository and a real engine: clone, remote-only ref resolution, worktree, 1-file/11-line diff, 220-line prompt, claude-code invocation, verdict parse (request-changes), persistence of prompt.md/result.md/metadata.json, and read-back via runs list/runs show. It found exactly what fake-based tests could not -- risk-e6h1-014, a high-severity defect invisible to 661 tests.
+next_action:
+  kind: complete
+  target: e6-f1-h1-cli-base
+  summary: >-
+    Final QA re-run after S12 returned `pass`: gates green and matching exactly (check exit 0,
+    97 modules / 229 dependencies, 681 tests across 38 files, build 107.36 KB, GitPort contract
+    40/40), all five PR #73 fixes verified correct rather than merely present, AC-13 judged not
+    violated by D13's two stderr lines, and the AC-12 amendment confirmed honest. The change is
+    `completed`. Remaining work is session bookkeeping, not implementation: answer and resolve
+    the five PR #73 review threads, correct F-9 (the S12 execution-log bullet claims the AC-12
+    spec text was not updated while its own commit amends it), and write the `history/` entry.
+    Never merge the PR.
+created_at: "2026-08-23T00:00:00Z"
+updated_at: "2026-08-25T07:00:00Z"

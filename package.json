@@ -15,7 +15,7 @@
     "skills"
   ],
   "scripts": {
-    "dev": "node --experimental-strip-types src/main/cli.ts",
+    "dev": "tsup --silent && node dist/cli.js",
     "build": "tsup",
     "check": "biome check . && tsc --noEmit && depcruise src",
     "test": "vitest run"
@@ -29,6 +29,7 @@
     "vitest": "4.1.10"
   },
   "dependencies": {
+    "commander": "^15.0.0",
     "execa": "^9.6.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

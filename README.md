@@ -24,7 +24,7 @@ Requires **Node ≥ 22**.
 npm ci
 npm run check   # biome + tsc --noEmit + architecture guards
 npm test        # vitest run
-npm run dev     # run the CLI from source
+npm run dev     # rebuild with tsup, then run the CLI
 ```
 
 The published binary is `sentinel` (alias `snt`); packaging lands later in the

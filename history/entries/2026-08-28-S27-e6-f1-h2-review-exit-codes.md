@@ -24,6 +24,7 @@ spec → design → plan → executor → final QA, and open its PR.
 | S27-D7 | Author `spec.md` inline (orchestrator) after the delegated worker was cut off | Re-delegate a fresh spec worker | A provider spend limit interrupted the worker mid-stage; decisions were already firm; re-delegating would spend more budget. Fallback clause invoked, degradation recorded as `risk-e6h2-004` | `claude` (A, forced) |
 | S27-D8 | Execute S1–S4 in one approved pass + S5 gate | Batch by dependency; one stage at a time | Small change, fully in-process testable (no engine/git/TTY) — batching is safe | `claude→user` |
 | S27-D9 | Fix `risk-e6h2-005` (blank `--changes-exit-code` → silent soft gate) before opening the PR | Defer as a hardening nit (QA logged it non-blocking) | One-line guard + one test in the same file; improves exactly the contract this story ships | `claude→user` |
+| S27-D10 | Act on the PR #74 review: make `resolveReviewExitCode` fail **closed** (2) on an `ok` run with no verdict, not open (0) | Keep the fail-open default; reply that it is type-impossible | The repo owner's review was validated as genuine — for a gate an untrustworthy `ok` must be rejected, same bucket as `ambiguous`; fail-open is the dangerous direction (`risk-e6h2-006`) | `claude→user` |
 
 ## Deviations
 
@@ -35,6 +36,11 @@ spec → design → plan → executor → final QA, and open its PR.
 - **Final QA (verdict `pass`) surfaced `risk-e6h2-005`**: `parseChangesExitCode` accepted an
   empty/whitespace argument as a silent soft-gate 0 (`Number("")===0`). Non-blocking (violates no AC),
   but a real scripting footgun; fixed before the PR at the user's request (S27-D9).
+- **PR #74 review (repo owner, "cambios recomendados") surfaced `risk-e6h2-006` (high)**: the exit-code
+  mapping failed **open** on an `ok` result with no verdict (`→ 0`). Validated as genuine and fixed to
+  fail closed (`→ 2`, S27-D10) with a CLI integration test and a mutation-verify; spec AC-7 and design
+  amended. This is `risk-e6h2-004` (inline-authored spec under reduced isolation) materialising exactly
+  where predicted — the QA validated against the spec and so did not challenge its defensive default.
 
 ## Work done
 
@@ -42,13 +48,14 @@ spec → design → plan → executor → final QA, and open its PR.
 - `5ddba58` proposal + state (issue #37, D1–D3 decided) · `f7b1f11` spec (10 ACs) · `d341ee9` spec checkpoint resolved · `f439670` design (`ReviewExitSignal`) · `cc1db55` plan (5 stages)
 - `25542bb` **feat(cli): review exit codes — closes #37** — new `cli/exit-code.ts` (`resolveReviewExitCode` + `ReviewExitSignal`), `--changes-exit-code` flag + validator, `runProgram` branch, `--help` contract, e2e + unit tests
 - `c38e51a` final QA `pass`, change `completed` · `add25d7` fix: reject blank `--changes-exit-code` (`risk-e6h2-005`)
+- PR **#74** opened (`Closes #37`); `d7ac878` fix: fail closed on `ok`-without-verdict (`risk-e6h2-006`, from the owner's review) — `npm run check` clean, `npm test` **708/39**; review answered on the PR
 - Validations: `npm run check` clean (biome + tsc + depcruise, 98 modules, 232 deps, 0 violations); `npm test` **707 passed / 39 files** (baseline 681/38; +26 tests, +1 file). Independently re-run by the orchestrator and by final QA. Two executor mutation-verifies killed the expected tests and were reverted.
 - 9 stage delegations attempted (1 interrupted); all sdd-lite stages completed; change `completed`.
 
 ## Pending and next steps
 
-- **PR for `[E6.F1.H2]` (`Closes #37`)** — being opened by the orchestrator now; **review + merge is the user's** (never Claude's).
-- Risks: `e6h2-002/003/004/005` resolved; `e6h2-001` (the two-axis conflation) encoded by `e6h2-D1` and covered by the exit-code table tests. None left blocking.
+- **PR #74 (`Closes #37`)** — opened; the owner's review found `risk-e6h2-006`, fixed and pushed (`d7ac878`), the review answered on the PR. Awaiting the owner's re-review + merge; **merge is the user's** (never Claude's).
+- Risks: `e6h2-002/003/004/005/006` resolved; `e6h2-001` (the two-axis conflation) encoded by `e6h2-D1` and covered by the exit-code table tests. None left blocking.
 - Next E6 stories (not started): `[E6.F2.H1]` TUI navigation (#38), then `[E6.F2.H2]` result rendering (#39). `[E6.F2.H3]` (`sentinel open`) is ⚪ optional.
 
 ## Open questions for the user

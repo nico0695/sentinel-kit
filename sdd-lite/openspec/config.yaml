@@ -21,10 +21,12 @@ paths:
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
 
-# NOTE: E0 through E5 have landed on `main` @ 1e7cf01. All four scripts are runnable
-# and verified exit 0 on 2026-08-23 against that commit: `npm run check` (full form,
-# biome over 118 files + tsc + depcruise over 81 modules, 0 violations), `npm test`
-# (vitest, 500/500 across 28 files), `npm run build` (tsup) and `npm run dev`.
+# NOTE: E0 through E6.F1.H1 have landed on `main` @ 16e3650 (PR #73 merged). All four
+# scripts are runnable and verified exit 0 as of that merge: `npm run check` (biome +
+# tsc + depcruise, 0 violations), `npm test` (vitest, 681/681 across 38 files),
+# `npm run build` (tsup) and `npm run dev` (now `tsup --silent && node dist/cli.js`).
+# `[E6.F1.H1]` added the CLI adapter (`src/adapters/driving/cli/`), the `commander`
+# runtime dep, and the `src/main/` composition root (cli.ts, container.ts, paths.ts).
 quality_commands:
   install:
     - npm ci
@@ -44,19 +46,18 @@ bootstrap:
   strategy: shallow-high-signal
   generated_at: "2026-08-01T14:39:32Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-23T21:00:00Z"
-  # Surgical refresh 2026-08-23 by the orchestrator (not a full sddl-init run),
-  # post-E4/E5 on `main` @ 1e7cf01, at the start of `[E6.F1.H1]`. What changed since
-  # the 2026-08-09 entry: E4 (runReview, verdict parser, claude-code + opencode
-  # adapters, cascading engine resolution) and E5 (ProcessRunner + exec adapter,
-  # declared validations, RunStore + history queries) landed; `npm test` grew from
-  # 163 tests / 14 files to 500 / 28; five new test roots appeared (core/run,
-  # core/history, adapters/driven/exec, engines/claude-code, engines/opencode).
-  # Runtime deps are still execa + yaml + zod: the previous refresh trigger ("the
-  # first E6 runtime dependency") is firing now — `[E6.F1.H1]` is expected to add
-  # the CLI parser and terminal-style deps, so this file needs a follow-up touch
-  # once that change's design ratifies them.
-  # Next refresh trigger: E6 runtime deps merged, or E7 (release pipeline).
+  last_validated_at: "2026-08-28T00:00:00Z"
+  # Surgical refresh 2026-08-28 by the orchestrator (not a full sddl-init run),
+  # post-E6.F1.H1 on `main` @ 16e3650, at the start of `[E6.F1.H2]`. What changed
+  # since the 2026-08-23 entry: `[E6.F1.H1]` (PR #73) landed the CLI adapter under
+  # `src/adapters/driving/cli/` (commander shell + repo/runs/review commands +
+  # renderers) and the `src/main/` composition root (cli.ts, container.ts, paths.ts);
+  # `commander ^15` is now the first E6 runtime dep; `npm test` grew from 500/28 to
+  # 681/38 (two new test roots: adapters/driving/cli, main); `npm run dev` changed to
+  # `tsup --silent && node dist/cli.js` (NodeNext `.js` specifiers broke strip-types).
+  # `[E6.F1.H2]` extends the review command with exit codes + non-interactive flags;
+  # no new runtime dep expected until the TUI (`@clack/prompts`, `[E6.F2.x]`).
+  # Next refresh trigger: E6 TUI deps merged, or E7 (release pipeline).
   refresh_recommended: false
   refresh_reason_codes: []
   observed_files:
@@ -95,6 +96,8 @@ bootstrap:
       - src/adapters/driven/exec/__test__
       - src/adapters/driven/git/__test__
       - src/adapters/driven/storage/__test__
+      - src/adapters/driving/cli/__test__
+      - src/main/__test__
     fixture_roots:
       - fixtures
     config_roots:

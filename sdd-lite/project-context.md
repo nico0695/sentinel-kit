@@ -6,26 +6,26 @@
 - project_root: /home/user/sentinel-kit
 - runtime_root: ./sdd-lite
 - generated_at: 2026-08-01T13:14:29Z
-- last_refreshed_at: 2026-08-23T21:00:00Z
-- generated_by: sddl-init (surgical refresh by orchestrator, post-E4/E5)
+- last_refreshed_at: 2026-08-28T00:00:00Z
+- generated_by: sddl-init (surgical refresh by orchestrator, post-E6.F1.H1)
 
 ## Stack Summary
 
-> E0 through E5 have landed on `main` @ `1e7cf01`. The stack below is **observed** in the working tree.
+> E0 through E6.F1.H1 have landed on `main` @ `16e3650` (PR #73). The stack below is **observed** in the working tree.
 > Package: `@nico0695/sentinel` (ESM, bin `sentinel` + `snt`).
 
 | Area | Value | Evidence |
 |---|---|---|
 | languages | typescript 5.9.3 | `package.json` devDependencies; `tsconfig.json` at root |
-| frameworks | none — CLI application (commander + @clack/prompts still planned for E6) | `docs/setup-tecnico-sentinel.md` §4 |
-| runtime | node >=22, runtime-agnostic code | `package.json` `engines.node: ">=22"`; `npm run dev` uses `--experimental-strip-types` |
+| frameworks | none — CLI application (`commander` installed; `@clack/prompts` still planned for the E6 TUI) | `docs/setup-tecnico-sentinel.md` §4; `package.json` dependencies |
+| runtime | node >=22, runtime-agnostic code | `package.json` `engines.node: ">=22"`; `npm run dev` builds with tsup then runs `dist/cli.js` |
 | package_manager | npm | `package-lock.json` (lockfileVersion 3) present |
 
-Runtime dependencies installed: `execa ^9.6.1`, `yaml ^2.9.0`, `zod ^4.4.3`. Dev toolchain installed and green:
-@biomejs/biome 2.5.6, typescript 5.9.3, @types/node 22.20.1, vitest 4.1.10, dependency-cruiser 18.1.0, tsup 8.5.1.
-Still pending: commander / @clack/prompts / picocolors (E6 interface), changesets (E7 release). `[E6.F1.H1]`
-is the change that ratifies and installs the first of those — until its design stage decides, they stay declared-only
-recommendations from `docs/setup-tecnico-sentinel.md` §4, not commitments.
+Runtime dependencies installed: `commander ^15.0.0`, `execa ^9.6.1`, `yaml ^2.9.0`, `zod ^4.4.3`. Dev toolchain
+installed and green: @biomejs/biome 2.5.6, typescript 5.9.3, @types/node 22.20.1, vitest 4.1.10,
+dependency-cruiser 18.1.0, tsup 8.5.1. `commander` was ratified and installed by `[E6.F1.H1]` (the first E6
+runtime dep). Still pending: `@clack/prompts` / picocolors (E6 TUI, `[E6.F2.x]`), changesets (E7 release) —
+declared-only recommendations from `docs/setup-tecnico-sentinel.md` §4 until their story's design ratifies them.
 
 ## Important Directories
 
@@ -34,7 +34,7 @@ recommendations from `docs/setup-tecnico-sentinel.md` §4, not commitments.
 | `docs/` | Specification source of truth | PRD, technical setup, MVP backlog. The only authoritative content today. |
 | `sdd-lite/` | Vendored sdd-lite package + runtime root | Package files and generated runtime artifacts share this directory. |
 | `.claude/skills/` | Installed sdd-lite skills | Copy install, path-rewritten to project-relative. |
-| `src/` | Source root per PRD §4.2 | Implemented: `core/{repos,workspace,review,run,history,shared}`, `adapters/driven/{engines/{fake,claude-code,opencode},git,storage,exec}`, `main/cli.ts` (still the `--version` stub from `[E0.F1.H3]`). `adapters/driving/{cli,tui}` are **still empty placeholders** — `[E6.F1.H1]` is the first change to fill `cli/`. Tests live in `<module>/__test__/`. |
+| `src/` | Source root per PRD §4.2 | Implemented: `core/{repos,workspace,review,run,history,shared}`, `adapters/driven/{engines/{fake,claude-code,opencode},git,storage,exec}`, `adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands, renderers — from `[E6.F1.H1]`), `main/{cli.ts,container.ts,paths.ts}` (composition root — the only place adapters are instantiated). `adapters/driving/tui/` is **still an `export {}` placeholder** — the TUI is `[E6.F2.x]`. Tests live in `<module>/__test__/`. |
 | `harnesses/` | Factory review harnesses (E3.F2) | `pr-review/`, `security/`, `quick/` — each `harness.md` + `output.md` + `skills.yaml`. Ships in the npm package. |
 | `skills/` | Shared harness skills (E3) | `code-quality.md`, `security.md`. Ships in the npm package. |
 | `fixtures/` | Real engine output fixtures (E1.F1.H3) | `claude-code/` (6 files) and `opencode/` (6 files) + provenance `README.md`. Feed the E4 adapter contract tests. |
@@ -52,14 +52,14 @@ recommendations from `docs/setup-tecnico-sentinel.md` §4, not commitments.
 
 ## Quality Commands
 
-> All scripts are runnable. Verified exit 0 on 2026-08-23 against `main` @ `1e7cf01`.
+> All scripts are runnable. Verified exit 0 as of PR #73 merge against `main` @ `16e3650`.
 
 | Command Type | Command | Status |
 |---|---|---|
 | install | `npm ci` | Runnable — lockfile v3, full toolchain installs clean. |
-| lint / typecheck / format / guards | `npm run check` | **Runnable, verified exit 0.** Full form: `biome check . && tsc --noEmit && depcruise src` (118 files, 81 modules, 0 violations). |
-| test | `npm test` (`vitest run`) | **Runnable, verified 500/500 passing across 28 files.** Projects: `core`, `adapters`, `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
-| dev | `npm run dev` | Runnable (`node --experimental-strip-types src/main/cli.ts`). |
+| lint / typecheck / format / guards | `npm run check` | **Runnable, verified exit 0.** Full form: `biome check . && tsc --noEmit && depcruise src`, 0 violations. |
+| test | `npm test` (`vitest run`) | **Runnable, verified 681/681 passing across 38 files.** Projects: `core`, `adapters` (also covers `src/main/**`), `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
+| dev | `npm run dev` | Runnable (`tsup --silent && node dist/cli.js`) — builds the bundle, then runs it. Changed in `[E6.F1.H1]`: NodeNext `.js` specifiers are not rewritten by `--experimental-strip-types`. |
 | build | `npm run build` (`tsup`) | Runnable — tsup 8.5.1 installed, `tsup.config.ts` at root. |
 
 `npm run check` is the single quality gate by design (no separate lint/typecheck/format commands) and already
@@ -89,10 +89,13 @@ covers the five architecture guards via `.dependency-cruiser.cjs`: `core-no-adap
   documented per engine in `docs/engines/`, with 12 real output fixtures in `fixtures/`. **E4.F2 must build on
   those docs rather than re-deriving invocation details.** Residual risk: flags verified only against Claude Code
   `2.1.226` and OpenCode `1.17.9` — flag drift on version bumps is PRD risk #1.
-- **The product has no user-facing surface yet.** The full review pipeline (worktree → diff → prompt → engine →
-  parse → terminal state → cleanup), persistence and history queries are implemented and unit/contract-tested, but
-  nothing is reachable from a terminal: `npm run dev` only prints the version. E6 is what makes the MVP runnable by
-  hand, and `[E7.F1.H1]` is what covers the flow end to end.
+- ~~The product has no user-facing surface yet.~~ **Partially resolved 2026-08-28** (`[E6.F1.H1]`, PR #73): the
+  CLI is now reachable — `repo add|list`, `review`, `runs list|show`, `--version`, `--help`, each invoking its use
+  case with zero logic in the command. `[E6.F1.H2]` adds documented exit codes + non-interactive/scriptable use;
+  the TUI is `[E6.F2.x]`; `[E7.F1.H1]` is what covers the flow end to end. Two spec-vs-behavior deltas carried
+  from `[E6.F1.H1]`: `risk-e6h1-011` (`repo add` on an already-cloned repo prints `-` where the spec promised the
+  local path) and the D14 persistence-failure exit semantics (verdict on stdout, diagnostic on stderr, exit 1
+  without a sixth terminal state).
 - **Residual E5 debt, non-blocking for E6.** `risk-006` (the `ProcessRunner` does not kill the whole process group
   on timeout, inherited from `[E5.F1.H1]`) and the info-tier `R3-001` / `R4-001` scope observations from the
   `[E5.F1.H2]` 4R review. Candidates for E7 dogfooding, not for this epic.

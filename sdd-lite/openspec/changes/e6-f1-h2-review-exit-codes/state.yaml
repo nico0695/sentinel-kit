@@ -17,8 +17,8 @@ complexity_assessment:
     the commander signalling mechanism are open design tensions, and one touches public UX/config.
   confidence: medium
   recorded_at: "2026-08-28T00:00:00Z"
-lifecycle_status: planned
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -88,7 +88,28 @@ stages:
       requires stage_approval and validates with `npm run check` + `npx vitest run --project
       adapters`. Firm e6h2-D1/D2/D3 and all architecture guards carried into every stage.
   sddl-executor:
-    status: pending
+    status: completed
+    started_at: "2026-08-28T17:31:00Z"
+    completed_at: "2026-08-28T17:37:00Z"
+    notes: >-
+      All five stages executed in one approved pass (S1-S4 code, S5 final gate), in dependency order.
+      S1: NEW cli/exit-code.ts resolveReviewExitCode(state, verdict, changesExitCode) (state!==ok->2,
+      else request-changes?C:0, absent-verdict->0) importing only core TerminalState/Verdict types +
+      NEW __test__/exit-code.test.ts (full table). S2: parseChangesExitCode (integer 0-255 else
+      InvalidArgumentError, mirrors parseTimeoutMs) + --changes-exit-code <n> flag default 1 +
+      non-optional changesExitCode on ReviewOptions; AC-6 tests. Correction: "" is a valid soft-gate 0
+      (Number("")===0), so it is accepted not rejected -- differs from parseTimeoutMs where 0 is
+      invalid. S3: ReviewExitSignal extends Error in exit-code.ts; runProgram catch gains the
+      instanceof branch BEFORE CommanderError; review action throws the signal AFTER persist+render so
+      the persistence-failure rethrow (exit 1) dominates the table (AC-9); H1 "exits 0" review.test
+      block replaced with the H2 contract (AC-1/2/3/4/5/8/9). Two mutation-verifies: breaking the
+      request-changes mapping killed 3 tests; moving the throw before persist killed the AC-9
+      persistence-dominates test (+19 others) -- both reverted, tree re-green. S4: .addHelpText EXIT_CODE
+      contract + help.test (AC-10). S5 final gate: npm run check green (biome + tsc + depcruise, all 5
+      guards, 232 deps no violations); npm test 705 passed / 39 files (baseline 681/38, +1 file, +24
+      tests). AC-1..AC-10 cross-checked to tests in execution-log.md. No scope drift, no blast-radius
+      expansion, no git side effects. Firm e6h2-D1/D2/D3 honored (no GlobalConfigSchema/container/CliDeps
+      change, no --json, five terminal states only).
   sddl-qa-review:
     status: pending
 artifacts:
@@ -211,7 +232,10 @@ open_risks:
       "Usable without a TTY" is asserted, not verified. The CLI routes output through the injected
       CliIo and appears TTY-free, but this needs a confirming test rather than an assumption.
     severity: low
-    direction_set_by: spec AC-8 requires a confirming test; risk closes when that test lands.
+    direction_set_by: >-
+      RESOLVED in sddl-executor -- the AC-8 test ("resolves the exit code and full output through the
+      injected io alone") drives a completed review through createCli with capturing IO doubles and no
+      TTY, asserting both the rendered output and the returned exit code. Test is green.
   - id: risk-e6h2-004
     summary: >-
       Reduced fresh-context isolation on spec.md. The delegated sddl-spec worker was interrupted by
@@ -220,12 +244,13 @@ open_risks:
       the orchestrator both directed and wrote it.
     severity: low
 next_action:
-  kind: await_stage_approval
-  target: sddl-executor
+  kind: await_stage
+  target: sddl-qa-review
   summary: >-
-    plan.md ready. Five stages (S1 pure exit-code.ts + unit table; S2 --changes-exit-code flag +
-    validator; S3 ReviewExitSignal + runProgram branch + review-action wiring + e2e cases; S4 --help
-    AC-10; S5 final gate). Execution requires explicit stage_approval before S1's first edit -- do
-    NOT auto-route to code changes. Recommended next: user approves and sddl-executor runs S1.
+    Executor completed all five stages; npm run check + npm test green (705 passed / 39 files). Change
+    is code-complete but NOT marked completed -- only final QA may close it. Recommended next:
+    sddl-qa-review in final mode over the full implemented change, scrutinizing the AC-9 persistence-
+    dominates ordering and the two-axis table (risk-e6h2-004: spec/design authored under reduced
+    isolation). No PR/commit yet -- the orchestrator owns git side effects.
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T01:45:00Z"
+updated_at: "2026-08-28T17:37:00Z"

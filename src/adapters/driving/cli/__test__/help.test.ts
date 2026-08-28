@@ -62,6 +62,22 @@ describe("root help", () => {
     expect(short.io.out).toEqual(long.io.out);
   });
 
+  it("documents the review exit-code contract (AC-10)", async () => {
+    const deps = createTestDeps();
+    const exitCode = await createCli(deps).run(argv("review", "--help"));
+    const help = deps.io.out.join("\n");
+
+    expect(exitCode).toBe(0);
+    expect(help).toContain("Exit codes:");
+    // 0 = passed, the configurable default 1 = changes requested, 2 = could
+    // not complete — the three branches a script tests.
+    expect(help).toMatch(/0\s+the review passed/);
+    expect(help).toContain("--changes-exit-code");
+    expect(help).toMatch(/1\s+changes requested/);
+    expect(help).toMatch(/2\s+the review could not complete/);
+    expect(deps.io.err).toEqual([]);
+  });
+
   it("propagates the shell's output routing to registered subcommands", async () => {
     // `commander` copies `exitOverride` and the output configuration into a
     // subcommand at `.command()` time, so a group registered by S6/S7 only

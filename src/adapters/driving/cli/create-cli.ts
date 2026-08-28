@@ -15,9 +15,12 @@
  *    is registered**, because `commander` copies both settings into a
  *    subcommand at `.command()` time. A subcommand registered before them
  *    would still write to the real streams and call `process.exit`.
- * 3. **Exit codes come from `commander` or from the catch-all**, never from a
- *    command inspecting a review's terminal state — AC-12's boundary with
- *    `[E6.F1.H2]`, which is the story that introduces the exit-code table.
+ * 3. **Exit codes come from `commander`, a `ReviewExitSignal`, or the
+ *    catch-all.** `[E6.F1.H2]` (#37) added the review exit-code table: the
+ *    `review` action throws a `ReviewExitSignal` carrying the run's resolved
+ *    code, and `runProgram` returns it — the same throw-carries-exit-code
+ *    shape `commander` already uses two lines up. The exit code is still never
+ *    read off `process`; it flows out as a return value.
  */
 
 import { Command, CommanderError } from "commander";
@@ -25,6 +28,7 @@ import type { CliDeps, CliIo } from "./cli-deps.js";
 import { registerRepoCommands } from "./commands/repo-commands.js";
 import { registerReviewCommand } from "./commands/review-command.js";
 import { registerRunsCommands } from "./commands/runs-commands.js";
+import { ReviewExitSignal } from "./exit-code.js";
 import { formatErrorLine } from "./render/format-error.js";
 
 /** The adapter's public entry point: parse an argv, resolve an exit code. */
@@ -120,6 +124,14 @@ async function runProgram(
     await program.parseAsync([...argv]);
     return 0;
   } catch (error) {
+    if (error instanceof ReviewExitSignal) {
+      // A completed review signals its exit code by throwing (design
+      // risk-e6h2-002). Placed before the `CommanderError` branch and the
+      // catch-all so the resolved terminal-state code is returned verbatim and
+      // never mistaken for a usage error or reformatted onto `stderr`.
+      return error.code;
+    }
+
     if (error instanceof CommanderError) {
       // `--help` and `--version` land here with exitCode 0; usage errors
       // (unknown command, unknown option, missing argument) carry a non-zero

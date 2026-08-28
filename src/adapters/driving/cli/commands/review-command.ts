@@ -27,10 +27,16 @@
  *    outcome is still rendered on `stdout` and the failure is reported on
  *    `stderr` with a non-zero exit (D13); a finished review is never
  *    discarded because a write failed.
- * 3. **Nothing reads `result.state` to decide an exit code** (AC-12). A
- *    completed invocation resolves to 0 through `createCli`'s normal path
- *    regardless of terminal state; the terminal-state → exit-code mapping is
- *    `[E6.F1.H2]`'s (#37). The state is rendered, never interpreted.
+ * 3. **The exit code is the run's terminal state, resolved by a pure mapping
+ *    and signalled by a throw** (`[E6.F1.H2]`, #37). After a successful
+ *    `persistRun` and render, the action computes
+ *    `resolveReviewExitCode(state, verdict, changesExitCode)` and throws a
+ *    `ReviewExitSignal` carrying it; `createCli`'s `runProgram` catch returns
+ *    that code. The throw is deliberately placed *after* persistence: when
+ *    `persistRun` fails the original error is rethrown first and dominates via
+ *    the catch-all (exit 1), so a run whose record could not be written is
+ *    never reported as a trustworthy gate result (AC-9). The state is
+ *    interpreted only through the pure mapping — no policy lives inline.
  * 4. **`--timeout` is parsed, not trusted.** `commander` hands option values
  *    over as strings while `ResolveReviewRequestFlags.timeoutMs` is a number;
  *    a non-numeric value is rejected as a usage error rather than forwarded
@@ -48,6 +54,7 @@ import {
   resolveReviewRequest,
 } from "../../../../core/run/index.js";
 import type { CliDeps } from "../cli-deps.js";
+import { ReviewExitSignal, resolveReviewExitCode } from "../exit-code.js";
 import {
   formatReviewOutcome,
   formatUnpersistedReviewOutcome,
@@ -58,6 +65,11 @@ interface ReviewOptions {
   readonly engine?: string;
   /** Already a number: `parseTimeoutMs` runs as commander's `parseArg`. */
   readonly timeout?: number;
+  /**
+   * Always a number: `parseChangesExitCode` runs as commander's `parseArg`
+   * and the option carries a default of 1, so no absent case exists (D2/AC-2).
+   */
+  readonly changesExitCode: number;
 }
 
 /**
@@ -82,6 +94,41 @@ function parseTimeoutMs(raw: string): number {
 
   return value;
 }
+
+/**
+ * Parses `--changes-exit-code <n>`. Mirrors `parseTimeoutMs`: `commander`
+ * hands the value over as a string, so the conversion happens here and an
+ * unusable value is reported as a usage error — a message and a non-zero
+ * exit — before any review work starts (AC-6), rather than reaching the
+ * exit-code mapping as a `NaN`.
+ *
+ * The bound is the POSIX exit-status range: an integer 0–255. `0` is a valid
+ * soft gate (AC-5); the default of 1 is applied by `commander`, not here.
+ */
+function parseChangesExitCode(raw: string): number {
+  const value = Number(raw);
+
+  if (!Number.isInteger(value) || value < 0 || value > 255) {
+    throw new InvalidArgumentError("expected an integer 0-255");
+  }
+
+  return value;
+}
+
+/**
+ * The `--help` footer documenting the exit-code contract (AC-10). This is the
+ * in-product documentation surface for the codes until `[E7.F2.H1]` writes
+ * user-facing docs, so it states every branch a script would test.
+ */
+const EXIT_CODE_HELP = [
+  "",
+  "Exit codes:",
+  "  0  the review passed — verdict approve or comment (non-blocking)",
+  "  1  changes requested — configurable via --changes-exit-code (0 for a",
+  "     soft gate that still passes)",
+  "  2  the review could not complete — ambiguous, engine-error, timeout or",
+  "     validation-failed",
+].join("\n");
 
 /**
  * Builds the per-invocation overrides. Absent flags stay absent keys rather
@@ -115,6 +162,13 @@ export function registerReviewCommand(program: Command, deps: CliDeps): void {
       "wall-clock budget for the engine invocation, in milliseconds",
       parseTimeoutMs,
     )
+    .option(
+      "--changes-exit-code <n>",
+      "exit code when the verdict is request-changes (0-255, 0 for a soft gate)",
+      parseChangesExitCode,
+      1,
+    )
+    .addHelpText("after", EXIT_CODE_HELP)
     .action(async (repo: string, branch: string, options: ReviewOptions) => {
       const { config, repos } = await deps.loadContext();
 
@@ -172,5 +226,18 @@ export function registerReviewCommand(program: Command, deps: CliDeps): void {
       )) {
         deps.io.stdout(line);
       }
+
+      // Only reached on the success path — persist succeeded and the outcome
+      // is rendered. Signalling by throw lets `runProgram`'s catch return the
+      // code without a mutable channel; the mapping is the sole interpreter of
+      // the terminal state (AC-7). AC-9's ordering is load-bearing: a
+      // persistence failure has already rethrown above and never gets here.
+      throw new ReviewExitSignal(
+        resolveReviewExitCode(
+          result.state,
+          result.verdict,
+          options.changesExitCode,
+        ),
+      );
     });
 }

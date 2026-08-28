@@ -105,7 +105,11 @@ checkpoints:
       Approve the spec and continue to sddl-design, revise, or stop?
     free_input_allowed: true
     created_at: "2026-08-28T01:15:00Z"
-    status: open
+    status: resolved
+    resolved_at: "2026-08-28T01:20:00Z"
+    resolution: >-
+      Approved ("avanza"). Routing to sddl-design to resolve the signalling mechanism
+      (risk-e6h2-002) and the mapping function's placement/signature within the architecture guards.
 decisions:
   - id: e6h2-D1
     level: B
@@ -181,12 +185,12 @@ open_risks:
       the orchestrator both directed and wrote it.
     severity: low
 next_action:
-  kind: wait_for_approval
-  target: cp-spec-exit-code-contract
+  kind: route_to_stage
+  target: sddl-design
   summary: >-
-    spec.md written (inline, per the spend-limit fallback) with 10 ACs and the two-axis exit-code
-    table. Awaiting user approval at cp-spec-exit-code-contract, then route to sddl-design to
-    resolve the signalling mechanism (risk-e6h2-002) and the mapping function's placement/signature
-    within the architecture guards. Interactive mode: pause for confirmation before design.
+    Spec approved. Delegated sddl-design to resolve risk-e6h2-002 (how the completed-run exit code
+    reaches run()'s return without leaking domain logic into the command), the pure mapping
+    function's placement and signature, the --changes-exit-code wiring/validation, and how AC-9's
+    persistence-failure-dominates composes with the new table.
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T01:15:00Z"
+updated_at: "2026-08-28T01:20:00Z"

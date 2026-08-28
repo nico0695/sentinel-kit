@@ -17,8 +17,8 @@ complexity_assessment:
     the commander signalling mechanism are open design tensions, and one touches public UX/config.
   confidence: medium
   recorded_at: "2026-08-28T00:00:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -111,7 +111,34 @@ stages:
       expansion, no git side effects. Firm e6h2-D1/D2/D3 honored (no GlobalConfigSchema/container/CliDeps
       change, no --json, five terminal states only).
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-08-28T18:00:00Z"
+    completed_at: "2026-08-28T18:10:00Z"
+    notes: >-
+      Final-mode QA over commit 25542bb. All 10 ACs independently verified against spec.md with
+      real, non-vacuous assertions (exit-code table re-derived row-by-row against core/run:
+      RunReviewResult.verdict present only on `ok`, five terminal states, mapping matches). Extra
+      scrutiny per risk-e6h2-004: AC-9 persistence-dominates ordering re-derived from
+      review-command.ts — the ReviewExitSignal throw (L235) is strictly after a successful
+      persistRun try-block, so a request-changes run whose persistRun throws exits 1 via the
+      catch-all, never C; proven by review.test L551-572 under --changes-exit-code 20. ReviewExitSignal
+      caught before formatErrorLine (create-cli.ts L127), never treated as a domain error. Architecture
+      guards hold; git show --stat confirms only the 6 approved files changed (CliDeps/container/
+      GlobalConfigSchema untouched, e6h2-D2/D3 honored). Gate run independently: npm run check green,
+      npm test 705 passed / 39 files. One low finding (F1): parseChangesExitCode accepts empty/
+      whitespace argument as silent soft-gate 0 (Number("")===0) — a scripting footgun but violates no
+      AC (AC-6 requires only non-numeric/out-of-range rejection; AC-5 requires 0 accepted). Non-blocking.
+      Verdict: pass. Change marked completed.
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    All 10 ACs met with real assertions; AC-9 ordering and two-axis table correct under independent
+    re-derivation; architecture guards hold; gate green (npm run check clean, npm test 705/39). One
+    low finding (empty/whitespace --changes-exit-code coerces to soft-gate 0) — non-blocking, violates
+    no AC. Change is completed and ready for the orchestrator to open the PR (Closes #37).
+  reported_at: "2026-08-28T18:10:00Z"
+  report_path: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/qa-report.md
 artifacts:
   state: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/proposal.md
@@ -243,14 +270,31 @@ open_risks:
       QA/review stages should scrutinize the spec as rigorously as a fresh worker's output, since
       the orchestrator both directed and wrote it.
     severity: low
+    direction_set_by: >-
+      RESOLVED in sddl-qa-review (final) -- the AC-9 persistence-dominates ordering and the two-axis
+      table were independently re-derived from source (review-command.ts throw order + core/run
+      RunReviewResult/TerminalState/Verdict) and confirmed correct. No spec defect surfaced under
+      the extra scrutiny.
+  - id: risk-e6h2-005
+    summary: >-
+      parseChangesExitCode accepts an empty or whitespace-only --changes-exit-code argument as a
+      silent soft-gate 0 (Number("")===0 passes the 0-255 integer guard). In scripting this is a
+      footgun: `--changes-exit-code "$UNSET"` turns a request-changes gate OFF (exit 0) instead of
+      erroring. Violates no AC (AC-6 requires only non-numeric/out-of-range rejection; AC-5 requires
+      0 accepted) and mirrors parseTimeoutMs's coercion, so it does not block this change.
+    severity: low
+    direction_set_by: >-
+      QA finding F1 (final). Recommended follow-up hardening: guard `raw.trim() === ""` in
+      parseChangesExitCode (and optionally parseTimeoutMs). Not a fix that gates this story.
 next_action:
-  kind: await_stage
-  target: sddl-qa-review
+  kind: complete
+  target: orchestrator
   summary: >-
-    Executor completed all five stages; npm run check + npm test green (705 passed / 39 files). Change
-    is code-complete but NOT marked completed -- only final QA may close it. Recommended next:
-    sddl-qa-review in final mode over the full implemented change, scrutinizing the AC-9 persistence-
-    dominates ordering and the two-axis table (risk-e6h2-004: spec/design authored under reduced
-    isolation). No PR/commit yet -- the orchestrator owns git side effects.
+    Final QA passed: all 10 ACs met, AC-9 ordering and two-axis table correct under independent
+    re-derivation, architecture guards hold, gate green (npm run check clean, npm test 705/39).
+    Change marked completed. One low, non-blocking finding (risk-e6h2-005, empty --changes-exit-code
+    soft-gate) logged as a future hardening nit. Next: the orchestrator opens one PR for the story
+    ([E6.F1.H2] review exit codes, Closes #37) -- the orchestrator owns all git/PR side effects. No
+    PR/commit created by QA.
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T17:37:00Z"
+updated_at: "2026-08-28T18:10:00Z"

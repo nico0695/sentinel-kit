@@ -287,6 +287,26 @@ describe("review — argument surface", () => {
     },
   );
 
+  it.each(["", " "])(
+    "rejects a blank --changes-exit-code %j rather than silently coercing to a soft gate (AC-6)",
+    async (value) => {
+      const h = harness();
+
+      const code = await h.run(
+        "review",
+        "owner/repo",
+        "feature",
+        "--changes-exit-code",
+        value,
+      );
+
+      // `Number("")` and `Number(" ")` are 0; a blank value must be a usage
+      // error, not an unnoticed soft gate (risk-e6h2-005).
+      expect(code).not.toBe(0);
+      expect(h.runReviewRequests).toHaveLength(0);
+    },
+  );
+
   it("exits non-zero without calling a use case when <branch> is missing", async () => {
     const h = harness();
 

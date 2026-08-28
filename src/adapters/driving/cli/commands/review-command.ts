@@ -104,8 +104,17 @@ function parseTimeoutMs(raw: string): number {
  *
  * The bound is the POSIX exit-status range: an integer 0–255. `0` is a valid
  * soft gate (AC-5); the default of 1 is applied by `commander`, not here.
+ *
+ * The empty/whitespace guard is load-bearing: `Number("")` and `Number("  ")`
+ * are `0`, so without it an empty `--changes-exit-code` would silently become a
+ * soft gate rather than the usage error a blank value is — a scripting footgun
+ * (a variable that expanded to nothing would disable the gate unnoticed).
  */
 function parseChangesExitCode(raw: string): number {
+  if (raw.trim() === "") {
+    throw new InvalidArgumentError("expected an integer 0-255");
+  }
+
   const value = Number(raw);
 
   if (!Number.isInteger(value) || value < 0 || value > 255) {

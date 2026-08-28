@@ -283,18 +283,23 @@ open_risks:
       erroring. Violates no AC (AC-6 requires only non-numeric/out-of-range rejection; AC-5 requires
       0 accepted) and mirrors parseTimeoutMs's coercion, so it does not block this change.
     severity: low
+    status: resolved
     direction_set_by: >-
-      QA finding F1 (final). Recommended follow-up hardening: guard `raw.trim() === ""` in
-      parseChangesExitCode (and optionally parseTimeoutMs). Not a fix that gates this story.
+      RESOLVED post-QA at the user's request before opening the PR. parseChangesExitCode now guards
+      `raw.trim() === ""` and rejects a blank value as a usage error (InvalidArgumentError), so an
+      empty/whitespace --changes-exit-code no longer silently becomes a soft gate. Covered by a new
+      it.each(["", " "]) regression case in review.test.ts. Gate re-run green: npm run check clean,
+      npm test 707/39 (705 + the 2 blank-value cases). parseTimeoutMs left unchanged (0 is already
+      invalid there, so a blank value is rejected by its existing integer/positive guard).
 next_action:
   kind: complete
   target: orchestrator
   summary: >-
     Final QA passed: all 10 ACs met, AC-9 ordering and two-axis table correct under independent
-    re-derivation, architecture guards hold, gate green (npm run check clean, npm test 705/39).
-    Change marked completed. One low, non-blocking finding (risk-e6h2-005, empty --changes-exit-code
-    soft-gate) logged as a future hardening nit. Next: the orchestrator opens one PR for the story
-    ([E6.F1.H2] review exit codes, Closes #37) -- the orchestrator owns all git/PR side effects. No
-    PR/commit created by QA.
+    re-derivation, architecture guards hold. The one QA finding (risk-e6h2-005, empty
+    --changes-exit-code soft-gate) was then fixed at the user's request before the PR: blank values
+    now reject as a usage error, with a regression test. Gate green (npm run check clean, npm test
+    707/39). Change completed; orchestrator opening one PR ([E6.F1.H2] review exit codes, Closes
+    #37).
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T18:10:00Z"
+updated_at: "2026-08-28T20:35:00Z"

@@ -494,6 +494,22 @@ describe("review — exit codes (AC-1, AC-2, AC-3)", () => {
     expect(h.persistRunRequests).toHaveLength(1);
     expect(fieldsOf(h.deps.io.out).get("state")).toBe(state);
   });
+
+  it("fails the gate (2) for an inconsistent ok run carrying no verdict", async () => {
+    // Type-impossible per RunReviewResult, but a defense-in-depth guard for the
+    // one consumer that matters: a CI gate. An `ok` with no verdict is not a
+    // trustworthy pass, so the whole command — not just the pure mapping — must
+    // exit 2, never 0. Drives the full createCli path, as the reviewer asked.
+    const h = harness({
+      result: { state: "ok", cleanup: { attempted: false } },
+      record: withoutVerdict(okRecord),
+    });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    expect(code).toBe(2);
+    expect(h.persistRunRequests).toHaveLength(1);
+  });
 });
 
 describe("review — configurable changes code (AC-4, AC-5)", () => {

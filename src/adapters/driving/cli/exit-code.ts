@@ -26,23 +26,28 @@ import type { TerminalState, Verdict } from "../../../core/run/index.js";
  * | `ok`              | `approve`         | 0                |
  * | `ok`              | `comment`         | 0                |
  * | `ok`              | `request-changes` | `changesExitCode`|
+ * | `ok`              | — (absent)        | 2                |
  * | any non-`ok`      | — (none)          | 2                |
  *
  * `0` = the review ran and does not block; `changesExitCode` = the review ran
  * and blocks (the gate); `2` = the tool could not produce a trustworthy verdict
- * (`ambiguous` / `engine-error` / `timeout` / `validation-failed`). Only the
- * `request-changes` row is configurable; `0` and `2` are fixed.
+ * (`ambiguous` / `engine-error` / `timeout` / `validation-failed`, and an `ok`
+ * run with no verdict — see below). Only the `request-changes` row is
+ * configurable; `0` and `2` are fixed.
  *
- * The ternary is inherently defensive: a `verdict` absent on `ok` is
- * type-impossible per `RunReviewResult`, but it resolves to `0` (pass) — the
- * least-surprising default, since `request-changes` is the sole blocking verdict.
+ * A `verdict` absent on `ok` is type-impossible per `RunReviewResult`, but the
+ * mapping fails closed on it — `2`, not `0`. An `ok` with no verdict is, to a
+ * gate, indistinguishable from `ambiguous` (a completed run with no trustworthy
+ * verdict), so it belongs in the same bucket: a gate must reject a run it
+ * cannot judge, never pass it silently. This is the safe default for the one
+ * consumer that matters here — a CI gate branching on `$?`.
  */
 export function resolveReviewExitCode(
   state: TerminalState,
   verdict: Verdict | undefined,
   changesExitCode: number,
 ): number {
-  if (state !== "ok") {
+  if (state !== "ok" || verdict === undefined) {
     return 2;
   }
 

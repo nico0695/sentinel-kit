@@ -37,7 +37,7 @@ Untouched (confirmed): `cli-deps.ts`, `main/container.ts`, `main/cli.ts`, all of
 
 ## Interfaces, Data, And State
 
-- **Mapping** — `resolveReviewExitCode(state: TerminalState, verdict: Verdict | undefined, changesExitCode: number): number`. Body: `if (state !== "ok") return 2;` then `return verdict === "request-changes" ? changesExitCode : 0;`. The ternary is inherently defensive — an absent verdict on `ok` (type-impossible per `RunReviewResult`) resolves to `0` (pass), the least-surprising default since `request-changes` is the sole blocking verdict.
+- **Mapping** — `resolveReviewExitCode(state: TerminalState, verdict: Verdict | undefined, changesExitCode: number): number`. Body: `if (state !== "ok" || verdict === undefined) return 2;` then `return verdict === "request-changes" ? changesExitCode : 0;`. It fails closed on an absent verdict on `ok` (type-impossible per `RunReviewResult`) — `2`, not `0`: to a gate an `ok` with no verdict is indistinguishable from `ambiguous` (a completed run with no trustworthy verdict), so it must reject the run, never pass it silently. **Amended after PR #74 review** (repo owner, `risk-e6h2-006`): the original `→ 0` default failed OPEN, the unsafe direction for a CI gate; corrected to `→ 2`.
 - **Signal** — `class ReviewExitSignal extends Error { readonly code: number }`. Extends `Error` to satisfy Biome's throw-only-error rule and to mirror `CommanderError`; it is caught by its own branch and never reaches `formatErrorLine`.
 - **Flag** — `.option("--changes-exit-code <n>", "<desc>", parseChangesExitCode, 1)`. `parseChangesExitCode(raw)` mirrors `parseTimeoutMs`: `Number(raw)`, reject with `InvalidArgumentError("expected an integer 0-255")` unless `Number.isInteger(value) && value >= 0 && value <= 255`. Default `1` means `options.changesExitCode` is always a `number`; `ReviewOptions` gains a non-optional `readonly changesExitCode: number`.
 - **AC-9 control flow (explicit ordering)** in the action: `runReview` → `try { persistRun } catch { render unpersisted; stderr diag; throw original }` → render outcome → `throw new ReviewExitSignal(resolveReviewExitCode(result.state, result.verdict, options.changesExitCode))`. A `request-changes` run whose `persistRun` throws exits 1 via the catch-all, never reaching the mapping — persistence failure dominates.
@@ -56,7 +56,7 @@ Untouched (confirmed): `cli-deps.ts`, `main/container.ts`, `main/cli.ts`, all of
 
 | Item | Why It Matters | Needed Before | Status |
 |---|---|---|---|
-| Defensive value for a (type-impossible) absent verdict on `ok` | Governs one mapping branch | plan | resolved: `0` (pass); alternative `changesExitCode` noted and rejected as more surprising |
+| Defensive value for a (type-impossible) absent verdict on `ok` | Governs one mapping branch | plan | resolved: `2` (fail closed). Originally `0` (pass); corrected after the PR #74 review (`risk-e6h2-006`) — a gate must reject a run it cannot judge, and an `ok` with no verdict is the same case as `ambiguous` |
 | Exact `--help` wording (AC-10) and flag description | In-product doc surface | executor | A-level; bounded by AC-10 (0 = approved/comment; default 1 = changes requested; 2 = could not complete) |
 
 ## Approval Notes

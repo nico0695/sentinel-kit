@@ -113,7 +113,11 @@ out-of-range value.
 function in the CLI adapter (`src/adapters/driving/cli/`), reading only `result.state`,
 `result.verdict`, and the resolved changes code. It imports no core internals beyond the exported
 `TerminalState`/`Verdict` types, pushes no logic into core, and introduces no new domain state.
-The design owns where the function lives and how its result reaches `run()`.
+The design owns where the function lives and how its result reaches `run()`. It **fails closed**:
+an `ok` result carrying no verdict (type-impossible per `RunReviewResult`, but a defensive branch)
+resolves to `2`, never `0` — for a gate an `ok` with no verdict is the same untrustworthy case as
+`ambiguous`, so the run is rejected, not silently passed. *(Amended after the PR #74 review,
+`risk-e6h2-006`: the original default resolved to `0`, which failed open.)*
 
 **AC-8 — usable without a TTY (verified, not asserted).** The `review` command produces its exit
 code and all output through the injected `CliIo`, with no dependency on `process.stdout.isTTY` or

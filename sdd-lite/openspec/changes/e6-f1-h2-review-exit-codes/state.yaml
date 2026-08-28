@@ -233,6 +233,21 @@ decisions:
     rationale: >-
       Presented against including a minimal `--json`; user chose to defer, keeping H2 a focused,
       well-tested exit-code contract within its acceptance criteria.
+  - id: e6h2-D4
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T22:55:00Z"
+    title: Fail closed (2) on an ok run with no verdict
+    summary: >-
+      An `ok` result carrying no verdict resolves to exit 2, not 0. Raised by the repo owner's
+      PR #74 review; the orchestrator validated it as genuine (fail-open is the unsafe direction
+      for a gate; an ok-without-verdict is the same untrustworthy case as `ambiguous`) and the
+      user approved the fix. Unit test flipped to assert 2; a CLI integration test proves the
+      inconsistent result does not pass the gate; spec AC-7 and design amended.
+    rationale: >-
+      Overturns the original inline-spec defensive default (0, "least surprising"). For the one
+      consumer that matters -- a CI gate -- a run with no trustworthy verdict must be rejected, not
+      passed silently. See risk-e6h2-006.
 open_risks:
   - id: risk-e6h2-001
     summary: >-
@@ -291,6 +306,24 @@ open_risks:
       it.each(["", " "]) regression case in review.test.ts. Gate re-run green: npm run check clean,
       npm test 707/39 (705 + the 2 blank-value cases). parseTimeoutMs left unchanged (0 is already
       invalid there, so a blank value is rejected by its existing integer/positive guard).
+  - id: risk-e6h2-006
+    summary: >-
+      resolveReviewExitCode originally failed OPEN on an `ok` result carrying no verdict:
+      `verdict === "request-changes" ? C : 0` returned 0 (pass) for an absent verdict. For a CI
+      gate that is the unsafe direction -- a run with no trustworthy verdict was passed silently.
+      Raised by the repo owner's PR #74 4R review (verdict "cambios recomendados").
+    severity: high
+    status: resolved
+    direction_set_by: >-
+      RESOLVED at commit after PR #74 review. The mapping now fails CLOSED: `if (state !== "ok" ||
+      verdict === undefined) return 2`. An `ok` with no verdict is treated as `ambiguous` -- the
+      same "no trustworthy verdict -> 2" bucket -- rather than a silent pass. The prior unit test
+      (which asserted 0) was flipped to assert 2, and a CLI-level integration test drives an
+      `ok`+undefined-verdict result through createCli and asserts exit 2 (the reviewer's requested
+      "inconsistent result must not pass the gate" proof). Mutation-verified: removing the guard
+      turned that test red. Gate green: npm run check clean, npm test 708/39. This is exactly the
+      class of defect risk-e6h2-004 predicted -- a defensive default chosen in the inline-authored
+      spec, in the direction the QA (validating against that spec) did not challenge.
 next_action:
   kind: complete
   target: orchestrator

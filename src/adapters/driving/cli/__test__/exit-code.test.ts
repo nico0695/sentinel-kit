@@ -59,10 +59,13 @@ describe("resolveReviewExitCode — configurable changes code (AC-4, AC-5)", () 
 });
 
 describe("resolveReviewExitCode — purity (AC-7)", () => {
-  it("defensively treats an absent verdict on ok as a pass", () => {
-    // Type-impossible per RunReviewResult, but the mapping must not throw and
-    // must default to 0 (pass), the least-surprising outcome.
+  it("fails closed (2) on an absent verdict on ok, never silently passes", () => {
+    // Type-impossible per RunReviewResult, but for a gate an `ok` with no
+    // verdict is indistinguishable from `ambiguous` — a completed run with no
+    // trustworthy verdict — so it must reject (2), not pass (0). The changes
+    // code is irrelevant: this is not a request-changes outcome.
     const verdict = undefined as Verdict | undefined;
-    expect(resolveReviewExitCode("ok", verdict, 1)).toBe(0);
+    expect(resolveReviewExitCode("ok", verdict, 1)).toBe(2);
+    expect(resolveReviewExitCode("ok", verdict, 42)).toBe(2);
   });
 });

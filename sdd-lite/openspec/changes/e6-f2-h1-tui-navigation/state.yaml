@@ -1,0 +1,81 @@
+version: "0.1"
+change_name: e6-f2-h1-tui-navigation
+objective: new-feature
+mode: lite
+execution_mode: interactive
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F2.H1] (issue #38), first story of feature E6.F2 (TUI): an interactive navigation
+    flow repo -> branch (with fetch) -> harness -> confirmation -> progress -> result, per the
+    backlog and PRD. Acceptance: the complete flow without leaving the TUI, cancelable at every
+    step, errors shown without raw stack traces. Bounded scope: fills the
+    `src/adapters/driving/tui/` placeholder (currently `export {}`) as a driving adapter that
+    invokes existing use cases only (listRepos, listBranches, runReview, harness listing per
+    design) and is wired in `src/main/` — no new core module expected. Risk profile medium: this
+    story introduces the first TUI runtime dependency (`@clack/prompts` is the setup-doc
+    recommendation; design must ratify it), defines new public UX, and must reuse the review
+    execution path [E6.F1.H1]/[E6.F1.H2] built for the CLI without duplicating logic; how the
+    TUI entry point coexists with the commander CLI (default command vs subcommand) is an open
+    B-level tension for spec/design.
+  confidence: medium
+  recorded_at: "2026-08-28T23:30:00Z"
+lifecycle_status: formalizing
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown for routing. The seams are known: `adapters/driving/tui/index.ts` is a
+      documented placeholder, the use cases the flow needs are exported from core module indexes,
+      and `main/container.ts` is the single wiring point. Open items (dep ratification, entry
+      point, cancel semantics, progress rendering) are spec/design decisions, not facts to
+      discover.
+  sddl-proposal:
+    status: pending
+decisions:
+  - id: e6f2h1-D0
+    level: A
+    authorship: user
+    decided_at: "2026-08-28T23:30:00Z"
+    title: CLAUDE.md refresh is the mandatory last step before the PR
+    summary: >-
+      User directive at change kickoff: before opening the PR for this change, update CLAUDE.md
+      with everything necessary — at minimum the stale "Current state: pre-implementation" section
+      (the repo has a full toolchain, src/ tree, and a working CLI since E0..E6.F1.H2 landed) and
+      whatever this story itself changes (TUI adapter, new runtime dep, commands). The plan must
+      carry this as an explicit final stage before PR creation.
+    rationale: >-
+      CLAUDE.md still describes the repo as having no commits, no package.json and no src/, which
+      contradicts repo reality and misleads every future session. Recorded verbatim as a user
+      decision so it survives stage handoffs.
+open_risks:
+  - id: risk-e6f2h1-001
+    summary: >-
+      First TUI runtime dependency: `@clack/prompts` (+ possibly picocolors) is only a
+      recommendation in docs/setup-tecnico-sentinel.md §4 and must be re-evaluated and ratified
+      (or replaced) with justification at design time, per the setup doc's own rule.
+    severity: medium
+  - id: risk-e6f2h1-002
+    summary: >-
+      Reuse boundary with the CLI review path: the TUI must drive the same use cases and reuse the
+      [E6.F1.H1]/[E6.F1.H2] execution/rendering seams without duplicating command logic or leaking
+      domain logic into the TUI (use cases are the only core API). Where rendering is shared
+      between CLI and TUI is a design decision; adapters must not import other adapters.
+    severity: medium
+  - id: risk-e6f2h1-003
+    summary: >-
+      "Progress" step semantics are undefined: runReview is a single awaited use case; what the
+      TUI can honestly display (spinner vs staged progress) and what "cancelable at every step"
+      means once the engine run has started (pre-run cancel vs mid-run abort) needs a firm spec
+      boundary. Mid-run abort may exceed this story's scope.
+    severity: medium
+next_action:
+  kind: delegate
+  target: sddl-proposal
+  summary: >-
+    Delegate sddl-proposal as a fresh worker to consolidate the change idea, grounded in the
+    backlog story (issue #38), PRD §3.1/§4.2, docs/setup-tecnico-sentinel.md §4 (clack
+    recommendation), and the current CLI adapter seams.
+created_at: "2026-08-28T23:30:00Z"
+updated_at: "2026-08-28T23:30:00Z"

@@ -1,0 +1,159 @@
+version: "0.1"
+change_name: e6-f1-h2-review-exit-codes
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F1.H2] (issue #37), second story of the E6 milestone: give `sentinel review` a
+    documented, tested exit-code contract so it is usable from a script without a TTY -- the seed
+    of gate mode (PRD use case 6). Bounded scope: extends the existing `review` command plus a
+    pure terminal-state -> exit-code mapping in the CLI driving adapter; no new core module and no
+    new domain terminal state. The seam is explicit -- [E6.F1.H1] (merged PR #73) documented in
+    code that `createCli.run()` returns 0 for any completed invocation and that `review-command.ts`
+    renders `result.state` without interpreting it, both naming #37 as the owner of the mapping.
+    Risk profile medium: the exit code is a two-axis function of the terminal state AND (when `ok`)
+    the parsed verdict, which the backlog phrasing loosely collapses; the `--json` scope call and
+    the commander signalling mechanism are open design tensions, and one touches public UX/config.
+  confidence: medium
+  recorded_at: "2026-08-28T00:00:00Z"
+lifecycle_status: planning
+current_stage: sddl-spec
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. The seam is documented in code (`createCli.run()` and
+      `review-command.ts`) and the domain values (`TerminalState`, `Verdict`) are exported and
+      stable. The open items are design decisions for spec/design, not facts to discover.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-28T00:00:00Z"
+    completed_at: "2026-08-28T00:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of
+      src/adapters/driving/cli/create-cli.ts and commands/review-command.ts (the documented
+      exit-code seam), src/core/run/{terminal-state,verdict}.ts and index.ts (the 5 terminal
+      states and 3 verdicts the mapping reads), and docs/backlog-mvp-sentinel.md §E6.F1.H2.
+      Four open questions carried to spec; the state-vs-verdict two-axis mapping flagged as the
+      load-bearing decision. No-TTY confirmed likely (all output via injected CliIo) but marked
+      for verification, not asserted.
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/state.yaml
+  proposal: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/proposal.md
+  spec: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/spec.md
+  design: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/design.md
+  plan: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/plan.md
+  execution_log: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/qa-report.md
+checkpoints:
+  - id: cp-proposal-exit-code-tensions
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec. The change is bounded (continue-lite): extend the `review`
+      command plus a pure exit-code mapping in the CLI adapter, with no new core module and no
+      sixth terminal state. Four open questions are deliberately unresolved for spec/design: the
+      exit-code table (state x verdict), whether "configurable" is a flag/config/both, whether
+      `--json` is in scope for H2 or deferred again, and the commander signalling mechanism for a
+      completed-but-non-approving run.
+    question: >-
+      Approve the proposal and continue to sddl-spec, revise this phase, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-28T00:00:00Z"
+    status: resolved
+    resolved_at: "2026-08-28T00:00:00Z"
+    resolution: >-
+      Approved. The three material open questions were decided by the user at this checkpoint as
+      e6h2-D1 (exit-code table: 0 / configurable default-1 / operational-failure 2), e6h2-D2
+      (configurable via `--changes-exit-code` flag only), and e6h2-D3 (defer `--json`). The fourth
+      open question -- the commander signalling mechanism -- is an A/design-level concern deferred
+      to sddl-design. Routing to sddl-spec.
+decisions:
+  - id: e6h2-D1
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Exit-code table model
+    summary: >-
+      The exit code is a two-axis function of the run. Exit 0 when the run passes: terminal state
+      `ok` with verdict `approve` or `comment`. A single configurable non-zero code (default 1)
+      when the run completes `ok` but the verdict is `request-changes` -- the gate-mode seed. A
+      single operational-failure code 2 for every non-`ok` terminal state (`ambiguous`,
+      `engine-error`, `timeout`, `validation-failed`). This lets a script distinguish "changes
+      requested" (1) from "the tool could not produce a trustworthy verdict" (2). No sixth terminal
+      state is introduced; the mapping lives in the CLI adapter, the states/verdict stay in core.
+    rationale: >-
+      Presented against a distinct-code-per-state alternative; user chose the leaner seed. Distinct
+      codes per failure state remain a future gate-mode refinement, not needed for the seed.
+  - id: e6h2-D2
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Configurable request-changes code -- flag only
+    summary: >-
+      The "configurable" non-zero code for `request-changes` is set by a per-invocation flag
+      `--changes-exit-code <n>` (default 1). Setting it to 0 yields a soft gate. No config-schema
+      key is added in this story; a global config default can be layered on later without breaking
+      the flag.
+    rationale: >-
+      Presented against flag+config-key with flag>config>default precedence; user chose flag-only
+      to keep the story a tight seed and avoid widening GlobalConfigSchema now. The scripting use
+      case is per-invocation (the CI job owns its exit policy), which the flag serves directly.
+  - id: e6h2-D3
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Defer --json out of H2
+    summary: >-
+      `--json` (machine-readable output) is deferred out of this story despite [E6.F1.H1] pointing
+      it here. H2's acceptance is exit codes + no-TTY usability; exit codes alone make the command
+      scriptable (a script branches on `$?`). Structured output becomes its own story or folds into
+      `[E6.F2.H2]` (result rendering).
+    rationale: >-
+      Presented against including a minimal `--json`; user chose to defer, keeping H2 a focused,
+      well-tested exit-code contract within its acceptance criteria.
+open_risks:
+  - id: risk-e6h2-001
+    summary: >-
+      The backlog phrase "ok/approve=0, request-changes!=0" conflates two distinct domain axes:
+      the exit code is a function of the terminal state AND, only when the state is `ok`, the
+      parsed verdict. Spec must resolve this precisely and must not add a sixth terminal state or
+      fold the verdict into the terminal-state union (PRD §4 domain contract).
+    severity: medium
+    direction_set_by: e6h2-D1 -- two-axis mapping decided, no sixth state; spec must encode it.
+  - id: risk-e6h2-002
+    summary: >-
+      The mechanism for signalling a non-zero exit for a completed-but-non-approving run is
+      non-obvious: `createCli.run()` returns 0 for any completed invocation and commander's action
+      callback cannot easily return a value. The chosen route (typed gate signal, mutable exit-code
+      channel on deps, or other) must keep the exit-code decision in the adapter without leaking
+      domain logic into the command.
+    severity: medium
+  - id: risk-e6h2-003
+    summary: >-
+      "Usable without a TTY" is asserted, not verified. The CLI routes output through the injected
+      CliIo and appears TTY-free, but this needs a confirming test rather than an assumption.
+    severity: low
+next_action:
+  kind: route_to_stage
+  target: sddl-spec
+  summary: >-
+    Proposal approved and the three material B-decisions (e6h2-D1/D2/D3) recorded. Route to
+    sddl-spec to formalize the exit-code contract: encode the two-axis state x verdict mapping from
+    e6h2-D1 (0 pass / configurable default-1 request-changes / 2 operational failure), the
+    `--changes-exit-code` flag from e6h2-D2, the `--json` deferral from e6h2-D3, the no-TTY
+    verification (risk-e6h2-003), and firm acceptance criteria downstream stages validate against.
+    The commander signalling mechanism (risk-e6h2-002) is left for sddl-design.
+created_at: "2026-08-28T00:00:00Z"
+updated_at: "2026-08-28T00:00:00Z"

@@ -61,6 +61,49 @@ decisions:
       CLAUDE.md still describes the repo as having no commits, no package.json and no src/, which
       contradicts repo reality and misleads every future session. Recorded verbatim as a user
       decision so it survives stage handoffs.
+  - id: e6f2h1-D1
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: TUI entry point — bare `sentinel` on a TTY
+    summary: >-
+      Running `sentinel` with no subcommand on an interactive TTY launches the TUI navigation
+      flow. When stdin is not a TTY, the command does not hang or crash: it prints guidance
+      pointing to `sentinel review` (scripting surface) instead. This replaces the current
+      commander default of printing help on no command; `--help`, `--version` and every existing
+      subcommand keep working unchanged.
+    rationale: >-
+      Presented against a `sentinel tui` subcommand; user chose bare invocation. Matches the PRD
+      positioning: the TUI is the primary interactive surface and the CLI is the "equivalent
+      direct command for scripting" (PRD §3.1-G).
+  - id: e6f2h1-D2
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: TUI library is ratified at design time, not pre-approved
+    summary: >-
+      `@clack/prompts` is NOT pre-ratified. sddl-design must compare real alternatives (at least
+      @clack/prompts vs @inquirer/prompts vs native readline-based prompts) against this story's
+      needs — per-step cancel, spinner, testability seam, ESM/Node>=22 fit, dependency weight —
+      and ratify one with recorded justification, per the setup doc's own re-evaluation rule.
+    rationale: >-
+      User chose evaluation over pre-ratification when offered clack directly. The spec must
+      therefore stay library-agnostic: acceptance criteria describe behavior (prompts, cancel,
+      spinner) without naming a package.
+  - id: e6f2h1-D3
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: Cancel semantics — pre-run only
+    summary: >-
+      "Cancelable at every step" means every navigation prompt (repo, branch, harness,
+      confirmation) can be cancelled with a clean, friendly exit and no side effects. Once the
+      confirmed review run starts, there is no interactive mid-run abort in this story; the
+      engine timeout already bounds the run. Mid-run abort (signal/AbortSignal through the use
+      case and engine adapter, worktree cleanup on abort) is a possible future story.
+    rationale: >-
+      Presented against implementing mid-run abort; user chose the bounded reading. Keeps the
+      story inside the TUI adapter without widening runReview's contract.
 open_risks:
   - id: risk-e6f2h1-001
     summary: >-
@@ -100,7 +143,13 @@ checkpoints:
       B-level decisions above.
     free_input_allowed: true
     created_at: "2026-08-28T23:40:00Z"
-    status: pending
+    status: resolved
+    resolved_at: "2026-08-28T23:50:00Z"
+    resolution: >-
+      Approved. The three B-level questions were decided by the user at this checkpoint as
+      e6f2h1-D1 (bare `sentinel` on a TTY launches the TUI), e6f2h1-D2 (do NOT pre-ratify
+      @clack/prompts — sddl-design must compare alternatives and ratify with justification) and
+      e6f2h1-D3 (cancel is pre-run only; no mid-run abort in this story). Routing to sddl-spec.
 next_action:
   kind: checkpoint
   target: user

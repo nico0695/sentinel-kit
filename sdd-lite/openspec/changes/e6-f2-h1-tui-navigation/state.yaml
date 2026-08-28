@@ -45,6 +45,19 @@ stages:
       rendering detail ([E6.F2.H2]), sentinel open ([E6.F2.H3] optional), mid-run abort. e6f2h1-D0
       (CLAUDE.md refresh before PR) carried in the scope sketch. Seven open questions surfaced
       (three B-level: entry point, dep ratification, cancel semantics), none decided.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-29T00:00:00Z"
+    completed_at: "2026-08-29T00:05:00Z"
+    notes: >-
+      spec.md written by a fresh delegated worker: 14 ACs encoding firm D0-D3 without reopening
+      them, library-agnostic per D2. The four open A-level questions were resolved in the spec as
+      e6f2h1-A1..A4 (non-TTY guidance + exit 1; spinner + static phase text; harness enumeration
+      via core loadHarnesses over the existing factory+user HarnessLoader pair, verified in
+      src/core/review/load-harnesses.ts and main/container.ts; empty states friendly + exit 0 +
+      zero side effects). H1/H2 boundary explicit (result step = terminal state + verdict + run
+      dir only). No new B-level questions; no new risks. Grounded in direct reads of the CLI
+      adapter seams, main wiring, and core repos/run/review indexes.
 decisions:
   - id: e6f2h1-D0
     level: A
@@ -104,6 +117,41 @@ decisions:
     rationale: >-
       Presented against implementing mid-run abort; user chose the bounded reading. Keeps the
       story inside the TUI adapter without widening runReview's contract.
+  - id: e6f2h1-A1
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Non-TTY behavior — one guidance line, exit 1
+    summary: >-
+      When bare `sentinel` runs with stdin not a TTY, print a single guidance line pointing to
+      `sentinel review <repo> <branch> --type <harness>` and exit 1, without hanging or crashing.
+      TTY-ness is an injected fact on the TUI deps seam so tests never need a real terminal.
+  - id: e6f2h1-A2
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Progress step — spinner plus static phase text
+    summary: >-
+      runReview is a single awaited use case, so the progress step shows a spinner with static
+      phase text and never fabricates staged progress the core cannot report (AC-6).
+  - id: e6f2h1-A3
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Harness enumeration — core loadHarnesses over existing loaders
+    summary: >-
+      The harness step enumerates via the exported core `loadHarnesses` use case over the
+      existing factory+user HarnessLoader pair already wired in main/container.ts — no new
+      enumeration mechanism, no direct FS access from the TUI.
+  - id: e6f2h1-A4
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Empty states — friendly line, exit 0, zero side effects
+    summary: >-
+      No repos registered, no branches, or no harnesses each terminate the flow with a friendly
+      explanatory line (pointing to the registering command where it applies), exit 0, and no
+      side effects (AC-10).
 open_risks:
   - id: risk-e6f2h1-001
     summary: >-
@@ -150,12 +198,29 @@ checkpoints:
       e6f2h1-D1 (bare `sentinel` on a TTY launches the TUI), e6f2h1-D2 (do NOT pre-ratify
       @clack/prompts — sddl-design must compare alternatives and ratify with justification) and
       e6f2h1-D3 (cancel is pre-run only; no mid-run abort in this story). Routing to sddl-spec.
+  - id: cp-spec-tui-contract
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is ready for design. 14 ACs encode firm D0-D3: bare-`sentinel` TTY entry with an
+      untouched CLI surface (AC-1), non-TTY guidance + exit 1 (AC-2), the full flow over core use
+      cases only (AC-3), pre-run cancel with exit 0 and zero side effects (AC-4), confirmation
+      gate (AC-5), honest spinner progress (AC-6), minimal result respecting the H2 boundary
+      (AC-7), persistRun-once semantics (AC-8), no raw stack traces (AC-9), friendly empty states
+      (AC-10), hexagonal guards (AC-11), TTY-free testability via a TuiDeps seam (AC-12), green
+      gate (AC-13), and the mandatory CLAUDE.md closeout before the PR (AC-14, D0). A-level
+      resolutions e6f2h1-A1..A4 recorded. The TUI library stays unnamed (D2) — design ratifies it.
+    question: >-
+      Approve the spec and continue to sddl-design, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:05:00Z"
+    status: pending
 next_action:
   kind: checkpoint
   target: user
   summary: >-
-    Present cp-proposal-tui-flow: proposal approval plus the three B-level decisions (entry
-    point, TUI dep ratification, cancel semantics), each with a recommendation per the decision
-    protocol. Route to sddl-spec on approval.
+    Present cp-spec-tui-contract: spec approval (14 ACs, A1-A4 resolutions). Route to
+    sddl-design on approval — design must ratify the TUI library (D2) and resolve the shared
+    rendering/helper placement (risk-e6f2h1-002).
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

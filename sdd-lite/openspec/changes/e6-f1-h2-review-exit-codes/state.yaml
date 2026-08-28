@@ -1,0 +1,338 @@
+version: "0.1"
+change_name: e6-f1-h2-review-exit-codes
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F1.H2] (issue #37), second story of the E6 milestone: give `sentinel review` a
+    documented, tested exit-code contract so it is usable from a script without a TTY -- the seed
+    of gate mode (PRD use case 6). Bounded scope: extends the existing `review` command plus a
+    pure terminal-state -> exit-code mapping in the CLI driving adapter; no new core module and no
+    new domain terminal state. The seam is explicit -- [E6.F1.H1] (merged PR #73) documented in
+    code that `createCli.run()` returns 0 for any completed invocation and that `review-command.ts`
+    renders `result.state` without interpreting it, both naming #37 as the owner of the mapping.
+    Risk profile medium: the exit code is a two-axis function of the terminal state AND (when `ok`)
+    the parsed verdict, which the backlog phrasing loosely collapses; the `--json` scope call and
+    the commander signalling mechanism are open design tensions, and one touches public UX/config.
+  confidence: medium
+  recorded_at: "2026-08-28T00:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown. The seam is documented in code (`createCli.run()` and
+      `review-command.ts`) and the domain values (`TerminalState`, `Verdict`) are exported and
+      stable. The open items are design decisions for spec/design, not facts to discover.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-28T00:00:00Z"
+    completed_at: "2026-08-28T00:00:00Z"
+    notes: >-
+      proposal.md written grounded in direct inspection of
+      src/adapters/driving/cli/create-cli.ts and commands/review-command.ts (the documented
+      exit-code seam), src/core/run/{terminal-state,verdict}.ts and index.ts (the 5 terminal
+      states and 3 verdicts the mapping reads), and docs/backlog-mvp-sentinel.md §E6.F1.H2.
+      Four open questions carried to spec; the state-vs-verdict two-axis mapping flagged as the
+      load-bearing decision. No-TTY confirmed likely (all output via injected CliIo) but marked
+      for verification, not asserted.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-28T01:10:00Z"
+    completed_at: "2026-08-28T01:15:00Z"
+    notes: >-
+      spec.md written with 10 acceptance criteria encoding e6h2-D1/D2/D3, the two-axis exit-code
+      table, no-TTY verification (AC-8), backward compatibility (AC-9, incl. persistence-failure
+      dominates on request-changes), and --help documentation (AC-10). Domain facts grounded in
+      direct reads of core/run/{terminal-state,verdict,run-review}.ts: Verdict is
+      approve|request-changes|comment (D1 holds); RunReviewResult.verdict is present only on `ok`.
+      DEGRADATION: the delegated sddl-spec worker was interrupted by a provider spend limit before
+      writing any artifact; per the SDDL-ORCHESTRATOR "Fallback if Agent tool is unavailable"
+      clause the orchestrator authored spec.md inline with reduced fresh-context isolation. This is
+      recorded so the QA/review stages apply extra scrutiny to the spec.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-28T01:20:00Z"
+    completed_at: "2026-08-28T01:35:00Z"
+    notes: >-
+      design.md written. Resolved risk-e6h2-002: the completed-run exit code reaches run()'s
+      return via a typed `ReviewExitSignal extends Error` that the review action throws after a
+      successful persistRun + render, translated by runProgram's existing catch (one new instanceof
+      branch, before the CommanderError branch) -- the same throw-carries-exit-code shape commander
+      already uses. Chosen over a mutable sink on deps (rejected: mutable state on an immutable
+      contract + per-run reset/stale-code risk since the program is built once). AC-9 satisfied by
+      throw ordering: persistence failure throws the original error first -> catch-all exit 1
+      dominates the terminal-state table. Pure mapping `resolveReviewExitCode(state, verdict,
+      changesExitCode)` in a NEW dedicated `cli/exit-code.ts` (not render/), reading only the
+      exported TerminalState/Verdict types; state!==ok -> 2, else verdict==="request-changes" -> C
+      else 0 (defensive absent-verdict -> 0/pass). `--changes-exit-code <n>` flag: default 1,
+      validator parseChangesExitCode (integer 0-255, mirrors parseTimeoutMs), read purely local to
+      the command -- CliDeps and container.ts untouched. All architecture guards confirmed to hold.
+      No material spec gap found. Grounded in direct reads of create-cli.ts, review-command.ts,
+      cli-deps.ts, container.ts, cli.ts, core/run/index.ts + run-review.ts, and cli-test-doubles.ts.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-28T01:40:00Z"
+    completed_at: "2026-08-28T01:45:00Z"
+    notes: >-
+      plan.md written from design.md (authoritative) + spec.md (10 ACs). Five stages, sequenced by
+      real dependency: S1 pure `cli/exit-code.ts` + unit table (AC-1..5,7); S2 `--changes-exit-code`
+      flag + parseChangesExitCode validator (AC-6); S3 ReviewExitSignal + runProgram instanceof
+      branch (before CommanderError) + review-action wiring with AC-9 persistence-dominates ordering
+      + e2e review.test cases (AC-1/2/3/4/5/8/9); S4 `--help` contract + help.test (AC-10); S5 final
+      gate (full check + test, 681 baseline + new, AC-1..10 cross-check). S2 sequenced before S3
+      because the thrown signal needs the flag-resolved changesExitCode. No manual smoke stage (fully
+      in-process testable via createCli + capturing IO doubles; no engine/git/TTY). Each code stage
+      requires stage_approval and validates with `npm run check` + `npx vitest run --project
+      adapters`. Firm e6h2-D1/D2/D3 and all architecture guards carried into every stage.
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-28T17:31:00Z"
+    completed_at: "2026-08-28T17:37:00Z"
+    notes: >-
+      All five stages executed in one approved pass (S1-S4 code, S5 final gate), in dependency order.
+      S1: NEW cli/exit-code.ts resolveReviewExitCode(state, verdict, changesExitCode) (state!==ok->2,
+      else request-changes?C:0, absent-verdict->0) importing only core TerminalState/Verdict types +
+      NEW __test__/exit-code.test.ts (full table). S2: parseChangesExitCode (integer 0-255 else
+      InvalidArgumentError, mirrors parseTimeoutMs) + --changes-exit-code <n> flag default 1 +
+      non-optional changesExitCode on ReviewOptions; AC-6 tests. Correction: "" is a valid soft-gate 0
+      (Number("")===0), so it is accepted not rejected -- differs from parseTimeoutMs where 0 is
+      invalid. S3: ReviewExitSignal extends Error in exit-code.ts; runProgram catch gains the
+      instanceof branch BEFORE CommanderError; review action throws the signal AFTER persist+render so
+      the persistence-failure rethrow (exit 1) dominates the table (AC-9); H1 "exits 0" review.test
+      block replaced with the H2 contract (AC-1/2/3/4/5/8/9). Two mutation-verifies: breaking the
+      request-changes mapping killed 3 tests; moving the throw before persist killed the AC-9
+      persistence-dominates test (+19 others) -- both reverted, tree re-green. S4: .addHelpText EXIT_CODE
+      contract + help.test (AC-10). S5 final gate: npm run check green (biome + tsc + depcruise, all 5
+      guards, 232 deps no violations); npm test 705 passed / 39 files (baseline 681/38, +1 file, +24
+      tests). AC-1..AC-10 cross-checked to tests in execution-log.md. No scope drift, no blast-radius
+      expansion, no git side effects. Firm e6h2-D1/D2/D3 honored (no GlobalConfigSchema/container/CliDeps
+      change, no --json, five terminal states only).
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-28T18:00:00Z"
+    completed_at: "2026-08-28T18:10:00Z"
+    notes: >-
+      Final-mode QA over commit 25542bb. All 10 ACs independently verified against spec.md with
+      real, non-vacuous assertions (exit-code table re-derived row-by-row against core/run:
+      RunReviewResult.verdict present only on `ok`, five terminal states, mapping matches). Extra
+      scrutiny per risk-e6h2-004: AC-9 persistence-dominates ordering re-derived from
+      review-command.ts — the ReviewExitSignal throw (L235) is strictly after a successful
+      persistRun try-block, so a request-changes run whose persistRun throws exits 1 via the
+      catch-all, never C; proven by review.test L551-572 under --changes-exit-code 20. ReviewExitSignal
+      caught before formatErrorLine (create-cli.ts L127), never treated as a domain error. Architecture
+      guards hold; git show --stat confirms only the 6 approved files changed (CliDeps/container/
+      GlobalConfigSchema untouched, e6h2-D2/D3 honored). Gate run independently: npm run check green,
+      npm test 705 passed / 39 files. One low finding (F1): parseChangesExitCode accepts empty/
+      whitespace argument as silent soft-gate 0 (Number("")===0) — a scripting footgun but violates no
+      AC (AC-6 requires only non-numeric/out-of-range rejection; AC-5 requires 0 accepted). Non-blocking.
+      Verdict: pass. Change marked completed.
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    All 10 ACs met with real assertions; AC-9 ordering and two-axis table correct under independent
+    re-derivation; architecture guards hold; gate green (npm run check clean, npm test 705/39). One
+    low finding (empty/whitespace --changes-exit-code coerces to soft-gate 0) — non-blocking, violates
+    no AC. Change is completed and ready for the orchestrator to open the PR (Closes #37).
+  reported_at: "2026-08-28T18:10:00Z"
+  report_path: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/qa-report.md
+artifacts:
+  state: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/state.yaml
+  proposal: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/proposal.md
+  spec: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/spec.md
+  design: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/design.md
+  plan: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/plan.md
+  execution_log: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e6-f1-h2-review-exit-codes/qa-report.md
+checkpoints:
+  - id: cp-proposal-exit-code-tensions
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec. The change is bounded (continue-lite): extend the `review`
+      command plus a pure exit-code mapping in the CLI adapter, with no new core module and no
+      sixth terminal state. Four open questions are deliberately unresolved for spec/design: the
+      exit-code table (state x verdict), whether "configurable" is a flag/config/both, whether
+      `--json` is in scope for H2 or deferred again, and the commander signalling mechanism for a
+      completed-but-non-approving run.
+    question: >-
+      Approve the proposal and continue to sddl-spec, revise this phase, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-28T00:00:00Z"
+    status: resolved
+    resolved_at: "2026-08-28T00:00:00Z"
+    resolution: >-
+      Approved. The three material open questions were decided by the user at this checkpoint as
+      e6h2-D1 (exit-code table: 0 / configurable default-1 / operational-failure 2), e6h2-D2
+      (configurable via `--changes-exit-code` flag only), and e6h2-D3 (defer `--json`). The fourth
+      open question -- the commander signalling mechanism -- is an A/design-level concern deferred
+      to sddl-design. Routing to sddl-spec.
+  - id: cp-spec-exit-code-contract
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is ready for design. 10 ACs encode e6h2-D1/D2/D3: the two-axis exit-code table (0
+      pass / configurable default-1 request-changes / 2 for every non-ok state), the
+      --changes-exit-code flag with 0-255 validation and soft-gate (0) support, no-TTY verification
+      (AC-8), backward compatibility incl. persistence-failure-dominates (AC-9), and --help
+      documentation (AC-10). The commander signalling mechanism stays a design decision (AC-7,
+      risk-e6h2-002).
+    question: >-
+      Approve the spec and continue to sddl-design, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-28T01:15:00Z"
+    status: resolved
+    resolved_at: "2026-08-28T01:20:00Z"
+    resolution: >-
+      Approved ("avanza"). Routing to sddl-design to resolve the signalling mechanism
+      (risk-e6h2-002) and the mapping function's placement/signature within the architecture guards.
+decisions:
+  - id: e6h2-D1
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Exit-code table model
+    summary: >-
+      The exit code is a two-axis function of the run. Exit 0 when the run passes: terminal state
+      `ok` with verdict `approve` or `comment`. A single configurable non-zero code (default 1)
+      when the run completes `ok` but the verdict is `request-changes` -- the gate-mode seed. A
+      single operational-failure code 2 for every non-`ok` terminal state (`ambiguous`,
+      `engine-error`, `timeout`, `validation-failed`). This lets a script distinguish "changes
+      requested" (1) from "the tool could not produce a trustworthy verdict" (2). No sixth terminal
+      state is introduced; the mapping lives in the CLI adapter, the states/verdict stay in core.
+    rationale: >-
+      Presented against a distinct-code-per-state alternative; user chose the leaner seed. Distinct
+      codes per failure state remain a future gate-mode refinement, not needed for the seed.
+  - id: e6h2-D2
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Configurable request-changes code -- flag only
+    summary: >-
+      The "configurable" non-zero code for `request-changes` is set by a per-invocation flag
+      `--changes-exit-code <n>` (default 1). Setting it to 0 yields a soft gate. No config-schema
+      key is added in this story; a global config default can be layered on later without breaking
+      the flag.
+    rationale: >-
+      Presented against flag+config-key with flag>config>default precedence; user chose flag-only
+      to keep the story a tight seed and avoid widening GlobalConfigSchema now. The scripting use
+      case is per-invocation (the CI job owns its exit policy), which the flag serves directly.
+  - id: e6h2-D3
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T00:00:00Z"
+    title: Defer --json out of H2
+    summary: >-
+      `--json` (machine-readable output) is deferred out of this story despite [E6.F1.H1] pointing
+      it here. H2's acceptance is exit codes + no-TTY usability; exit codes alone make the command
+      scriptable (a script branches on `$?`). Structured output becomes its own story or folds into
+      `[E6.F2.H2]` (result rendering).
+    rationale: >-
+      Presented against including a minimal `--json`; user chose to defer, keeping H2 a focused,
+      well-tested exit-code contract within its acceptance criteria.
+  - id: e6h2-D4
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T22:55:00Z"
+    title: Fail closed (2) on an ok run with no verdict
+    summary: >-
+      An `ok` result carrying no verdict resolves to exit 2, not 0. Raised by the repo owner's
+      PR #74 review; the orchestrator validated it as genuine (fail-open is the unsafe direction
+      for a gate; an ok-without-verdict is the same untrustworthy case as `ambiguous`) and the
+      user approved the fix. Unit test flipped to assert 2; a CLI integration test proves the
+      inconsistent result does not pass the gate; spec AC-7 and design amended.
+    rationale: >-
+      Overturns the original inline-spec defensive default (0, "least surprising"). For the one
+      consumer that matters -- a CI gate -- a run with no trustworthy verdict must be rejected, not
+      passed silently. See risk-e6h2-006.
+open_risks:
+  - id: risk-e6h2-001
+    summary: >-
+      The backlog phrase "ok/approve=0, request-changes!=0" conflates two distinct domain axes:
+      the exit code is a function of the terminal state AND, only when the state is `ok`, the
+      parsed verdict. Spec must resolve this precisely and must not add a sixth terminal state or
+      fold the verdict into the terminal-state union (PRD §4 domain contract).
+    severity: medium
+    direction_set_by: e6h2-D1 -- two-axis mapping decided, no sixth state; spec must encode it.
+  - id: risk-e6h2-002
+    summary: >-
+      The mechanism for signalling a non-zero exit for a completed-but-non-approving run is
+      non-obvious: `createCli.run()` returns 0 for any completed invocation and commander's action
+      callback cannot easily return a value. The chosen route (typed gate signal, mutable exit-code
+      channel on deps, or other) must keep the exit-code decision in the adapter without leaking
+      domain logic into the command.
+    severity: medium
+    direction_set_by: >-
+      RESOLVED in sddl-design -- a typed ReviewExitSignal thrown by the review action and
+      translated by runProgram's existing catch (chosen over a mutable sink on deps). See design.md
+      "Design Overview" and "Alternatives And Trade-Offs".
+  - id: risk-e6h2-003
+    summary: >-
+      "Usable without a TTY" is asserted, not verified. The CLI routes output through the injected
+      CliIo and appears TTY-free, but this needs a confirming test rather than an assumption.
+    severity: low
+    direction_set_by: >-
+      RESOLVED in sddl-executor -- the AC-8 test ("resolves the exit code and full output through the
+      injected io alone") drives a completed review through createCli with capturing IO doubles and no
+      TTY, asserting both the rendered output and the returned exit code. Test is green.
+  - id: risk-e6h2-004
+    summary: >-
+      Reduced fresh-context isolation on spec.md. The delegated sddl-spec worker was interrupted by
+      a provider spend limit before writing anything, so the orchestrator authored spec.md inline.
+      QA/review stages should scrutinize the spec as rigorously as a fresh worker's output, since
+      the orchestrator both directed and wrote it.
+    severity: low
+    direction_set_by: >-
+      RESOLVED in sddl-qa-review (final) -- the AC-9 persistence-dominates ordering and the two-axis
+      table were independently re-derived from source (review-command.ts throw order + core/run
+      RunReviewResult/TerminalState/Verdict) and confirmed correct. No spec defect surfaced under
+      the extra scrutiny.
+  - id: risk-e6h2-005
+    summary: >-
+      parseChangesExitCode accepts an empty or whitespace-only --changes-exit-code argument as a
+      silent soft-gate 0 (Number("")===0 passes the 0-255 integer guard). In scripting this is a
+      footgun: `--changes-exit-code "$UNSET"` turns a request-changes gate OFF (exit 0) instead of
+      erroring. Violates no AC (AC-6 requires only non-numeric/out-of-range rejection; AC-5 requires
+      0 accepted) and mirrors parseTimeoutMs's coercion, so it does not block this change.
+    severity: low
+    status: resolved
+    direction_set_by: >-
+      RESOLVED post-QA at the user's request before opening the PR. parseChangesExitCode now guards
+      `raw.trim() === ""` and rejects a blank value as a usage error (InvalidArgumentError), so an
+      empty/whitespace --changes-exit-code no longer silently becomes a soft gate. Covered by a new
+      it.each(["", " "]) regression case in review.test.ts. Gate re-run green: npm run check clean,
+      npm test 707/39 (705 + the 2 blank-value cases). parseTimeoutMs left unchanged (0 is already
+      invalid there, so a blank value is rejected by its existing integer/positive guard).
+  - id: risk-e6h2-006
+    summary: >-
+      resolveReviewExitCode originally failed OPEN on an `ok` result carrying no verdict:
+      `verdict === "request-changes" ? C : 0` returned 0 (pass) for an absent verdict. For a CI
+      gate that is the unsafe direction -- a run with no trustworthy verdict was passed silently.
+      Raised by the repo owner's PR #74 4R review (verdict "cambios recomendados").
+    severity: high
+    status: resolved
+    direction_set_by: >-
+      RESOLVED at commit after PR #74 review. The mapping now fails CLOSED: `if (state !== "ok" ||
+      verdict === undefined) return 2`. An `ok` with no verdict is treated as `ambiguous` -- the
+      same "no trustworthy verdict -> 2" bucket -- rather than a silent pass. The prior unit test
+      (which asserted 0) was flipped to assert 2, and a CLI-level integration test drives an
+      `ok`+undefined-verdict result through createCli and asserts exit 2 (the reviewer's requested
+      "inconsistent result must not pass the gate" proof). Mutation-verified: removing the guard
+      turned that test red. Gate green: npm run check clean, npm test 708/39. This is exactly the
+      class of defect risk-e6h2-004 predicted -- a defensive default chosen in the inline-authored
+      spec, in the direction the QA (validating against that spec) did not challenge.
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Final QA passed: all 10 ACs met, AC-9 ordering and two-axis table correct under independent
+    re-derivation, architecture guards hold. The one QA finding (risk-e6h2-005, empty
+    --changes-exit-code soft-gate) was then fixed at the user's request before the PR: blank values
+    now reject as a usage error, with a regression test. Gate green (npm run check clean, npm test
+    707/39). Change completed; orchestrator opening one PR ([E6.F1.H2] review exit codes, Closes
+    #37).
+created_at: "2026-08-28T00:00:00Z"
+updated_at: "2026-08-28T20:35:00Z"

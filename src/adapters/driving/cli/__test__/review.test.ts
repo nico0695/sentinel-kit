@@ -6,9 +6,10 @@
  * dedicated guards, because each of them is a bug the story exists to
  * prevent:
  *
- * - **exit 0 for any completed invocation** whatever the terminal state
- *   (AC-12); non-zero only when the invocation itself fails, and then with
- *   nothing persisted.
+ * - **the exit code is the run's terminal state** (`[E6.F1.H2]`, #37): 0 for
+ *   `ok`/approve|comment, the configurable code (default 1) for
+ *   `ok`/request-changes, 2 for every non-`ok` state — with an invocation that
+ *   fails before or during persistence dominating at the catch-all (exit 1).
  * - **exactly one persisted run** per completed invocation, failed runs
  *   included (AC-6).
  * - **`validations` / `validationTimeoutMs` reach `runReview`** (AC-11);
@@ -250,6 +251,62 @@ describe("review — argument surface", () => {
     },
   );
 
+  it("rejects a non-numeric --changes-exit-code before running the review (AC-6)", async () => {
+    const h = harness();
+
+    const code = await h.run(
+      "review",
+      "owner/repo",
+      "feature",
+      "--changes-exit-code",
+      "soon",
+    );
+
+    expect(code).not.toBe(0);
+    expect(h.runReviewRequests).toHaveLength(0);
+    expect(h.persistRunRequests).toHaveLength(0);
+    expect(h.deps.io.out).toEqual([]);
+    expect(h.deps.io.err.join("\n")).toContain("--changes-exit-code");
+  });
+
+  it.each(["-1", "256", "1.5", "300"])(
+    "rejects the out-of-range --changes-exit-code value %j (AC-6)",
+    async (value) => {
+      const h = harness();
+
+      const code = await h.run(
+        "review",
+        "owner/repo",
+        "feature",
+        "--changes-exit-code",
+        value,
+      );
+
+      expect(code).not.toBe(0);
+      expect(h.runReviewRequests).toHaveLength(0);
+    },
+  );
+
+  it.each(["", " "])(
+    "rejects a blank --changes-exit-code %j rather than silently coercing to a soft gate (AC-6)",
+    async (value) => {
+      const h = harness();
+
+      const code = await h.run(
+        "review",
+        "owner/repo",
+        "feature",
+        "--changes-exit-code",
+        value,
+      );
+
+      // `Number("")` and `Number(" ")` are 0; a blank value must be a usage
+      // error, not an unnoticed soft gate (risk-e6h2-005).
+      expect(code).not.toBe(0);
+      expect(h.runReviewRequests).toHaveLength(0);
+    },
+  );
+
   it("exits non-zero without calling a use case when <branch> is missing", async () => {
     const h = harness();
 
@@ -380,58 +437,177 @@ describe("review — persistence failure (R4-001, D13)", () => {
   });
 });
 
-describe("review — exit codes (AC-12)", () => {
-  it("exits 0 for a run that ended in engine-error", async () => {
-    const h = harness({
-      result: {
-        state: "engine-error",
-        cleanup: { attempted: false },
-        failure: { stage: "engine", error: new Error("boom") },
-      },
-      record: {
-        ...withoutVerdict(okRecord),
-        state: "engine-error",
-        failure: { stage: "engine", message: "boom" },
-      },
-    });
+/** An `ok`/`request-changes` result and its matching record (the gate row). */
+const requestChangesResult: RunReviewResult = {
+  state: "ok",
+  verdict: "request-changes",
+  cleanup: { attempted: false },
+};
+const requestChangesRecord: RunRecord = {
+  ...okRecord,
+  verdict: "request-changes",
+};
 
-    const code = await h.run("review", "owner/repo", "feature");
-
-    expect(code).toBe(0);
-    expect(fieldsOf(h.deps.io.out).get("state")).toBe("engine-error");
-  });
-
-  it.each(["ambiguous", "timeout", "validation-failed"] as const)(
-    "exits 0 for a run that ended in %s",
-    async (state) => {
+describe("review — exit codes (AC-1, AC-2, AC-3)", () => {
+  it.each(["approve", "comment"] as const)(
+    "exits 0 for a completed ok review with verdict %s (AC-1)",
+    async (verdict) => {
       const h = harness({
-        result: { state, cleanup: { attempted: false } },
-        record: { ...withoutVerdict(okRecord), state },
+        result: { state: "ok", verdict, cleanup: { attempted: false } },
+        record: { ...okRecord, verdict },
       });
 
       const code = await h.run("review", "owner/repo", "feature");
 
       expect(code).toBe(0);
+      expect(fieldsOf(h.deps.io.out).get("verdict")).toBe(verdict);
       expect(h.persistRunRequests).toHaveLength(1);
     },
   );
 
-  it("exits 0 for a completed run whose verdict is request-changes", async () => {
+  it("exits the default code 1 for ok/request-changes (AC-2)", async () => {
     const h = harness({
-      result: {
-        state: "ok",
-        verdict: "request-changes",
-        cleanup: { attempted: false },
-      },
-      record: { ...okRecord, verdict: "request-changes" },
+      result: requestChangesResult,
+      record: requestChangesRecord,
     });
 
     const code = await h.run("review", "owner/repo", "feature");
 
-    expect(code).toBe(0);
+    expect(code).toBe(1);
     expect(fieldsOf(h.deps.io.out).get("verdict")).toBe("request-changes");
   });
 
+  it.each([
+    "ambiguous",
+    "engine-error",
+    "timeout",
+    "validation-failed",
+  ] as const)("exits 2 for a run that ended in %s (AC-3)", async (state) => {
+    const h = harness({
+      result: { state, cleanup: { attempted: false } },
+      record: { ...withoutVerdict(okRecord), state },
+    });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    expect(code).toBe(2);
+    expect(h.persistRunRequests).toHaveLength(1);
+    expect(fieldsOf(h.deps.io.out).get("state")).toBe(state);
+  });
+
+  it("fails the gate (2) for an inconsistent ok run carrying no verdict", async () => {
+    // Type-impossible per RunReviewResult, but a defense-in-depth guard for the
+    // one consumer that matters: a CI gate. An `ok` with no verdict is not a
+    // trustworthy pass, so the whole command — not just the pure mapping — must
+    // exit 2, never 0. Drives the full createCli path, as the reviewer asked.
+    const h = harness({
+      result: { state: "ok", cleanup: { attempted: false } },
+      record: withoutVerdict(okRecord),
+    });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    expect(code).toBe(2);
+    expect(h.persistRunRequests).toHaveLength(1);
+  });
+});
+
+describe("review — configurable changes code (AC-4, AC-5)", () => {
+  it("exits the custom --changes-exit-code for ok/request-changes (AC-4)", async () => {
+    const h = harness({
+      result: requestChangesResult,
+      record: requestChangesRecord,
+    });
+
+    const code = await h.run(
+      "review",
+      "owner/repo",
+      "feature",
+      "--changes-exit-code",
+      "20",
+    );
+
+    expect(code).toBe(20);
+  });
+
+  it("leaves a passing review at 0 even with a custom changes code (AC-4)", async () => {
+    const h = harness();
+
+    const code = await h.run(
+      "review",
+      "owner/repo",
+      "feature",
+      "--changes-exit-code",
+      "20",
+    );
+
+    expect(code).toBe(0);
+  });
+
+  it("exits 0 for ok/request-changes under --changes-exit-code 0 (AC-5)", async () => {
+    const h = harness({
+      result: requestChangesResult,
+      record: requestChangesRecord,
+    });
+
+    const code = await h.run(
+      "review",
+      "owner/repo",
+      "feature",
+      "--changes-exit-code",
+      "0",
+    );
+
+    expect(code).toBe(0);
+    expect(fieldsOf(h.deps.io.out).get("verdict")).toBe("request-changes");
+  });
+});
+
+describe("review — no TTY (AC-8)", () => {
+  it("resolves the exit code and full output through the injected io alone", async () => {
+    // Driven entirely through `createCli` + capturing io doubles: no
+    // `process.stdout.isTTY`, no controlling terminal. Both the rendered
+    // outcome and the returned code come back without one.
+    const h = harness({
+      result: requestChangesResult,
+      record: requestChangesRecord,
+    });
+
+    const code = await h.run("review", "owner/repo", "feature");
+
+    expect(code).toBe(1);
+    expect(h.deps.io.out.map((line) => line.split("\t")[0])).toEqual([
+      ...REVIEW_OUTCOME_FIELDS,
+    ]);
+    expect(fieldsOf(h.deps.io.out).get("verdict")).toBe("request-changes");
+    expect(h.deps.io.err).toEqual([]);
+  });
+});
+
+describe("review — persistence dominates the gate (AC-9)", () => {
+  it("exits 1, not the changes code, when a request-changes run fails to persist", async () => {
+    // The operational failure dominates: a run whose record could not be
+    // written is not a trustworthy gate result, so it exits via the catch-all
+    // (1), never reaching the terminal-state table — even under a custom code.
+    const h = harness({
+      result: requestChangesResult,
+      persistRunFails: new Error("Failed to persist run at /runs/owner__repo"),
+    });
+
+    const code = await h.run(
+      "review",
+      "owner/repo",
+      "feature",
+      "--changes-exit-code",
+      "20",
+    );
+
+    expect(code).toBe(1);
+    expect(h.deps.io.err[0]).toContain("could not be persisted");
+  });
+});
+
+describe("review — exit codes for failed invocations (AC-9)", () => {
   it("exits non-zero for an unregistered alias and persists no run", async () => {
     const h = harness();
 

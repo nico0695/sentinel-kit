@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-28T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -53,7 +53,25 @@ stages:
       clause the orchestrator authored spec.md inline with reduced fresh-context isolation. This is
       recorded so the QA/review stages apply extra scrutiny to the spec.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-28T01:20:00Z"
+    completed_at: "2026-08-28T01:35:00Z"
+    notes: >-
+      design.md written. Resolved risk-e6h2-002: the completed-run exit code reaches run()'s
+      return via a typed `ReviewExitSignal extends Error` that the review action throws after a
+      successful persistRun + render, translated by runProgram's existing catch (one new instanceof
+      branch, before the CommanderError branch) -- the same throw-carries-exit-code shape commander
+      already uses. Chosen over a mutable sink on deps (rejected: mutable state on an immutable
+      contract + per-run reset/stale-code risk since the program is built once). AC-9 satisfied by
+      throw ordering: persistence failure throws the original error first -> catch-all exit 1
+      dominates the terminal-state table. Pure mapping `resolveReviewExitCode(state, verdict,
+      changesExitCode)` in a NEW dedicated `cli/exit-code.ts` (not render/), reading only the
+      exported TerminalState/Verdict types; state!==ok -> 2, else verdict==="request-changes" -> C
+      else 0 (defensive absent-verdict -> 0/pass). `--changes-exit-code <n>` flag: default 1,
+      validator parseChangesExitCode (integer 0-255, mirrors parseTimeoutMs), read purely local to
+      the command -- CliDeps and container.ts untouched. All architecture guards confirmed to hold.
+      No material spec gap found. Grounded in direct reads of create-cli.ts, review-command.ts,
+      cli-deps.ts, container.ts, cli.ts, core/run/index.ts + run-review.ts, and cli-test-doubles.ts.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -171,6 +189,10 @@ open_risks:
       channel on deps, or other) must keep the exit-code decision in the adapter without leaking
       domain logic into the command.
     severity: medium
+    direction_set_by: >-
+      RESOLVED in sddl-design -- a typed ReviewExitSignal thrown by the review action and
+      translated by runProgram's existing catch (chosen over a mutable sink on deps). See design.md
+      "Design Overview" and "Alternatives And Trade-Offs".
   - id: risk-e6h2-003
     summary: >-
       "Usable without a TTY" is asserted, not verified. The CLI routes output through the injected
@@ -186,11 +208,11 @@ open_risks:
     severity: low
 next_action:
   kind: route_to_stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    Spec approved. Delegated sddl-design to resolve risk-e6h2-002 (how the completed-run exit code
-    reaches run()'s return without leaking domain logic into the command), the pure mapping
-    function's placement and signature, the --changes-exit-code wiring/validation, and how AC-9's
-    persistence-failure-dominates composes with the new table.
+    Design approved-ready. design.md resolves risk-e6h2-002 (ReviewExitSignal thrown by the action,
+    translated by runProgram's catch), fixes the pure mapping's placement/signature
+    (cli/exit-code.ts), the --changes-exit-code wiring + 0-255 validator, and the AC-9
+    persistence-failure-dominates ordering. Route to sddl-plan to produce the ordered stage plan.
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T01:20:00Z"
+updated_at: "2026-08-28T01:35:00Z"

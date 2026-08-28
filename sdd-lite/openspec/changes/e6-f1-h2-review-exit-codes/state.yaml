@@ -18,7 +18,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-28T00:00:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -39,7 +39,19 @@ stages:
       load-bearing decision. No-TTY confirmed likely (all output via injected CliIo) but marked
       for verification, not asserted.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-28T01:10:00Z"
+    completed_at: "2026-08-28T01:15:00Z"
+    notes: >-
+      spec.md written with 10 acceptance criteria encoding e6h2-D1/D2/D3, the two-axis exit-code
+      table, no-TTY verification (AC-8), backward compatibility (AC-9, incl. persistence-failure
+      dominates on request-changes), and --help documentation (AC-10). Domain facts grounded in
+      direct reads of core/run/{terminal-state,verdict,run-review}.ts: Verdict is
+      approve|request-changes|comment (D1 holds); RunReviewResult.verdict is present only on `ok`.
+      DEGRADATION: the delegated sddl-spec worker was interrupted by a provider spend limit before
+      writing any artifact; per the SDDL-ORCHESTRATOR "Fallback if Agent tool is unavailable"
+      clause the orchestrator authored spec.md inline with reduced fresh-context isolation. This is
+      recorded so the QA/review stages apply extra scrutiny to the spec.
   sddl-design:
     status: pending
   sddl-plan:
@@ -79,6 +91,21 @@ checkpoints:
       (configurable via `--changes-exit-code` flag only), and e6h2-D3 (defer `--json`). The fourth
       open question -- the commander signalling mechanism -- is an A/design-level concern deferred
       to sddl-design. Routing to sddl-spec.
+  - id: cp-spec-exit-code-contract
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is ready for design. 10 ACs encode e6h2-D1/D2/D3: the two-axis exit-code table (0
+      pass / configurable default-1 request-changes / 2 for every non-ok state), the
+      --changes-exit-code flag with 0-255 validation and soft-gate (0) support, no-TTY verification
+      (AC-8), backward compatibility incl. persistence-failure-dominates (AC-9), and --help
+      documentation (AC-10). The commander signalling mechanism stays a design decision (AC-7,
+      risk-e6h2-002).
+    question: >-
+      Approve the spec and continue to sddl-design, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-28T01:15:00Z"
+    status: open
 decisions:
   - id: e6h2-D1
     level: B
@@ -145,15 +172,21 @@ open_risks:
       "Usable without a TTY" is asserted, not verified. The CLI routes output through the injected
       CliIo and appears TTY-free, but this needs a confirming test rather than an assumption.
     severity: low
+    direction_set_by: spec AC-8 requires a confirming test; risk closes when that test lands.
+  - id: risk-e6h2-004
+    summary: >-
+      Reduced fresh-context isolation on spec.md. The delegated sddl-spec worker was interrupted by
+      a provider spend limit before writing anything, so the orchestrator authored spec.md inline.
+      QA/review stages should scrutinize the spec as rigorously as a fresh worker's output, since
+      the orchestrator both directed and wrote it.
+    severity: low
 next_action:
-  kind: route_to_stage
-  target: sddl-spec
+  kind: wait_for_approval
+  target: cp-spec-exit-code-contract
   summary: >-
-    Proposal approved and the three material B-decisions (e6h2-D1/D2/D3) recorded. Route to
-    sddl-spec to formalize the exit-code contract: encode the two-axis state x verdict mapping from
-    e6h2-D1 (0 pass / configurable default-1 request-changes / 2 operational failure), the
-    `--changes-exit-code` flag from e6h2-D2, the `--json` deferral from e6h2-D3, the no-TTY
-    verification (risk-e6h2-003), and firm acceptance criteria downstream stages validate against.
-    The commander signalling mechanism (risk-e6h2-002) is left for sddl-design.
+    spec.md written (inline, per the spend-limit fallback) with 10 ACs and the two-axis exit-code
+    table. Awaiting user approval at cp-spec-exit-code-contract, then route to sddl-design to
+    resolve the signalling mechanism (risk-e6h2-002) and the mapping function's placement/signature
+    within the architecture guards. Interactive mode: pause for confirmation before design.
 created_at: "2026-08-28T00:00:00Z"
-updated_at: "2026-08-28T00:00:00Z"
+updated_at: "2026-08-28T01:15:00Z"

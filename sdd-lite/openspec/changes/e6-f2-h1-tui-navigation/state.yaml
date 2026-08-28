@@ -58,6 +58,25 @@ stages:
       zero side effects). H1/H2 boundary explicit (result step = terminal state + verdict + run
       dir only). No new B-level questions; no new risks. Grounded in direct reads of the CLI
       adapter seams, main wiring, and core repos/run/review indexes.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-29T00:20:00Z"
+    completed_at: "2026-08-29T00:30:00Z"
+    notes: >-
+      design.md written by a fresh delegated worker. Approach: second driving adapter on the CLI
+      house pattern — TuiDeps contract (bound use-case thunks incl. listBranches and a names-only
+      listHarnessTypes, line IO, injected TuiPrompter, injected TTY fact), one sequential
+      runTuiFlow (repo -> branch(fetch+spinner) -> harness -> confirmation with resolved engine ->
+      spinner progress -> minimal result) with early returns for cancel/empty (exit 0) and a
+      catch-all one-liner (exit 1); clack confined to a single clack-prompter.ts translation
+      file; dispatch in main/cli.ts by argv length (zero user args -> TUI, else commander
+      byte-identical, AC-1 by construction); createTuiDeps projected from a refactored internal
+      graph in container.ts. All 14 ACs mapped to mechanisms and test files; persistRun-once and
+      persist-failure mirror review-command.ts D13. Both mandated resolutions decided from repo
+      evidence: @clack/prompts ratified (risk-001) and TUI owns its minimal renderer because
+      .dependency-cruiser.cjs adapters-isolated forbids ALL cross-adapter imports, driving ->
+      driving included (risk-002). One notable ancillary decision (TUI exit-0 on completed runs)
+      flagged to the user at the design checkpoint as B-adjacent.
 decisions:
   - id: e6f2h1-D0
     level: A
@@ -159,6 +178,16 @@ open_risks:
       recommendation in docs/setup-tecnico-sentinel.md §4 and must be re-evaluated and ratified
       (or replaced) with justification at design time, per the setup doc's own rule.
     severity: medium
+    status: resolved-pending-install
+    direction_set_by: >-
+      RESOLVED in sddl-design (D2 discharged): @clack/prompts ratified as the ONLY new dep
+      (picocolors deferred to H2). Matrix: sole candidate with select + cancel-as-value
+      (isCancel, no exception control flow) + built-in spinner in one tiny ESM-native maintained
+      package; @inquirer/prompts loses on cancel-by-ExitPromptError plus needing a separate
+      spinner dep; native readline/promises means owned terminal plumbing the MVP should not
+      carry. Testability neutralized by the owned TuiPrompter seam (scripted doubles, no TTY,
+      library-free tests). Design had no npm access: the executor confirms and records the exact
+      pinned version at install time.
   - id: risk-e6f2h1-002
     summary: >-
       Reuse boundary with the CLI review path: the TUI must drive the same use cases and reuse the
@@ -166,6 +195,14 @@ open_risks:
       domain logic into the TUI (use cases are the only core API). Where rendering is shared
       between CLI and TUI is a design decision; adapters must not import other adapters.
     severity: medium
+    status: resolved
+    direction_set_by: >-
+      RESOLVED in sddl-design: the TUI owns its minimal renderer. Verified in
+      .dependency-cruiser.cjs that adapters-isolated forbids ALL cross-folder imports under
+      src/adapters/ (driving->driving included), so a shared driving/ helper is illegal as the
+      guard stands. The real overlap is ~10 lines of error-line reduction (deliberately copied as
+      formatTuiErrorLine) plus a 3-line human-facing result block that H2 rewrites anyway; editing
+      a PRD §4.5 guard for that is disproportionate. No guard edit, no new structure.
   - id: risk-e6f2h1-003
     summary: >-
       "Progress" step semantics are undefined: runReview is a single awaited use case; what the
@@ -173,6 +210,12 @@ open_risks:
       means once the engine run has started (pre-run cancel vs mid-run abort) needs a firm spec
       boundary. Mid-run abort may exceed this story's scope.
     severity: medium
+    status: closed
+    direction_set_by: >-
+      CLOSED by D3 + A2 (spec) and design: clack's cancel-as-value maps mechanically to the
+      zero-side-effects contract; progress is a spinner with static phase text. Residual accepted
+      sliver: the argv-length dispatch line in main/cli.ts is entry-script-trivial and untested,
+      same as the existing entry file.
 checkpoints:
   - id: cp-proposal-tui-flow
     type: phase_validation
@@ -221,12 +264,29 @@ checkpoints:
       (compare at least @clack/prompts vs @inquirer/prompts vs native readline), resolve the
       shared rendering/helper placement (risk-e6f2h1-002), define the TuiDeps seam and the
       bare-`sentinel` entry dispatch, and map every AC to a concrete mechanism.
+  - id: cp-design-tui-mechanisms
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md is ready for plan. Ratifications: @clack/prompts as the only new dep (risk-001,
+      executor pins the exact version at install); TUI owns its minimal renderer because the
+      adapters-isolated guard forbids driving->driving imports (risk-002, no guard edit). House
+      pattern mirrored: TuiDeps + TuiPrompter seams, runTuiFlow state machine, argv-length
+      dispatch in main/cli.ts, createTuiDeps in container.ts. One B-adjacent ancillary decision
+      needs the user's eye: a completed+persisted TUI run exits 0 regardless of terminal state
+      (gate exit codes remain the CLI's scripting contract; TUI non-zero exits reserved for
+      failures and the non-TTY guard).
+    question: >-
+      Approve the design (including the TUI exit-0-on-completed-runs decision) and continue to
+      sddl-plan, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:30:00Z"
+    status: pending
 next_action:
   kind: checkpoint
   target: user
   summary: >-
-    Present cp-spec-tui-contract: spec approval (14 ACs, A1-A4 resolutions). Route to
-    sddl-design on approval — design must ratify the TUI library (D2) and resolve the shared
-    rendering/helper placement (risk-e6f2h1-002).
+    Present cp-design-tui-mechanisms: design approval including the two ratifications (clack,
+    TUI-owned renderer) and the B-adjacent TUI exit-0 decision. Route to sddl-plan on approval.
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

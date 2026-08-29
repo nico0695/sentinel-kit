@@ -55,8 +55,14 @@ import type {
   CliUseCases,
   ReviewContext,
 } from "../adapters/driving/cli/index.js";
+import {
+  createClackPrompter,
+  type TuiDeps,
+  type TuiIo,
+} from "../adapters/driving/tui/index.js";
 import { getRun, listRuns, persistRun } from "../core/history/index.js";
-import { listRepos, registerRepo } from "../core/repos/index.js";
+import { listBranches, listRepos, registerRepo } from "../core/repos/index.js";
+import { loadHarnesses } from "../core/review/index.js";
 import type { ReviewEngine } from "../core/run/index.js";
 import { runReview } from "../core/run/index.js";
 import {
@@ -134,11 +140,25 @@ function createEngine(
   }
 }
 
+/** The subset of the surface options the wiring graph itself consumes. */
+interface WiringGraphOptions {
+  readonly env?: PathEnv;
+  readonly homeDir?: string;
+}
+
 /**
- * Builds every dependency the CLI needs, in one place, in wiring order:
- * paths → driven adapters → use-case thunks.
+ * Builds the wiring graph, in order: paths → driven adapters → use-case
+ * thunks → the `loadContext`/`now` seams.
+ *
+ * One call builds one graph, and each surface factory below calls it exactly
+ * once — that is what keeps property 1 of the module doc-comment structural:
+ * `sentinelPaths()` runs here and nowhere else, so every projection of the
+ * graph shares the single `SentinelPaths` object. The adapters in the return
+ * (`git`, `configStore`, `harnesses`) are part of the graph's surface so a
+ * projection can bind surface-specific thunks from the same instances
+ * instead of constructing anything twice.
  */
-export function createCliDeps(options: CliDepsOptions): CliDeps {
+function createWiringGraph(options: WiringGraphOptions) {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? homedir();
 
@@ -217,12 +237,72 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
     getRun: (request) => getRun(request, { store: runStore }),
   };
 
+  return { paths, git, configStore, harnesses, useCases, loadContext, now };
+}
+
+/**
+ * Projects the CLI's view of the wiring graph: the bound use-case thunks,
+ * line IO, the context/clock seams, and the one filesystem fact the CLI
+ * reports (`clonesDir`).
+ */
+export function createCliDeps(options: CliDepsOptions): CliDeps {
+  const graph = createWiringGraph(options);
   return {
-    useCases,
+    useCases: graph.useCases,
     io: options.io ?? processIo,
-    loadContext,
-    now,
+    loadContext: graph.loadContext,
+    now: graph.now,
     version: options.version,
-    clonesDir: paths.clonesDir,
+    clonesDir: graph.paths.clonesDir,
+  };
+}
+
+/** Inputs the entrypoint owns for the TUI surface; defaults read the real process. */
+export interface TuiDepsOptions {
+  /** Environment to resolve `SENTINEL_HOME`/`SENTINEL_OPENCODE_MODEL` from. */
+  readonly env?: PathEnv;
+  /** Home directory backing the `~/.sentinel` default. */
+  readonly homeDir?: string;
+  /** Output sink; defaults to the real streams. */
+  readonly io?: TuiIo;
+}
+
+/**
+ * Projects the TUI's view of the wiring graph (`[E6.F2.H1]`, #38): the CLI's
+ * review quartet plus the two enumerations navigation needs, the clack-backed
+ * prompter, and the TTY facts the adapter must not read from `process` itself
+ * (e6f2h1-A1 — that is what keeps AC-2 assertable in-process).
+ *
+ * `listHarnessTypes` returns names only (the merged map's keys, e6f2h1-A3):
+ * the flow hands a type string to `resolveReviewRequest` and has no use for
+ * `ResolvedHarness` internals. Only `main/cli.ts`'s dispatch decides which
+ * surface runs, so each process builds exactly one graph either way.
+ */
+export function createTuiDeps(options: TuiDepsOptions = {}): TuiDeps {
+  const graph = createWiringGraph(options);
+  return {
+    useCases: {
+      listRepos: graph.useCases.listRepos,
+      listBranches: (request) =>
+        listBranches(request, {
+          git: graph.git,
+          config: graph.configStore,
+          clonesDir: graph.paths.clonesDir,
+        }),
+      listHarnessTypes: async () => [
+        ...(await loadHarnesses(graph.harnesses)).keys(),
+      ],
+      runReview: graph.useCases.runReview,
+      persistRun: graph.useCases.persistRun,
+    },
+    io: options.io ?? processIo,
+    prompter: createClackPrompter(),
+    tty: {
+      stdin: process.stdin.isTTY === true,
+      stdout: process.stdout.isTTY === true,
+    },
+    loadContext: graph.loadContext,
+    now: graph.now,
+    clonesDir: graph.paths.clonesDir,
   };
 }

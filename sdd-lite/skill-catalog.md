@@ -93,13 +93,14 @@ When validating a stage, check the work against these docs + the guard file.
 - Record changed files, checks run, blockers, and next action in `execution-log.md`.
 - If a story conflicts with the PRD, or reality contradicts a documented assumption: stop and ask. Do not
   improvise scope.
-- E0 through `[E6.F1.H1]` have landed on `main` @ `16e3650` (PR #73). All four scripts (`check`, `test`, `build`,
-  `dev`) are runnable and green as of that merge (`check` clean, `npm test` 681/681 across 38 files).
+- E0 through `[E6.F1.H2]` have landed on `main` @ `ac7a442` (PR #74). All four scripts (`check`, `test`, `build`,
+  `dev`) are runnable and green as of that merge (`check` clean, `npm test` 707/707 across 39 files).
 - `[E6.F1.H1]` filled `src/adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands,
   renderers) and replaced the `[E0.F1.H3]` stub: `src/main/` now holds `cli.ts`, `container.ts` and
   `paths.ts`, and is the only place adapters are instantiated. `src/adapters/driving/tui/` is still
-  `export {}` — the TUI is `[E6.F2.x]`. `main/` wiring stays hot-path. `[E6.F1.H2]` extends the
-  `review` command with documented exit codes and non-interactive/scriptable behavior.
+  `export {}` — the TUI is `[E6.F2.x]`. `main/` wiring stays hot-path. `[E6.F1.H2]` (PR #74) added the
+  documented review exit-code contract (`cli/exit-code.ts`, `ReviewExitSignal`, `--changes-exit-code`);
+  the current story is `[E6.F2.H1]` (TUI navigation flow).
 
 ### testing
 
@@ -107,7 +108,7 @@ When validating a stage, check the work against these docs + the guard file.
 - Final review should start from configured quality commands, then narrow or expand as evidence requires.
 - If a useful automated check cannot run, say so explicitly and record the gap.
 - Quality gate is `npm run check` plus `npm test`. Both must pass before opening a PR. Both are runnable and
-  green today (`check` = `biome check . && tsc --noEmit && depcruise src`; `npm test` = vitest, 681 tests).
+  green today (`check` = `biome check . && tsc --noEmit && depcruise src`; `npm test` = vitest, 707 tests).
 - Test placement: core = unit with in-memory port fakes; driven adapters = shared contract suite per port;
   e2e = smoke of the full flow with FakeEngine. Test files live in `<module>/__test__/*.test.ts`.
 - Vitest projects: `core` (`src/core/**/__test__/**`), `adapters` (`src/adapters/**/__test__/**` plus

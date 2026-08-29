@@ -1,0 +1,294 @@
+# Execution Log
+
+- change_name: e6-f2-h1-tui-navigation
+- executor: sddl-executor (batch 1: S1–S2 approved for this invocation)
+- plan source: `plan.md` (Stage Plan table, authoritative)
+
+## Stage Overview
+
+| Stage Id | Goal (short) | Status |
+|---|---|---|
+| S1 | Pin + install `@clack/prompts` (exact, no `^`), record resolved version | done (version flag resolved: keep `1.7.0`, decision e6f2h1-D5) |
+| S2 | Behavior-preserving refactor of `src/main/container.ts` | done |
+| S3 | TUI contract + minimal renderer + test doubles | done |
+| S4 | `runTuiFlow`/`createTui` + five behavioral suites | done |
+| S5 | clack prompter, barrel, `createTuiDeps`, argv dispatch | done |
+| S6 | CLAUDE.md closeout (D0/AC-14) | done (executed inline by the orchestrator, see S6 entry) |
+| S7 | Fix R1-001/R1-002: owned spinner replaces clack spinner (fix round 1) | done |
+
+## S1 — Pin + install `@clack/prompts`
+
+- approval: `stage_approval` granted by the user for S1–S6 (handoff envelope, batch 1 covers S1–S2).
+- preparation: `npm ci` restored the baseline toolchain (node_modules was absent in this environment). Succeeded.
+- command: `npm install --save-exact @clack/prompts` — succeeded through the configured proxy (risk-e6f2h1-004 did not materialize).
+- **resolved version: `1.7.0` (exact-pinned, no `^`)**.
+- changed files:
+  - `package.json` — adds `"@clack/prompts": "1.7.0"` to `dependencies` (only change).
+  - `package-lock.json` — lockfile entries for `@clack/prompts` and its transitive deps.
+
+### FLAG — resolved version outside the expected 0.10–0.11.x line (risk-e6f2h1-001)
+
+design.md §Resolution 1 expected the current line at 0.10–0.11.x and delegated exact-version confirmation to install time. Registry facts gathered as decision evidence:
+
+- `1.x` is now the **stable** line: ten stable releases `1.0.0 … 1.7.0`; `latest` resolves to `1.7.0`.
+- The last `0.x` release is `0.11.0`.
+- API surface check against the installed `1.7.0` (ESM import): `select`, `confirm`, `spinner`, `isCancel`, `intro`, `outro` are all exported functions — the design's cancel-as-value mechanism (`isCancel` → `PromptOutcome.cancel`) and the S3–S5 interface plan remain mechanically compatible as far as export presence shows. Behavioral API details (option shapes, spinner start/stop signatures) not yet exercised — that happens in S5.
+- Options for the orchestrator: (a) keep `1.7.0` — actively maintained stable line, design rationale for the pin ("prompt libraries move fast pre-1.0") arguably *strengthens* the case for the 1.x stable line; (b) pin `0.11.0` to stay inside the design's stated expectation. Recommendation: (a), recorded as the executor's suggestion only — per the handoff, a major jump needs orchestrator eyes, so no stage past S1 was started.
+
+### S1 quick checks
+
+| Command | Outcome |
+|---|---|
+| `npm install --save-exact @clack/prompts` | success; resolved `1.7.0` |
+| `npm run check` (biome + tsc + depcruise) | clean — no lint/type errors, no dependency violations (98 modules, 232 dependencies cruised) |
+| `npm test` (full suite) | **39 files passed, 708 tests passed**, 0 failed |
+
+Note on the baseline count: the handoff states 707 tests / 39 files; the suite at current HEAD (`7b4b17b`) runs **708/39 green** with a working tree containing only the two S1 files above, so the extra test predates this stage — the 707 figure in plan/handoff is one off versus HEAD, not a regression. New effective baseline to protect from S2 onward: **708 tests / 39 files**.
+
+- blockers: none technical; stage held at the version flag per handoff ("do not proceed past a flag silently").
+- git: no commits performed (orchestrator owns git operations); working tree carries `package.json` + `package-lock.json` modified.
+
+### S1 flag resolution (post-invocation)
+
+The version flag was resolved before S2 started: **keep `@clack/prompts` 1.7.0** (A-level decision `e6f2h1-D5` in `state.yaml` — the design's 0.10–0.11.x figure was a no-npm-access guess; 1.x is the maintained stable line and every export the mechanism needs is present). S1 is committed; the effective regression baseline from S2 onward is **708 tests / 39 files** (also recorded in D5).
+
+## S2 — Behavior-preserving refactor of `src/main/container.ts`
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); this invocation is scoped to S2 only per the orchestrator handoff.
+- planned scope (plan.md S2): `src/main/container.ts` only — extract the internal wiring graph (paths → driven adapters → thunks → `loadContext`/`now`); `createCliDeps` becomes a projection. No TUI code, no new exports, `main/cli.ts` untouched.
+- actual changed files: `src/main/container.ts` only. Two edits, body of the wiring logic moved verbatim:
+  - NEW internal (non-exported) `interface WiringGraphOptions { env?, homeDir? }` — the subset of the surface options the graph consumes; `CliDepsOptions` is structurally assignable to it, so its public shape is untouched.
+  - NEW internal (non-exported) `createWiringGraph(options)` — the former `createCliDeps` body, unchanged line for line (paths resolved once, driven adapters, `ensureHomeRoot`, `loadContext`, `now`, the `CliUseCases` thunks, all with their original comments). Returns `{ paths, git, configStore, harnesses, useCases, loadContext, now }`; `runStore`/`processRunner` stay closure-internal (consumed only by thunks). The adapters in the return are the S5 projection surface (`listBranches` needs `git`+`configStore`+`paths.clonesDir`; `listHarnessTypes` needs `harnesses`), per design §Affected Areas (container row).
+  - `createCliDeps` is now a six-line projection: `graph.useCases`, `options.io ?? processIo` (io default unchanged and still surface-owned), `graph.loadContext`, `graph.now`, `options.version`, `graph.paths.clonesDir`. Construction order and semantics identical — one graph per call, `sentinelPaths()` still called exactly once (module doc-comment property 1 now held structurally by the single graph builder; the graph doc-comment says so).
+- exports of the module after the stage: `CliDepsOptions`, `createCliDeps` — unchanged set (no `createTuiDeps` yet; that is S5 as planned).
+- scope/drift/blast-radius: none. No contradiction with design/spec encountered.
+
+### S2 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; no dependency violations (98 modules, 232 dependencies cruised — counts identical to S1) |
+| `npm test` (full suite) | yes — the stage's regression net | **39 files passed, 708 tests passed**, 0 failed — exactly the S1 baseline, zero behavioral diff |
+
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the `container.ts` edit plus this log update.
+- QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint per the approved batching (S1+S2 → commit → summary); the refactor is fully guarded by the untouched 708-test suite, so deferring QA to the batch boundary is low risk.
+
+## S3 — TUI contract + minimal renderer + test doubles
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); this invocation (batch 2) is scoped to S3 then S4.
+- precondition check: working tree clean at start (S1/S2 committed), `main/container.ts` carries `createWiringGraph` as the batch-1 handoff describes, `tui/index.ts` still the `export {}` placeholder. No contradiction with plan/design/spec.
+- planned scope (plan.md S3): three NEW files, nothing else. Actual changed files match exactly:
+  - `src/adapters/driving/tui/tui-deps.ts` (NEW) — the contract: `TuiIo` (declared locally, `CliIo` shape — `adapters-isolated` forbids importing it), `TuiTty`, `PromptOutcome<T>` (cancel-as-value), `TuiSelectOption`, `TuiSpinner`, `TuiPrompter`, `TuiReviewContext`, `TuiUseCases` (quartet + `listBranches` + names-only `listHarnessTypes` per e6f2h1-A3), `TuiDeps { useCases, io, prompter, tty, loadContext, now, clonesDir }`. Type-only imports from core public indexes (`history`, `repos`, `run`).
+  - `src/adapters/driving/tui/render.ts` (NEW) — `formatTuiErrorLine` (the design-sanctioned ~10-line deliberate copy of the CLI's `format-error.ts`, comment names the duplication and points at design §Resolution 2) and `formatTuiResult(state, verdict, runDir?)` — state line, verdict line only when present, run-directory line with `-` for the persist-failure path. No markdown, no severities (AC-7/H2 boundary).
+  - `src/adapters/driving/tui/__test__/tui-test-doubles.ts` (NEW) — mirrors `cli-test-doubles.ts`: capturing `TuiIo`, `answer`/`cancel` script helpers, `createScriptedPrompter` (queue of `PromptOutcome`s, records every prompt with message+options and spinner start/stop events, throws on script exhaustion), loud `notWired` fake use cases, `createTuiTestDeps` with `tty` defaulting to `{stdin: true, stdout: true}` and an empty prompt script by default (so no-interaction tests prove it structurally).
+- A-level notes: `TuiSpinner` named and exported as its own interface (component of `TuiPrompter`; the doubles and S4 tests reference it) — a naming addition inside the designed surface, not a new capability.
+- `tui/index.ts` deliberately untouched: the public barrel is S5's scope.
+
+### S3 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; no dependency violations (100 modules, 236 dependencies cruised) |
+| `npx vitest run --project adapters` | yes | **18 files passed, 359 tests passed** — unchanged (the doubles file is not a test file), still green |
+
+- blockers: none.
+- git: no commits performed (orchestrator owns git).
+
+## S4 — `createTui`/`runTuiFlow` + five behavioral suites
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); batch 2, second and last stage of this invocation.
+- planned scope (plan.md S4): six NEW files. Actual changed files match exactly:
+  - `src/adapters/driving/tui/tui-flow.ts` (NEW) — `createTui(deps): SentinelTui { run(): Promise<number> }`. `run` = TTY gate (AC-2: `!stdin || !stdout` → one `stderr` guidance line naming `sentinel review <repo> <branch> --type <harness>` and `--help`, return 1) then `try { runTuiFlow } catch { stderr(formatTuiErrorLine(e)); return 1 }` (AC-9). `runTuiFlow` (module-internal; the barrel is S5's call and design's barrel row lists `createTui` only) implements design §Interfaces steps 1–8: intro → repo (empty → `repo add` guidance, 0; cancel → 0) → branch (spinner around `listBranches`, stopped before rethrow on failure; empty → line naming the repo, 0; cancel → 0) → harness (names only; empty → broken-installation hint, 0; cancel → 0) → `loadContext` + pure `resolveReviewRequest` BEFORE the gate → summary showing repo/branch/harness/resolved engine (AC-5) → confirm (cancel or `false` → 0) → `now()` + spinner with static text around the single awaited `runReview` (AC-6, D3) → `persistRun` exactly once (AC-8) → `formatTuiResult` lines → **return 0 regardless of terminal state** (recorded A-level design decision, restated in the module doc-comment as property 4).
+  - persist-failure path mirrors `review-command.ts` D13: outcome rendered from `request`+`result` with `-` runDir, no-history diagnostic on `stderr`, then the underlying failure via `formatTuiErrorLine` on `stderr`, return 1. A-level micro-decision (recorded): the design's step (7) lists only the diagnostic, but "mirrors review-command.ts D13" is the stated intent and the CLI renders the original failure after its diagnostic — the TUI does the same, as a rendered line instead of a rethrow (the flow returns codes, it has no `ReviewExitSignal` channel).
+  - `src/adapters/driving/tui/__test__/flow.test.ts` (NEW) — AC-1 adapter side (injected tty true → flow launches, 3 selects + 1 confirm), AC-3 (use-case order `listRepos → listBranches → listHarnessTypes → loadContext → runReview → persistRun`, options offered, request composed through the CLI's cascade with `repoPath`/`baseRef`/`engineName` resolved), AC-5 (summary content; trace proves confirm strictly precedes `runReview`), AC-6 (fetch spinner before the branch menu; deferred `runReview` — indicator active with static text while pending, `persistRun` untouched until resolution).
+  - `__test__/cancel.test.ts` (NEW) — AC-4 ×4 steps via `it.each` + confirm-answered-no + cancel-after-summary (AC-5): each exits 0, friendly line, recording `runReview`/`persistRun` fakes stay empty, `stderr` empty.
+  - `__test__/empty-states.test.ts` (NEW) — AC-10 ×3: no repos (guidance to `sentinel repo add`, zero prompts — structural via the empty default script), no branches (line names the repo), no harnesses (broken-installation hint); all exit 0, zero side effects.
+  - `__test__/errors.test.ts` (NEW) — AC-2 ×3 TTY combinations (guidance line, exit 1, zero prompts/spinners, resolves — never blocks) and AC-9 per step: `listRepos` (`ConfigReadError`), `listBranches` (`BranchListError`, spinner stopped), `listHarnessTypes` (`HarnessNotFoundError`), resolution before the gate (`RepoNotFoundError` from `resolveReviewRequest`, no confirm ever asked, `runReview` untouched), `runReview` failure (persists nothing, spinner stopped), non-Error throwable, multi-line collapse, and a no-stack-frames sweep over both streams.
+  - `__test__/result.test.ts` (NEW) — AC-7 (`formatTuiResult` unit cases; the literal tail of `stdout` IS the minimal block per terminal state — no H2 rendering surface) and AC-8 (persist exactly once for `ok` + all four failed states, request/result identity and `now()`-sourced `startedAtEpochMs` in the persist request; persist-failure: outcome shown with `-` runDir, diagnostic + failure on `stderr`, exit 1, exactly one attempt). Completed+persisted exit-0 asserted for every terminal state.
+- structural verification: `grep` over `src/adapters/driving/tui/` — no `@clack` import, no `driving/cli` import, no `commander`, no `process.*` access anywhere in adapter code or tests (doc-comment mentions only). Core reached exclusively through public indexes + the injected thunks; the only core *value* import in the adapter is `resolveReviewRequest` (design property 1).
+- scope/drift/blast-radius: none. No contradiction with design/spec encountered.
+
+### S4 mutation-verify (load-bearing behaviors)
+
+| Mutation | Expected net | Result |
+|---|---|---|
+| Duplicate the `persistRun` call on the success path (breaks persist-once) | AC-8 suites | **8 tests red** (`result.test.ts` ×6, `flow.test.ts` ×2), reverted, suite green again |
+| Confirmation gate ignores an answered `false` (`kind === "cancel"` only) | AC-4/AC-5 cancel suite | **1 test red** (`cancel.test.ts` "answering no at the confirmation is the same as cancelling"), reverted, suite green again |
+
+### S4 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; no dependency violations (101 modules, 239 dependencies cruised) |
+| `npx vitest run --project adapters` | yes | **23 files passed, 400 tests passed** (18/359 before this batch) |
+| `npm test` (full suite) | yes (batch-2 handoff requires the full gate at S4) | **44 files passed, 749 tests passed**, 0 failed — the 708/39 baseline intact plus 41 new TUI tests in 5 new files |
+
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the eight new S3+S4 files plus this log update.
+- QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint — S3+S4 added a whole adapter surface (the batch's blast radius is all-new files, but the flow semantics are the story's core contract and worth structured eyes before S5 wires the real prompter and dispatch).
+
+## S5 — clack prompter, barrel, `createTuiDeps`, argv dispatch + full gate + built smoke
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); this invocation (batch 3) is scoped to S5 only.
+- precondition check: working tree matched the batch-2 handoff — `createWiringGraph` present in `container.ts`, `tui/index.ts` still the `export {}` placeholder, baseline check clean and full suite at 749/44. No contradiction with plan/design/spec.
+- planned scope (plan.md S5): one NEW file, three EDITs. Actual changed files match exactly:
+  - `src/adapters/driving/tui/clack-prompter.ts` (NEW) — `createClackPrompter(): TuiPrompter`, the ONLY file in the codebase importing `@clack/prompts` (grep-verified: the single import site is this file; every other mention is a doc comment). One private helper `toOutcome` collapses clack's `Value | symbol` resolution into `PromptOutcome` via `isCancel` — the library's cancel symbol dies at this boundary, exactly per design §Resolution 1. `select` maps `TuiSelectOption[]` onto clack options (hint spread conditionally — `exactOptionalPropertyTypes`), `confirm` passes the message through, `spinner()` wraps clack's `start(msg?)`/`stop(msg?)`. Declared-untested translation layer per design (§Affected Areas: "like `processIo`"); no unit tests invented, per plan.
+  - `src/adapters/driving/tui/index.ts` (EDIT) — placeholder replaced with the public barrel: `createTui`/`SentinelTui`, `createClackPrompter`, and the `TuiDeps` type family (`PromptOutcome`, `TuiDeps`, `TuiIo`, `TuiPrompter`, `TuiReviewContext`, `TuiSelectOption`, `TuiSpinner`, `TuiTty`, `TuiUseCases`), doc-comment in the CLI barrel's house style.
+  - `src/main/container.ts` (EDIT) — NEW exported `TuiDepsOptions { env?, homeDir?, io? }` and `createTuiDeps(options = {})` projecting the wiring graph: `listRepos`/`runReview`/`persistRun` reused from the graph's thunks; `listBranches` bound to `{ git, config: configStore, clonesDir: paths.clonesDir }`; `listHarnessTypes` = keys of `loadHarnesses(graph.harnesses)` (names only, e6f2h1-A3); `prompter: createClackPrompter()`; `tty` from `process.std{in,out}.isTTY === true`; io/`loadContext`/`now`/`clonesDir` as designed. Instantiation stays confined to `src/main/` (AC-11).
+  - `src/main/cli.ts` (EDIT) — argv-length dispatch: `process.argv.slice(2).length === 0` → `createTui(createTuiDeps()).run()`; anything else → the existing `createCli(createCliDeps({version})).run(process.argv)` unchanged. One surface's deps per process (the ternary constructs exactly one graph); exit code still assigned to `process.exitCode`, never `process.exit()`.
+
+### S5 clack 1.7.0 API notes (e6f2h1-D5 follow-through)
+
+Verified against the installed package's `dist/index.d.mts` before writing the prompter. **No signature difference required accommodation** — 1.7.0 kept every shape the design's mechanism assumed:
+
+| Design assumption (0.10–0.11.x) | Installed 1.7.0 | Impact |
+|---|---|---|
+| `select<Value>(opts): Promise<Value \| symbol>`, options `{value, label?, hint?}` | identical (options gained optional `disabled`, `initialValue`, `maxItems`) | none — extras unused |
+| `confirm(opts): Promise<boolean \| symbol>` | identical (gained `active`/`inactive`/`vertical`) | none |
+| `isCancel(value): value is symbol` | present (now re-exported from `@clack/core`, still importable from `@clack/prompts`) | none |
+| `spinner()` → `{ start(msg?), stop(msg?) }` | `stop` lost 0.x's unused `code` param; gained `cancel`/`error`/`message`/`clear`/`isCancelled` | none — seam uses `start`/`stop` only |
+| `intro`/`outro` | present | unused — the flow writes its own intro via `TuiIo` (S4 decision, design step 1) |
+
+D5's reopen condition ("any breakage at S5 reopens the decision toward a repin") was NOT triggered.
+
+### S5 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; **no dependency violations (103 modules, 247 dependencies cruised)**: clack confined, no adapter→adapter edge, instantiation only in `src/main/` (AC-11) |
+| `npm test` (full suite) | yes — the CLI regression suite is AC-1's proof | **44 files passed, 749 tests passed**, 0 failed — the S4 count exactly; the untouched CLI suite proves commander's surface unchanged |
+| `npm run build` | yes | tsup success, ESM `dist/cli.js` 116.69 KB |
+
+### S5 built smoke transcript (summary)
+
+| Invocation | Observed | Expected (AC) |
+|---|---|---|
+| `node dist/cli.js </dev/null` (bare, non-TTY stdin) | one line on **stderr**: `Interactive mode needs a terminal on stdin and stdout: run \`sentinel review <repo> <branch> --type <harness>\` instead, or see \`sentinel --help\`.` — stdout empty, **exit 1**, no hang | AC-2 real-guard smoke |
+| `echo "" \| node dist/cli.js` (bare, piped stdin) | same line, exit 1 | AC-2 |
+| `node dist/cli.js --help` | full usage (commands `repo`, `review`, `runs`, `help` + env-var epilogue), exit 0 — unchanged | AC-1 |
+| `node dist/cli.js --version` and `-V` | `0.0.0`, exit 0 | AC-1 |
+| `node dist/cli.js repo list` (fresh empty `SENTINEL_HOME`) | `No repositories registered.`, exit 0 | AC-1 subcommand |
+| `node dist/cli.js runs list` (missing arg) | `error: missing required argument 'repo'`, exit 1 | AC-1 usage-error path |
+| `node dist/cli.js nonsense` | `error: unknown command 'nonsense'`, exit 1 | AC-1 unknown-command path |
+
+- scope/drift/blast-radius: none. No contradiction with design/spec encountered.
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the four S5 files plus this log update.
+- QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint — S5 is the one stage that edits the live entry path (`main/cli.ts`) and closes the wiring loop; AC-1/AC-11/AC-13 evidence above is worth structured eyes before the S6 closeout.
+
+## Next Action
+
+Batch 3 complete (S5 done in the working tree; check clean, full suite 749/44, built smoke green). Orchestrator: commit per the approved batch protocol (optionally after stage-mode QA), then proceed to batch 4 (S6: CLAUDE.md closeout, D0/AC-14, last pre-PR stage). The standing exit-0 amendment offer expired as planned with S5 landing — the completed+persisted → 0 behavior is now wired end to end as designed.
+
+## S6 — CLAUDE.md refresh closeout (D0 / AC-14)
+
+- Executed inline by the orchestrator (single-file doc edit; the full current CLAUDE.md text and
+  the session's accumulated project-state evidence were already in orchestrator context — noted
+  as a deliberate deviation from worker delegation, consistent with the delegation table's
+  "write atomic, one file, already known" row).
+- Changes:
+  - Replaced the stale `## Current state: pre-implementation` section with
+    `## Current state: E0–E6 implemented`: merged-epic summary (E0–E5, E6.F1), this story's TUI
+    (bare `sentinel` entry, scripting surface + exit-code contract), the runtime dependency
+    list incl. exact-pinned `@clack/prompts`, remaining MVP work (E6.F2.H2, E7), and a pointer
+    to `history/INDEX.md` + GitHub milestones as the live status source.
+  - Commands intro: dropped "they become real with [E0.F1.H1]".
+  - Architecture: added a "Driving surfaces" paragraph (TTY dispatch, zero domain logic in the
+    TUI, `createTuiDeps` in main, clack confined to `clack-prompter.ts`, scripted-double tests).
+- Validation: `npm run check` clean after the edit; grep sweep over CLAUDE.md/README.md/
+  CONTRIBUTING.md finds no remaining pre-implementation claims. AC-14 discharged; AC-13
+  re-confirmed at S5's full run (749/44).
+- Next action: review gate (full-4r triage — the story diff touches `main/` hot path and
+  exceeds 400 lines), then final-mode QA, history entry, PR.
+
+## S7 — owned spinner replaces clack spinner (fix round 1: R1-001, R1-002)
+
+- approval: `stage_approval` granted by the user at the `review_gate` (recorded in `state.yaml`
+  checkpoint resolution and in plan.md's S7 row); this invocation is scoped to S7 only.
+- precondition check: working tree matched the post-S6 state — `clack-prompter.ts` still wrapped
+  clack's `spinner()`, baseline full suite green at 749/44. No contradiction with the Fix Round 1
+  plan; `tui-flow.ts`, `tui-deps.ts`, `container.ts`, `index.ts` confirmed untouched by this stage.
+- planned scope (plan.md S7): one EDIT, one NEW. Actual changed files match exactly:
+  - `src/adapters/driving/tui/clack-prompter.ts` (EDIT) — dropped the `spinner` import from
+    `@clack/prompts` (the file now imports only `confirm`, `isCancel`, `select`); added the owned
+    minimal spinner per the plan mechanism: private `createOwnedSpinner(output)` with a
+    `setInterval` (80 ms) frame loop writing `\r` + erase-line + frame + text to the sink, `stop`
+    clears the interval, clears the line, and writes the final text (when given) as a plain
+    newline-terminated line. No stdin access, no raw mode, no process listeners of any kind.
+    `createClackPrompter` gained `ClackPrompterOptions` with the optional `spinnerOutput` sink
+    (exported `SpinnerOutput` shape `{ write(chunk: string): void; isTTY?: boolean }`) defaulting
+    to `process.stdout` — `src/main/container.ts` needed no edit, exactly as planned. The
+    `TuiSpinner` seam is unchanged. Doc comment refreshed: a "Spinner constraint" paragraph states
+    why clack's spinner is not used (raw-mode keypress cancel branch → `process.exit(0)`, five
+    process listeners swallowing SIGINT/SIGTERM, orphaned engine child, skipped cleanup/persist,
+    false success), and the "declared-untested translation layer" claim now covers only the clack
+    `select`/`confirm` mapping.
+  - `src/adapters/driving/tui/__test__/spinner.test.ts` (NEW) — 5 tests per the plan's regression
+    spec: (1) the five process listener counts (`SIGINT`, `SIGTERM`, `exit`,
+    `uncaughtExceptionMonitor`, `unhandledRejection`) unchanged while running and after stop;
+    (2) `process.stdin.listenerCount("keypress")` and `("data")` unchanged across start/stop
+    (a `setRawMode` spy deliberately NOT used — clack guarded it with `isTTY`, vacuously green in
+    CI); (3) rendering contract via an injected capturing sink under fake timers: immediate frame
+    on start, interval frames, final text on `stop`, and zero writes after stop (interval cleared,
+    no timer leak).
+
+### S7 red-pre-fix evidence (tests written first, run against the unmodified prompter)
+
+`npx vitest run --project adapters src/adapters/driving/tui/__test__/spinner.test.ts` against the
+pre-fix clack-backed spinner: **4 failed | 1 passed (5)** —
+
+| Test | Pre-fix outcome |
+|---|---|
+| registers no process signal or lifecycle listeners across start/stop | RED (clack registered all five) |
+| never touches stdin (no keypress or data listeners) | RED (`block()` adds `keypress` even non-TTY) |
+| writes an immediate frame on start and further frames on the interval | RED (sink never written — clack wrote to `process.stdout`) |
+| writes the final text on stop and nothing afterwards | RED (sink empty) |
+| stop without text only clears the line and stops the frames | green (vacuous pre-fix: 0 chunks stays 0) |
+
+Both load-bearing listener-isolation proofs (the ledger's pre-fix-red predictions for R1-001 and
+R1-002) were red exactly as the plan stated. Post-fix: **5 passed (5)**.
+
+### S7 mutation-verify (executed, logged, reverted)
+
+Temporarily restored the clack spinner in `clack-prompter.ts` (re-added the `spinner` import and
+swapped `createOwnedSpinner` back for the clack wrapper), re-ran the suite: **4 failed | 1 passed**
+— the same four assertions red as pre-fix, proving the suite guards the fix. Reverted the
+mutation; suite back to **5 passed (5)**. Final file state re-validated below.
+
+### S7 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — **no dependency violations (103 modules, 247 dependencies cruised)**; clack-confinement and instantiation guards green with the reduced clack import |
+| Full `npm test` | yes | **45 files passed, 754 tests passed**, 0 failed — the 749/44 baseline intact plus the 5 new spinner tests in 1 new file |
+| clack confinement grep | yes (validation step 5) | `@clack/prompts` imported ONLY in `src/adapters/driving/tui/clack-prompter.ts` (single import site: `confirm`, `isCancel`, `select` — no `spinner`); every other mention is a doc comment |
+| Mutation-verify | yes | red under mutation (4/5), green after revert (5/5) — recorded above |
+
+### S7 finding dispositions
+
+- **R1-001 (CRITICAL)** → **fixed**: the owned spinner never touches stdin (no raw mode, no
+  keypress handler), so Ctrl+C generates a real terminal SIGINT again and the default disposition
+  kills the foreground process group — parent and execa engine child, exit 130 — exactly like the
+  CLI path. No `process.exit(0)`, no orphaned engine, no skipped worktree cleanup or `persistRun`,
+  no false success. Guarded by regression tests 1–2.
+- **R1-002 (WARNING/info)** → **structurally resolved by the same fix**: zero SIGINT/SIGTERM
+  handlers registered, so the first externally delivered termination signal takes the default
+  disposition and terminates the process instead of being swallowed. Conscious disposition per the
+  plan — not a separate stage.
+
+- scope/drift/blast-radius: none — exactly the two planned files changed; `tui-flow.ts`,
+  `tui-deps.ts`, `container.ts`, `tui/index.ts` untouched (grep- and diff-scope-verified).
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the edited prompter,
+  the new spinner suite, and this log update.
+- QA handoff: per plan.md Fix Round 1, the next step is the orchestrator-owned **scoped re-review
+  of the fix delta** under the ledger's fix-round protocol (fix round 1 of 2), then ledger update
+  (R1-001 → fixed, R1-002 → resolved) and verdict.
+
+## Next Action (post-S7)
+
+S7 complete in the working tree (check clean, full suite 754/45, red-pre-fix and mutation-verify
+evidence recorded). Orchestrator: run the scoped re-review of the S7 delta per
+`review-ledger.md`'s fix-round protocol, update the ledger dispositions and verdict, then resume
+the closeout path (final-mode QA, history entry, PR).

@@ -11,7 +11,7 @@
 
 ## Stack Summary
 
-> E0 through E6.F1.H1 have landed on `main` @ `16e3650` (PR #73). The stack below is **observed** in the working tree.
+> E0 through E6.F1.H2 have landed on `main` @ `ac7a442` (PR #74). The stack below is **observed** in the working tree.
 > Package: `@nico0695/sentinel` (ESM, bin `sentinel` + `snt`).
 
 | Area | Value | Evidence |
@@ -52,13 +52,13 @@ declared-only recommendations from `docs/setup-tecnico-sentinel.md` §4 until th
 
 ## Quality Commands
 
-> All scripts are runnable. Verified exit 0 as of PR #73 merge against `main` @ `16e3650`.
+> All scripts are runnable. Verified exit 0 as of PR #74 merge against `main` @ `ac7a442`.
 
 | Command Type | Command | Status |
 |---|---|---|
 | install | `npm ci` | Runnable — lockfile v3, full toolchain installs clean. |
 | lint / typecheck / format / guards | `npm run check` | **Runnable, verified exit 0.** Full form: `biome check . && tsc --noEmit && depcruise src`, 0 violations. |
-| test | `npm test` (`vitest run`) | **Runnable, verified 681/681 passing across 38 files.** Projects: `core`, `adapters` (also covers `src/main/**`), `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
+| test | `npm test` (`vitest run`) | **Runnable, verified 707/707 passing across 39 files.** Projects: `core`, `adapters` (also covers `src/main/**`), `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
 | dev | `npm run dev` | Runnable (`tsup --silent && node dist/cli.js`) — builds the bundle, then runs it. Changed in `[E6.F1.H1]`: NodeNext `.js` specifiers are not rewritten by `--experimental-strip-types`. |
 | build | `npm run build` (`tsup`) | Runnable — tsup 8.5.1 installed, `tsup.config.ts` at root. |
 
@@ -91,8 +91,10 @@ covers the five architecture guards via `.dependency-cruiser.cjs`: `core-no-adap
   `2.1.226` and OpenCode `1.17.9` — flag drift on version bumps is PRD risk #1.
 - ~~The product has no user-facing surface yet.~~ **Partially resolved 2026-08-28** (`[E6.F1.H1]`, PR #73): the
   CLI is now reachable — `repo add|list`, `review`, `runs list|show`, `--version`, `--help`, each invoking its use
-  case with zero logic in the command. `[E6.F1.H2]` adds documented exit codes + non-interactive/scriptable use;
-  the TUI is `[E6.F2.x]`; `[E7.F1.H1]` is what covers the flow end to end. Two spec-vs-behavior deltas carried
+  case with zero logic in the command. `[E6.F1.H2]` (PR #74) added the documented exit-code contract
+  (0 / configurable-default-1 / 2, fail-closed on ok-without-verdict, `--changes-exit-code`) for
+  non-interactive/scriptable use; the TUI is `[E6.F2.x]` (current story: `[E6.F2.H1]` navigation flow);
+  `[E7.F1.H1]` is what covers the flow end to end. Two spec-vs-behavior deltas carried
   from `[E6.F1.H1]`: `risk-e6h1-011` (`repo add` on an already-cloned repo prints `-` where the spec promised the
   local path) and the D14 persistence-failure exit semantics (verdict on stdout, diagnostic on stderr, exit 1
   without a sixth terminal state).

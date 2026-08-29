@@ -1,0 +1,444 @@
+version: "0.1"
+change_name: e6-f2-h1-tui-navigation
+objective: new-feature
+mode: lite
+execution_mode: interactive
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F2.H1] (issue #38), first story of feature E6.F2 (TUI): an interactive navigation
+    flow repo -> branch (with fetch) -> harness -> confirmation -> progress -> result, per the
+    backlog and PRD. Acceptance: the complete flow without leaving the TUI, cancelable at every
+    step, errors shown without raw stack traces. Bounded scope: fills the
+    `src/adapters/driving/tui/` placeholder (currently `export {}`) as a driving adapter that
+    invokes existing use cases only (listRepos, listBranches, runReview, harness listing per
+    design) and is wired in `src/main/` — no new core module expected. Risk profile medium: this
+    story introduces the first TUI runtime dependency (`@clack/prompts` is the setup-doc
+    recommendation; design must ratify it), defines new public UX, and must reuse the review
+    execution path [E6.F1.H1]/[E6.F1.H2] built for the CLI without duplicating logic; how the
+    TUI entry point coexists with the commander CLI (default command vs subcommand) is an open
+    B-level tension for spec/design.
+  confidence: medium
+  recorded_at: "2026-08-28T23:30:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      No blocking unknown for routing. The seams are known: `adapters/driving/tui/index.ts` is a
+      documented placeholder, the use cases the flow needs are exported from core module indexes,
+      and `main/container.ts` is the single wiring point. Open items (dep ratification, entry
+      point, cancel semantics, progress rendering) are spec/design decisions, not facts to
+      discover.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-28T23:35:00Z"
+    completed_at: "2026-08-28T23:40:00Z"
+    notes: >-
+      proposal.md written by a fresh delegated worker, grounded in the backlog E6.F2 section, PRD
+      §3.1/§3.2/§4.1-4.3, setup doc §4 (clack recommendation), and direct reads of the code seams
+      (tui/index.ts placeholder, create-cli.ts, cli-deps.ts, review-command.ts, main/cli.ts,
+      main/container.ts, core repos/run indexes). Scope: fill the TUI placeholder driving only
+      existing use cases (listRepos, listBranches, resolveReviewRequest, runReview, persistRun)
+      with a TuiDeps-style injection seam mirroring the CLI, wired only in src/main/. OUT: result
+      rendering detail ([E6.F2.H2]), sentinel open ([E6.F2.H3] optional), mid-run abort. e6f2h1-D0
+      (CLAUDE.md refresh before PR) carried in the scope sketch. Seven open questions surfaced
+      (three B-level: entry point, dep ratification, cancel semantics), none decided.
+  sddl-spec:
+    status: completed
+    started_at: "2026-08-29T00:00:00Z"
+    completed_at: "2026-08-29T00:05:00Z"
+    notes: >-
+      spec.md written by a fresh delegated worker: 14 ACs encoding firm D0-D3 without reopening
+      them, library-agnostic per D2. The four open A-level questions were resolved in the spec as
+      e6f2h1-A1..A4 (non-TTY guidance + exit 1; spinner + static phase text; harness enumeration
+      via core loadHarnesses over the existing factory+user HarnessLoader pair, verified in
+      src/core/review/load-harnesses.ts and main/container.ts; empty states friendly + exit 0 +
+      zero side effects). H1/H2 boundary explicit (result step = terminal state + verdict + run
+      dir only). No new B-level questions; no new risks. Grounded in direct reads of the CLI
+      adapter seams, main wiring, and core repos/run/review indexes.
+  sddl-design:
+    status: completed
+    started_at: "2026-08-29T00:20:00Z"
+    completed_at: "2026-08-29T00:30:00Z"
+    notes: >-
+      design.md written by a fresh delegated worker. Approach: second driving adapter on the CLI
+      house pattern — TuiDeps contract (bound use-case thunks incl. listBranches and a names-only
+      listHarnessTypes, line IO, injected TuiPrompter, injected TTY fact), one sequential
+      runTuiFlow (repo -> branch(fetch+spinner) -> harness -> confirmation with resolved engine ->
+      spinner progress -> minimal result) with early returns for cancel/empty (exit 0) and a
+      catch-all one-liner (exit 1); clack confined to a single clack-prompter.ts translation
+      file; dispatch in main/cli.ts by argv length (zero user args -> TUI, else commander
+      byte-identical, AC-1 by construction); createTuiDeps projected from a refactored internal
+      graph in container.ts. All 14 ACs mapped to mechanisms and test files; persistRun-once and
+      persist-failure mirror review-command.ts D13. Both mandated resolutions decided from repo
+      evidence: @clack/prompts ratified (risk-001) and TUI owns its minimal renderer because
+      .dependency-cruiser.cjs adapters-isolated forbids ALL cross-adapter imports, driving ->
+      driving included (risk-002). One notable ancillary decision (TUI exit-0 on completed runs)
+      flagged to the user at the design checkpoint as B-adjacent.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-29T00:50:00Z"
+    completed_at: "2026-08-29T00:55:00Z"
+    notes: >-
+      plan.md written from design.md (authoritative) + spec.md (14 ACs). Six sequential stages:
+      S1 pin+install @clack/prompts recording the exact resolved version (closes risk-001);
+      S2 behavior-preserving container graph refactor under the full 707-test net; S3 TUI
+      contract + minimal renderer + test doubles; S4 createTui/runTuiFlow + five behavioral
+      suites (AC-2..AC-10, AC-12); S5 clack-prompter, barrel, createTuiDeps, argv-length
+      dispatch + full gate + built non-TTY smoke (AC-1, AC-11, AC-13); S6 mandatory CLAUDE.md
+      refresh closeout (D0/AC-14) as the last stage before the PR. The two edits to existing
+      code (container, cli entry) are each pinned to a full-suite run at the moment they land;
+      all-new TUI files sit between them. Every stage requires stage_approval. All 14 ACs
+      mapped to stages. New risk-e6f2h1-004 (low): npm registry access for S1.
+  sddl-executor:
+    status: completed
+    started_at: "2026-08-29T01:10:00Z"
+    completed_at: "2026-08-29T02:30:00Z"
+    notes: >-
+      Batch 1 (S1+S2) done. S1: @clack/prompts 1.7.0 pinned exact after the version flag
+      (resolved as e6f2h1-D5; measured baseline corrected to 708/39). S2: behavior-preserving
+      container refactor — createCliDeps body moved verbatim into an internal non-exported
+      createWiringGraph (paths -> driven adapters -> thunks -> loadContext/now) returning the
+      surface S5's createTuiDeps will project from; createCliDeps is now a six-line projection
+      with identical order/semantics and an unchanged export set. Gate after each stage:
+      npm run check clean, npm test 708/39. Batch 2 (S3+S4) done: TuiDeps contract
+      (cancel-as-value PromptOutcome, names-only listHarnessTypes, injected TuiTty), minimal
+      renderer (formatTuiErrorLine deliberate copy + formatTuiResult at the H1/H2 boundary),
+      scripted-prompter/capturing-IO doubles, and createTui/runTuiFlow implementing design
+      §Interfaces steps 1-8 verbatim with five behavioral suites (41 new tests, AC-2..AC-10 +
+      AC-12). Two mutation-verifies recorded (duplicated persistRun -> 8 red; confirmation gate
+      ignoring "no" -> 1 red; both reverted, green). No clack/cross-adapter/process access in
+      tui/ (grep-verified). Gate: check clean, npm test 749/44. Two A-level micro-decisions in
+      the log (persist-failure also renders the underlying error line after the diagnostic;
+      TuiSpinner as named interface). Batch 3 (S5) done: clack-prompter.ts as the sole
+      @clack/prompts import site (toOutcome collapses Value|symbol via isCancel into
+      PromptOutcome), public barrel replacing the placeholder, createTuiDeps projected from
+      createWiringGraph (prompter instantiated in main, tty from process.std{in,out}.isTTY),
+      argv-length dispatch in main/cli.ts (zero user args -> TUI, else commander unchanged).
+      Clack 1.7.0 verified against installed types — zero accommodations, D5 repin condition not
+      triggered. Gate: check clean (103 modules / 247 deps, no violations), npm test 749/44
+      (identical to S4 baseline — CLI surface untouched), npm run build ok, built smoke: bare
+      non-TTY -> guidance on stderr + exit 1; --help/--version/subcommands byte-identical.
+      Batch 4 (S6) done inline by the orchestrator (single-file doc edit, recorded as a
+      deliberate deviation in the execution log): CLAUDE.md "pre-implementation" section
+      replaced with the E0-E6 implemented state, commands intro fixed, Driving surfaces
+      paragraph added. check clean after the edit; no stale claims left (grep sweep). All six
+      stages done — D0/AC-14 discharged. Executor phase complete.
+decisions:
+  - id: e6f2h1-D0
+    level: A
+    authorship: user
+    decided_at: "2026-08-28T23:30:00Z"
+    title: CLAUDE.md refresh is the mandatory last step before the PR
+    summary: >-
+      User directive at change kickoff: before opening the PR for this change, update CLAUDE.md
+      with everything necessary — at minimum the stale "Current state: pre-implementation" section
+      (the repo has a full toolchain, src/ tree, and a working CLI since E0..E6.F1.H2 landed) and
+      whatever this story itself changes (TUI adapter, new runtime dep, commands). The plan must
+      carry this as an explicit final stage before PR creation.
+    rationale: >-
+      CLAUDE.md still describes the repo as having no commits, no package.json and no src/, which
+      contradicts repo reality and misleads every future session. Recorded verbatim as a user
+      decision so it survives stage handoffs.
+  - id: e6f2h1-D1
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: TUI entry point — bare `sentinel` on a TTY
+    summary: >-
+      Running `sentinel` with no subcommand on an interactive TTY launches the TUI navigation
+      flow. When stdin is not a TTY, the command does not hang or crash: it prints guidance
+      pointing to `sentinel review` (scripting surface) instead. This replaces the current
+      commander default of printing help on no command; `--help`, `--version` and every existing
+      subcommand keep working unchanged.
+    rationale: >-
+      Presented against a `sentinel tui` subcommand; user chose bare invocation. Matches the PRD
+      positioning: the TUI is the primary interactive surface and the CLI is the "equivalent
+      direct command for scripting" (PRD §3.1-G).
+  - id: e6f2h1-D2
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: TUI library is ratified at design time, not pre-approved
+    summary: >-
+      `@clack/prompts` is NOT pre-ratified. sddl-design must compare real alternatives (at least
+      @clack/prompts vs @inquirer/prompts vs native readline-based prompts) against this story's
+      needs — per-step cancel, spinner, testability seam, ESM/Node>=22 fit, dependency weight —
+      and ratify one with recorded justification, per the setup doc's own re-evaluation rule.
+    rationale: >-
+      User chose evaluation over pre-ratification when offered clack directly. The spec must
+      therefore stay library-agnostic: acceptance criteria describe behavior (prompts, cancel,
+      spinner) without naming a package.
+  - id: e6f2h1-D3
+    level: B
+    authorship: claude->user
+    decided_at: "2026-08-28T23:50:00Z"
+    title: Cancel semantics — pre-run only
+    summary: >-
+      "Cancelable at every step" means every navigation prompt (repo, branch, harness,
+      confirmation) can be cancelled with a clean, friendly exit and no side effects. Once the
+      confirmed review run starts, there is no interactive mid-run abort in this story; the
+      engine timeout already bounds the run. Mid-run abort (signal/AbortSignal through the use
+      case and engine adapter, worktree cleanup on abort) is a possible future story.
+    rationale: >-
+      Presented against implementing mid-run abort; user chose the bounded reading. Keeps the
+      story inside the TUI adapter without widening runReview's contract.
+  - id: e6f2h1-A1
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Non-TTY behavior — one guidance line, exit 1
+    summary: >-
+      When bare `sentinel` runs with stdin not a TTY, print a single guidance line pointing to
+      `sentinel review <repo> <branch> --type <harness>` and exit 1, without hanging or crashing.
+      TTY-ness is an injected fact on the TUI deps seam so tests never need a real terminal.
+  - id: e6f2h1-A2
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Progress step — spinner plus static phase text
+    summary: >-
+      runReview is a single awaited use case, so the progress step shows a spinner with static
+      phase text and never fabricates staged progress the core cannot report (AC-6).
+  - id: e6f2h1-A3
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Harness enumeration — core loadHarnesses over existing loaders
+    summary: >-
+      The harness step enumerates via the exported core `loadHarnesses` use case over the
+      existing factory+user HarnessLoader pair already wired in main/container.ts — no new
+      enumeration mechanism, no direct FS access from the TUI.
+  - id: e6f2h1-A4
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T00:05:00Z"
+    title: Empty states — friendly line, exit 0, zero side effects
+    summary: >-
+      No repos registered, no branches, or no harnesses each terminate the flow with a friendly
+      explanatory line (pointing to the registering command where it applies), exit 0, and no
+      side effects (AC-10).
+  - id: e6f2h1-D5
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T01:30:00Z"
+    title: Keep @clack/prompts 1.7.0 (executor S1 version flag resolved)
+    summary: >-
+      S1 resolved @clack/prompts to 1.7.0, outside design.md's guessed 0.10-0.11.x line — the
+      flag condition — so the executor stopped as instructed. Resolution: keep 1.7.0. The
+      design's stated line was a no-npm-access guess; its actual intent was "pin the exact
+      latest stable at install", and the registry shows 1.x is the maintained stable line (ten
+      stable releases, 0.11.0 was the last 0.x). Runtime import of the installed package
+      confirms every export the design's mechanism needs (select, confirm, spinner, isCancel,
+      intro, outro). Behavioral API shapes are exercised at S5; any breakage there reopens this
+      decision toward a repin.
+    rationale: >-
+      Technical, reversible (one command to repin), aligned with the design's pin rationale —
+      A-level per the decision protocol. Also recorded: the measured baseline at HEAD is 708/39
+      (plan said 707; the extra test predates this change), so 708/39 is the regression net for
+      S2 onward.
+open_risks:
+  - id: risk-e6f2h1-001
+    summary: >-
+      First TUI runtime dependency: `@clack/prompts` (+ possibly picocolors) is only a
+      recommendation in docs/setup-tecnico-sentinel.md §4 and must be re-evaluated and ratified
+      (or replaced) with justification at design time, per the setup doc's own rule.
+    severity: medium
+    status: resolved-pending-install
+    direction_set_by: >-
+      RESOLVED in sddl-design (D2 discharged): @clack/prompts ratified as the ONLY new dep
+      (picocolors deferred to H2). Matrix: sole candidate with select + cancel-as-value
+      (isCancel, no exception control flow) + built-in spinner in one tiny ESM-native maintained
+      package; @inquirer/prompts loses on cancel-by-ExitPromptError plus needing a separate
+      spinner dep; native readline/promises means owned terminal plumbing the MVP should not
+      carry. Testability neutralized by the owned TuiPrompter seam (scripted doubles, no TTY,
+      library-free tests). Design had no npm access: the executor confirms and records the exact
+      pinned version at install time. CLOSED in executor S1: @clack/prompts 1.7.0 pinned exact
+      (see e6f2h1-D5 for the version-flag resolution).
+  - id: risk-e6f2h1-002
+    summary: >-
+      Reuse boundary with the CLI review path: the TUI must drive the same use cases and reuse the
+      [E6.F1.H1]/[E6.F1.H2] execution/rendering seams without duplicating command logic or leaking
+      domain logic into the TUI (use cases are the only core API). Where rendering is shared
+      between CLI and TUI is a design decision; adapters must not import other adapters.
+    severity: medium
+    status: resolved
+    direction_set_by: >-
+      RESOLVED in sddl-design: the TUI owns its minimal renderer. Verified in
+      .dependency-cruiser.cjs that adapters-isolated forbids ALL cross-folder imports under
+      src/adapters/ (driving->driving included), so a shared driving/ helper is illegal as the
+      guard stands. The real overlap is ~10 lines of error-line reduction (deliberately copied as
+      formatTuiErrorLine) plus a 3-line human-facing result block that H2 rewrites anyway; editing
+      a PRD §4.5 guard for that is disproportionate. No guard edit, no new structure.
+  - id: risk-e6f2h1-003
+    summary: >-
+      "Progress" step semantics are undefined: runReview is a single awaited use case; what the
+      TUI can honestly display (spinner vs staged progress) and what "cancelable at every step"
+      means once the engine run has started (pre-run cancel vs mid-run abort) needs a firm spec
+      boundary. Mid-run abort may exceed this story's scope.
+    severity: medium
+    status: closed
+    direction_set_by: >-
+      CLOSED by D3 + A2 (spec) and design: clack's cancel-as-value maps mechanically to the
+      zero-side-effects contract; progress is a spinner with static phase text. Residual accepted
+      sliver: the argv-length dispatch line in main/cli.ts is entry-script-trivial and untested,
+      same as the existing entry file.
+checkpoints:
+  - id: cp-proposal-tui-flow
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec. The change is bounded (continue-lite): fill the TUI driving
+      adapter with the guided flow repo -> branch -> harness -> confirmation -> progress -> result
+      over existing use cases only, wired in src/main/. Three B-level questions are put to the
+      user at this checkpoint: entry point (bare `sentinel` on a TTY vs a `tui` subcommand), the
+      first TUI runtime dependency (`@clack/prompts` ratification), and the cancel-semantics
+      boundary once the engine run has started. A-level questions (progress display shape, shared
+      rendering placement, harness enumeration source, non-TTY fallback) are deferred to
+      spec/design.
+    question: >-
+      Approve the proposal and continue to sddl-spec, revise this phase, or stop? Plus the three
+      B-level decisions above.
+    free_input_allowed: true
+    created_at: "2026-08-28T23:40:00Z"
+    status: resolved
+    resolved_at: "2026-08-28T23:50:00Z"
+    resolution: >-
+      Approved. The three B-level questions were decided by the user at this checkpoint as
+      e6f2h1-D1 (bare `sentinel` on a TTY launches the TUI), e6f2h1-D2 (do NOT pre-ratify
+      @clack/prompts — sddl-design must compare alternatives and ratify with justification) and
+      e6f2h1-D3 (cancel is pre-run only; no mid-run abort in this story). Routing to sddl-spec.
+  - id: cp-spec-tui-contract
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is ready for design. 14 ACs encode firm D0-D3: bare-`sentinel` TTY entry with an
+      untouched CLI surface (AC-1), non-TTY guidance + exit 1 (AC-2), the full flow over core use
+      cases only (AC-3), pre-run cancel with exit 0 and zero side effects (AC-4), confirmation
+      gate (AC-5), honest spinner progress (AC-6), minimal result respecting the H2 boundary
+      (AC-7), persistRun-once semantics (AC-8), no raw stack traces (AC-9), friendly empty states
+      (AC-10), hexagonal guards (AC-11), TTY-free testability via a TuiDeps seam (AC-12), green
+      gate (AC-13), and the mandatory CLAUDE.md closeout before the PR (AC-14, D0). A-level
+      resolutions e6f2h1-A1..A4 recorded. The TUI library stays unnamed (D2) — design ratifies it.
+    question: >-
+      Approve the spec and continue to sddl-design, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:05:00Z"
+    status: resolved
+    resolved_at: "2026-08-29T00:15:00Z"
+    resolution: >-
+      Approved ("si"). Routing to sddl-design, which must ratify the TUI library per D2
+      (compare at least @clack/prompts vs @inquirer/prompts vs native readline), resolve the
+      shared rendering/helper placement (risk-e6f2h1-002), define the TuiDeps seam and the
+      bare-`sentinel` entry dispatch, and map every AC to a concrete mechanism.
+  - id: cp-design-tui-mechanisms
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md is ready for plan. Ratifications: @clack/prompts as the only new dep (risk-001,
+      executor pins the exact version at install); TUI owns its minimal renderer because the
+      adapters-isolated guard forbids driving->driving imports (risk-002, no guard edit). House
+      pattern mirrored: TuiDeps + TuiPrompter seams, runTuiFlow state machine, argv-length
+      dispatch in main/cli.ts, createTuiDeps in container.ts. One B-adjacent ancillary decision
+      needs the user's eye: a completed+persisted TUI run exits 0 regardless of terminal state
+      (gate exit codes remain the CLI's scripting contract; TUI non-zero exits reserved for
+      failures and the non-TTY guard).
+    question: >-
+      Approve the design (including the TUI exit-0-on-completed-runs decision) and continue to
+      sddl-plan, revise, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:30:00Z"
+    status: resolved
+    resolved_at: "2026-08-29T00:45:00Z"
+    resolution: >-
+      Approved ("si"). Note: the user's approval arrived before the checkpoint detail was
+      rendered in chat (session hiccup), so the orchestrator re-presented the ratifications and
+      the exit-0 decision alongside the plan routing, with an explicit standing offer to amend
+      the exit-0 decision before stage_approval of any code-touching stage. Routing to sddl-plan.
+  - id: cp-stage-approval-s1-s6
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      plan.md is ready: S1 install @clack/prompts (exact version recorded) -> S2 container graph
+      refactor (behavior-preserving, full-suite guard) -> S3 TUI contract/renderer/doubles ->
+      S4 runTuiFlow + behavioral suites -> S5 clack prompter + wiring + argv dispatch + full gate
+      + built non-TTY smoke -> S6 CLAUDE.md refresh closeout (D0/AC-14, last pre-PR stage). Files
+      touched outside new tui/ code: package.json+lock (S1), main/container.ts (S2, S5),
+      main/cli.ts (S5), CLAUDE.md (S6). Validation per stage: npm run check + targeted adapters
+      project; full npm test at S2, S5 and S6. Standing offer to amend the completed-run exit-0
+      decision before S4/S5 remains open.
+    question: >-
+      Grant stage_approval: all six stages in sequence (executor pauses with a summary after
+      each), only S1 for now, revise the plan, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:55:00Z"
+    status: resolved
+    resolved_at: "2026-08-29T01:05:00Z"
+    resolution: >-
+      Approved: stage_approval granted for S1-S6 in sequence. The orchestrator runs the executor
+      in sequential batches (S1+S2, S3+S4, S5, S6), commits after each batch, reports a summary
+      per batch, and stops on any blocker, contradiction, scope drift, or blast-radius expansion.
+      The exit-0 amendment offer stays open until S4/S5 land.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-29T05:00:00Z"
+    completed_at: "2026-08-29T05:20:00Z"
+    notes: >-
+      Final-mode QA over commits 3cb488e..68a672f. All 14 ACs independently re-verified against
+      real code and tests (not the execution log): gates re-run by QA (check clean, npm test
+      754/45), fresh build + process-level smoke re-confirmed the non-TTY guard and the
+      untouched CLI surface. Review ledger consumed as evidence — the R1-001 owned-spinner fix
+      is real and its regression suite genuinely pins it. Three low, non-blocking findings:
+      QA-F1 (carry R3-002 argv-dispatch test gap to E7 smoke), QA-F2 (default process.stdout
+      sink is the adapter's single real process access, confined to the impure translation
+      file), QA-F3 (pre-existing EPIPE on piped --help, E6.F1 processIo, out of scope — E7
+      hardening candidate). Verdict: pass. Change marked completed.
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    All 14 ACs met under independent re-verification; gate green (check clean, npm test
+    754/45); review lineage closed pass_with_warnings with R1-001 verified. Three low
+    non-blocking findings (E7 candidates). Change completed — orchestrator proceeds to the
+    history entry and the PR (Closes #38).
+  reported_at: "2026-08-29T05:20:00Z"
+  report_path: sdd-lite/openspec/changes/e6-f2-h1-tui-navigation/qa-report.md
+review_summary:
+  mode: 4r
+  tier: full-4r
+  target: "7b4b17b..f3dea84 (diff sha256 2dd75aee...)"
+  counts: { confirmed: 1, suspect: 0, escalated: 0, info: 4 }
+  open_severe_findings: 0
+  fix_rounds_used: 1
+  verdict: pass_with_warnings
+  ledger: sdd-lite/openspec/changes/e6-f2-h1-tui-navigation/review-ledger.md
+  note: >-
+    R1-001 (CRITICAL, deterministic, introduced): clack's raw-mode spinner calls
+    process.exit(0) on Ctrl+C/Escape during branch fetch or the engine run — orphaned engine
+    child, leaked worktree, no persist, false-success exit 0. R1-002 (info, same root):
+    external SIGINT/SIGTERM swallowed during a spinner. No refuter run (zero severe
+    inferential candidates). First R1/R2/R3 workers were killed by a provider session limit
+    before returning findings and were relaunched with identical envelopes (retry, not a
+    second sweep); R4 completed on first launch.
+open_risks_from_review:
+  - id: risk-e6f2h1-005
+    source: R1-001
+    severity: high
+    status: resolved
+    summary: >-
+      Clack spinner raw-mode keypress handler exits 0 mid-run (orphaned engine process, leaked
+      worktree, unpersisted run, false success). RESOLVED in fix round 1 (S7, commit 4a6b4c2):
+      owned interval-driven spinner with no stdin/raw-mode/process listeners; verified by scoped
+      re-review with red-pre-fix regression tests and a mutation-verify. R1-002 (signal
+      swallowing) resolved structurally by the same fix.
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Final QA passed; change completed. Orchestrator writes the session history entry (S28) and
+    opens one PR ([E6.F2.H1] TUI navigation flow, Closes #38) from the S1-S7 commits plus the
+    sdd-lite artifacts.
+created_at: "2026-08-28T23:30:00Z"
+updated_at: "2026-08-28T23:40:00Z"

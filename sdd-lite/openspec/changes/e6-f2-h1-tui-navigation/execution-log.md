@@ -12,7 +12,7 @@
 | S2 | Behavior-preserving refactor of `src/main/container.ts` | done |
 | S3 | TUI contract + minimal renderer + test doubles | done |
 | S4 | `runTuiFlow`/`createTui` + five behavioral suites | done |
-| S5 | clack prompter, barrel, `createTuiDeps`, argv dispatch | pending |
+| S5 | clack prompter, barrel, `createTuiDeps`, argv dispatch | done |
 | S6 | CLAUDE.md closeout (D0/AC-14) | pending |
 
 ## S1 — Pin + install `@clack/prompts`
@@ -127,6 +127,55 @@ The version flag was resolved before S2 started: **keep `@clack/prompts` 1.7.0**
 - git: no commits performed (orchestrator owns git); working tree carries the eight new S3+S4 files plus this log update.
 - QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint — S3+S4 added a whole adapter surface (the batch's blast radius is all-new files, but the flow semantics are the story's core contract and worth structured eyes before S5 wires the real prompter and dispatch).
 
+## S5 — clack prompter, barrel, `createTuiDeps`, argv dispatch + full gate + built smoke
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); this invocation (batch 3) is scoped to S5 only.
+- precondition check: working tree matched the batch-2 handoff — `createWiringGraph` present in `container.ts`, `tui/index.ts` still the `export {}` placeholder, baseline check clean and full suite at 749/44. No contradiction with plan/design/spec.
+- planned scope (plan.md S5): one NEW file, three EDITs. Actual changed files match exactly:
+  - `src/adapters/driving/tui/clack-prompter.ts` (NEW) — `createClackPrompter(): TuiPrompter`, the ONLY file in the codebase importing `@clack/prompts` (grep-verified: the single import site is this file; every other mention is a doc comment). One private helper `toOutcome` collapses clack's `Value | symbol` resolution into `PromptOutcome` via `isCancel` — the library's cancel symbol dies at this boundary, exactly per design §Resolution 1. `select` maps `TuiSelectOption[]` onto clack options (hint spread conditionally — `exactOptionalPropertyTypes`), `confirm` passes the message through, `spinner()` wraps clack's `start(msg?)`/`stop(msg?)`. Declared-untested translation layer per design (§Affected Areas: "like `processIo`"); no unit tests invented, per plan.
+  - `src/adapters/driving/tui/index.ts` (EDIT) — placeholder replaced with the public barrel: `createTui`/`SentinelTui`, `createClackPrompter`, and the `TuiDeps` type family (`PromptOutcome`, `TuiDeps`, `TuiIo`, `TuiPrompter`, `TuiReviewContext`, `TuiSelectOption`, `TuiSpinner`, `TuiTty`, `TuiUseCases`), doc-comment in the CLI barrel's house style.
+  - `src/main/container.ts` (EDIT) — NEW exported `TuiDepsOptions { env?, homeDir?, io? }` and `createTuiDeps(options = {})` projecting the wiring graph: `listRepos`/`runReview`/`persistRun` reused from the graph's thunks; `listBranches` bound to `{ git, config: configStore, clonesDir: paths.clonesDir }`; `listHarnessTypes` = keys of `loadHarnesses(graph.harnesses)` (names only, e6f2h1-A3); `prompter: createClackPrompter()`; `tty` from `process.std{in,out}.isTTY === true`; io/`loadContext`/`now`/`clonesDir` as designed. Instantiation stays confined to `src/main/` (AC-11).
+  - `src/main/cli.ts` (EDIT) — argv-length dispatch: `process.argv.slice(2).length === 0` → `createTui(createTuiDeps()).run()`; anything else → the existing `createCli(createCliDeps({version})).run(process.argv)` unchanged. One surface's deps per process (the ternary constructs exactly one graph); exit code still assigned to `process.exitCode`, never `process.exit()`.
+
+### S5 clack 1.7.0 API notes (e6f2h1-D5 follow-through)
+
+Verified against the installed package's `dist/index.d.mts` before writing the prompter. **No signature difference required accommodation** — 1.7.0 kept every shape the design's mechanism assumed:
+
+| Design assumption (0.10–0.11.x) | Installed 1.7.0 | Impact |
+|---|---|---|
+| `select<Value>(opts): Promise<Value \| symbol>`, options `{value, label?, hint?}` | identical (options gained optional `disabled`, `initialValue`, `maxItems`) | none — extras unused |
+| `confirm(opts): Promise<boolean \| symbol>` | identical (gained `active`/`inactive`/`vertical`) | none |
+| `isCancel(value): value is symbol` | present (now re-exported from `@clack/core`, still importable from `@clack/prompts`) | none |
+| `spinner()` → `{ start(msg?), stop(msg?) }` | `stop` lost 0.x's unused `code` param; gained `cancel`/`error`/`message`/`clear`/`isCancelled` | none — seam uses `start`/`stop` only |
+| `intro`/`outro` | present | unused — the flow writes its own intro via `TuiIo` (S4 decision, design step 1) |
+
+D5's reopen condition ("any breakage at S5 reopens the decision toward a repin") was NOT triggered.
+
+### S5 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; **no dependency violations (103 modules, 247 dependencies cruised)**: clack confined, no adapter→adapter edge, instantiation only in `src/main/` (AC-11) |
+| `npm test` (full suite) | yes — the CLI regression suite is AC-1's proof | **44 files passed, 749 tests passed**, 0 failed — the S4 count exactly; the untouched CLI suite proves commander's surface unchanged |
+| `npm run build` | yes | tsup success, ESM `dist/cli.js` 116.69 KB |
+
+### S5 built smoke transcript (summary)
+
+| Invocation | Observed | Expected (AC) |
+|---|---|---|
+| `node dist/cli.js </dev/null` (bare, non-TTY stdin) | one line on **stderr**: `Interactive mode needs a terminal on stdin and stdout: run \`sentinel review <repo> <branch> --type <harness>\` instead, or see \`sentinel --help\`.` — stdout empty, **exit 1**, no hang | AC-2 real-guard smoke |
+| `echo "" \| node dist/cli.js` (bare, piped stdin) | same line, exit 1 | AC-2 |
+| `node dist/cli.js --help` | full usage (commands `repo`, `review`, `runs`, `help` + env-var epilogue), exit 0 — unchanged | AC-1 |
+| `node dist/cli.js --version` and `-V` | `0.0.0`, exit 0 | AC-1 |
+| `node dist/cli.js repo list` (fresh empty `SENTINEL_HOME`) | `No repositories registered.`, exit 0 | AC-1 subcommand |
+| `node dist/cli.js runs list` (missing arg) | `error: missing required argument 'repo'`, exit 1 | AC-1 usage-error path |
+| `node dist/cli.js nonsense` | `error: unknown command 'nonsense'`, exit 1 | AC-1 unknown-command path |
+
+- scope/drift/blast-radius: none. No contradiction with design/spec encountered.
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the four S5 files plus this log update.
+- QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint — S5 is the one stage that edits the live entry path (`main/cli.ts`) and closes the wiring loop; AC-1/AC-11/AC-13 evidence above is worth structured eyes before the S6 closeout.
+
 ## Next Action
 
-Batch 2 complete (S3 + S4 done in the working tree, full gate green at 749/44). Orchestrator: commit per the approved batch protocol (optionally after stage-mode QA), then proceed to batch 3 (S5: clack prompter, barrel, `createTuiDeps`, argv dispatch + built non-TTY smoke). The standing offer to amend the completed-run exit-0 decision remains open until S5 lands; S4's tests assert it as designed (completed+persisted → 0).
+Batch 3 complete (S5 done in the working tree; check clean, full suite 749/44, built smoke green). Orchestrator: commit per the approved batch protocol (optionally after stage-mode QA), then proceed to batch 4 (S6: CLAUDE.md closeout, D0/AC-14, last pre-PR stage). The standing exit-0 amendment offer expired as planned with S5 landing — the completed+persisted → 0 behavior is now wired end to end as designed.

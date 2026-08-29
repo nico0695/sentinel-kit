@@ -111,7 +111,16 @@ stages:
       ignoring "no" -> 1 red; both reverted, green). No clack/cross-adapter/process access in
       tui/ (grep-verified). Gate: check clean, npm test 749/44. Two A-level micro-decisions in
       the log (persist-failure also renders the underlying error line after the diagnostic;
-      TuiSpinner as named interface). Remaining: S5 (batch 3), S6 CLAUDE.md closeout (batch 4).
+      TuiSpinner as named interface). Batch 3 (S5) done: clack-prompter.ts as the sole
+      @clack/prompts import site (toOutcome collapses Value|symbol via isCancel into
+      PromptOutcome), public barrel replacing the placeholder, createTuiDeps projected from
+      createWiringGraph (prompter instantiated in main, tty from process.std{in,out}.isTTY),
+      argv-length dispatch in main/cli.ts (zero user args -> TUI, else commander unchanged).
+      Clack 1.7.0 verified against installed types — zero accommodations, D5 repin condition not
+      triggered. Gate: check clean (103 modules / 247 deps, no violations), npm test 749/44
+      (identical to S4 baseline — CLI surface untouched), npm run build ok, built smoke: bare
+      non-TTY -> guidance on stderr + exit 1; --help/--version/subcommands byte-identical.
+      Remaining: S6 CLAUDE.md closeout (batch 4, orchestrator-inline single-file doc edit).
 decisions:
   - id: e6f2h1-D0
     level: A

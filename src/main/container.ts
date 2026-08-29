@@ -55,8 +55,14 @@ import type {
   CliUseCases,
   ReviewContext,
 } from "../adapters/driving/cli/index.js";
+import {
+  createClackPrompter,
+  type TuiDeps,
+  type TuiIo,
+} from "../adapters/driving/tui/index.js";
 import { getRun, listRuns, persistRun } from "../core/history/index.js";
-import { listRepos, registerRepo } from "../core/repos/index.js";
+import { listBranches, listRepos, registerRepo } from "../core/repos/index.js";
+import { loadHarnesses } from "../core/review/index.js";
 import type { ReviewEngine } from "../core/run/index.js";
 import { runReview } from "../core/run/index.js";
 import {
@@ -247,6 +253,56 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
     loadContext: graph.loadContext,
     now: graph.now,
     version: options.version,
+    clonesDir: graph.paths.clonesDir,
+  };
+}
+
+/** Inputs the entrypoint owns for the TUI surface; defaults read the real process. */
+export interface TuiDepsOptions {
+  /** Environment to resolve `SENTINEL_HOME`/`SENTINEL_OPENCODE_MODEL` from. */
+  readonly env?: PathEnv;
+  /** Home directory backing the `~/.sentinel` default. */
+  readonly homeDir?: string;
+  /** Output sink; defaults to the real streams. */
+  readonly io?: TuiIo;
+}
+
+/**
+ * Projects the TUI's view of the wiring graph (`[E6.F2.H1]`, #38): the CLI's
+ * review quartet plus the two enumerations navigation needs, the clack-backed
+ * prompter, and the TTY facts the adapter must not read from `process` itself
+ * (e6f2h1-A1 — that is what keeps AC-2 assertable in-process).
+ *
+ * `listHarnessTypes` returns names only (the merged map's keys, e6f2h1-A3):
+ * the flow hands a type string to `resolveReviewRequest` and has no use for
+ * `ResolvedHarness` internals. Only `main/cli.ts`'s dispatch decides which
+ * surface runs, so each process builds exactly one graph either way.
+ */
+export function createTuiDeps(options: TuiDepsOptions = {}): TuiDeps {
+  const graph = createWiringGraph(options);
+  return {
+    useCases: {
+      listRepos: graph.useCases.listRepos,
+      listBranches: (request) =>
+        listBranches(request, {
+          git: graph.git,
+          config: graph.configStore,
+          clonesDir: graph.paths.clonesDir,
+        }),
+      listHarnessTypes: async () => [
+        ...(await loadHarnesses(graph.harnesses)).keys(),
+      ],
+      runReview: graph.useCases.runReview,
+      persistRun: graph.useCases.persistRun,
+    },
+    io: options.io ?? processIo,
+    prompter: createClackPrompter(),
+    tty: {
+      stdin: process.stdin.isTTY === true,
+      stdout: process.stdout.isTTY === true,
+    },
+    loadContext: graph.loadContext,
+    now: graph.now,
     clonesDir: graph.paths.clonesDir,
   };
 }

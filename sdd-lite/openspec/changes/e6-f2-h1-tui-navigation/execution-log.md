@@ -13,7 +13,8 @@
 | S3 | TUI contract + minimal renderer + test doubles | done |
 | S4 | `runTuiFlow`/`createTui` + five behavioral suites | done |
 | S5 | clack prompter, barrel, `createTuiDeps`, argv dispatch | done |
-| S6 | CLAUDE.md closeout (D0/AC-14) | pending |
+| S6 | CLAUDE.md closeout (D0/AC-14) | done (executed inline by the orchestrator, see S6 entry) |
+| S7 | Fix R1-001/R1-002: owned spinner replaces clack spinner (fix round 1) | done |
 
 ## S1 — Pin + install `@clack/prompts`
 
@@ -200,3 +201,94 @@ Batch 3 complete (S5 done in the working tree; check clean, full suite 749/44, b
   re-confirmed at S5's full run (749/44).
 - Next action: review gate (full-4r triage — the story diff touches `main/` hot path and
   exceeds 400 lines), then final-mode QA, history entry, PR.
+
+## S7 — owned spinner replaces clack spinner (fix round 1: R1-001, R1-002)
+
+- approval: `stage_approval` granted by the user at the `review_gate` (recorded in `state.yaml`
+  checkpoint resolution and in plan.md's S7 row); this invocation is scoped to S7 only.
+- precondition check: working tree matched the post-S6 state — `clack-prompter.ts` still wrapped
+  clack's `spinner()`, baseline full suite green at 749/44. No contradiction with the Fix Round 1
+  plan; `tui-flow.ts`, `tui-deps.ts`, `container.ts`, `index.ts` confirmed untouched by this stage.
+- planned scope (plan.md S7): one EDIT, one NEW. Actual changed files match exactly:
+  - `src/adapters/driving/tui/clack-prompter.ts` (EDIT) — dropped the `spinner` import from
+    `@clack/prompts` (the file now imports only `confirm`, `isCancel`, `select`); added the owned
+    minimal spinner per the plan mechanism: private `createOwnedSpinner(output)` with a
+    `setInterval` (80 ms) frame loop writing `\r` + erase-line + frame + text to the sink, `stop`
+    clears the interval, clears the line, and writes the final text (when given) as a plain
+    newline-terminated line. No stdin access, no raw mode, no process listeners of any kind.
+    `createClackPrompter` gained `ClackPrompterOptions` with the optional `spinnerOutput` sink
+    (exported `SpinnerOutput` shape `{ write(chunk: string): void; isTTY?: boolean }`) defaulting
+    to `process.stdout` — `src/main/container.ts` needed no edit, exactly as planned. The
+    `TuiSpinner` seam is unchanged. Doc comment refreshed: a "Spinner constraint" paragraph states
+    why clack's spinner is not used (raw-mode keypress cancel branch → `process.exit(0)`, five
+    process listeners swallowing SIGINT/SIGTERM, orphaned engine child, skipped cleanup/persist,
+    false success), and the "declared-untested translation layer" claim now covers only the clack
+    `select`/`confirm` mapping.
+  - `src/adapters/driving/tui/__test__/spinner.test.ts` (NEW) — 5 tests per the plan's regression
+    spec: (1) the five process listener counts (`SIGINT`, `SIGTERM`, `exit`,
+    `uncaughtExceptionMonitor`, `unhandledRejection`) unchanged while running and after stop;
+    (2) `process.stdin.listenerCount("keypress")` and `("data")` unchanged across start/stop
+    (a `setRawMode` spy deliberately NOT used — clack guarded it with `isTTY`, vacuously green in
+    CI); (3) rendering contract via an injected capturing sink under fake timers: immediate frame
+    on start, interval frames, final text on `stop`, and zero writes after stop (interval cleared,
+    no timer leak).
+
+### S7 red-pre-fix evidence (tests written first, run against the unmodified prompter)
+
+`npx vitest run --project adapters src/adapters/driving/tui/__test__/spinner.test.ts` against the
+pre-fix clack-backed spinner: **4 failed | 1 passed (5)** —
+
+| Test | Pre-fix outcome |
+|---|---|
+| registers no process signal or lifecycle listeners across start/stop | RED (clack registered all five) |
+| never touches stdin (no keypress or data listeners) | RED (`block()` adds `keypress` even non-TTY) |
+| writes an immediate frame on start and further frames on the interval | RED (sink never written — clack wrote to `process.stdout`) |
+| writes the final text on stop and nothing afterwards | RED (sink empty) |
+| stop without text only clears the line and stops the frames | green (vacuous pre-fix: 0 chunks stays 0) |
+
+Both load-bearing listener-isolation proofs (the ledger's pre-fix-red predictions for R1-001 and
+R1-002) were red exactly as the plan stated. Post-fix: **5 passed (5)**.
+
+### S7 mutation-verify (executed, logged, reverted)
+
+Temporarily restored the clack spinner in `clack-prompter.ts` (re-added the `spinner` import and
+swapped `createOwnedSpinner` back for the clack wrapper), re-ran the suite: **4 failed | 1 passed**
+— the same four assertions red as pre-fix, proving the suite guards the fix. Reverted the
+mutation; suite back to **5 passed (5)**. Final file state re-validated below.
+
+### S7 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — **no dependency violations (103 modules, 247 dependencies cruised)**; clack-confinement and instantiation guards green with the reduced clack import |
+| Full `npm test` | yes | **45 files passed, 754 tests passed**, 0 failed — the 749/44 baseline intact plus the 5 new spinner tests in 1 new file |
+| clack confinement grep | yes (validation step 5) | `@clack/prompts` imported ONLY in `src/adapters/driving/tui/clack-prompter.ts` (single import site: `confirm`, `isCancel`, `select` — no `spinner`); every other mention is a doc comment |
+| Mutation-verify | yes | red under mutation (4/5), green after revert (5/5) — recorded above |
+
+### S7 finding dispositions
+
+- **R1-001 (CRITICAL)** → **fixed**: the owned spinner never touches stdin (no raw mode, no
+  keypress handler), so Ctrl+C generates a real terminal SIGINT again and the default disposition
+  kills the foreground process group — parent and execa engine child, exit 130 — exactly like the
+  CLI path. No `process.exit(0)`, no orphaned engine, no skipped worktree cleanup or `persistRun`,
+  no false success. Guarded by regression tests 1–2.
+- **R1-002 (WARNING/info)** → **structurally resolved by the same fix**: zero SIGINT/SIGTERM
+  handlers registered, so the first externally delivered termination signal takes the default
+  disposition and terminates the process instead of being swallowed. Conscious disposition per the
+  plan — not a separate stage.
+
+- scope/drift/blast-radius: none — exactly the two planned files changed; `tui-flow.ts`,
+  `tui-deps.ts`, `container.ts`, `tui/index.ts` untouched (grep- and diff-scope-verified).
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the edited prompter,
+  the new spinner suite, and this log update.
+- QA handoff: per plan.md Fix Round 1, the next step is the orchestrator-owned **scoped re-review
+  of the fix delta** under the ledger's fix-round protocol (fix round 1 of 2), then ledger update
+  (R1-001 → fixed, R1-002 → resolved) and verdict.
+
+## Next Action (post-S7)
+
+S7 complete in the working tree (check clean, full suite 754/45, red-pre-fix and mutation-verify
+evidence recorded). Orchestrator: run the scoped re-review of the S7 delta per
+`review-ledger.md`'s fix-round protocol, update the ledger dispositions and verdict, then resume
+the closeout path (final-mode QA, history entry, PR).

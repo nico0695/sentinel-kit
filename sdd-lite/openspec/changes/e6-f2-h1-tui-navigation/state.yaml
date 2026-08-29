@@ -92,6 +92,18 @@ stages:
       code (container, cli entry) are each pinned to a full-suite run at the moment they land;
       all-new TUI files sit between them. Every stage requires stage_approval. All 14 ACs
       mapped to stages. New risk-e6f2h1-004 (low): npm registry access for S1.
+  sddl-executor:
+    status: in-progress
+    started_at: "2026-08-29T01:10:00Z"
+    notes: >-
+      Batch 1 (S1+S2) done. S1: @clack/prompts 1.7.0 pinned exact after the version flag
+      (resolved as e6f2h1-D5; measured baseline corrected to 708/39). S2: behavior-preserving
+      container refactor — createCliDeps body moved verbatim into an internal non-exported
+      createWiringGraph (paths -> driven adapters -> thunks -> loadContext/now) returning the
+      surface S5's createTuiDeps will project from; createCliDeps is now a six-line projection
+      with identical order/semantics and an unchanged export set. Gate after each stage:
+      npm run check clean, npm test 708/39. Remaining: S3+S4 (batch 2), S5 (batch 3),
+      S6 CLAUDE.md closeout (batch 4).
 decisions:
   - id: e6f2h1-D0
     level: A

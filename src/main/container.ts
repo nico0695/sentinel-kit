@@ -134,11 +134,25 @@ function createEngine(
   }
 }
 
+/** The subset of the surface options the wiring graph itself consumes. */
+interface WiringGraphOptions {
+  readonly env?: PathEnv;
+  readonly homeDir?: string;
+}
+
 /**
- * Builds every dependency the CLI needs, in one place, in wiring order:
- * paths → driven adapters → use-case thunks.
+ * Builds the wiring graph, in order: paths → driven adapters → use-case
+ * thunks → the `loadContext`/`now` seams.
+ *
+ * One call builds one graph, and each surface factory below calls it exactly
+ * once — that is what keeps property 1 of the module doc-comment structural:
+ * `sentinelPaths()` runs here and nowhere else, so every projection of the
+ * graph shares the single `SentinelPaths` object. The adapters in the return
+ * (`git`, `configStore`, `harnesses`) are part of the graph's surface so a
+ * projection can bind surface-specific thunks from the same instances
+ * instead of constructing anything twice.
  */
-export function createCliDeps(options: CliDepsOptions): CliDeps {
+function createWiringGraph(options: WiringGraphOptions) {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? homedir();
 
@@ -217,12 +231,22 @@ export function createCliDeps(options: CliDepsOptions): CliDeps {
     getRun: (request) => getRun(request, { store: runStore }),
   };
 
+  return { paths, git, configStore, harnesses, useCases, loadContext, now };
+}
+
+/**
+ * Projects the CLI's view of the wiring graph: the bound use-case thunks,
+ * line IO, the context/clock seams, and the one filesystem fact the CLI
+ * reports (`clonesDir`).
+ */
+export function createCliDeps(options: CliDepsOptions): CliDeps {
+  const graph = createWiringGraph(options);
   return {
-    useCases,
+    useCases: graph.useCases,
     io: options.io ?? processIo,
-    loadContext,
-    now,
+    loadContext: graph.loadContext,
+    now: graph.now,
     version: options.version,
-    clonesDir: paths.clonesDir,
+    clonesDir: graph.paths.clonesDir,
   };
 }

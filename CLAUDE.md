@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI-powered code review orchestrator CLI. Hexagonal architecture, TypeScript, Node >=22.
 
-## Current state: E0–E6 implemented
+## Current state: E0–E6 complete
 
-The toolchain, `src/` tree, and product surfaces are real. Merged: E0 (scaffold, guards, CI), E1 (engine spikes + fixtures), E2 (git wrapper, worktrees/diff, config store, repo management), E3 (harness system + factory harnesses), E4 (`runReview`, verdict parser, real `claude-code`/`opencode` engine adapters, cascading resolution), E5 (`ProcessRunner` + declared validations, run history), and E6.F1 (the `sentinel` CLI with documented review exit codes). `[E6.F2.H1]` added the interactive TUI: bare `sentinel` on a TTY opens the navigation flow (repo → branch → harness → confirm → progress → result); `sentinel review …` remains the scripting surface (exit codes 0 / configurable-default-1 via `--changes-exit-code` / 2, fail-closed on ok-without-verdict). Runtime deps: `commander`, `execa`, `yaml`, `zod`, `@clack/prompts` (exact-pinned; confined to `tui/clack-prompter.ts`).
+The toolchain, `src/` tree, and product surfaces are real. Merged: E0 (scaffold, guards, CI), E1 (engine spikes + fixtures), E2 (git wrapper, worktrees/diff, config store, repo management), E3 (harness system + factory harnesses), E4 (`runReview`, verdict parser, real `claude-code`/`opencode` engine adapters, cascading resolution), E5 (`ProcessRunner` + declared validations, run history), and E6.F1 (the `sentinel` CLI with documented review exit codes). E6.F2 closed the interactive TUI: `[E6.F2.H1]` added the navigation flow — bare `sentinel` on a TTY walks repo → branch → harness → confirm → progress → result — and `[E6.F2.H2]` made the result step readable, rendering a digest (state, verdict, failure, findings grouped by the harnesses' `[SEV: …]` convention, run directory and a `Full review:` pointer at the persisted `result.md`) and then offering the engine's raw markdown behind one opt-in prompt that cannot change the exit code. `sentinel review …` remains the scripting surface (exit codes 0 / configurable-default-1 via `--changes-exit-code` / 2, fail-closed on ok-without-verdict). Runtime deps: `commander`, `execa`, `yaml`, `zod`, `@clack/prompts` (exact-pinned; confined to `tui/clack-prompter.ts`) and `picocolors` (exact-pinned `1.1.1`; confined to `tui/colors.ts`). E6's ⚪ `[E6.F2.H3]` (`sentinel open`) is skipped, not built — workflow contract rule 7.
 
-Remaining MVP work: `[E6.F2.H2]` result rendering (🔴) and E7 (E2E smoke, dogfooding, user docs, license, release). The live status is `history/INDEX.md` plus the GitHub milestones — update this section only when an epic-level fact changes.
+Remaining MVP work: E7 (E2E smoke, dogfooding, user docs, license, release). The live status is `history/INDEX.md` plus the GitHub milestones — update this section only when an epic-level fact changes.
 
 ## Source of truth
 - `docs/prd-sentinel.md` — product definition (v0.3). Architecture rules in §4 are MANDATORY.
@@ -57,7 +57,7 @@ Ports are owned by the domain module that needs them, not by a central technical
 
 The review flow all stories converge on: **worktree → diff → prompt → engine → parse → terminal state → cleanup**. An ephemeral git worktree per review (never a checkout in the managed clone — that serializes reviews), diffed as `merge-base(base, target)..target` to match PR semantics.
 
-Driving surfaces: bare `sentinel` on a TTY opens the TUI (non-TTY prints guidance and exits 1); every other invocation reaches the commander CLI unchanged. Both drive the same use cases — the TUI holds zero domain logic, gets its dependencies via `createTuiDeps` in `src/main/container.ts`, and keeps `@clack/prompts` confined to `tui/clack-prompter.ts` (tests use scripted prompter doubles, no real TTY).
+Driving surfaces: bare `sentinel` on a TTY opens the TUI (non-TTY prints guidance and exits 1); every other invocation reaches the commander CLI unchanged. Both drive the same use cases — the TUI holds zero domain logic, gets its dependencies via `createTuiDeps` in `src/main/container.ts`, and keeps each terminal library confined to one module (`@clack/prompts` to `tui/clack-prompter.ts`, `picocolors` to `tui/colors.ts`, whose palette the pure renderers take as a required argument). Tests use scripted prompter doubles and an injected plain palette — no real TTY, no ambient colour detection.
 
 ## Architecture guards (also enforced by dependency-cruiser in CI)
 - `src/core/**` never imports from `src/adapters/**`, `src/main/**`, or any I/O library (whitelist: zod).

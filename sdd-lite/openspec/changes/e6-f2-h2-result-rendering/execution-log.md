@@ -1,7 +1,7 @@
 # Execution Log
 
 - change_name: e6-f2-h2-result-rendering
-- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5)
+- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7 — all seven planned stages executed)
 - plan source: `plan.md` (Stage Plan table, authoritative)
 
 ## Stage Overview
@@ -13,8 +13,8 @@
 | S3 | `colors.ts` (sole `picocolors` importer) + test-side `stripAnsi` | done — M2 proved the palette really colours |
 | S4 | `render.ts` additive: `formatResultDigest` / `formatFullView` + pure tests | done — +45 tests (823 / 46), `formatTuiResult` retained, H1 tails still green |
 | S5 | Supersession: flow call sites → digest, delete the legacy renderer, rewrite the four H1 tails (AC-15) + the D9 amendment | done — 824 / 46 (823 − 3 + 4), the digest is now the product's output |
-| S6 | `offerFullView` + `full-view.test.ts` (AC-8/9/10/12/13) | pending |
-| S7 | CLAUDE.md closeout + final evidence sweep (AC-14/16/17) | pending |
+| S6 | `offerFullView` + `full-view.test.ts` (AC-8/9/10/12/13) | done — 856 / 47 (824 + 31 + 1), M3/M4/M5 all verified red then reverted |
+| S7 | CLAUDE.md closeout + final evidence sweep (AC-14/16/17) | done — `CLAUDE.md` only, 4 insertions / 4 deletions; sweep green, count unchanged at **856 / 47** |
 
 ## S1 — Dependency gate: `picocolors` install, pin, export-shape and baseline confirmation
 
@@ -532,3 +532,105 @@ Not deviations, but recorded so a reviewer does not read them as oversights: **Q
 - git: **no commits, no stashes, no resets** — the orchestrator owns git. The working tree carries the three source files, plus this log and the `state.yaml` stage entry, uncommitted.
 - QA handoff: **recommended, not run.** S6 adds the flow's first post-run interaction and discharges five ACs; a stage-mode `sddl-qa-review` should check the three invariants independently — that both `return` statements are untouched and the exit codes still depend only on (completed, persisted), that `persistRun` is still called exactly once, and that the prompt is unreachable when the markdown is blank — plus the prompt copy against the spec's intent, since the wording is an A-level choice made here.
 - next action: orchestrator commits S6, then obtains a **new `stage_approval` for S7** — the `CLAUDE.md` closeout (E6 complete, remaining MVP work, `picocolors` in the runtime-dependency list) plus the final evidence sweep (AC-14/16/17). S7 must not be started under `cp-stage-approval-s6`. **New baseline for every later comparison: 856 tests / 47 files.** The orchestrator's standing correction still holds for S7: the valid confinement check is `grep -rEn '^import .*"picocolors"' src/` = 1, not the plan's literal `grep -rn "picocolors" src/`.
+
+---
+
+## S7 — the closeout: CLAUDE.md at the E6-complete state, then the final evidence sweep
+
+- approval: `cp-stage-approval-s7` (decision `e6f2h2-D11`, "S7 y después review 4R"). S7 was **not** run under `cp-stage-approval-s6`.
+- planned scope (plan.md S7 row): **`CLAUDE.md` only**. Actual scope: `CLAUDE.md` only. No source change was needed or made — the standing level-C guard never fired.
+
+### Changed files — the complete list
+
+| File | Change | Diff |
+|---|---|---|
+| `CLAUDE.md` | MODIFIED — four anchored replacements | **+4 / −4** (`git diff --stat`: `1 file changed, 4 insertions(+), 4 deletions(-)`) |
+
+`git status --porcelain` after the stage: `M CLAUDE.md` plus this log and the `state.yaml` stage entry. Nothing else in the tree.
+
+### The four CLAUDE.md edits, section by section
+
+1. **Heading (line 9)** — `## Current state: E0–E6 implemented` → `## Current state: E0–E6 complete`. "Implemented" was the honest word while `[E6.F2.H2]` was still open; the epic-level fact that changed is that E6's last **required** story is done.
+2. **"Current state" paragraph (line 11)** — the H1-only TUI sentence is replaced by the E6.F2-as-a-whole sentence. `[E6.F2.H1]` keeps its navigation-flow credit; `[E6.F2.H2]` is described by what it actually renders — *"a digest (state, verdict, failure, findings grouped by the harnesses' `[SEV: …]` convention, run directory and a `Full review:` pointer at the persisted `result.md`) and then offering the engine's raw markdown behind one opt-in prompt that cannot change the exit code"*. Every clause is checked against `render.ts`'s `formatResultDigest` line order (`Review result:` / `Verdict:` / `Failure:` / `Findings:` / `Run directory:` / `Full review:`), not against the design's intent. The runtime-dep list gains **`picocolors` (exact-pinned `1.1.1`; confined to `tui/colors.ts`)** beside the existing five. The paragraph closes with the anti-overstatement clause the handoff demanded: *"E6's ⚪ `[E6.F2.H3]` (`sentinel open`) is skipped, not built — workflow contract rule 7."*
+3. **"Remaining MVP work" line (line 13)** — `` `[E6.F2.H2]` result rendering (🔴) and E7 `` → **E7 only**. E7's five items are left exactly as they were: it remains entirely open, and nothing in this stage implies otherwise.
+4. **Architecture → "Driving surfaces" (line 60)** — the single-importer sentence generalised: `keeps @clack/prompts confined to tui/clack-prompter.ts (tests use scripted prompter doubles, no real TTY)` → `keeps each terminal library confined to one module (@clack/prompts to tui/clack-prompter.ts, picocolors to tui/colors.ts, whose palette the pure renderers take as a required argument). Tests use scripted prompter doubles and an injected plain palette — no real TTY, no ambient colour detection.` **A-level decision, authorship `claude`, recorded as the one edit beyond the literal AC-17 wording** (see Deviations): AC-14's confinement is an architectural rule a future contributor can break, and this paragraph is the only place in CLAUDE.md that states the rule for the sibling library. Leaving it naming `@clack/prompts` alone would have made the file describe half of a rule that now governs two modules.
+
+Sections deliberately **not** touched: Source of truth, Language policy, Commands, `create-issues.sh`, the `src/` tree block, ports/review-flow paragraphs, Architecture guards, Workflow contract, Conventions, Session kickoff, the sdd-lite policy, the decision protocol, the audit-history rules, and the generated `sdd-lite:start/end` block.
+
+### Final evidence sweep — commands and their real output
+
+| # | Command | Required | Actual output |
+|---|---|---|---|
+| 1 | `git diff --stat src/core` | empty (AC-16) | **empty** — no output at all |
+| 1b | `git diff --stat src/main` | empty (standing guard) | **empty** |
+| 2 | `grep -rEn '^import .*"picocolors"' src/` | exactly 1 | **exactly 1** — `src/adapters/driving/tui/colors.ts:34:import pc from "picocolors";` |
+| 2b | `grep -rn "picocolors" src/ \| wc -l` (the plan's literal form) | — | **11** — the orchestrator's correction re-confirmed at closeout: the naive grep is not an acceptance check. The other 10 hits are prose (the `colors.ts` header states the single-importer rule and quotes both grep forms; `__test__/tui-test-doubles.ts` explains `stripAnsi`). It reads 11 rather than the orchestrator's measured 9 because S5/S6 added two more prose mentions after that measurement — which is exactly why a literal-count check would have been a false failure |
+| 3 | `grep -n '"picocolors"' package.json` | bare exact pin | **`35:    "picocolors": "1.1.1",`** — no caret, no range. `package-lock.json` agrees: root `dependencies` spec `1.1.1`, `node_modules/picocolors` version `1.1.1` |
+| 4 | `npm run check` | clean | **exit 0** — biome `Checked 160 files in 164ms. No fixes applied.`; `tsc --noEmit` silent; depcruise `✔ no dependency violations found (106 modules, 253 dependencies cruised)`. All five guards green |
+| 5 | `npm test` (full) | green | **exit 0** — `Test Files 47 passed (47)`, `Tests 856 passed (856)`, 0 failed, 17.41s |
+| 6a | `NO_COLOR=1 npx vitest run --project adapters` | AC-14 | **26 files / 507 tests passed**, exit 0 |
+| 6b | `FORCE_COLOR=1 npx vitest run --project adapters` | identical | **26 files / 507 tests passed**, exit 0 — same file count, same test count, zero failures. **Identical** |
+| 7 | consistency read of `CLAUDE.md` | no stale TUI-result claim | **clean** — see below |
+
+**Consistency read (7), in detail.** Every mention of the TUI result surface in `CLAUDE.md` was re-read after the edit: line 11 (the "Current state" paragraph), line 13 (remaining work), line 60 (driving surfaces), line 67 (the guard "no logic in TUI/CLI commands" — still true, the flow calls pure renderers and holds no domain logic). `grep -n "🔴\|pending\|not yet\|minimal"` over the file returns exactly one hit, line 77, which is the workflow contract's "pending review" and unrelated. No sentence survives that describes the result step as minimal, as H1's, or as future work.
+
+### Test-count arithmetic — the full path from the story baseline
+
+The inherited baseline was **754 tests / 45 files** (measured by the orchestrator, then *confirmed* by S1 as its first act — it was not assumed).
+
+| Stage | Δ tests | Δ files | Running total | What moved |
+|---|---|---|---|---|
+| baseline (pre-S1) | — | — | **754 / 45** | inherited from `[E6.F2.H1]`, confirmed at S1 |
+| S1 | 0 | 0 | 754 / 45 | dependency gate only — `package.json` / `package-lock.json` |
+| S2 + S3 | **+24** | **+1** | **778 / 46** | NEW `__test__/findings.test.ts` (the AC-3 matrix). `colors.ts` and the `stripAnsi` helper added no permanent test of their own — M2 was a throwaway, deleted |
+| S4 | **+45** | 0 | **823 / 46** | `result.test.ts` gains the pure `formatResultDigest` / `formatFullView` describes; purely additive, `formatTuiResult` retained |
+| S5 | **−3 +4 = +1** | 0 | **824 / 46** | the **only** permitted reduction: the three superseded `formatTuiResult` unit cases, deleted with the function. +4 = one pure D9 whitespace case and three flow cases covering the success branch's conditional spreads |
+| S6 | **+31 +1 = +32** | **+1** | **856 / 47** | NEW `__test__/full-view.test.ts` (31: AC-8/9/10/12/13 plus the ten permanent palette invariants) and one AC-11 ordering case in `result.test.ts` |
+| **S7** | **0** | **0** | **856 / 47** | documentation only — no test file was created, edited or deleted |
+
+Arithmetic: `754 + 24 + 45 − 3 + 4 + 31 + 1 = 856`; files `45 + 1 + 1 = 47`. **Net +102 tests / +2 files**, of which exactly **3 deletions**, all at S5, all replaced by S4's pure equivalents. The final `npm test` measured **856 / 47** — the arithmetic and the measurement agree.
+
+### AC status at closeout
+
+- **AC-14** — pin verified in `package.json` *and* `package-lock.json`; statement-level confinement = 1; the adapters project is identical under `NO_COLOR=1` and `FORCE_COLOR=1` (507/507 both ways); colour-as-decoration is pinned permanently by the ten palette invariants S6 landed. **Satisfied.**
+- **AC-16** — `npm run check` clean (five guards), `npm test` 856/47 green, `git diff --stat src/core` **empty** across the whole change. **Satisfied.**
+- **AC-17** — `CLAUDE.md` refreshed to the E6-complete state, `picocolors` in the runtime-dependency list, remaining work now E7-only. **Satisfied.**
+
+### Quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `git diff --stat src/core` · `src/main` | yes (AC-16) | both **empty** |
+| statement-level picocolors grep | yes (as corrected) | **1** |
+| exact pin in `package.json` | yes | **`"picocolors": "1.1.1"`** |
+| `npm run check` | yes | **clean, exit 0** |
+| `npm test` (full) | yes | **856 / 47, exit 0** |
+| AC-14 dual-env adapters run | yes | **507 / 507 identical** |
+| consistency read of CLAUDE.md | yes | **clean** |
+| `git status --porcelain` | scope | `M CLAUDE.md` only (plus this log and the state entry) |
+
+### Deviations
+
+One, stated rather than smoothed over.
+
+1. **A fourth CLAUDE.md edit beyond the literal AC-17 wording.** AC-17 names the "Current state" facts and the runtime-dependency list; edit 4 above touches the **Architecture → Driving surfaces** paragraph as well, to generalise the terminal-library confinement rule from `@clack/prompts` alone to both libraries. It is inside S7's declared scope (`CLAUDE.md` only), it is one sentence, and it states a rule the change actually introduced rather than adding new claims. Level A, authorship `claude`. The alternative — leaving line 60 naming one of the two confined libraries — would have left `CLAUDE.md` describing half of a live architectural rule.
+
+Not deviations, but recorded so a reviewer does not read them as oversights:
+
+- **The `Stage Overview` table at the top of this log was refreshed**, not rewritten: S6's row still said `pending` although its full section was appended below it, and the executor header listed invocations only through S5. Both now match the sections that exist. No prior entry text was altered.
+- **`README.md` carries a materially stale status block and was deliberately NOT edited** — it is outside S7's scope. Reported to the orchestrator for a decision (see below).
+
+### Stale-claim sweep outside CLAUDE.md — reported, not edited
+
+- **`README.md` (lines 13–17) — MATERIAL, stale.** The blockquote reads *"**Status: pre-MVP.** Epic **E0 — Foundations** is complete: hexagonal scaffold, executable architecture guards in CI, the `ReviewEngine` port + run terminal-state model, and a `FakeEngine` with a shared reusable contract suite. The rest of the MVP develops against `FakeEngine` while the real engines are spiked."* Two claims are now false: E0 is not the frontier (E1–E6 are done), and the real `claude-code` / `opencode` engine adapters landed at **E4** — they are no longer "being spiked". Recommendation: this is `[E7.F2.H1]` (user documentation) territory, whose acceptance is a reproducible quick start; folding a status refresh into this story's PR would widen `[E6.F2.H2]`'s diff beyond its scope. The orchestrator decides — a one-line status correction in this PR is defensible, a README rewrite is not.
+- **`README.md` — minor.** *"The published binary is `sentinel` (alias `snt`); packaging lands later in the backlog"* is still accurate (`[E7.F2.H3]`). *"License is not yet decided (tracked for the wrap-up epic)"* is still accurate (`[E7.F2.H2]`). No action.
+- **`CONTRIBUTING.md` — clean.** It states no progress or status facts: prerequisites, the four commands (all still exact), the workflow contract, the sdd-lite activation policy and a pointer list. Every command and rule it names matches `package.json` and `CLAUDE.md`. Nothing stale found, nothing to report.
+
+### Stage close
+
+- blockers: none.
+- scope / drift / blast-radius: none. Planned scope was `CLAUDE.md` only and actual scope is `CLAUDE.md` only; no source change was needed, so the contradiction stop this stage was warned about never triggered.
+- risks: no new risk. `risk-e6f2h2-003`'s documentation half is now discharged (its remaining half is the PR description, orchestrator-owned).
+- git: **no commits, no stashes, no resets.** The orchestrator owns git. The tree carries `CLAUDE.md`, this log and the `state.yaml` stage entry, uncommitted.
+- QA handoff: **not this stage's call.** S7 touched no code, so a stage-mode QA over it would review a documentation diff. The plan's post-execution route stands and is unchanged: **4R code review over the frozen diff** (`e6f2h2-D11`), then **final QA (`sddl-qa-review`, `final` mode)** — the only stage that may mark this change `completed`. This stage claims neither.
+- next action: the orchestrator commits S7, then runs the 4R code review over the frozen diff, then final QA. All seven planned stages are executed; `sddl-executor` has nothing left to run for this change.

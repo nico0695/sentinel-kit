@@ -241,6 +241,32 @@ checkpoints:
       free_text: "Approved — route to sddl-plan. Judgment-day declined."
       responded_at: "2026-08-29T16:55:00Z"
     resolved_at: "2026-08-29T16:55:00Z"
+  - id: cp-stage-approval-s1-s3
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      First code-touching approval of the change. STAGE S1 — goal: install and exact-pin
+      `picocolors`, confirm the resolved version's default-export shape and the inherited 754/45
+      baseline BEFORE any rendering code exists. Scope: `package.json`, `package-lock.json`.
+      Touches code: yes (manifest + lockfile only, no source). Validation: runtime export probe
+      writing no file, `npm run check`, full `npm test` against the inherited baseline; STOP and
+      escalate (level B) if the resolved version's export shape differs; no `tsconfig.json` edit is
+      permitted — the interop half is already closed by the orchestrator probe.
+      STAGES S2 + S3 (batched) — goal: the pure `[SEV: ...]` matcher with its AC-3 matrix, then the
+      colour seam. Scope: NEW `tui/findings.ts`, NEW `__test__/findings.test.ts`, NEW
+      `tui/colors.ts`, MODIFIED `__test__/tui-test-doubles.ts` (add `stripAnsi`). Touches code: yes.
+      Batched because the two new modules are disjoint, nothing imports them yet, no existing
+      behaviour changes, and they share one narrowed validation run. Validation: narrowed
+      `npx vitest run --project adapters`, `npm run check`, `grep -rn picocolors src/` = 1 hit,
+      adapters green under both `NO_COLOR=1` and `FORCE_COLOR=1`, plus mutation-verifies M1 and M2.
+    question: >-
+      Approve S1 alone, approve S1 with S2+S3 batched, or revise the plan before any code changes?
+    free_input_allowed: true
+    created_at: "2026-08-29T17:10:00Z"
+    response:
+      free_text: "Approved: S1, then S2+S3 batched. Stop after S3 for the stage summary."
+      responded_at: "2026-08-29T17:12:00Z"
+    resolved_at: "2026-08-29T17:12:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -317,6 +343,17 @@ decisions:
       design already probed its load-bearing assumptions empirically, so the 4R review over the
       frozen diff remains the adversarial pass.
     recorded_at: "2026-08-29T16:55:00Z"
+  - id: e6f2h2-D7
+    checkpoint_id: cp-stage-approval-s1-s3
+    selected_option_id: approve-s1-plus-s2s3-batched
+    free_text: "Aprobar S1 + S2/S3 batcheadas"
+    rationale: >-
+      Execution authorised: S1 first, then S2+S3 in one batch as the plan recommended — the two new
+      modules are disjoint, unimported, and change no existing behaviour, so the batch cannot
+      regress the 754-test baseline. S4-S7 stay one invocation each: every one of them changes an
+      existing surface, and S5 and S6 change observable behaviour. Execution stops after S3 for the
+      stage summary.
+    recorded_at: "2026-08-29T17:12:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

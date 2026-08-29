@@ -158,36 +158,45 @@ stages:
     status: in_progress
     started_at: "2026-08-29T18:00:00Z"
     notes: >-
-      S1 and the S2/S3 batch are DONE; S4-S7 pending. S1 (committed as `b0a3a04`): `npm i -E
-      picocolors` resolved exactly 1.1.1, bare-pinned, four colour functions confirmed on the
-      default export, `npm run check` clean, inherited baseline CONFIRMED at 754 tests / 45 files;
-      risk-e6f2h2-007 fully closed and no `tsconfig.json` edit needed or made. S2+S3 (batched
-      under the same approval, uncommitted): NEW `tui/findings.ts` (86 lines, zero imports —
-      `matchFindingLine` / `extractFindings`, the design's rule verbatim, with the regex
-      alternation deliberately left as the SOLE severity gate so M1 stays observable) plus NEW
-      `__test__/findings.test.ts` (228 lines, 24 tests, both positive fixture cases read from the
-      real `fixtures/claude-code/valid-verdict.json`); NEW `tui/colors.ts` (76 lines, `TuiPalette`
-      / `TUI_PALETTE` / `PLAIN_PALETTE`, the SOLE `picocolors` importer via the default form) and
-      `__test__/tui-test-doubles.ts` +22/-0 adding the exported `stripAnsi` (existing doubles
-      byte-unchanged). Both mutation-verifies were really run: M1 (severity group widened to
-      `[a-z]+`) went RED with 2 failures — the unit `[SEV: critical]` case AND the extractor's
-      source-order case, which gained a `critical` finding — then was reverted to green; M2's
-      throwaway probe was GREEN under `FORCE_COLOR=1` (`TUI_PALETTE.bad` really emits SGR and
-      `stripAnsi` reverses it, closing the risk-e6f2h2-009 vacuity hole empirically) and RED under
-      `NO_COLOR=1` (proving it cannot be permanent), then deleted. Quick checks: `npm run check`
-      clean (biome 159 files, tsc silent — the real typecheck of the default import — depcruise
-      106 modules / 248 dependencies, no violations; no orphan rule, so the unimported modules are
-      legal); adapters project 429/429 identical under both `NO_COLOR=1` and `FORCE_COLOR=1`; full
-      `npm test` 778 tests / 46 files passed = 754 + 24 new, purely additive, zero failures;
-      `git diff --stat src/core` and `src/main` empty. ONE deviation, recorded: the plan's literal
-      confinement command `grep -rn "picocolors" src/` cannot return 1 hit because design.md
-      requires the header to state the single-importer rule in prose — it returns 9 hits in 2
-      files (8 prose/import in `colors.ts`, 1 prose in the test doubles), while the
-      statement-level `grep -rEn '^import .*"picocolors"' src/` returns exactly 1
-      (`colors.ts:34`); S7's sweep should use the statement-level form. No blocker, no scope
-      drift, no new risk, no git side effects. S4 was NOT started — it needs its own
-      `stage_approval`. Stage-mode QA review recommended (not run) at this checkpoint, per the
-      user's "stop after S3".
+      S1, the S2/S3 batch and S4 are DONE; S5-S7 pending. S1 (committed `b0a3a04`): picocolors
+      pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
+      CONFIRMED at 754 tests / 45 files, no tsconfig edit needed. S2+S3 (committed `3f9d2ff`): NEW
+      `tui/findings.ts` (pure, zero imports) + 24-test AC-3 matrix, NEW `tui/colors.ts` (the sole
+      picocolors importer) + exported `stripAnsi` in the test doubles; M1 verified RED then
+      reverted, M2 GREEN under FORCE_COLOR=1 and RED under NO_COLOR=1 then deleted; suite 778 / 46.
+      S4 (uncommitted): `tui/render.ts` MODIFIED **purely additively** (+236 / -0) — `TuiResultDigest`,
+      `formatResultDigest` and `formatFullView` landed with the palette as a REQUIRED argument, the
+      digest copy implemented verbatim from design.md's literal block, severity labels padded before
+      colouring, `node:path.join` for the `Full review` line, the findings section and that line keyed
+      on `engineOutput` (never on `state`), the pointer emitted iff runDir AND engineOutput are
+      defined (the exact `run-store-fs.ts:223` condition), and `formatFullView` splitting on "\n";
+      `__test__/result.test.ts` MODIFIED (+491 / -1, the one deletion being the widened import line)
+      adding 45 pure tests in eight describes. **The S4 invariant held: no observable behaviour
+      changed.** `formatTuiResult` and `formatTuiErrorLine` are byte-identical (zero deletions in
+      render.ts), `tui-flow.ts` is untouched, and the four `[E6.F2.H1]` literal-tail assertions
+      (`slice(-3)` at result.test.ts:183 and :235, `slice(-2)` at :206 and :271) plus the four H1
+      AC-8 named cases are all still present unmodified and GREEN — verified by name in a verbose
+      run. Quick checks: narrowed adapters run 58/58 on result.test.ts; `npm run check` clean
+      (depcruise 106 modules / 252 dependencies, +4 edges from render.ts, no violations); adapters
+      project 474/474, identical under NO_COLOR=1 and FORCE_COLOR=1; full `npm test` **823 tests /
+      46 files** (778 + 45, purely additive); `git diff --stat src/core` and `src/main` empty;
+      tui-flow/tui-deps/index/clack-prompter/findings/colors all untouched; the statement-level
+      picocolors grep still exactly 1 hit. An UNPLANNED non-vacuity probe was run and recorded:
+      removing `.padEnd(SEVERITY_LABEL_WIDTH)` turned 5 tests RED, then was reverted to green.
+      A-level decisions at S4 (authorship `claude`): the `comment` verdict takes the `muted` role
+      (colors.ts's role doc named the other two but not this one); a readable marker palette beside
+      PLAIN_PALETTE, because an all-identity palette would let every plain assertion pass against a
+      renderer that ignored its palette argument entirely — it turns "colour is decoration only"
+      into an equality. THREE deviations, all recorded in execution-log.md, none a scope change:
+      (a) render.ts's module doc comment still carries H1's boundary text, deliberately, because
+      plan.md assigns that rewrite to S5 as AC-15 evidence — result.test.ts's header is stale for
+      the same one stage; (b) "additive" is literal for render.ts (0 deletions) but result.test.ts
+      has one deleted line, the widened import; (c) the AC-14 colour describe sits outside S4's
+      assigned AC list (AC-1/2/4/5/6/7/12) and exists to guard those, not to pull AC-14's flow half
+      forward. No blocker, no drift, no blast-radius expansion, no new risk, no git side effects.
+      S5 was NOT started — it needs its own `stage_approval`. Stage-mode QA review recommended (not
+      run): S4 is the last point at which the digest copy and role assignment can be reviewed before
+      S5 wires them in and deletes the assertions that currently pin the old output.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -527,29 +536,33 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S2 + S3 are DONE and green, uncommitted, and the user's stop point is reached. Landed:
-    `src/adapters/driving/tui/findings.ts` (NEW, pure, zero imports),
-    `src/adapters/driving/tui/__test__/findings.test.ts` (NEW, 24 tests, including the real
-    `fixtures/claude-code/valid-verdict.json` lines), `src/adapters/driving/tui/colors.ts` (NEW,
-    the sole `picocolors` importer, default import form) and `__test__/tui-test-doubles.ts`
-    (+22/-0, exported `stripAnsi`). Evidence: `npm run check` clean; full `npm test` 778 / 46
-    (= 754 + 24, purely additive); adapters project 429/429 identical under `NO_COLOR=1` and
-    `FORCE_COLOR=1`; the statement-level picocolors grep exactly 1 hit (`colors.ts:34`);
-    `git diff --stat src/core` empty. M1 verified RED then restored; M2 verified GREEN under
-    `FORCE_COLOR=1` and RED under `NO_COLOR=1`, then deleted. Next: the orchestrator commits
-    S2 + S3 and gives the stage summary the user asked for, optionally running a stage-mode
-    `sddl-qa-review` first (recommended, cheap — nothing imports the new modules yet). Then a NEW
-    `stage_approval` for S4 (`render.ts` additive: `formatResultDigest` + `formatFullView`,
-    `formatTuiResult` retained for exactly one more stage, plus the pure `PLAIN_PALETTE`
-    describes in `result.test.ts`) — S4 is NOT covered by `cp-stage-approval-s1-s3`. The baseline
-    for later comparisons is now 778 / 46 (S5 is still the only stage permitted to reduce it, by
-    exactly the three superseded `formatTuiResult` cases).
-    ORCHESTRATOR CORRECTION, binding on S7: the plan's literal `grep -rn "picocolors" src/` = 1 hit
-    is NOT a valid acceptance check — it returns 9, because design.md requires colors.ts's header to
-    state the single-importer rule in prose. The real check is the statement-level
+    S4 is DONE and green, uncommitted. Landed: `src/adapters/driving/tui/render.ts` MODIFIED purely
+    additively (+236 / -0) with `TuiResultDigest`, `formatResultDigest` and `formatFullView` — the
+    palette a required argument, the design's literal digest copy, labels padded before colouring,
+    `node:path.join` for the pointer, everything markdown-dependent keyed on `engineOutput` and
+    never on `state`, the `Full review` line emitted iff runDir AND engineOutput are defined; and
+    `src/adapters/driving/tui/__test__/result.test.ts` MODIFIED (+491 / -1) with 45 new pure tests
+    in eight describes. Evidence: narrowed run 58/58; `npm run check` clean; adapters 474/474
+    identical under NO_COLOR=1 and FORCE_COLOR=1; full `npm test` **823 / 46** (= 778 + 45, purely
+    additive); `git diff --stat src/core` and `src/main` empty; tui-flow.ts and the other four TUI
+    modules untouched. THE S4 INVARIANT HELD: no observable behaviour changed — `formatTuiResult`
+    and `formatTuiErrorLine` are byte-identical, the flow still calls the legacy renderer, and the
+    four `[E6.F2.H1]` literal-tail assertions plus the four H1 AC-8 cases are still present
+    UNMODIFIED and green. An unplanned non-vacuity probe (removing the label padding) turned 5 tests
+    red and was reverted. Next: the orchestrator commits S4, optionally runs a stage-mode
+    `sddl-qa-review` first (recommended, cheap — nothing imports the new functions yet, and this is
+    the last point at which the digest copy can be reviewed before it becomes the flow's output),
+    then obtains a NEW `stage_approval` for S5 — both `tui-flow.ts` result call sites switched to
+    `formatResultDigest` with conditional spreads (exactOptionalPropertyTypes), `formatTuiResult`
+    and its three unit cases deleted, the four literal tails rewritten through `stripAnsi`, and
+    render.ts's H1 boundary doc comment replaced by an H2 one. S5 is NOT covered by
+    `cp-stage-approval-s4`, and it is the only stage permitted to reduce the test count — by exactly
+    those three cases, from the new 823 / 46 baseline.
+    ORCHESTRATOR CORRECTION, still binding on S7: the plan's literal `grep -rn "picocolors" src/`
+    = 1 hit is NOT a valid acceptance check — it returns 9, because design.md requires colors.ts's
+    header to state the single-importer rule in prose. The real check is the statement-level
     `grep -rEn '^import .*"picocolors"' src/`, which returns exactly 1
-    (`src/adapters/driving/tui/colors.ts:34`), verified by the orchestrator after S3. S7 must use
-    that form. After execution: 4R code review over
-    the frozen diff, then final QA — the only stage that may mark this change completed.
+    (`src/adapters/driving/tui/colors.ts:34`), re-confirmed at S4. After execution: 4R code review
+    over the frozen diff, then final QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T18:20:00Z"
+updated_at: "2026-08-29T20:10:00Z"

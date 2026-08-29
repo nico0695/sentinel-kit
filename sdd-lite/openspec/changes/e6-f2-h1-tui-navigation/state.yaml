@@ -186,6 +186,25 @@ decisions:
       No repos registered, no branches, or no harnesses each terminate the flow with a friendly
       explanatory line (pointing to the registering command where it applies), exit 0, and no
       side effects (AC-10).
+  - id: e6f2h1-D5
+    level: A
+    authorship: claude
+    decided_at: "2026-08-29T01:30:00Z"
+    title: Keep @clack/prompts 1.7.0 (executor S1 version flag resolved)
+    summary: >-
+      S1 resolved @clack/prompts to 1.7.0, outside design.md's guessed 0.10-0.11.x line — the
+      flag condition — so the executor stopped as instructed. Resolution: keep 1.7.0. The
+      design's stated line was a no-npm-access guess; its actual intent was "pin the exact
+      latest stable at install", and the registry shows 1.x is the maintained stable line (ten
+      stable releases, 0.11.0 was the last 0.x). Runtime import of the installed package
+      confirms every export the design's mechanism needs (select, confirm, spinner, isCancel,
+      intro, outro). Behavioral API shapes are exercised at S5; any breakage there reopens this
+      decision toward a repin.
+    rationale: >-
+      Technical, reversible (one command to repin), aligned with the design's pin rationale —
+      A-level per the decision protocol. Also recorded: the measured baseline at HEAD is 708/39
+      (plan said 707; the extra test predates this change), so 708/39 is the regression net for
+      S2 onward.
 open_risks:
   - id: risk-e6f2h1-001
     summary: >-
@@ -202,7 +221,8 @@ open_risks:
       spinner dep; native readline/promises means owned terminal plumbing the MVP should not
       carry. Testability neutralized by the owned TuiPrompter seam (scripted doubles, no TTY,
       library-free tests). Design had no npm access: the executor confirms and records the exact
-      pinned version at install time.
+      pinned version at install time. CLOSED in executor S1: @clack/prompts 1.7.0 pinned exact
+      (see e6f2h1-D5 for the version-flag resolution).
   - id: risk-e6f2h1-002
     summary: >-
       Reuse boundary with the CLI review path: the TUI must drive the same use cases and reuse the

@@ -362,6 +362,30 @@ checkpoints:
       free_text: "avanzar"
       responded_at: "2026-08-29T18:31:00Z"
     resolved_at: "2026-08-29T18:31:00Z"
+  - id: cp-stage-approval-s5
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      STAGE S5 — the supersession, and the only stage permitted to reduce the test count. Goal:
+      point both `tui-flow.ts` result call sites at `formatResultDigest`, delete `formatTuiResult`,
+      rewrite the four `[E6.F2.H1]` literal stdout-tail assertions, and refresh the H1 boundary doc
+      comments. Scope: MODIFIED `tui-flow.ts`, `render.ts`, `__test__/result.test.ts`. Touches code:
+      yes — this is the first stage that changes OBSERVABLE behaviour; after it the digest IS the
+      product's output. Covers the flow halves of AC-1, AC-5, AC-6, AC-7 and all of AC-15.
+      Validation: full `npm test` (not narrowed), an AC-15 checklist naming the four preserved H1
+      AC-8 cases by title, and `grep formatTuiResult` = 0. Baseline 823/46; the count drops by the
+      three superseded `formatTuiResult` unit cases and rises by the new/repaired ones — report the
+      delta explicitly rather than matching a fixed number.
+      FOLDED IN by decision e6f2h2-D9: the QA-S4-01 fix (risk-e6f2h2-010).
+    question: >-
+      Approve S5, and how should QA-S4-01 (multi-line `Failure:` message vs AC-6's one line) be
+      resolved — collapse in the digest, leave as designed, or collapse and truncate?
+    free_input_allowed: true
+    created_at: "2026-08-29T20:40:00Z"
+    response:
+      free_text: "Colapsar en S5, reusando la normalización del archivo. S5 approved."
+      responded_at: "2026-08-29T20:45:00Z"
+    resolved_at: "2026-08-29T20:45:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -457,6 +481,26 @@ decisions:
       S4 authorised. Scoped to the next stage only, not to the rest of execution: S5 and S6 change
       observable behaviour and each still needs its own stage_approval before running.
     recorded_at: "2026-08-29T18:31:00Z"
+  - id: e6f2h2-D9
+    checkpoint_id: cp-stage-approval-s5
+    selected_option_id: collapse-reusing-file-normalisation
+    free_text: "Colapsar en S5, reusando la normalización del archivo"
+    rationale: >-
+      QA-S4-01 (risk-e6f2h2-010) is fixed inside S5, which already owns both call sites.
+      `formatResultDigest` must apply the same whitespace normalisation `formatTuiErrorLine`
+      already applies ten lines above it in the same file (`render.ts:35`,
+      `replace(/\s*\n\s*/g, " ").trim()`) — so this is the file's own established behaviour, not
+      a new invention, and it brings the TUI in line with the CLI's `field()`, which collapses the
+      same value deliberately and carries a comment naming this exact hazard.
+      This is a RECORDED AMENDMENT to design.md, which states that `record.failure` passes
+      "straight through untouched": the spec's AC-6 (exactly one message line) is authoritative
+      over that design sentence, and the design's wording is what was wrong. Escalated to B rather
+      than decided autonomously precisely because it contradicts a documented design decision.
+      The vacuous guard test must be repaired in the same stage: asserting no newline while feeding
+      `message: "spawn failed"` proves nothing, because that input cannot contain one. The
+      replacement must feed a genuinely multi-line message — the shape measured in this session
+      from a real bad-ref `git worktree add`: 3 lines including a blank one.
+    recorded_at: "2026-08-29T20:45:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

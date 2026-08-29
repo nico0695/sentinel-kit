@@ -462,6 +462,26 @@ checkpoints:
       free_text: "avanza"
       responded_at: "2026-08-29T21:36:00Z"
     resolved_at: "2026-08-29T21:36:00Z"
+  - id: cp-stage-approval-s7
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      STAGE S7 — the closeout. Goal: refresh CLAUDE.md to the E6-complete state (AC-17) and run the
+      final evidence sweep for AC-14 and AC-16. Scope: MODIFIED `CLAUDE.md` only — no source
+      changes expected. Touches code: no (documentation), but it is the stage that certifies the
+      whole change. Validation: `git diff --stat src/core` empty; the STATEMENT-LEVEL picocolors
+      grep = 1; the exact pin intact; `npm run check` + full `npm test` with the delta from the
+      754/45 story baseline explained; the dual-env adapters re-run; and a consistency read that no
+      stale pre-implementation claim survives. Last stage before the adversarial review.
+    question: >-
+      Approve S7, and after it run the 4R code review over the frozen diff, judgment-day instead,
+      or stop for a manual read?
+    free_input_allowed: true
+    created_at: "2026-08-29T22:20:00Z"
+    response:
+      free_text: "S7 y después review 4R."
+      responded_at: "2026-08-29T22:22:00Z"
+    resolved_at: "2026-08-29T22:22:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -589,6 +609,18 @@ decisions:
       probe closed the reading-vs-running gap, but the invariants themselves belong in a permanent
       suite here.
     recorded_at: "2026-08-29T21:36:00Z"
+  - id: e6f2h2-D11
+    checkpoint_id: cp-stage-approval-s7
+    selected_option_id: s7-then-4r
+    free_text: "S7 y después review 4R"
+    rationale: >-
+      S7 authorised, and the adversarial pass over the frozen diff is the standard 4R protocol
+      rather than judgment-day. Rationale for choosing 4R here: judgment-day was already offered
+      and declined at both the spec and design checkpoints, the planning artifacts were probed
+      empirically instead, and the 4R lens sweep with its refuter pass is the protocol that found
+      `[E6.F2.H1]`'s only CRITICAL — a defect 749 green tests had missed. Final QA follows the
+      review and is the only stage that may mark the change completed.
+    recorded_at: "2026-08-29T22:22:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

@@ -510,7 +510,13 @@ next_action:
     `formatTuiResult` retained for exactly one more stage, plus the pure `PLAIN_PALETTE`
     describes in `result.test.ts`) — S4 is NOT covered by `cp-stage-approval-s1-s3`. The baseline
     for later comparisons is now 778 / 46 (S5 is still the only stage permitted to reduce it, by
-    exactly the three superseded `formatTuiResult` cases). After execution: 4R code review over
+    exactly the three superseded `formatTuiResult` cases).
+    ORCHESTRATOR CORRECTION, binding on S7: the plan's literal `grep -rn "picocolors" src/` = 1 hit
+    is NOT a valid acceptance check — it returns 9, because design.md requires colors.ts's header to
+    state the single-importer rule in prose. The real check is the statement-level
+    `grep -rEn '^import .*"picocolors"' src/`, which returns exactly 1
+    (`src/adapters/driving/tui/colors.ts:34`), verified by the orchestrator after S3. S7 must use
+    that form. After execution: 4R code review over
     the frozen diff, then final QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
 updated_at: "2026-08-29T18:20:00Z"

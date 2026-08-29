@@ -281,12 +281,19 @@ checkpoints:
       sddl-plan, revise, or stop?
     free_input_allowed: true
     created_at: "2026-08-29T00:30:00Z"
-    status: pending
+    status: resolved
+    resolved_at: "2026-08-29T00:45:00Z"
+    resolution: >-
+      Approved ("si"). Note: the user's approval arrived before the checkpoint detail was
+      rendered in chat (session hiccup), so the orchestrator re-presented the ratifications and
+      the exit-0 decision alongside the plan routing, with an explicit standing offer to amend
+      the exit-0 decision before stage_approval of any code-touching stage. Routing to sddl-plan.
 next_action:
-  kind: checkpoint
-  target: user
+  kind: delegate
+  target: sddl-plan
   summary: >-
-    Present cp-design-tui-mechanisms: design approval including the two ratifications (clack,
-    TUI-owned renderer) and the B-adjacent TUI exit-0 decision. Route to sddl-plan on approval.
+    Delegate sddl-plan as a fresh worker: ordered stage plan from design.md (authoritative) +
+    spec.md (14 ACs), including the mandatory CLAUDE.md closeout stage before the PR (D0/AC-14)
+    and the exact-version pin of @clack/prompts in the install stage.
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

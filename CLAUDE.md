@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI-powered code review orchestrator CLI. Hexagonal architecture, TypeScript, Node >=22.
 
-## Current state: pre-implementation
+## Current state: E0–E6 implemented
 
-The repo has **no commits and no source code yet** — no `package.json`, no `src/`, no toolchain installed. What exists is the specification (`docs/`), the issue-seeding script, and a vendored `sdd-lite/` package. The first story to land is `[E0.F1.H1]` (scaffold + `npm run check`). Until it does, the commands below do not exist yet; do not assume a working `npm` setup.
+The toolchain, `src/` tree, and product surfaces are real. Merged: E0 (scaffold, guards, CI), E1 (engine spikes + fixtures), E2 (git wrapper, worktrees/diff, config store, repo management), E3 (harness system + factory harnesses), E4 (`runReview`, verdict parser, real `claude-code`/`opencode` engine adapters, cascading resolution), E5 (`ProcessRunner` + declared validations, run history), and E6.F1 (the `sentinel` CLI with documented review exit codes). `[E6.F2.H1]` added the interactive TUI: bare `sentinel` on a TTY opens the navigation flow (repo → branch → harness → confirm → progress → result); `sentinel review …` remains the scripting surface (exit codes 0 / configurable-default-1 via `--changes-exit-code` / 2, fail-closed on ok-without-verdict). Runtime deps: `commander`, `execa`, `yaml`, `zod`, `@clack/prompts` (exact-pinned; confined to `tui/clack-prompter.ts`).
+
+Remaining MVP work: `[E6.F2.H2]` result rendering (🔴) and E7 (E2E smoke, dogfooding, user docs, license, release). The live status is `history/INDEX.md` plus the GitHub milestones — update this section only when an epic-level fact changes.
 
 ## Source of truth
 - `docs/prd-sentinel.md` — product definition (v0.3). Architecture rules in §4 are MANDATORY.
@@ -22,7 +24,7 @@ The repo has **no commits and no source code yet** — no `package.json`, no `sr
 
 ## Commands
 
-Defined in `docs/setup-tecnico-sentinel.md` §5.1 — they become real with `[E0.F1.H1]`:
+Defined in `docs/setup-tecnico-sentinel.md` §5.1:
 
 ```bash
 npm run dev     # tsup --silent && node dist/cli.js — rebuild (~1s), then run the bundle
@@ -54,6 +56,8 @@ src/main/       composition root — the only place adapters are instantiated
 Ports are owned by the domain module that needs them, not by a central technical folder. The MVP port catalog (PRD §4.3): `ReviewEngine` (run), `GitPort` (repos/workspace), `ConfigStore` (repos/review), `RunStore` (history), `ProcessRunner` (run).
 
 The review flow all stories converge on: **worktree → diff → prompt → engine → parse → terminal state → cleanup**. An ephemeral git worktree per review (never a checkout in the managed clone — that serializes reviews), diffed as `merge-base(base, target)..target` to match PR semantics.
+
+Driving surfaces: bare `sentinel` on a TTY opens the TUI (non-TTY prints guidance and exits 1); every other invocation reaches the commander CLI unchanged. Both drive the same use cases — the TUI holds zero domain logic, gets its dependencies via `createTuiDeps` in `src/main/container.ts`, and keeps `@clack/prompts` confined to `tui/clack-prompter.ts` (tests use scripted prompter doubles, no real TTY).
 
 ## Architecture guards (also enforced by dependency-cruiser in CI)
 - `src/core/**` never imports from `src/adapters/**`, `src/main/**`, or any I/O library (whitelist: zod).

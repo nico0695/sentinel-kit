@@ -179,3 +179,24 @@ D5's reopen condition ("any breakage at S5 reopens the decision toward a repin")
 ## Next Action
 
 Batch 3 complete (S5 done in the working tree; check clean, full suite 749/44, built smoke green). Orchestrator: commit per the approved batch protocol (optionally after stage-mode QA), then proceed to batch 4 (S6: CLAUDE.md closeout, D0/AC-14, last pre-PR stage). The standing exit-0 amendment offer expired as planned with S5 landing — the completed+persisted → 0 behavior is now wired end to end as designed.
+
+## S6 — CLAUDE.md refresh closeout (D0 / AC-14)
+
+- Executed inline by the orchestrator (single-file doc edit; the full current CLAUDE.md text and
+  the session's accumulated project-state evidence were already in orchestrator context — noted
+  as a deliberate deviation from worker delegation, consistent with the delegation table's
+  "write atomic, one file, already known" row).
+- Changes:
+  - Replaced the stale `## Current state: pre-implementation` section with
+    `## Current state: E0–E6 implemented`: merged-epic summary (E0–E5, E6.F1), this story's TUI
+    (bare `sentinel` entry, scripting surface + exit-code contract), the runtime dependency
+    list incl. exact-pinned `@clack/prompts`, remaining MVP work (E6.F2.H2, E7), and a pointer
+    to `history/INDEX.md` + GitHub milestones as the live status source.
+  - Commands intro: dropped "they become real with [E0.F1.H1]".
+  - Architecture: added a "Driving surfaces" paragraph (TTY dispatch, zero domain logic in the
+    TUI, `createTuiDeps` in main, clack confined to `clack-prompter.ts`, scripted-double tests).
+- Validation: `npm run check` clean after the edit; grep sweep over CLAUDE.md/README.md/
+  CONTRIBUTING.md finds no remaining pre-implementation claims. AC-14 discharged; AC-13
+  re-confirmed at S5's full run (749/44).
+- Next action: review gate (full-4r triage — the story diff touches `main/` hot path and
+  exceeds 400 lines), then final-mode QA, history entry, PR.

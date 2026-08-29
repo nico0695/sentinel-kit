@@ -93,8 +93,9 @@ stages:
       all-new TUI files sit between them. Every stage requires stage_approval. All 14 ACs
       mapped to stages. New risk-e6f2h1-004 (low): npm registry access for S1.
   sddl-executor:
-    status: in-progress
+    status: completed
     started_at: "2026-08-29T01:10:00Z"
+    completed_at: "2026-08-29T02:30:00Z"
     notes: >-
       Batch 1 (S1+S2) done. S1: @clack/prompts 1.7.0 pinned exact after the version flag
       (resolved as e6f2h1-D5; measured baseline corrected to 708/39). S2: behavior-preserving
@@ -120,7 +121,11 @@ stages:
       triggered. Gate: check clean (103 modules / 247 deps, no violations), npm test 749/44
       (identical to S4 baseline — CLI surface untouched), npm run build ok, built smoke: bare
       non-TTY -> guidance on stderr + exit 1; --help/--version/subcommands byte-identical.
-      Remaining: S6 CLAUDE.md closeout (batch 4, orchestrator-inline single-file doc edit).
+      Batch 4 (S6) done inline by the orchestrator (single-file doc edit, recorded as a
+      deliberate deviation in the execution log): CLAUDE.md "pre-implementation" section
+      replaced with the E0-E6 implemented state, commands intro fixed, Driving surfaces
+      paragraph added. check clean after the edit; no stale claims left (grep sweep). All six
+      stages done — D0/AC-14 discharged. Executor phase complete.
 decisions:
   - id: e6f2h1-D0
     level: A
@@ -377,10 +382,11 @@ checkpoints:
       per batch, and stops on any blocker, contradiction, scope drift, or blast-radius expansion.
       The exit-0 amendment offer stays open until S4/S5 land.
 next_action:
-  kind: delegate
-  target: sddl-executor
+  kind: review_gate
+  target: user
   summary: >-
-    Delegate sddl-executor batch 1 (S1: pin+install @clack/prompts recording the exact version;
-    S2: behavior-preserving container graph refactor under the full test suite).
+    All six stages executed and committed. Offer the sddl-code-review protocol: the story diff
+    triages full-4r (touches src/main/ hot path, well over 400 changed lines). After review:
+    sddl-qa-review in final mode, history entry, then the PR (Closes #38).
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

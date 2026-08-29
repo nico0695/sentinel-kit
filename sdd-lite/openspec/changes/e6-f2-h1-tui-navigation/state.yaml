@@ -20,8 +20,8 @@ complexity_assessment:
     B-level tension for spec/design.
   confidence: medium
   recorded_at: "2026-08-28T23:30:00Z"
-lifecycle_status: formalizing
-current_stage: sddl-proposal
+lifecycle_status: planned
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -77,6 +77,21 @@ stages:
       .dependency-cruiser.cjs adapters-isolated forbids ALL cross-adapter imports, driving ->
       driving included (risk-002). One notable ancillary decision (TUI exit-0 on completed runs)
       flagged to the user at the design checkpoint as B-adjacent.
+  sddl-plan:
+    status: completed
+    started_at: "2026-08-29T00:50:00Z"
+    completed_at: "2026-08-29T00:55:00Z"
+    notes: >-
+      plan.md written from design.md (authoritative) + spec.md (14 ACs). Six sequential stages:
+      S1 pin+install @clack/prompts recording the exact resolved version (closes risk-001);
+      S2 behavior-preserving container graph refactor under the full 707-test net; S3 TUI
+      contract + minimal renderer + test doubles; S4 createTui/runTuiFlow + five behavioral
+      suites (AC-2..AC-10, AC-12); S5 clack-prompter, barrel, createTuiDeps, argv-length
+      dispatch + full gate + built non-TTY smoke (AC-1, AC-11, AC-13); S6 mandatory CLAUDE.md
+      refresh closeout (D0/AC-14) as the last stage before the PR. The two edits to existing
+      code (container, cli entry) are each pinned to a full-suite run at the moment they land;
+      all-new TUI files sit between them. Every stage requires stage_approval. All 14 ACs
+      mapped to stages. New risk-e6f2h1-004 (low): npm registry access for S1.
 decisions:
   - id: e6f2h1-D0
     level: A
@@ -288,12 +303,29 @@ checkpoints:
       rendered in chat (session hiccup), so the orchestrator re-presented the ratifications and
       the exit-0 decision alongside the plan routing, with an explicit standing offer to amend
       the exit-0 decision before stage_approval of any code-touching stage. Routing to sddl-plan.
+  - id: cp-stage-approval-s1-s6
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      plan.md is ready: S1 install @clack/prompts (exact version recorded) -> S2 container graph
+      refactor (behavior-preserving, full-suite guard) -> S3 TUI contract/renderer/doubles ->
+      S4 runTuiFlow + behavioral suites -> S5 clack prompter + wiring + argv dispatch + full gate
+      + built non-TTY smoke -> S6 CLAUDE.md refresh closeout (D0/AC-14, last pre-PR stage). Files
+      touched outside new tui/ code: package.json+lock (S1), main/container.ts (S2, S5),
+      main/cli.ts (S5), CLAUDE.md (S6). Validation per stage: npm run check + targeted adapters
+      project; full npm test at S2, S5 and S6. Standing offer to amend the completed-run exit-0
+      decision before S4/S5 remains open.
+    question: >-
+      Grant stage_approval: all six stages in sequence (executor pauses with a summary after
+      each), only S1 for now, revise the plan, or stop?
+    free_input_allowed: true
+    created_at: "2026-08-29T00:55:00Z"
+    status: pending
 next_action:
-  kind: delegate
-  target: sddl-plan
+  kind: checkpoint
+  target: user
   summary: >-
-    Delegate sddl-plan as a fresh worker: ordered stage plan from design.md (authoritative) +
-    spec.md (14 ACs), including the mandatory CLAUDE.md closeout stage before the PR (D0/AC-14)
-    and the exact-version pin of @clack/prompts in the install stage.
+    Present cp-stage-approval-s1-s6 (mandatory stage_approval gate). On approval, delegate
+    sddl-executor starting at S1.
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

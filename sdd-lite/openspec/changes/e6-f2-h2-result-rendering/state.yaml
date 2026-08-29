@@ -23,7 +23,7 @@ complexity_assessment:
     than structured domain data. Risk low-medium.
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
-lifecycle_status: planning
+lifecycle_status: planned
 current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
@@ -114,7 +114,46 @@ stages:
       the `allowSyntheticDefaultImports` fix edits repo-wide config and must be escalated, not
       applied silently.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-08-29T17:30:00Z"
+    completed_at: "2026-08-29T17:55:00Z"
+    notes: >-
+      plan.md written from design.md (authoritative for mechanism and file layout) + spec.md
+      (authoritative for the 17 ACs), grounded in direct reads of the current
+      `src/adapters/driving/tui/{render,tui-flow,tui-deps}.ts`,
+      `__test__/{result.test.ts,tui-test-doubles.ts}`, `.dependency-cruiser.cjs`, `package.json`,
+      `vitest.config.ts`, the `fixtures/claude-code/valid-verdict.json` result text, and the
+      `[E6.F2.H1]` plan as precedent. SEVEN sequential stages: S1 the `picocolors`
+      install-and-confirm gate plus baseline confirmation (D6 binding order, residual
+      risk-e6f2h2-007); S2 `findings.ts` + the AC-3 matrix; S3 `colors.ts` (the only picocolors
+      importer) + the test-side `stripAnsi`; S4 `render.ts` ADDITIVE (`formatResultDigest` /
+      `formatFullView` land with their pure tests while `formatTuiResult` is retained one stage);
+      S5 the VISIBLE SUPERSESSION (both `tui-flow.ts` result call sites switch to the digest,
+      `formatTuiResult` and its three unit cases are deleted, the four `[E6.F2.H1]` literal-tail
+      assertions at L174/L197/L226/L262 are rewritten, its four AC-8 cases checked by name);
+      S6 `offerFullView` + `full-view.test.ts`; S7 the CLAUDE.md closeout + final evidence sweep
+      (D6, AC-17). The S4/S5 split with a one-stage transitional `formatTuiResult` is what makes
+      every stage validate green (tsc typechecks the test files, so removing the export, switching
+      the call sites and rewriting the assertions is otherwise one atomic unit) while still giving
+      the AC-15 supersession a stage whose diff is a deletion-and-replacement of exactly the H1
+      assertions. Validation strategy is tiered — `npm run check` on every code-touching stage,
+      narrowed `npx vitest run --project adapters <file>` for S2-S4, full `npm test` at S1 / S5 /
+      S6 / S7 only, and the AC-14 dual run (`NO_COLOR=1` + `FORCE_COLOR=1`) at S3 / S6 / S7.
+      Five mutation-verification steps (M1-M5) prove the non-vacuity of the assertions that could
+      otherwise pass for the wrong reason: the AC-3 negative cases, the palette actually emitting
+      ANSI (AC-14 is satisfiable in letter by a no-op palette), AC-9's script-exhaustion proof
+      (which doubles as the evidence that the four untouched TUI suites are green BECAUSE of the
+      blank-guard — plan-time grep confirms zero `engineOutput` hits anywhere in the TUI adapter),
+      AC-11's post-persist placement, and AC-13's no-truncation count. Baseline recorded as
+      INHERITED (754 tests / 45 files, measured by the orchestrator, not by this stage): S1
+      confirms or corrects it, the `[E6.F2.H1]` precedent. Recommended batching: S2+S3 under one
+      stage_approval (disjoint new files, no existing behaviour touched); S4-S7 individually.
+      Six A-level decisions recorded in the artifact's Approval Notes; no new B-level item (the
+      only conditional one, a picocolors export shape differing from the design's, is an S1 STOP
+      and explicitly forbids a silent `tsconfig.json` edit — the interop half is already closed by
+      the orchestrator probe); no level-C item — nothing in the plan requires `src/core/**`, and
+      the standing guard to stop if execution finds itself there is carried into the artifact.
+      Two low risks appended (008 transitional export, 009 AC-14 vacuity).
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -357,19 +396,47 @@ open_risks:
       RESIDUAL: `npm i -E picocolors` may still resolve a version other than 1.1.1, so S1 keeps its
       install-and-confirm gate; only the interop half of this risk is closed.
     severity: low
+  - id: risk-e6f2h2-008
+    summary: >-
+      Transitional export across one stage boundary, introduced by the plan's S4/S5 split.
+      `tsc --noEmit` typechecks the test files and `result.test.ts` both imports `formatTuiResult`
+      and pins the flow's literal output, so deleting the export, switching the two `tui-flow.ts`
+      call sites and rewriting the `[E6.F2.H1]` assertions is otherwise one atomic green unit.
+      S4 therefore lands `formatResultDigest`/`formatFullView` ADDITIVELY and keeps
+      `formatTuiResult` until S5 deletes it. Consequence: an intermediate state of the branch
+      carries a legacy export that nothing in the final design retains, and a change that stopped
+      between S4 and S5 would ship it. Mitigation: S5's validation includes
+      `grep -rn "formatTuiResult" src/` returning zero, and final QA checks the merged diff.
+    severity: low
+  - id: risk-e6f2h2-009
+    summary: >-
+      AC-14 is satisfiable in letter by a palette that never emits ANSI. Every flow assertion
+      compares through `stripAnsi` and every pure assertion injects `PLAIN_PALETTE`, so a
+      `TUI_PALETTE` whose functions were accidentally identities (a bad import shape, a wrong
+      picocolors export, a mistaken `createColors(false)`) would keep both the `NO_COLOR=1` and
+      the `FORCE_COLOR=1` runs green while the story's colour requirement silently did nothing.
+      Mitigation: plan step M2 at S3 — a throwaway test under `FORCE_COLOR=1` asserting that
+      `TUI_PALETTE.bad("x")` actually contains an SGR sequence and that `stripAnsi` reverses it,
+      run once and deleted (an unconditional ANSI assertion cannot be permanent: it would be red
+      under `NO_COLOR=1`) — plus the permanent env-independent invariants added in
+      `full-view.test.ts` at S6.
+    severity: low
 next_action:
   kind: run_stage
-  target: sddl-plan
+  target: sddl-executor
   summary: >-
-    design.md is complete: file layout, four signatures, the digest's literal copy, the exact
-    `[SEV: …]` matching rule and an AC → mechanism → file map for all 17 criteria. sddl-plan now
-    stages it. Two ordering constraints the design fixes for the plan: (1) S1 must be
-    "install + exact-pin `picocolors` + confirm the resolved API and that `tsc --noEmit` accepts
-    the default import" before any rendering code is written (risk-e6f2h2-007); (2) the CLAUDE.md
-    closeout is the LAST stage (AC-17, the `[E6.F2.H1]` D0 precedent). The rewrite of
-    `result.test.ts` (AC-15 supersession of `[E6.F2.H1]` AC-7) should be its own visible stage so
-    the diff review can check the four preserved AC-8 cases. A phase checkpoint is warranted only
-    if the user wants to pre-approve the conditional level-B tsconfig escalation; otherwise the
-    design carries no unresolved technical decision.
+    plan.md is complete and execution-ready: seven ordered stages, each with its files, its ACs,
+    its dependencies and its own validation step, plus five mutation-verification steps. Next is
+    a plan checkpoint (the plan has multiple stages with real dependencies) and then
+    `sddl-executor` on S1 — the `picocolors` install-and-confirm gate — behind its own
+    stage_approval. S1 must (a) `npm i -E picocolors`, (b) record the exact resolved version and
+    confirm the bare pin in `dependencies`, (c) confirm the colour functions are on the default
+    export with a runtime probe that writes no file, and (d) run `npm run check` + full
+    `npm test`, confirming or correcting the INHERITED baseline of 754 tests / 45 files before
+    anything moves. S1 STOPS and escalates (level B) if the export shape differs from the
+    design's assumption; it may NOT edit `tsconfig.json` (the interop half of risk-e6f2h2-007 is
+    already closed by the orchestrator probe). Recommended batching: S2+S3 under one approval;
+    S4-S7 one per invocation. After execution: a 4R code review over the frozen diff, then final
+    QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T16:45:00Z"
+updated_at: "2026-08-29T17:55:00Z"

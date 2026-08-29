@@ -381,12 +381,37 @@ checkpoints:
       in sequential batches (S1+S2, S3+S4, S5, S6), commits after each batch, reports a summary
       per batch, and stops on any blocker, contradiction, scope drift, or blast-radius expansion.
       The exit-0 amendment offer stays open until S4/S5 land.
+review_summary:
+  mode: 4r
+  tier: full-4r
+  target: "7b4b17b..f3dea84 (diff sha256 2dd75aee...)"
+  counts: { confirmed: 1, suspect: 0, escalated: 0, info: 4 }
+  open_severe_findings: 1
+  verdict: not_reached
+  ledger: sdd-lite/openspec/changes/e6-f2-h1-tui-navigation/review-ledger.md
+  note: >-
+    R1-001 (CRITICAL, deterministic, introduced): clack's raw-mode spinner calls
+    process.exit(0) on Ctrl+C/Escape during branch fetch or the engine run — orphaned engine
+    child, leaked worktree, no persist, false-success exit 0. R1-002 (info, same root):
+    external SIGINT/SIGTERM swallowed during a spinner. No refuter run (zero severe
+    inferential candidates). First R1/R2/R3 workers were killed by a provider session limit
+    before returning findings and were relaunched with identical envelopes (retry, not a
+    second sweep); R4 completed on first launch.
+open_risks_from_review:
+  - id: risk-e6f2h1-005
+    source: R1-001
+    severity: high
+    summary: >-
+      Clack spinner raw-mode keypress handler exits 0 mid-run (orphaned engine process, leaked
+      worktree, unpersisted run, false success). Open pending fix round 1.
 next_action:
   kind: review_gate
   target: user
   summary: >-
-    All six stages executed and committed. Offer the sddl-code-review protocol: the story diff
-    triages full-4r (touches src/main/ hot path, well over 400 changed lines). After review:
-    sddl-qa-review in final mode, history entry, then the PR (Closes #38).
+    Present the fix route for R1-001 (+R1-002 same-root): rerun sddl-plan to insert fix stage
+    S7 scoped to the TUI adapter (neutralize clack's spinner/prompt process-control behavior in
+    clack-prompter.ts or equivalent design-consistent mechanism), then stage_approval, then
+    sddl-executor, then a scoped re-review of the fix delta. Findings are inside the approved
+    scope. After the lineage closes: sddl-qa-review final mode, history entry, PR (Closes #38).
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

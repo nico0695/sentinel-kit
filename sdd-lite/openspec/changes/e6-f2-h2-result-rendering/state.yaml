@@ -299,6 +299,31 @@ checkpoints:
       free_text: "Approved: S1, then S2+S3 batched. Stop after S3 for the stage summary."
       responded_at: "2026-08-29T17:12:00Z"
     resolved_at: "2026-08-29T17:12:00Z"
+  - id: cp-stage-approval-s4
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      STAGE S4 — goal: land `formatResultDigest` and `formatFullView` in `render.ts` ADDITIVELY,
+      already covered by pure tests, while `formatTuiResult` is deliberately retained for exactly
+      one more stage. Scope: MODIFIED `src/adapters/driving/tui/render.ts`, MODIFIED
+      `src/adapters/driving/tui/__test__/result.test.ts` (new pure describes only — the four
+      literal stdout-tail assertions stay untouched until S5). Touches code: yes, but changes NO
+      observable behaviour: nothing calls the new functions yet, so `tui-flow.ts` is untouched and
+      the existing H1 assertions must all stay green. Covers the pure halves of AC-1, AC-2, AC-4,
+      AC-5, AC-6, AC-7 and AC-12. Validation: narrowed `npx vitest run --project adapters` with the
+      new cases green AND the H1 tails still green, plus `npm run check`. Baseline to beat: 778/46,
+      additive only. Rationale for the transitional export (risk-e6f2h2-008): `tsc --noEmit`
+      typechecks the test files, and `result.test.ts` both imports `formatTuiResult` and pins the
+      flow's literal output — so deleting the function before S5 rewrites those assertions would
+      leave an intermediate stage red.
+    question: >-
+      Approve S4, or pause before `render.ts` is touched?
+    free_input_allowed: true
+    created_at: "2026-08-29T18:30:00Z"
+    response:
+      free_text: "avanzar"
+      responded_at: "2026-08-29T18:31:00Z"
+    resolved_at: "2026-08-29T18:31:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -386,6 +411,14 @@ decisions:
       existing surface, and S5 and S6 change observable behaviour. Execution stops after S3 for the
       stage summary.
     recorded_at: "2026-08-29T17:12:00Z"
+  - id: e6f2h2-D8
+    checkpoint_id: cp-stage-approval-s4
+    selected_option_id: approve-s4
+    free_text: "avanzar"
+    rationale: >-
+      S4 authorised. Scoped to the next stage only, not to the rest of execution: S5 and S6 change
+      observable behaviour and each still needs its own stage_approval before running.
+    recorded_at: "2026-08-29T18:31:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

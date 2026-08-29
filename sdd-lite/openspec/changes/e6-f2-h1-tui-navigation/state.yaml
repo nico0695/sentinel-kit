@@ -20,8 +20,8 @@ complexity_assessment:
     B-level tension for spec/design.
   confidence: medium
   recorded_at: "2026-08-28T23:30:00Z"
-lifecycle_status: executing
-current_stage: sddl-executor
+lifecycle_status: completed
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -381,6 +381,30 @@ checkpoints:
       in sequential batches (S1+S2, S3+S4, S5, S6), commits after each batch, reports a summary
       per batch, and stops on any blocker, contradiction, scope drift, or blast-radius expansion.
       The exit-0 amendment offer stays open until S4/S5 land.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-08-29T05:00:00Z"
+    completed_at: "2026-08-29T05:20:00Z"
+    notes: >-
+      Final-mode QA over commits 3cb488e..68a672f. All 14 ACs independently re-verified against
+      real code and tests (not the execution log): gates re-run by QA (check clean, npm test
+      754/45), fresh build + process-level smoke re-confirmed the non-TTY guard and the
+      untouched CLI surface. Review ledger consumed as evidence — the R1-001 owned-spinner fix
+      is real and its regression suite genuinely pins it. Three low, non-blocking findings:
+      QA-F1 (carry R3-002 argv-dispatch test gap to E7 smoke), QA-F2 (default process.stdout
+      sink is the adapter's single real process access, confined to the impure translation
+      file), QA-F3 (pre-existing EPIPE on piped --help, E6.F1 processIo, out of scope — E7
+      hardening candidate). Verdict: pass. Change marked completed.
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    All 14 ACs met under independent re-verification; gate green (check clean, npm test
+    754/45); review lineage closed pass_with_warnings with R1-001 verified. Three low
+    non-blocking findings (E7 candidates). Change completed — orchestrator proceeds to the
+    history entry and the PR (Closes #38).
+  reported_at: "2026-08-29T05:20:00Z"
+  report_path: sdd-lite/openspec/changes/e6-f2-h1-tui-navigation/qa-report.md
 review_summary:
   mode: 4r
   tier: full-4r
@@ -410,12 +434,11 @@ open_risks_from_review:
       re-review with red-pre-fix regression tests and a mutation-verify. R1-002 (signal
       swallowing) resolved structurally by the same fix.
 next_action:
-  kind: delegate
-  target: sddl-qa-review
+  kind: complete
+  target: orchestrator
   summary: >-
-    Review lineage closed (verdict pass_with_warnings, 0 open severe, fix round 1 used and
-    verified). Delegate sddl-qa-review in FINAL mode over the full change (S1-S7) against
-    spec.md's 14 ACs, consuming the review ledger as evidence. Then history entry, then the PR
-    (Closes #38).
+    Final QA passed; change completed. Orchestrator writes the session history entry (S28) and
+    opens one PR ([E6.F2.H1] TUI navigation flow, Closes #38) from the S1-S7 commits plus the
+    sdd-lite artifacts.
 created_at: "2026-08-28T23:30:00Z"
 updated_at: "2026-08-28T23:40:00Z"

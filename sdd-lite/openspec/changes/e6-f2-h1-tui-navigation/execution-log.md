@@ -10,8 +10,8 @@
 |---|---|---|
 | S1 | Pin + install `@clack/prompts` (exact, no `^`), record resolved version | done (version flag resolved: keep `1.7.0`, decision e6f2h1-D5) |
 | S2 | Behavior-preserving refactor of `src/main/container.ts` | done |
-| S3 | TUI contract + minimal renderer + test doubles | pending |
-| S4 | `runTuiFlow`/`createTui` + five behavioral suites | pending |
+| S3 | TUI contract + minimal renderer + test doubles | done |
+| S4 | `runTuiFlow`/`createTui` + five behavioral suites | done |
 | S5 | clack prompter, barrel, `createTuiDeps`, argv dispatch | pending |
 | S6 | CLAUDE.md closeout (D0/AC-14) | pending |
 
@@ -73,6 +73,60 @@ The version flag was resolved before S2 started: **keep `@clack/prompts` 1.7.0**
 - git: no commits performed (orchestrator owns git); working tree carries the `container.ts` edit plus this log update.
 - QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint per the approved batching (S1+S2 → commit → summary); the refactor is fully guarded by the untouched 708-test suite, so deferring QA to the batch boundary is low risk.
 
+## S3 — TUI contract + minimal renderer + test doubles
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); this invocation (batch 2) is scoped to S3 then S4.
+- precondition check: working tree clean at start (S1/S2 committed), `main/container.ts` carries `createWiringGraph` as the batch-1 handoff describes, `tui/index.ts` still the `export {}` placeholder. No contradiction with plan/design/spec.
+- planned scope (plan.md S3): three NEW files, nothing else. Actual changed files match exactly:
+  - `src/adapters/driving/tui/tui-deps.ts` (NEW) — the contract: `TuiIo` (declared locally, `CliIo` shape — `adapters-isolated` forbids importing it), `TuiTty`, `PromptOutcome<T>` (cancel-as-value), `TuiSelectOption`, `TuiSpinner`, `TuiPrompter`, `TuiReviewContext`, `TuiUseCases` (quartet + `listBranches` + names-only `listHarnessTypes` per e6f2h1-A3), `TuiDeps { useCases, io, prompter, tty, loadContext, now, clonesDir }`. Type-only imports from core public indexes (`history`, `repos`, `run`).
+  - `src/adapters/driving/tui/render.ts` (NEW) — `formatTuiErrorLine` (the design-sanctioned ~10-line deliberate copy of the CLI's `format-error.ts`, comment names the duplication and points at design §Resolution 2) and `formatTuiResult(state, verdict, runDir?)` — state line, verdict line only when present, run-directory line with `-` for the persist-failure path. No markdown, no severities (AC-7/H2 boundary).
+  - `src/adapters/driving/tui/__test__/tui-test-doubles.ts` (NEW) — mirrors `cli-test-doubles.ts`: capturing `TuiIo`, `answer`/`cancel` script helpers, `createScriptedPrompter` (queue of `PromptOutcome`s, records every prompt with message+options and spinner start/stop events, throws on script exhaustion), loud `notWired` fake use cases, `createTuiTestDeps` with `tty` defaulting to `{stdin: true, stdout: true}` and an empty prompt script by default (so no-interaction tests prove it structurally).
+- A-level notes: `TuiSpinner` named and exported as its own interface (component of `TuiPrompter`; the doubles and S4 tests reference it) — a naming addition inside the designed surface, not a new capability.
+- `tui/index.ts` deliberately untouched: the public barrel is S5's scope.
+
+### S3 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; no dependency violations (100 modules, 236 dependencies cruised) |
+| `npx vitest run --project adapters` | yes | **18 files passed, 359 tests passed** — unchanged (the doubles file is not a test file), still green |
+
+- blockers: none.
+- git: no commits performed (orchestrator owns git).
+
+## S4 — `createTui`/`runTuiFlow` + five behavioral suites
+
+- approval: `stage_approval` granted for S1–S6 (checkpoint `cp-stage-approval-s1-s6`); batch 2, second and last stage of this invocation.
+- planned scope (plan.md S4): six NEW files. Actual changed files match exactly:
+  - `src/adapters/driving/tui/tui-flow.ts` (NEW) — `createTui(deps): SentinelTui { run(): Promise<number> }`. `run` = TTY gate (AC-2: `!stdin || !stdout` → one `stderr` guidance line naming `sentinel review <repo> <branch> --type <harness>` and `--help`, return 1) then `try { runTuiFlow } catch { stderr(formatTuiErrorLine(e)); return 1 }` (AC-9). `runTuiFlow` (module-internal; the barrel is S5's call and design's barrel row lists `createTui` only) implements design §Interfaces steps 1–8: intro → repo (empty → `repo add` guidance, 0; cancel → 0) → branch (spinner around `listBranches`, stopped before rethrow on failure; empty → line naming the repo, 0; cancel → 0) → harness (names only; empty → broken-installation hint, 0; cancel → 0) → `loadContext` + pure `resolveReviewRequest` BEFORE the gate → summary showing repo/branch/harness/resolved engine (AC-5) → confirm (cancel or `false` → 0) → `now()` + spinner with static text around the single awaited `runReview` (AC-6, D3) → `persistRun` exactly once (AC-8) → `formatTuiResult` lines → **return 0 regardless of terminal state** (recorded A-level design decision, restated in the module doc-comment as property 4).
+  - persist-failure path mirrors `review-command.ts` D13: outcome rendered from `request`+`result` with `-` runDir, no-history diagnostic on `stderr`, then the underlying failure via `formatTuiErrorLine` on `stderr`, return 1. A-level micro-decision (recorded): the design's step (7) lists only the diagnostic, but "mirrors review-command.ts D13" is the stated intent and the CLI renders the original failure after its diagnostic — the TUI does the same, as a rendered line instead of a rethrow (the flow returns codes, it has no `ReviewExitSignal` channel).
+  - `src/adapters/driving/tui/__test__/flow.test.ts` (NEW) — AC-1 adapter side (injected tty true → flow launches, 3 selects + 1 confirm), AC-3 (use-case order `listRepos → listBranches → listHarnessTypes → loadContext → runReview → persistRun`, options offered, request composed through the CLI's cascade with `repoPath`/`baseRef`/`engineName` resolved), AC-5 (summary content; trace proves confirm strictly precedes `runReview`), AC-6 (fetch spinner before the branch menu; deferred `runReview` — indicator active with static text while pending, `persistRun` untouched until resolution).
+  - `__test__/cancel.test.ts` (NEW) — AC-4 ×4 steps via `it.each` + confirm-answered-no + cancel-after-summary (AC-5): each exits 0, friendly line, recording `runReview`/`persistRun` fakes stay empty, `stderr` empty.
+  - `__test__/empty-states.test.ts` (NEW) — AC-10 ×3: no repos (guidance to `sentinel repo add`, zero prompts — structural via the empty default script), no branches (line names the repo), no harnesses (broken-installation hint); all exit 0, zero side effects.
+  - `__test__/errors.test.ts` (NEW) — AC-2 ×3 TTY combinations (guidance line, exit 1, zero prompts/spinners, resolves — never blocks) and AC-9 per step: `listRepos` (`ConfigReadError`), `listBranches` (`BranchListError`, spinner stopped), `listHarnessTypes` (`HarnessNotFoundError`), resolution before the gate (`RepoNotFoundError` from `resolveReviewRequest`, no confirm ever asked, `runReview` untouched), `runReview` failure (persists nothing, spinner stopped), non-Error throwable, multi-line collapse, and a no-stack-frames sweep over both streams.
+  - `__test__/result.test.ts` (NEW) — AC-7 (`formatTuiResult` unit cases; the literal tail of `stdout` IS the minimal block per terminal state — no H2 rendering surface) and AC-8 (persist exactly once for `ok` + all four failed states, request/result identity and `now()`-sourced `startedAtEpochMs` in the persist request; persist-failure: outcome shown with `-` runDir, diagnostic + failure on `stderr`, exit 1, exactly one attempt). Completed+persisted exit-0 asserted for every terminal state.
+- structural verification: `grep` over `src/adapters/driving/tui/` — no `@clack` import, no `driving/cli` import, no `commander`, no `process.*` access anywhere in adapter code or tests (doc-comment mentions only). Core reached exclusively through public indexes + the injected thunks; the only core *value* import in the adapter is `resolveReviewRequest` (design property 1).
+- scope/drift/blast-radius: none. No contradiction with design/spec encountered.
+
+### S4 mutation-verify (load-bearing behaviors)
+
+| Mutation | Expected net | Result |
+|---|---|---|
+| Duplicate the `persistRun` call on the success path (breaks persist-once) | AC-8 suites | **8 tests red** (`result.test.ts` ×6, `flow.test.ts` ×2), reverted, suite green again |
+| Confirmation gate ignores an answered `false` (`kind === "cancel"` only) | AC-4/AC-5 cancel suite | **1 test red** (`cancel.test.ts` "answering no at the confirmation is the same as cancelling"), reverted, suite green again |
+
+### S4 quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| `npm run check` (biome + tsc + depcruise) | yes | clean — no lint/type errors; no dependency violations (101 modules, 239 dependencies cruised) |
+| `npx vitest run --project adapters` | yes | **23 files passed, 400 tests passed** (18/359 before this batch) |
+| `npm test` (full suite) | yes (batch-2 handoff requires the full gate at S4) | **44 files passed, 749 tests passed**, 0 failed — the 708/39 baseline intact plus 41 new TUI tests in 5 new files |
+
+- blockers: none.
+- git: no commits performed (orchestrator owns git); working tree carries the eight new S3+S4 files plus this log update.
+- QA handoff: recommend `sddl-qa-review` (stage mode) at the orchestrator's batch checkpoint — S3+S4 added a whole adapter surface (the batch's blast radius is all-new files, but the flow semantics are the story's core contract and worth structured eyes before S5 wires the real prompter and dispatch).
+
 ## Next Action
 
-Batch 1 complete (S1 committed, S2 done in the working tree). Orchestrator: commit S2 per the approved batch protocol, then proceed to `stage_approval`-covered batch 2 (S3: TUI contract + minimal renderer + test doubles; S4: `runTuiFlow` + behavioral suites). The standing offer to amend the completed-run exit-0 decision remains open until S4/S5 land.
+Batch 2 complete (S3 + S4 done in the working tree, full gate green at 749/44). Orchestrator: commit per the approved batch protocol (optionally after stage-mode QA), then proceed to batch 3 (S5: clack prompter, barrel, `createTuiDeps`, argv dispatch + built non-TTY smoke). The standing offer to amend the completed-run exit-0 decision remains open until S5 lands; S4's tests assert it as designed (completed+persisted → 0).

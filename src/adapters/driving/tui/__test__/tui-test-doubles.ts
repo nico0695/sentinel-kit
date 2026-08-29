@@ -1,0 +1,184 @@
+/**
+ * Test doubles for the TUI driving adapter (`[E6.F2.H1]`, #38).
+ *
+ * The CLI's pattern (`cli-test-doubles.ts`), extended by the one seam the TUI
+ * adds: a **scripted prompter** — a queue of pre-decided `PromptOutcome`s
+ * that records every prompt it was asked and fails loudly when the script
+ * runs out. Together with the capturing io and the fake use cases, it is the
+ * whole environment the flow needs (AC-12): no real TTY, no keypress
+ * emulation, no `@clack/prompts` anywhere in the tests.
+ */
+
+import type {
+  PromptOutcome,
+  TuiDeps,
+  TuiIo,
+  TuiPrompter,
+  TuiReviewContext,
+  TuiSelectOption,
+  TuiTty,
+  TuiUseCases,
+} from "../tui-deps.js";
+
+export interface CapturingTuiIo extends TuiIo {
+  readonly out: string[];
+  readonly err: string[];
+}
+
+/** A `TuiIo` that keeps every line instead of writing it anywhere. */
+export function createCapturingTuiIo(): CapturingTuiIo {
+  const out: string[] = [];
+  const err: string[] = [];
+
+  return {
+    out,
+    err,
+    stdout: (line: string) => {
+      out.push(line);
+    },
+    stderr: (line: string) => {
+      err.push(line);
+    },
+  };
+}
+
+/** Shorthand for scripting an answered prompt. */
+export function answer<T>(value: T): PromptOutcome<T> {
+  return { kind: "answer", value };
+}
+
+/** Shorthand for scripting a cancelled prompt. */
+export function cancel(): PromptOutcome<never> {
+  return { kind: "cancel" };
+}
+
+/** One prompt the scripted prompter was asked, in the order it was asked. */
+export interface RecordedPrompt {
+  readonly kind: "select" | "confirm";
+  readonly message: string;
+  readonly options?: readonly TuiSelectOption[];
+}
+
+export interface ScriptedPrompter extends TuiPrompter {
+  /** Every prompt asked, in order — the flow's interaction trace. */
+  readonly prompts: RecordedPrompt[];
+  /** `start:<text>` / `stop:<text>` events, in order (AC-6). */
+  readonly spinnerEvents: string[];
+}
+
+/**
+ * A prompter that answers from a fixed script. Each prompt consumes the next
+ * outcome; a prompt beyond the script throws, so a flow that asks more than
+ * the test decided fails loudly instead of hanging or improvising.
+ */
+export function createScriptedPrompter(
+  script: ReadonlyArray<PromptOutcome<string | boolean>>,
+): ScriptedPrompter {
+  const queue = [...script];
+  const prompts: RecordedPrompt[] = [];
+  const spinnerEvents: string[] = [];
+
+  const next = (prompt: RecordedPrompt): PromptOutcome<string | boolean> => {
+    prompts.push(prompt);
+    const outcome = queue.shift();
+    if (outcome === undefined) {
+      throw new Error(
+        `prompt script exhausted: unexpected ${prompt.kind} "${prompt.message}"`,
+      );
+    }
+    return outcome;
+  };
+
+  return {
+    prompts,
+    spinnerEvents,
+    select: (input) =>
+      Promise.resolve(
+        next({
+          kind: "select",
+          message: input.message,
+          options: input.options,
+        }) as PromptOutcome<string>,
+      ),
+    confirm: (input) =>
+      Promise.resolve(
+        next({
+          kind: "confirm",
+          message: input.message,
+        }) as PromptOutcome<boolean>,
+      ),
+    spinner: () => ({
+      start: (text: string) => {
+        spinnerEvents.push(`start:${text}`);
+      },
+      stop: (text?: string) => {
+        spinnerEvents.push(`stop:${text ?? ""}`);
+      },
+    }),
+  };
+}
+
+function notWired(name: string): () => never {
+  return () => {
+    throw new Error(`use case ${name} was not expected to be called`);
+  };
+}
+
+/**
+ * Fake use cases. Every entry rejects unless the test overrides it, so an
+ * unexpected call fails loudly instead of silently returning `undefined`.
+ */
+export function createFakeTuiUseCases(
+  overrides: Partial<TuiUseCases> = {},
+): TuiUseCases {
+  return {
+    listRepos: notWired("listRepos"),
+    listBranches: notWired("listBranches"),
+    listHarnessTypes: notWired("listHarnessTypes"),
+    runReview: notWired("runReview"),
+    persistRun: notWired("persistRun"),
+    ...overrides,
+  };
+}
+
+export interface TuiTestDepsOverrides {
+  readonly useCases?: Partial<TuiUseCases>;
+  readonly io?: CapturingTuiIo;
+  readonly prompter?: ScriptedPrompter;
+  /** Defaults to fully interactive; AC-2 tests flip one or both flags. */
+  readonly tty?: TuiTty;
+  /** Left throwing by default so an unexpected config read fails loudly. */
+  readonly loadContext?: () => Promise<TuiReviewContext>;
+  /** Fixed clock; the flow reads it once, for the run's start instant. */
+  readonly now?: () => number;
+  readonly clonesDir?: string;
+}
+
+/**
+ * Builds a complete `TuiDeps` around the capturing io, the scripted prompter
+ * and the fakes. The prompter defaults to an EMPTY script, so a test that
+ * expects no interaction (non-TTY guard, empty states) proves it structurally.
+ */
+export function createTuiTestDeps(
+  overrides: TuiTestDepsOverrides = {},
+): TuiDeps & {
+  readonly io: CapturingTuiIo;
+  readonly prompter: ScriptedPrompter;
+} {
+  const io = overrides.io ?? createCapturingTuiIo();
+  const prompter = overrides.prompter ?? createScriptedPrompter([]);
+
+  return {
+    useCases: createFakeTuiUseCases(overrides.useCases ?? {}),
+    io,
+    prompter,
+    tty: overrides.tty ?? { stdin: true, stdout: true },
+    loadContext:
+      overrides.loadContext ??
+      (() => {
+        throw new Error("loadContext was not expected to be called");
+      }),
+    now: overrides.now ?? (() => 0),
+    clonesDir: overrides.clonesDir ?? "/tmp/sentinel-test/clones",
+  };
+}

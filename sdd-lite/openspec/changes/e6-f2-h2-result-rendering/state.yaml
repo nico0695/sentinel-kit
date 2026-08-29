@@ -1,0 +1,147 @@
+version: "0.1"
+change_name: e6-f2-h2-result-rendering
+# The orchestrator's handoff objective was `implementer`; `state.schema.yaml` has no such
+# enum member, so the schema-valid equivalent for a backlog feature story is recorded here
+# (the same mapping `[E6.F2.H1]` used). Intent is unchanged: this change runs through
+# execution, it does not stop at plan.
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E6.F2.H2] (issue #39), last required story of E6 and of feature E6.F2 (TUI): render a
+    readable review result on completion plus the location of the persisted run. Bounded scope
+    span — one driving adapter surface (`src/adapters/driving/tui/render.ts`, its two call sites
+    in `tui-flow.ts`, and `__test__/result.test.ts`), which `[E6.F2.H1]` deliberately left minimal
+    and documented as this story's to rewrite. Presentation-layer blast radius: proposal-stage
+    exploration confirms the review markdown, verdict, failure and run directory already reach the
+    TUI in memory, so no core change is required for the recommended shape. Medium ambiguity, all
+    of it at the spec/design boundary: how much markdown rendering (digest vs full styled render),
+    whether a runtime dep lands (`picocolors` / `marked-terminal`, declared-only in setup §4),
+    whether the CLI shares the surface, and — the load-bearing one — where severity/finding
+    extraction lives, since blockers are free text following a harness prompt convention rather
+    than structured domain data. Risk low-medium.
+  confidence: medium
+  recorded_at: "2026-08-29T15:20:00Z"
+lifecycle_status: planning
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: skipped
+    notes: >-
+      Not required for routing. The four material unknowns the orchestrator named were resolved by
+      bounded targeted reads inside the proposal stage itself (core/run result shape, history
+      persist path and on-disk layout, CLI renderers, verdict/finding model plus the factory
+      harness `output.md` contract and a real engine fixture). Everything still open is a
+      spec/design decision, not a fact to discover.
+  sddl-proposal:
+    status: completed
+    started_at: "2026-08-29T15:20:00Z"
+    completed_at: "2026-08-29T15:35:00Z"
+    notes: >-
+      proposal.md written by a fresh delegated worker, grounded in the backlog E6.F2.H2 entry,
+      issue #39, and direct reads of `src/core/run/{index,run-review,verdict,terminal-state}.ts`,
+      `src/core/run/ports/review-engine.ts`, `src/core/history/{persist-run,ports/run-store}.ts`,
+      `src/adapters/driven/storage/run-store-fs.ts`, `src/adapters/driving/tui/{render,tui-flow}.ts`
+      and its `__test__/result.test.ts`, `src/adapters/driving/cli/render/format-review.ts`,
+      `harnesses/{pr-review,quick,security}/output.md`, and `fixtures/claude-code/valid-verdict.json`.
+      Key findings: (1) the raw review markdown IS in memory at the TUI result step
+      (`RunReviewResult.engineOutput`, also on `RunRecord`), so no core change is needed to render
+      it; (2) `persistRun` returns the absolute run directory and the on-disk layout is
+      `metadata.json` + `result.md` (raw engine output) + `prompt.md` + `validations/`; (3) the CLI
+      block is deliberately machine-parseable `key<TAB>value`, so a human-facing TUI renderer does
+      not grow H1's ~10-line `formatTuiErrorLine` duplication; (4) blockers are NOT structured data
+      anywhere in the domain — `Verdict` is a three-value union and no findings field exists —
+      they appear only as free text following the factory harnesses' `[SEV: blocker|major|minor|nit]`
+      prompt convention, which a real engine fixture confirms is honored in practice. Nine open
+      questions raised (four B-level: rendering depth, runtime dep, where finding extraction lives,
+      CLI scope), none decided.
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/state.yaml
+  proposal: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/proposal.md
+  spec: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/spec.md
+  design: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/design.md
+  plan: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/plan.md
+  execution_log: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/review-ledger.md
+checkpoints:
+  - id: cp-proposal-result-rendering
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      proposal.md is ready for spec. The change stays continue-lite: rewrite the TUI result surface
+      `[E6.F2.H1]` deliberately left minimal so a finished review shows its verdict, its blocking
+      findings and the persisted run path at a glance. Exploration confirmed every input is already
+      in the adapter's hands (raw engine markdown, verdict, failure, run directory), so no core
+      change is required for the recommended shape. Four B-level questions gate the spec: (Q1) how
+      much markdown is rendered — compact digest vs full styled render; (Q2) whether a runtime dep
+      lands (`picocolors` and/or `marked-terminal`, both declared-only recommendations); (Q3) where
+      severity/finding extraction lives, given that blockers are free text following a harness
+      prompt convention and NOT structured domain data — an adapter-side heuristic keeps the story
+      presentational, a core findings parser would be scope expansion (level C); (Q4) whether the
+      CLI shares this surface or the story stays TUI-only. Five A-level questions (superseding H1
+      AC-7's pinned assertions, non-`ok` and `ambiguous` rendering, run-path shape, long-output
+      policy, the `formatTuiErrorLine` duplication revisit) are recorded with recommendations for
+      the spec to resolve.
+    question: >-
+      Approve the proposal and continue to sddl-spec, revise this phase, or stop? Plus the four
+      B-level decisions above — Q3 in particular, because answering it "core findings model"
+      changes the story's nature rather than its detail.
+    free_input_allowed: true
+    created_at: "2026-08-29T15:35:00Z"
+decisions: []
+open_risks:
+  - id: risk-e6f2h2-001
+    summary: >-
+      "Blockers visible at a glance" rests on a prompt convention, not a contract. The domain
+      carries no findings model: `Verdict` is `approve | request-changes | comment` and blockers
+      exist only as free text inside `engineOutput`. The factory harnesses' `output.md` pins
+      `[SEV: blocker|major|minor|nit] <file>:<line> — <summary>` and a real engine fixture honors
+      it, but user-authored harnesses may declare any output contract and an engine may simply not
+      comply (that is what the `ambiguous` state exists for). Any extraction the renderer performs
+      must degrade gracefully to plain output instead of showing nothing or lying.
+    severity: medium
+  - id: risk-e6f2h2-002
+    summary: >-
+      Possible new runtime dependency: `picocolors` and/or `marked + marked-terminal` are
+      declared-only recommendations in docs/setup-tecnico-sentinel.md §4 (marked-terminal is
+      flagged optional there and in the backlog), and neither is installed. Adding a runtime dep is
+      a B-level decision ratified at design with justification, per the `[E6.F2.H1]` precedent —
+      not pre-approved by this proposal.
+    severity: medium
+  - id: risk-e6f2h2-003
+    summary: >-
+      This story must supersede acceptance criteria of a completed story. `[E6.F2.H1]` AC-7 pinned
+      the minimal `State:`/`Verdict:`/`Run directory:` block as the literal tail of stdout
+      (asserted via `slice(-3)` in `tui/__test__/result.test.ts`) precisely so no H2 surface could
+      slip in early. Rewriting those assertions is expected and sanctioned by H1's own doc comment,
+      but it must be an explicit, recorded supersession — never a silent test edit.
+    severity: low
+  - id: risk-e6f2h2-004
+    summary: >-
+      Scope-creep vector into the core. If the spec decides that finding/severity extraction is
+      domain knowledge (a structured findings model beside the verdict parser in `src/core/run/`),
+      the blast radius jumps from one presentation adapter to a core hot path and the story stops
+      being `[E6.F2.H2]`. Treat that outcome as level C — stop and ask — rather than absorbing it.
+    severity: medium
+next_action:
+  kind: wait_for_approval
+  target: cp-proposal-result-rendering
+  summary: >-
+    Present the proposal checkpoint to the user: approve and route to sddl-spec, revise, or stop —
+    and decide the four B-level questions (rendering depth, runtime dependency, where finding
+    extraction lives, CLI scope). On approval the next stage is sddl-spec, which must formalize
+    the ACs, resolve the five A-level questions, and explicitly supersede `[E6.F2.H1]` AC-7.
+created_at: "2026-08-29T15:20:00Z"
+updated_at: "2026-08-29T15:35:00Z"

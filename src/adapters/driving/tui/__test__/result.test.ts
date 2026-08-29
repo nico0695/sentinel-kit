@@ -47,6 +47,7 @@ import {
   formatResultDigest,
   type TuiResultDigest,
 } from "../render.js";
+import type { PromptOutcome } from "../tui-deps.js";
 import { createTui } from "../tui-flow.js";
 import {
   answer,
@@ -112,6 +113,11 @@ interface ResultHarness {
   readonly deps: ReturnType<typeof createTuiTestDeps>;
   readonly runReviewRequests: RunReviewRequest[];
   readonly persistRunRequests: PersistRunRequest[];
+  /**
+   * How many prompts had been asked when `persistRun` was called, one entry
+   * per call — the ordering evidence AC-11 needs.
+   */
+  readonly promptsAtPersist: number[];
   run(): Promise<number>;
 }
 
@@ -120,18 +126,24 @@ function harness(
     readonly result?: RunReviewResult;
     readonly record?: RunRecord;
     readonly persistRunFails?: unknown;
+    /** Scripted AFTER the four pre-run answers (`[E6.F2.H2]` AC-11). */
+    readonly extraAnswers?: ReadonlyArray<PromptOutcome<boolean>>;
   } = {},
 ): ResultHarness {
   const runReviewRequests: RunReviewRequest[] = [];
   const persistRunRequests: PersistRunRequest[] = [];
+  const promptsAtPersist: number[] = [];
+
+  const prompter = createScriptedPrompter([
+    answer("owner/repo"),
+    answer("feature"),
+    answer("pr-review"),
+    answer(true),
+    ...(options.extraAnswers ?? []),
+  ]);
 
   const deps = createTuiTestDeps({
-    prompter: createScriptedPrompter([
-      answer("owner/repo"),
-      answer("feature"),
-      answer("pr-review"),
-      answer(true),
-    ]),
+    prompter,
     loadContext: () => Promise.resolve({ config, repos }),
     now: () => 1_700_000_000_000,
     useCases: {
@@ -148,6 +160,7 @@ function harness(
       },
       persistRun: (request) => {
         persistRunRequests.push(request);
+        promptsAtPersist.push(prompter.prompts.length);
         if (options.persistRunFails !== undefined) {
           return Promise.reject(options.persistRunFails);
         }
@@ -163,6 +176,7 @@ function harness(
     deps,
     runReviewRequests,
     persistRunRequests,
+    promptsAtPersist,
     run: () => createTui(deps).run(),
   };
 }
@@ -239,6 +253,26 @@ describe("result step per terminal state (AC-1, AC-7, AC-8)", () => {
     expect(persisted.request).toBe(h.runReviewRequests[0]);
     expect(persisted.result).toBe(okResult);
   });
+
+  it("asks about the full view strictly after persistRun settled (AC-11)", async () => {
+    const engineOutput = "[SEV: blocker] calc.js:6 — no guard";
+    const h = harness({
+      result: { ...okResult, engineOutput },
+      record: { ...okRecord, engineOutput },
+      extraAnswers: [answer(false)],
+    });
+
+    const code = await h.run();
+
+    expect(code).toBe(0);
+    // Exactly FOUR prompts had been asked when the run was recorded — the
+    // pre-run ones. The full-view prompt is the fifth and comes after, so it
+    // can never decide whether the run was written; and `persistRun` still
+    // ran exactly once (one entry).
+    expect(h.promptsAtPersist).toEqual([4]);
+    expect(h.deps.prompter.prompts).toHaveLength(5);
+    expect(h.persistRunRequests).toHaveLength(1);
+  });
 });
 
 describe("persistence failure (AC-8, D13 mirror)", () => {
@@ -310,6 +344,10 @@ describe("the flow builds the digest from what it persisted (AC-5, AC-6, AC-7)",
         verdict: "request-changes",
         engineOutput: "[SEV: blocker] calc.js:6 — no guard\n[SEV: nit] naming",
       },
+      // The record carries markdown, so the flow now offers the full view
+      // (AC-8). Declined here: this case is about the digest, and a decline
+      // prints nothing further, so its tail assertion is unaffected.
+      extraAnswers: [answer(false)],
     });
 
     const code = await h.run();

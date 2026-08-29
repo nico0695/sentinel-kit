@@ -413,3 +413,122 @@ Not a deviation, but recorded so a reviewer does not read it as one: the two kno
 - git: **no commits, no stashes, no resets** — the orchestrator owns git. The working tree carries the three source files modified, plus this log and the `state.yaml` stage entry, uncommitted.
 - QA handoff: **recommended, not run.** This is the first stage that changes observable behaviour and it discharges AC-15, so the supersession is best reviewed on its own diff, before S6 adds a prompt on top of it. A stage-mode `sddl-qa-review` should check: the four preserved AC-8 titles, the four rewritten tails against the spec's contract (not against the old literals), the D9 amendment against AC-6, and that both `return` statements are untouched.
 - next action: orchestrator commits S5, then obtains a **new `stage_approval` for S6** — `offerFullView` at the end of both persist branches (blank-guard → one `confirm` → print only on `answer(true)`, returning `void`), the new `__test__/full-view.test.ts`, the AC-11 `prompts.length === 4` assertion in `result.test.ts`, and mutation-verifications M3/M4/M5. S6 must not be started under `cp-stage-approval-s5`. New baseline for every later comparison: **824 tests / 46 files**.
+
+## S6 — the opt-in full view: one post-run prompt that can change nothing
+
+- approval: `stage_approval` granted by the user — checkpoint `cp-stage-approval-s6`, decision `e6f2h2-D10`. This invocation is scoped to **S6 only**; **S7 was not started** — `CLAUDE.md` is untouched.
+- precondition check: working tree **clean** at stage start (`git status --porcelain` empty) at `ab67aad`, S1–S5 committed. `plan.md`, `design.md`, `spec.md`, `qa-report.md` and the three target files re-read at stage start. The inherited baseline was **re-measured, not assumed**: `npm test` → **824 tests / 46 files** before a line was written. No contradiction with the tree.
+- `tui-deps.ts` needed **no change**: `TuiPrompter.confirm` (`tui-deps.ts:95`) already carries the seam, exactly as spec A7 and design §Post-run prompt predicted. The contract file's diff is empty.
+
+### Changed files — the complete list
+
+| File | Change | Diff |
+|---|---|---|
+| `src/adapters/driving/tui/tui-flow.ts` | module doc gains property 5; `offerFullView` helper; one call at the end of **each** persist branch | `+68 / −1` |
+| `src/adapters/driving/tui/__test__/full-view.test.ts` | **NEW** — 31 tests: AC-8, AC-9, AC-10 (3×2), AC-12, AC-13, and the permanent AC-14 palette invariants (D10) | `+470` (new file) |
+| `src/adapters/driving/tui/__test__/result.test.ts` | the AC-11 ordering assertion, its harness support, and one scripted answer added to an existing case (see Deviations) | `+44 / −6` |
+
+`git status --porcelain` lists exactly those three paths and nothing else. Verified empty by explicit `git diff --stat`: `src/core`, `src/main`, `tui-deps.ts`, `index.ts`, `clack-prompter.ts`, `findings.ts`, `colors.ts`, **`render.ts`** (byte-identical to its S5 state after the M5 revert), `tui-test-doubles.ts`, `tsconfig.json`, `.dependency-cruiser.cjs`, `biome.json`, `vitest.config.ts`, `tsup.config.ts`, `package.json`, `CLAUDE.md`, `docs/`, `harnesses/`, `fixtures/`, `history/`, `cli/`.
+
+### The mechanism
+
+```
+persistRun catch branch  → digest(no runDir) → 2x io.stderr → await offerFullView(io, prompter, result.engineOutput) → return 1
+persistRun success branch→ digest(runDir)                   → await offerFullView(io, prompter, record.engineOutput) → return 0
+```
+
+`offerFullView(io, prompter, engineOutput): Promise<void>` — blank/`undefined` guard → one `prompter.confirm` → `formatFullView(engineOutput, TUI_PALETTE)` to `io.stdout`, one line at a time, only on `{kind:"answer", value:true}`. It returns `void`, both calls are the last statement before an **unchanged** `return`, and the `persistRun` call itself was not touched. Nothing in it reads `process`, installs a listener, touches raw mode or exits: cancel is a value, handled by the same `if` as "no" — the direct answer to the H1 CRITICAL where a library owned terminal state.
+
+Per spec **A6** the full view is offered on the persist-failure branch too, sourced from the in-memory `result` (no record exists there). That is the branch where the markdown exists nowhere on disk, so withholding it would invert the story's motivation. The exit code stays 1.
+
+**A-level decisions (authorship `claude`), recorded rather than assumed:**
+
+1. **Prompt copy: `Show the full review output?`** — neither `spec.md` nor `design.md` fixes the wording. Chosen to match the flow's existing register (`Run this review?`) and to name what it prints (the *output*, raw, not a rendered view). It is asserted against a named constant in `full-view.test.ts`, so a later change is a visible test edit.
+2. **Positional parameters `(io, prompter, engineOutput)`** rather than a `Pick<TuiDeps, …>` object: the helper needs exactly two seams and the flow already destructures them.
+3. **The AC-11 assertion rests on a `promptsAtPersist` recorder** in `result.test.ts`'s harness (the prompt count captured *inside* the `persistRun` fake, one entry per call), plus an optional `extraAnswers` script suffix. Existing cases pass neither: the script they build is byte-identical and the recorder is write-only, so no existing assertion changed meaning. `createScriptedPrompter` itself is untouched, as the handoff requires.
+
+### AC-11, and why the assertion is not vacuous
+
+The AC-11 case drives a run whose **`result` and `record` both carry markdown** and scripts a fifth answer. That is deliberate: with a markdown-less run the assertion would hold wherever the call sat, because the guard would suppress the prompt either way — the test would pass vacuously and M4 could not go red. Because the markdown is present, hoisting the call above `persistRun` really does make the fake observe five prompts (M4 below, measured).
+
+### Mutation verification — actually run, with the real observed output
+
+**M3 (AC-9 — the blank guard is what keeps the other suites valid).** The `if (engineOutput === undefined || engineOutput.trim() === "")` early return was deleted.
+
+Result: **RED — 18 failed | 130 passed (148)** across **three** suites:
+
+- `full-view.test.ts` — 7 cases: all five AC-9 cases (`no engine output`, and the four blank shapes `""`, `" "`, `"   \n\t\n  "`, `"\n"`), the persist-failure no-output case, and `still points at result.md for a defined but empty engine output`.
+- `result.test.ts` — 8 cases: `renders the digest and exits 0 for a persisted ok run`, the four `persists once and still exits 0 for a completed <state> run` cases, `emits the no-history diagnostic and the failure, and exits non-zero`, `collapses a multi-line failure message from the persisted record`, `reduces the raw failure to one line when the run could not be persisted`.
+- **`flow.test.ts` — 3 cases**: `launches the interactive flow when both streams are TTYs`, `drives only core use cases, in the review order`, `keeps a single static-text indicator active while runReview is pending`. This is the point of M3: an **untouched** suite goes red, so the four other TUI suites are green *because of* the guard, not by luck.
+
+The failures surface as `expected 1 to be +0` (the throw is caught by `createTui` and becomes exit 1) with the exhaustion message on `stderr`. It was surfaced verbatim with a temporary `toEqual` probe on the persist-failure case, then reverted:
+
+```
+[
+  "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
+  "Failed to persist run at /runs/owner__repo",
+  "prompt script exhausted: unexpected confirm \"Show the full review output?\"",
+]
+```
+
+So the predicted `prompt script exhausted` is the real cause, quoting this stage's own prompt. Guard restored → **148 / 148** green.
+
+**M4 (AC-11 — the prompt is strictly after `persistRun`).** The success-branch `offerFullView` call was moved above the `persistRun` `try` (reading `result.engineOutput`, the only value in scope there).
+
+Result: **RED** — `result.test.ts`: `AssertionError: expected [ 5 ] to deeply equal [ 4 ]` on `asks about the full view strictly after persistRun settled (AC-11)`; **1 failed | 59 passed (60)**. Across the whole TUI directory the mutation costs **10 failures** (the AC-11 case plus nine `full-view.test.ts` cases whose stdout tail is no longer digest-then-view), so the ordering is pinned from two directions. Restored → green.
+
+**M5 (AC-13 — no truncation).** `formatFullView` was capped with `.slice(0, 100)`.
+
+Result: **RED** — `emits a 500-line output in full, with no marker and no further prompt`: `AssertionError: expected [ …(111) ] to have a length of 500 but got 111` (111 = the 11 lines the flow prints before the view, plus the 100 that survived the cap); **1 failed | 30 passed (31)**. Restored; `render.ts` verified byte-identical to its S5 state, its `git diff --stat` empty.
+
+All three went red exactly as `plan.md` predicted. No mutation was skipped or argued instead of run.
+
+### `e6f2h2-D10` — the permanent palette invariants, landed
+
+`risk-e6f2h2-009`'s remaining half was that AC-14's dual run could be satisfied *in letter* by assertions that are themselves env-dependent. `full-view.test.ts` now carries ten permanent cases that are relations **between** `TUI_PALETTE`, `PLAIN_PALETTE` and `stripAnsi`, never assertions about the ambient decision — so they hold identically under `NO_COLOR=1` and `FORCE_COLOR=1` by construction, which is what makes the dual run meaningful rather than two runs that happen to agree:
+
+- `stripAnsi(TUI_PALETTE[role]("sentinel")) === "sentinel"` for all four roles;
+- `PLAIN_PALETTE[role]("sentinel") === "sentinel"` for all four roles;
+- `stripAnsi("\u001b[31mred\u001b[39m") === "red"` and a nested bold+green case — **without these two, the eight above would also hold for a `stripAnsi` that did nothing at all**, which is precisely the vacuity M2 could only rule out with a throwaway;
+- `formatResultDigest(digest, TUI_PALETTE).map(stripAnsi)` deep-equals `formatResultDigest(digest, PLAIN_PALETTE)`, and the same identity for `formatFullView` (also equal to `MARKDOWN.split("\n")`).
+
+M2's throwaway is thereby superseded by permanent coverage, and S5's `stripAnsi` probe is no longer the only evidence that the strip is load-bearing.
+
+### Test-count arithmetic
+
+**824 + 32 = 856** tests; **46 + 1 = 47** files. Additive only — nothing was deleted or weakened.
+
+- **+31** — `full-view.test.ts` (new file): 4 AC-8 (accept / decline / cancel / the persist-failure branch), 8 AC-9 (absent, four blank shapes, the persist-failure branch, and the A9 `result.md`-pointer asymmetry), 6 AC-10 (the 3×2 matrix), 2 AC-12, 1 AC-13, 10 AC-14/D10 palette invariants.
+- **+1** — `result.test.ts`: `asks about the full view strictly after persistRun settled (AC-11)`. The file goes 59 → 60.
+- The four `[E6.F2.H1]` AC-8 titles are still present and green, untouched by this stage.
+
+### Quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| **`npm test`** (full — non-negotiable for S6) | yes | **47 files passed (47), 856 tests passed (856)**, 0 failed, exit 0 |
+| `npm run check` (biome + tsc + depcruise) | yes | **clean**, exit 0 — biome 160 files, no fixes applied; `tsc --noEmit` silent; depcruise **no violations**, 106 modules / **253** dependencies (unchanged — `tui-flow.ts` already imported `render.ts` and `colors.ts`) |
+| `NO_COLOR=1 npx vitest run --project adapters` | yes (AC-14) | **26 files / 507 tests passed** |
+| `FORCE_COLOR=1 npx vitest run --project adapters` | yes (AC-14) | **26 files / 507 tests passed — identical**: same files, same count, zero failures |
+| `npx vitest run --project adapters src/adapters/driving/tui/` | narrowed check | **148 passed (148)** across all eight TUI suites |
+| `git diff --stat src/core` · `src/main` | standing guard (AC-16) | **both empty** |
+| `git diff --stat` over the forbidden TUI/config/doc paths | handoff constraint | **all empty** (`render.ts` included, post-M5) |
+| `grep -rEn '^import .*"picocolors"' src/` | confinement (orchestrator's corrected form) | **exactly 1** — `src/adapters/driving/tui/colors.ts:34` |
+| `git status --porcelain` | scope | exactly the three S6 files: 2 modified, 1 new |
+
+**The four other TUI suites needed no edit — proved, not assumed.** `cancel.test.ts`, `empty-states.test.ts`, `errors.test.ts` and `spinner.test.ts` are green untouched, and M3 showed what makes that true: delete the guard and `flow.test.ts` goes red immediately. (`flow.test.ts` reaches `persistRun` on its happy path; the other three stop before it.)
+
+### Deviations
+
+One, stated rather than smoothed over. It is a consequence of the approved behaviour, not a scope change.
+
+1. **`result.test.ts` needed one edit more than "the AC-11 assertion only".** The case S5 added — `renders the record's findings section and the result.md pointer` — is the one existing case whose **record carries `engineOutput`**, so under AC-8 the flow now legitimately asks a fifth prompt and its four-answer script overran (`prompt script exhausted`). One scripted `answer(false)` was added, with a comment saying why; a decline prints nothing further, so its `slice(-6)` tail assertion is untouched and still asserts exactly what it did. The alternative — withholding the prompt so an existing script stays valid — would contradict AC-8. The handoff's plan-time evidence (`grep -rn "engineOutput" src/adapters/driving/tui/` returning zero hits) predates S5, which introduced that single hit; every *other* TUI suite still sets no `engineOutput` and needed nothing.
+
+Not deviations, but recorded so a reviewer does not read them as oversights: **QA-S4-02** was left exactly as instructed — `full-view.test.ts` now *pins* the A9 asymmetry as intended behaviour (`still points at result.md for a defined but empty engine output`: the path line is emitted, the prompt is not) rather than unifying the two guards; `formatTuiErrorLine`'s duplication, the trailing space on an empty finding, and `tui-deps.ts` were all left untouched.
+
+- blockers: none.
+- scope / drift / blast-radius: none beyond the single deviation above. Actual scope equals planned scope.
+- risks: no new risk. **`risk-e6f2h2-009` (AC-14 vacuity) is now CLOSED** — permanent, env-independent palette invariants exist, including the two cases that make `stripAnsi` itself non-vacuous, and the adapters project is identical under both env settings. **`risk-e6f2h2-006`** (the process now waits for input after a run) is realised as designed and remains accepted: the prompt is asked only when there is output to show, cancel is a value, and no script can reach it (H1's non-TTY guard).
+- git: **no commits, no stashes, no resets** — the orchestrator owns git. The working tree carries the three source files, plus this log and the `state.yaml` stage entry, uncommitted.
+- QA handoff: **recommended, not run.** S6 adds the flow's first post-run interaction and discharges five ACs; a stage-mode `sddl-qa-review` should check the three invariants independently — that both `return` statements are untouched and the exit codes still depend only on (completed, persisted), that `persistRun` is still called exactly once, and that the prompt is unreachable when the markdown is blank — plus the prompt copy against the spec's intent, since the wording is an A-level choice made here.
+- next action: orchestrator commits S6, then obtains a **new `stage_approval` for S7** — the `CLAUDE.md` closeout (E6 complete, remaining MVP work, `picocolors` in the runtime-dependency list) plus the final evidence sweep (AC-14/16/17). S7 must not be started under `cp-stage-approval-s6`. **New baseline for every later comparison: 856 tests / 47 files.** The orchestrator's standing correction still holds for S7: the valid confinement check is `grep -rEn '^import .*"picocolors"' src/` = 1, not the plan's literal `grep -rn "picocolors" src/`.

@@ -158,7 +158,7 @@ stages:
     status: in_progress
     started_at: "2026-08-29T18:00:00Z"
     notes: >-
-      S1, the S2/S3 batch, S4 and S5 are DONE; S6-S7 pending. S1 (committed `b0a3a04`): picocolors
+      S1, the S2/S3 batch, S4, S5 and S6 are DONE; only S7 (the CLAUDE.md closeout) is pending. S1 (committed `b0a3a04`): picocolors
       pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
       CONFIRMED at 754 tests / 45 files, no tsconfig edit needed. S2+S3 (committed `3f9d2ff`): NEW
       `tui/findings.ts` + its 24-test AC-3 matrix, NEW `tui/colors.ts` (the sole picocolors
@@ -221,6 +221,36 @@ stages:
       risk-e6f2h2-008 and risk-e6f2h2-010 are CLOSED by this stage; risk-e6f2h2-009 is materially
       narrowed; risk-e6f2h2-003 is discharged in the diff, its remaining half being the PR
       description. No git side effects.
+
+      **S6 (uncommitted) is the opt-in full view.** `tui-flow.ts` gains one `offerFullView(io,
+      prompter, engineOutput)` helper (+68/-1, module doc gains property 5) called at the END of
+      both persist branches: blank/undefined guard -> exactly one `prompter.confirm` ("Show the
+      full review output?") -> `formatFullView(engineOutput, TUI_PALETTE)` to stdout only on
+      answer(true). It returns void, sits after the try/catch has settled, and both `return`
+      statements plus the `persistRun` call are byte-identical, so the exit code stays a function
+      of (completed, persisted) alone. Spec A6 honoured: the persist-failure branch offers it too,
+      from the in-memory result, and still exits 1. NEW `__test__/full-view.test.ts` (31 tests:
+      AC-8 accept/decline/cancel + the persist-failure branch, AC-9 absent/four blank shapes/A9
+      asymmetry, the AC-10 3x2 matrix, AC-12, the AC-13 500-line case, and ten permanent
+      env-independent palette invariants) and `__test__/result.test.ts` +44/-6 (the AC-11
+      `promptsAtPersist` assertion, its harness support, and one scripted answer added to the
+      S5-added case whose record carries engineOutput - the single deviation, recorded).
+      Evidence: full `npm test` **856 / 47** (= 824 + 31 + 1, additive only); `npm run check`
+      clean (106 modules / 253 dependencies, no new edge); adapters project **507 / 507 identical**
+      under NO_COLOR=1 and FORCE_COLOR=1; all eight TUI suites green (148/148) with the four other
+      TUI suites UNEDITED; `git diff --stat src/core` and `src/main` both EMPTY, as are
+      tui-deps.ts, index.ts, clack-prompter.ts, findings.ts, colors.ts, render.ts,
+      tui-test-doubles.ts, every config file, CLAUDE.md, docs/, harnesses/, fixtures/ and
+      history/. All three mutation-verifies were RUN and went red as predicted, then reverted:
+      M3 (guard deleted) -> 18 failures across THREE suites including the untouched flow.test.ts,
+      with the literal cause `prompt script exhausted: unexpected confirm "Show the full review
+      output?"`; M4 (prompt hoisted above persistRun) -> `expected [ 5 ] to deeply equal [ 4 ]`
+      plus nine full-view failures; M5 (formatFullView capped at 100 lines) -> `expected [ ...(111) ]
+      to have a length of 500`. Decision D10's second half is discharged: **risk-e6f2h2-009 is now
+      CLOSED** by permanent invariants that hold in either env by construction, including the two
+      cases that make `stripAnsi` itself non-vacuous. A-level decisions at S6 (authorship `claude`):
+      the prompt copy, positional helper parameters, and the write-only `promptsAtPersist` recorder
+      (createScriptedPrompter untouched). No git side effects.
   sddl-qa-review:
     status: completed
     mode: stage
@@ -704,36 +734,36 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S5 is DONE and green, uncommitted — the supersession landed and the digest is now the product's
-    output. Changed: exactly the three files plan.md's S5 row names — `tui-flow.ts` (+45/-8, both
-    result call sites build a `TuiResultDigest` with conditional spreads and render it with
-    `TUI_PALETTE`; both `return` statements and the exit-code contract untouched), `render.ts`
-    (+43/-29, the legacy `formatTuiResult` DELETED, the H1 module doc replaced by the H2 one, and
-    decision D9 applied via a shared `collapseToOneLine` extracted from `formatTuiErrorLine`), and
-    `__test__/result.test.ts` (+177/-52, the four literal tails rewritten through `stripAnsi`, the
-    three superseded unit cases deleted, the vacuous AC-6 guard repaired, four cases added).
-    Evidence: full `npm test` **824 / 46** (= 823 - 3 + 4); `npm run check` clean; `grep -rn
-    formatTuiResult src/` = **0**; the four H1 AC-8 cases present BY NAME and green; adapters 475 /
-    475 identical under NO_COLOR=1 and FORCE_COLOR=1; `git diff --stat src/core` and `src/main`
-    both empty; no `offerFullView` and exactly one `prompter.confirm` — S6 was NOT started.
-    Two measured non-vacuity probes, both reverted: removing the D9 collapse turned 3 tests red
-    while the raw-path case stayed green (the two failure paths have separate defences); dropping
-    `.map(stripAnsi)` from a rewritten tail was green under NO_COLOR=1 and red under FORCE_COLOR=1,
-    so the strip is load-bearing and the ANSI identity is now exercised rather than inferred.
-    D9 is applied as an approved amendment over one sentence of design.md, with spec AC-6 as the
-    authority — recorded in execution-log.md as such. Next: the orchestrator commits S5,
-    optionally runs a stage-mode `sddl-qa-review` first (recommended — this is the first stage that
-    changes observable behaviour and it discharges AC-15, so the supersession reviews best on its
-    own diff, before S6 layers a prompt on top), then obtains a NEW `stage_approval` for S6:
-    `offerFullView` at the end of both persist branches (blank-guard -> one `confirm` -> print only
-    on `answer(true)`, returning `void`), NEW `__test__/full-view.test.ts`, the AC-11
-    `prompts.length === 4` assertion, and mutation-verifications M3/M4/M5. S6 is NOT covered by
-    `cp-stage-approval-s5`. New baseline for every later comparison: **824 tests / 46 files**.
-    ORCHESTRATOR CORRECTION, still binding on S7: the plan's literal `grep -rn "picocolors" src/` =
-    1 hit is NOT a valid acceptance check — it returns 9, because design.md requires colors.ts's
-    header to state the single-importer rule in prose. The real check is the statement-level
-    `grep -rEn '^import .*"picocolors"' src/`, which returns exactly 1
-    (`src/adapters/driving/tui/colors.ts:34`). After execution: 4R code review over the frozen
-    diff, then final QA — the only stage that may mark this change completed.
+    S6 is DONE and green, uncommitted — the opt-in full view landed and E6.F2.H2's behaviour is now
+    complete. Changed: exactly the three files plan.md's S6 row names — `tui-flow.ts` (+68/-1, the
+    `offerFullView` helper plus one call at the END of each persist branch; both `return` statements,
+    the `persistRun` call and the exit-code contract byte-identical), NEW
+    `__test__/full-view.test.ts` (31 tests), and `__test__/result.test.ts` (+44/-6, the AC-11
+    ordering assertion and its harness support). Evidence: full `npm test` **856 / 47** (= 824 + 32,
+    additive only); `npm run check` clean; adapters **507 / 507 identical** under NO_COLOR=1 and
+    FORCE_COLOR=1; all eight TUI suites green with the four other TUI suites UNEDITED;
+    `git diff --stat src/core` and `src/main` both empty; `CLAUDE.md` untouched — S7 was NOT started.
+    All three mutation-verifies were RUN, went red exactly as predicted and were reverted: M3 turned
+    18 tests red across THREE suites (including the untouched `flow.test.ts`) with the literal cause
+    `prompt script exhausted: unexpected confirm "Show the full review output?"` — the proof that the
+    other TUI suites are green BECAUSE of the blank guard; M4 produced `expected [ 5 ] to deeply
+    equal [ 4 ]`; M5 produced `expected [ ...(111) ] to have a length of 500`. ONE DEVIATION, stated:
+    `result.test.ts` needed one edit beyond the AC-11 assertion — the S5-added case
+    `renders the record's findings section and the result.md pointer` is the one existing case whose
+    record carries `engineOutput`, so AC-8 now legitimately asks it a fifth prompt and its
+    four-answer script overran; one `answer(false)` was added with a comment, and its tail assertion
+    is unchanged (a decline prints nothing further). Withholding the prompt instead would contradict
+    AC-8. risk-e6f2h2-009 is CLOSED by the permanent palette invariants (D10's second half).
+    Next: the orchestrator commits S6, optionally runs a stage-mode `sddl-qa-review` first
+    (recommended — this stage adds the flow's first post-run interaction and discharges five ACs),
+    then obtains a NEW `stage_approval` for S7: the CLAUDE.md closeout (E6 complete, remaining MVP
+    work, `picocolors` in the runtime-dependency list) plus the final evidence sweep (AC-14/16/17).
+    S7 is NOT covered by `cp-stage-approval-s6`. New baseline for every later comparison:
+    **856 tests / 47 files**. ORCHESTRATOR CORRECTION, still binding on S7: the plan's literal
+    `grep -rn "picocolors" src/` = 1 hit is NOT a valid acceptance check — it returns 9, because
+    design.md requires colors.ts's header to state the single-importer rule in prose. The real check
+    is the statement-level `grep -rEn '^import .*"picocolors"' src/`, which returns exactly 1
+    (`src/adapters/driving/tui/colors.ts:34`). After execution: 4R code review over the frozen diff,
+    then final QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T21:30:00Z"
+updated_at: "2026-08-29T22:05:00Z"

@@ -180,6 +180,28 @@ checkpoints:
       free_text: "Approved as written — route to sddl-design. Judgment-day declined."
       responded_at: "2026-08-29T16:15:00Z"
     resolved_at: "2026-08-29T16:15:00Z"
+  - id: cp-design-result-rendering
+    type: phase_validation
+    stage: sddl-design
+    summary: >-
+      design.md is ready for planning. Three-module split inside the TUI adapter (pure `findings.ts`
+      matcher, `colors.ts` as the sole `picocolors` importer, rewritten `render.ts` taking the
+      palette as a REQUIRED argument), one `offerFullView` helper called at the end of both
+      persistRun branches returning void so the exit-code statements stay untouched, and an
+      AC -> mechanism -> file map for all 17 criteria. Spec A7 was verified against the code rather
+      than assumed: `TuiPrompter.confirm` already exists, so `tui-deps.ts` and `src/main/**` are
+      untouched. The design's conditional B-level question (whether this tsconfig needs
+      `allowSyntheticDefaultImports` for the picocolors default import) was resolved by an
+      orchestrator probe BEFORE it could stop the executor: it does not fire.
+    question: >-
+      Approve the design and route to sddl-plan, revise this phase, or run judgment-day over
+      design.md first?
+    free_input_allowed: true
+    created_at: "2026-08-29T16:50:00Z"
+    response:
+      free_text: "Approved — route to sddl-plan. Judgment-day declined."
+      responded_at: "2026-08-29T16:55:00Z"
+    resolved_at: "2026-08-29T16:55:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -242,6 +264,20 @@ decisions:
       the proposal's Q9 finding: H1's `formatTuiErrorLine` duplication does not materially grow,
       so the recorded revisit is performed and the duplication stays.
     recorded_at: "2026-08-29T15:50:00Z"
+  - id: e6f2h2-D6
+    checkpoint_id: cp-design-result-rendering
+    selected_option_id: approve-route-to-plan
+    free_text: "Sí, ir a plan"
+    rationale: >-
+      Design approved. Its two ordering constraints are binding on the plan: S1 installs and
+      exact-pins `picocolors` and confirms the resolved API before any rendering code is written
+      (the `[E6.F2.H1]` lesson, where a guessed clack version stopped the executor mid-stage), and
+      the CLAUDE.md closeout is the last stage (AC-17, the H1 D0 precedent). The `result.test.ts`
+      rewrite gets its own visible stage so the AC-15 supersession and the four preserved H1 AC-8
+      cases are legible in the diff. Judgment-day over design.md was offered and declined — the
+      design already probed its load-bearing assumptions empirically, so the 4R review over the
+      frozen diff remains the adversarial pass.
+    recorded_at: "2026-08-29T16:55:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

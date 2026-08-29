@@ -57,7 +57,31 @@ stages:
       questions raised (four B-level: rendering depth, runtime dep, where finding extraction lives,
       CLI scope), none decided.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-08-29T15:50:00Z"
+    completed_at: "2026-08-29T16:10:00Z"
+    notes: >-
+      spec.md written by a fresh delegated worker over the four firm decisions (e6f2h2-D1..D4),
+      which were encoded and not reopened. 17 acceptance criteria, each naming the mechanism and
+      the test that verifies it (the `[E6.F2.H1]` bar). Grounded in direct reads of
+      `src/core/run/run-review.ts` (RunReviewResult / RunFailure / RunStage),
+      `src/core/history/ports/run-store.ts` (RunRecord carries `engineOutput` and a reduced
+      `failure.message`), `src/adapters/driven/storage/run-store-fs.ts` (result.md is written ONLY
+      when `record.engineOutput !== undefined`), `src/adapters/driving/tui/{render,tui-flow,tui-deps}.ts`
+      and `__test__/{result.test.ts,tui-test-doubles.ts}`,
+      `src/adapters/driving/cli/render/format-review.ts`, all three `harnesses/*/output.md`
+      (verified identical — one contract for the heuristic to target),
+      `fixtures/claude-code/valid-verdict.json`, `.dependency-cruiser.cjs`, `package.json`, and the
+      `[E6.F2.H1]` spec's AC-7. Nine A-level questions resolved (e6f2h2-A1..A9): Q5 supersession of
+      H1 AC-7 made explicit (AC-15), Q6 answered by keying markdown-dependent output on
+      `engineOutput` presence rather than on the terminal state (the parse-fault path carries both
+      `engineOutput` and `failure`), Q7 gating the `result.md` pointer on exactly what run-store-fs
+      writes, Q8 no pager/no truncation, Q9 duplication revisit performed and kept; plus four new
+      A-level resolutions (A6 full view offered on the persist-failure branch too, A7 reuse of the
+      existing `confirm` seam with no `TuiPrompter` change, A8 severity-marker-only heuristic
+      carrying the line remainder verbatim, A9 blank-vs-absent `engineOutput`). No level-C item
+      arose: no acceptance criterion requires touching `src/core/**`. No new B-level question
+      arose. Two new risks appended (005, 006).
   sddl-design:
     status: pending
   sddl-plan:
@@ -197,16 +221,37 @@ open_risks:
       CLOSED by e6f2h2-D3: extraction stays in the TUI adapter; a core findings model is rejected.
       Retained as a standing guard — if execution finds itself editing `src/core/**`, stop.
     severity: low
+  - id: risk-e6f2h2-005
+    summary: >-
+      Digest flood. The spec deliberately lists EVERY `blocker` and `major` finding with no cap
+      (minor/nit are counted only), because capping risks hiding a blocker and that would break the
+      backlog acceptance "verdict and blockers visible at a glance". A pathological review with
+      dozens of blockers therefore produces a long digest. Accepted: the harness `output.md`
+      mandates ~120-character one-line summaries, and the opt-in full view is the unbounded surface.
+      Revisit if `[E7.F1.H1]` dogfooding shows real floods.
+    severity: low
+  - id: risk-e6f2h2-006
+    summary: >-
+      Behavioral change introduced by e6f2h2-D1: the process now waits for input AFTER the run
+      instead of exiting, so a user who walked away during a multi-minute review returns to a
+      pending prompt. Accepted — the surface is interactive by definition, `[E6.F2.H1]`'s non-TTY
+      guard guarantees no script can reach this prompt, and cancel is a value, so Esc/Ctrl+C
+      resolves it cleanly without changing the rendered outcome or the exit code (AC-10).
+    severity: low
 next_action:
-  kind: delegate_stage
-  target: sddl-spec
+  kind: run_stage
+  target: sddl-design
   summary: >-
-    Proposal approved and all four B-level questions decided (e6f2h2-D1..D4). sddl-spec formalizes
-    the acceptance criteria over that firm ground: digest + opt-in full view (D1), picocolors only
-    with the full view as raw markdown (D2), adapter-side `[SEV: ...]` extraction with graceful
-    degradation (D3), TUI-only (D4). It must also resolve the five A-level questions, state the
-    post-run-prompt semantics D1 introduces (decline/cancel changes neither the rendered outcome
-    nor the exit code; it lands after persistence), and explicitly supersede `[E6.F2.H1]` AC-7
-    rather than silently editing its pinned assertions.
+    spec.md is formalized: 17 acceptance criteria over the firm ground of e6f2h2-D1..D4, with the
+    scope boundary explicitly excluding any `src/core/**` change and any CLI change. sddl-design
+    now ratifies and exact-pins `picocolors` (the `@clack/prompts` precedent), fixes the digest's
+    literal labels/ordering, picks the colour-determinism mechanism AC-14 requires (injected seam
+    vs ANSI-stripping in assertions), decides the module layout inside
+    `src/adapters/driving/tui/` and the confinement point for `picocolors`, and settles the new
+    `formatTuiResult`/full-view renderer signatures for the two `tui-flow.ts` call sites (whose
+    failure shapes differ: raw `unknown` on the persist-failure path, reduced `message` on the
+    persisted path). A phase checkpoint is warranted before design: the spec supersedes a completed
+    story's acceptance criterion (`[E6.F2.H1]` AC-7, risk-e6f2h2-003), carries the open medium risk
+    risk-e6f2h2-001, and adds two new low risks (005, 006).
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T15:50:00Z"
+updated_at: "2026-08-29T16:10:00Z"

@@ -57,3 +57,41 @@
 ## Budget Notes
 
 - At the upper lite bound: six code-touching stages, a per-stage validation contract, and a 14-AC coverage map are the minimum the executor needs to run without reinterpretation.
+
+## Fix Round 1
+
+Appended after the 4R review (`review-ledger.md`, fix round 1 of 2). Source findings: **R1-001 (CRITICAL, open)** and **R1-002 (info, same root)**. S1–S6 above are unchanged and remain the record of the executed plan.
+
+### Defect being fixed (from the ledger, verified against sources)
+
+Clack's `spinner().start()` calls `block()` from `@clack/core`, which (a) registers a stdin `keypress` listener whose cancel branch (Ctrl+C `\x03` / Escape — raw mode means no SIGINT is generated) is a bare `process.exit(0)`, and (b) registers five process listeners (`SIGINT`, `SIGTERM`, `exit`, `uncaughtExceptionMonitor`, `unhandledRejection`) whose SIGINT/SIGTERM path only renders "Canceled" and returns. While a spinner is active (branch fetch, or the up-to-10-minute engine run) this orphans the execa engine child, skips `runReview`'s in-process worktree cleanup and `persistRun`, and reports success (R1-001); it also swallows the first externally delivered SIGINT/SIGTERM (R1-002). Clack's `select`/`confirm` are NOT affected — their cancel path resolves to the cancel symbol, which `clack-prompter.ts` already maps to `{ kind: "cancel" }`.
+
+### Mechanism (evaluated against the sources; consistent with design §Interfaces — the `TuiSpinner` seam absorbs the swap)
+
+Replace the clack spinner inside `clack-prompter.ts` with an **owned minimal spinner** fulfilling the existing `TuiSpinner` contract (`start(text)` / `stop(text?)`): a `setInterval`-driven frame loop that writes `\r` + clear-line + frame + text to an injected output sink, and on `stop` clears the line, writes the final text as a plain line, and clears the interval. It never touches stdin (no raw mode, no keypress listeners — Ctrl+C generates a real SIGINT again) and registers **zero** process listeners (no SIGINT/SIGTERM/exit handlers — default signal disposition terminates the foreground process group, engine child included, restoring CLI-parity Ctrl+C semantics: exit 130, no false success). This is the minimal correct in-adapter mechanism: `tui-flow.ts`, `tui-deps.ts`, and the `TuiSpinner` interface are untouched; clack stays confined to `clack-prompter.ts` for the unaffected `select`/`confirm`; the design's "cancel is a value" contract is not involved (spinners never cancel). Alternatives rejected: patching clack's behavior from outside (fragile, still raw-mode), or moving mid-run cancel handling into the flow (out of scope — D3 forbids mid-run abort; the fix restores signal semantics, it does not add features.)
+
+Injection detail: `createClackPrompter` gains an optional `spinnerOutput` sink (shape `{ write(chunk: string): void; isTTY?: boolean }`) defaulting to `process.stdout` — the same default clack itself used, so `src/main/container.ts` needs no edit; tests inject a capturing sink. The file's doc comment is updated: the spinner is now owned and tested (the "declared-untested translation layer" claim shrinks to the clack `select`/`confirm` mapping).
+
+### Stage S7
+
+| Stage Id | Goal | Depends On | Expected Scope | Validation | Touches Code | Approval Required | Status |
+|---|---|---|---|---|---|---|---|
+| S7 | Fix R1-001 (and structurally resolve R1-002): replace the clack spinner with the owned minimal spinner in `clack-prompter.ts` per the mechanism above; add a no-TTY regression suite that is red on the pre-fix code | S5 (fixes code S5 landed) | `src/adapters/driving/tui/clack-prompter.ts` (EDIT — drop the `spinner` import from `@clack/prompts`, add the owned spinner + optional `spinnerOutput` param, refresh doc comment), `src/adapters/driving/tui/__test__/spinner.test.ts` (NEW) | `npm run check` clean; **full `npm test`** — baseline 749/44 green plus the new spinner tests; **mutation-verify**: temporarily restoring the clack `spinner()` call (or removing the fix) turns the new listener-count assertions red, then revert — recorded in `execution-log.md` | yes | stage_approval — **granted by the user at the `review_gate`** (recorded here; the executor still confirms scope before running) | pending |
+
+### Regression tests (`spinner.test.ts` — adapters project, no TTY, per house `__test__/*.test.ts` convention)
+
+1. **No process signal/lifecycle listeners** (the pre-fix-red proof): capture `process.listenerCount()` for `SIGINT`, `SIGTERM`, `exit`, `uncaughtExceptionMonitor`, `unhandledRejection` before `createClackPrompter().spinner().start(...)`; assert all five are unchanged while the spinner runs and after `stop()`. Pre-fix, clack registers all five unconditionally — red without the fix even in a non-TTY test process.
+2. **No stdin involvement**: assert `process.stdin.listenerCount("keypress")` (and `"data"`) unchanged across start/stop. Pre-fix, `block()` registers a `keypress` listener regardless of TTY — also red pre-fix. (A `setRawMode` spy is deliberately NOT the proof: `block()` guards it with `isTTY`, so it would be green pre-fix in CI.)
+3. **Rendering contract**: with an injected capturing sink — frames are written after `start`, `stop("done")` writes the final text, and nothing is written after `stop` (interval cleared; no timer leak).
+
+### Finding dispositions
+
+- **R1-001** → fixed by S7: no raw mode and no keypress handler means Ctrl+C is a real terminal SIGINT again, killing the foreground process group (parent + engine child, exit 130) exactly like the CLI path; no `process.exit(0)`, no orphaned engine, no false success.
+- **R1-002** → resolved structurally by the same fix: the owned spinner registers no SIGINT/SIGTERM handlers, so the first externally delivered termination signal takes the default disposition and terminates the process instead of being swallowed. Recorded as a conscious disposition, not a separate stage.
+
+### Validation strategy (S7)
+
+- `npm run check` — biome + tsc + depcruise (clack-confinement and instantiation guards must stay green with the reduced clack import).
+- Full `npm test` — 749/44 baseline intact plus the new `spinner.test.ts` assertions green.
+- Mutation-verify (executed and logged, then reverted): re-introducing clack's `spinner()` in the prompter makes tests 1–2 red, proving the suite guards the fix.
+- After S7: scoped re-review of the fix delta per the ledger's fix-round protocol (orchestrator-owned, not a plan stage).

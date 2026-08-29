@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -130,6 +130,27 @@ checkpoints:
         (e6f2h2-D1..D4 below); Q1 decided against the orchestrator's recommendation.
       responded_at: "2026-08-29T15:50:00Z"
     resolved_at: "2026-08-29T15:50:00Z"
+  - id: cp-spec-result-rendering
+    type: phase_validation
+    stage: sddl-spec
+    summary: >-
+      spec.md is ready for design. 17 individually verifiable acceptance criteria encode D1-D4
+      without reopening them, each naming what checks it. Nine A-level questions resolved in-spec
+      (e6f2h2-A1..A9); no new B-level question and nothing requiring `src/core/**`. The spec
+      overruled the proposal's Q6 recommendation with evidence: markdown-dependent output keys on
+      `engineOutput` presence, never on the terminal state, because a parse-stage fault yields
+      `engine-error` carrying `engineOutput` AND `failure` together. The `Full review` path line is
+      gated on exactly the condition under which `run-store-fs.ts:223` writes `result.md`. AC-15
+      makes the supersession of `[E6.F2.H1]` AC-7 explicit while preserving its AC-8 coverage.
+    question: >-
+      Approve the spec and route to sddl-design, revise this phase, or run judgment-day over
+      spec.md first (it supersedes a completed story's acceptance criteria)?
+    free_input_allowed: true
+    created_at: "2026-08-29T16:10:00Z"
+    response:
+      free_text: "Approved as written — route to sddl-design. Judgment-day declined."
+      responded_at: "2026-08-29T16:15:00Z"
+    resolved_at: "2026-08-29T16:15:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -171,6 +192,15 @@ decisions:
       core findings model was explicitly rejected as scope expansion — this CLOSES the level-C
       escalation vector recorded as risk-e6f2h2-004.
     recorded_at: "2026-08-29T15:50:00Z"
+  - id: e6f2h2-D5
+    checkpoint_id: cp-spec-result-rendering
+    selected_option_id: approve-route-to-design
+    free_text: "Sí, ir a design"
+    rationale: >-
+      Spec approved as written, including its evidence-backed overrule of the proposal's Q6
+      state-keyed recommendation. Judgment-day over spec.md was offered (it supersedes a completed
+      story's ACs) and declined — the 4R review after execution remains the adversarial pass.
+    recorded_at: "2026-08-29T16:15:00Z"
   - id: e6f2h2-D4
     checkpoint_id: cp-proposal-result-rendering
     selected_option_id: tui-only

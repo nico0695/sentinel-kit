@@ -410,6 +410,28 @@ checkpoints:
       free_text: "Colapsar en S5, reusando la normalización del archivo. S5 approved."
       responded_at: "2026-08-29T20:45:00Z"
     resolved_at: "2026-08-29T20:45:00Z"
+  - id: cp-stage-approval-s6
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      STAGE S6 — goal: the post-run `offerFullView` prompt on BOTH persistRun branches, plus the
+      suite that covers it. Scope: MODIFIED `tui-flow.ts`, NEW `__test__/full-view.test.ts`,
+      MODIFIED `__test__/result.test.ts` (the AC-11 ordering assertion only). Touches code: yes —
+      the second and last stage that changes observable behaviour, and the one that introduces the
+      flow's first post-run interaction. Covers AC-8, AC-9, AC-10, AC-11, AC-13 and the prompt half
+      of AC-5. Validation: FULL `npm test` (narrowed is not enough — the full run is what PROVES
+      the four other TUI suites need no edit), the dual-env adapters run, and mutation-verifies
+      M3, M4 and M5. Baseline 824/46, additive only. Load-bearing invariants: declining or
+      cancelling the prompt changes neither the rendered outcome nor the exit code, and the prompt
+      lands strictly AFTER persistRun settles, so it can never affect whether the run was recorded.
+    question: >-
+      Approve S6, or pause before the post-run prompt is wired?
+    free_input_allowed: true
+    created_at: "2026-08-29T21:35:00Z"
+    response:
+      free_text: "avanza"
+      responded_at: "2026-08-29T21:36:00Z"
+    resolved_at: "2026-08-29T21:36:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -525,6 +547,18 @@ decisions:
       replacement must feed a genuinely multi-line message — the shape measured in this session
       from a real bad-ref `git worktree add`: 3 lines including a blank one.
     recorded_at: "2026-08-29T20:45:00Z"
+  - id: e6f2h2-D10
+    checkpoint_id: cp-stage-approval-s6
+    selected_option_id: approve-s6
+    free_text: "avanza"
+    rationale: >-
+      S6 authorised. Scoped to this stage; S7 (the CLAUDE.md closeout) still follows, and after it
+      the 4R review over the frozen diff and final QA — the only stage that may mark the change
+      completed. S6 must also land the permanent, env-independent palette invariants that
+      risk-e6f2h2-009 still tracks: M2 at S3 was a throwaway probe by necessity, and S5's stripAnsi
+      probe closed the reading-vs-running gap, but the invariants themselves belong in a permanent
+      suite here.
+    recorded_at: "2026-08-29T21:36:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

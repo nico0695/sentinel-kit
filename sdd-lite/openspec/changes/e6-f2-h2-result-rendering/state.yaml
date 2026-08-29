@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -83,7 +83,36 @@ stages:
       arose: no acceptance criterion requires touching `src/core/**`. No new B-level question
       arose. Two new risks appended (005, 006).
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-08-29T16:20:00Z"
+    completed_at: "2026-08-29T16:45:00Z"
+    notes: >-
+      design.md written by a fresh delegated worker. Ratifies e6f2h2-D1..D5 as mechanisms and
+      closes the four items the spec left "open — design detail". Module layout inside
+      `src/adapters/driving/tui/`: NEW `findings.ts` (pure `[SEV: …]` matcher/extractor, zero
+      imports) + NEW `colors.ts` (the ONLY `picocolors` importer, exporting a four-role
+      `TuiPalette`, the real `TUI_PALETTE` and an identity `PLAIN_PALETTE`) + rewritten
+      `render.ts` (`formatResultDigest` / `formatFullView`, palette as a REQUIRED argument so no
+      test can inherit the ambient one; `formatTuiErrorLine` kept byte-identical per Q9/D4).
+      Colour determinism is dual and grounded in picocolors' actual source, read from the hoisted
+      transitive copy in `node_modules` (1.1.1, CJS, `export =`): `isColorSupported` is a
+      load-time snapshot that `NO_COLOR` forces off and that `FORCE_COLOR` **or a bare `CI` env
+      var** forces on — so pure tests inject `PLAIN_PALETTE` and flow tests compare through a new
+      `stripAnsi` helper in `tui-test-doubles.ts`, making AC-14's two env runs assert identical
+      strings. Spec A7 VERIFIED against the code, not assumed: `TuiPrompter.confirm` already
+      exists (`tui-deps.ts:95`) and `createTuiDeps` (`container.ts:281`) needs no edit, so
+      `src/main/**` is untouched. The post-run prompt is one `offerFullView` helper called at the
+      end of BOTH `persistRun` branches (spec A6), after the try/catch settles (AC-11), returning
+      void so the two `return 0` / `return 1` statements are untouched (AC-10); its blank-guard is
+      what keeps the four other TUI suites valid (verified: no TUI test outside `result.test.ts`
+      sets `engineOutput`). Digest copy, the exact matching rule, blocker-before-major grouping,
+      `split("\n")` (not `/\r?\n/`, which would break AC-12 on CRLF), label padding before
+      colouring, and `node:path.join` for the `Full review` line are all fixed in the artifact.
+      All 17 ACs mapped to a mechanism and a file. Ten A-level decisions recorded; no level-C item
+      (zero `src/core/**`); no new B-level item except a CONDITIONAL one — if `tsc --noEmit`
+      rejects `import pc from "picocolors"` under `verbatimModuleSyntax` with no `esModuleInterop`,
+      the `allowSyntheticDefaultImports` fix edits repo-wide config and must be escalated, not
+      applied silently.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -268,20 +297,43 @@ open_risks:
       guard guarantees no script can reach this prompt, and cancel is a value, so Esc/Ctrl+C
       resolves it cleanly without changing the rendered outcome or the exit code (AC-10).
     severity: low
+  - id: risk-e6f2h2-007
+    summary: >-
+      Dependency assumption, not yet a fact. The design is written against `picocolors@1.1.1` as
+      READ from the hoisted transitive copy in `node_modules` (it is not a declared dependency
+      yet): CJS, `main: ./picocolors.js`, `types: ./picocolors.d.ts` with `export = picocolors`,
+      no `exports` map, colour functions on the default export. `npm i -E picocolors` may resolve
+      a different version, and this repo's tsconfig (`NodeNext` + `verbatimModuleSyntax`, no
+      `esModuleInterop`) has not been proven to accept `import pc from "picocolors"`. Note the
+      namespace form is runtime-WRONG here: cjs-module-lexer sees `module.exports = createColors()`
+      and would expose only `default` + `createColors`, so `pc.red` would be undefined. Mitigation:
+      plan stage S1 is an explicit install-and-confirm gate (pin the resolved version, confirm the
+      export shape, run the typecheck) BEFORE any rendering code is written — the `[E6.F2.H1]`
+      lesson where a guessed clack version stopped the executor mid-stage.
+      PARTIALLY RESOLVED 2026-08-29 by an orchestrator probe against the hoisted 1.1.1 (temporary
+      file under `src/`, `npx tsc --noEmit`, then removed; working tree left clean): the tsconfig
+      DOES accept `import pc from "picocolors"` — probe clean, and `pc.red` is a function at
+      runtime — so the design's conditional B-level question about `allowSyntheticDefaultImports`
+      does NOT fire and no repo-wide config edit is needed. The namespace form was confirmed
+      runtime-wrong exactly as predicted (`Object.keys` = `createColors,default`, `pc.red`
+      undefined). Colour determinism confirmed: `FORCE_COLOR=1` emits ANSI, `NO_COLOR=1` does not,
+      and a bare `CI=1` forces colour ON — which is why no assertion may rely on ambient detection.
+      RESIDUAL: `npm i -E picocolors` may still resolve a version other than 1.1.1, so S1 keeps its
+      install-and-confirm gate; only the interop half of this risk is closed.
+    severity: low
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-plan
   summary: >-
-    spec.md is formalized: 17 acceptance criteria over the firm ground of e6f2h2-D1..D4, with the
-    scope boundary explicitly excluding any `src/core/**` change and any CLI change. sddl-design
-    now ratifies and exact-pins `picocolors` (the `@clack/prompts` precedent), fixes the digest's
-    literal labels/ordering, picks the colour-determinism mechanism AC-14 requires (injected seam
-    vs ANSI-stripping in assertions), decides the module layout inside
-    `src/adapters/driving/tui/` and the confinement point for `picocolors`, and settles the new
-    `formatTuiResult`/full-view renderer signatures for the two `tui-flow.ts` call sites (whose
-    failure shapes differ: raw `unknown` on the persist-failure path, reduced `message` on the
-    persisted path). A phase checkpoint is warranted before design: the spec supersedes a completed
-    story's acceptance criterion (`[E6.F2.H1]` AC-7, risk-e6f2h2-003), carries the open medium risk
-    risk-e6f2h2-001, and adds two new low risks (005, 006).
+    design.md is complete: file layout, four signatures, the digest's literal copy, the exact
+    `[SEV: …]` matching rule and an AC → mechanism → file map for all 17 criteria. sddl-plan now
+    stages it. Two ordering constraints the design fixes for the plan: (1) S1 must be
+    "install + exact-pin `picocolors` + confirm the resolved API and that `tsc --noEmit` accepts
+    the default import" before any rendering code is written (risk-e6f2h2-007); (2) the CLAUDE.md
+    closeout is the LAST stage (AC-17, the `[E6.F2.H1]` D0 precedent). The rewrite of
+    `result.test.ts` (AC-15 supersession of `[E6.F2.H1]` AC-7) should be its own visible stage so
+    the diff review can check the four preserved AC-8 cases. A phase checkpoint is warranted only
+    if the user wants to pre-approve the conditional level-B tsconfig escalation; otherwise the
+    design carries no unresolved technical decision.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T16:10:00Z"
+updated_at: "2026-08-29T16:45:00Z"

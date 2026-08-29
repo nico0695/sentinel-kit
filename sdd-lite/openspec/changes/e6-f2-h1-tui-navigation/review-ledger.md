@@ -8,9 +8,9 @@
 - lenses run: R1 risk, R2 readability, R3 reliability, R4 resilience — one sweep each. The first R1/R2/R3 workers were killed mid-sweep by a provider session limit before returning any findings; they were relaunched with byte-identical envelopes (a retry of the same sweep, not a second sweep). R4 completed on the first launch.
 - refuter: not run — the only severe finding (R1-001) is `deterministic`, and deterministic findings are never refuted; zero severe inferential candidates existed
 - counts: confirmed 1 · suspect 0 · escalated 0 · info 4
-- open_severe_findings: 1
-- fix rounds used: 0 of 2
-- verdict: not_reached (fix round pending for R1-001)
+- open_severe_findings: 0 (R1-001 verified after fix round 1)
+- fix rounds used: 1 of 2
+- verdict: pass_with_warnings (no open severe findings; 4 info rows remain)
 
 ## Findings
 
@@ -25,7 +25,7 @@
   - `node_modules/@clack/core/dist/index.mjs:55-59` — cancel aliases are `\x03` (Ctrl+C; raw mode means no SIGINT is generated) and `escape`
   - `src/core/run/run-review.ts:274-299` — worktree cleanup is in-process after the engine await; `process.exit` skips it; the execa engine child is not killed by parent exit
   - Contrast: the CLI review path has no spinner, so Ctrl+C delivers SIGINT to the whole foreground process group (parent and engine child die, exit 130); the TUI spinner converts this into a parent-only exit 0 with the child left running
-- status: open
+- status: verified — fixed in S7 (commit `4a6b4c2`): the prompter owns a minimal interval-driven spinner (injected sink, no stdin, no raw mode, no keypress handler, no process listeners); clack's `spinner` import removed, clack retained for `select`/`confirm` only (their cancel path resolves to a symbol — safe, pre-existing surface). Scoped re-review confirmed: no reachable path to clack's `block()` spinner, regression tests red if the clack spinner returns (listener counts on the exact five events clack registers, plus stdin `keypress`/`data` counts — unconditional in `block()`, so red even in non-TTY CI), error paths stop the spinner before rethrow, no writes after stop, no new severe findings.
 
 ### R1-002 — WARNING — info
 
@@ -33,7 +33,7 @@
 - evidence_class: deterministic · causal_disposition: introduced
 - claim: An externally delivered SIGINT/SIGTERM arriving while a spinner is active is swallowed: clack's spinner registers `process.on('SIGINT'/'SIGTERM')` handlers that only render a "Canceled" line and return, so the first termination request to a TUI review is silently ignored and the review continues to completion, persists, and exits 0.
 - proof_refs: `node_modules/@clack/prompts/dist/index.mjs:966-973`; `src/adapters/driving/tui/tui-flow.ts:186-193`
-- note: same root as R1-001 (clack's spinner process-control behavior); a fix for R1-001 should resolve or consciously re-scope this too.
+- note: same root as R1-001 (clack's spinner process-control behavior). RESOLVED structurally by the S7 fix: the owned spinner registers zero process listeners (asserted by regression test 1, including SIGINT/SIGTERM), so external signals take default disposition. Stays `info` (was WARNING per the severity floor).
 
 ### R2-001 — SUGGESTION — info
 
@@ -66,7 +66,7 @@
 
 ## Fix Rounds
 
-- Round 1: pending — R1-001 (and R1-002 as same-root) routed via `review_gate`: rerun `sddl-plan` to insert a fix stage (S7) from the confirmed ledger ids, then `stage_approval`, then `sddl-executor`, then a scoped re-review of the fix delta.
+- Round 1: COMPLETE. Routed via `review_gate` (user approved): `sddl-plan` appended fix stage S7 → `sddl-executor` implemented it test-first (regression suite red pre-fix 4/5, green post-fix 5/5, mutation-verify restoring the clack spinner turned the same 4 red; gate `npm run check` clean + `npm test` 754/45) → scoped re-review of the immutable fix delta (commit `4a6b4c2`) verified R1-001 and found zero new severe findings (adapters 405/405, depcruise clean). R1-001 `fixed → verified`; R1-002 resolved structurally. Round 2 unused.
 
 ## Review History
 

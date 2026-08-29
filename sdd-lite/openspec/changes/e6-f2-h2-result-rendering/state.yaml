@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -100,7 +100,65 @@ checkpoints:
       changes the story's nature rather than its detail.
     free_input_allowed: true
     created_at: "2026-08-29T15:35:00Z"
-decisions: []
+    response:
+      free_text: >-
+        Approved, route to sddl-spec. All four B-level questions decided by the user
+        (e6f2h2-D1..D4 below); Q1 decided against the orchestrator's recommendation.
+      responded_at: "2026-08-29T15:50:00Z"
+    resolved_at: "2026-08-29T15:50:00Z"
+decisions:
+  - id: e6f2h2-D1
+    checkpoint_id: cp-proposal-result-rendering
+    selected_option_id: digest-plus-full-toggle
+    free_text: "Digest + toggle a completo"
+    rationale: >-
+      Q1 (rendering depth). The result step renders a compact digest — verdict, findings by
+      severity, run path — and then offers the user an opt-in way to see the full review without
+      leaving the TUI. The user chose this over the orchestrator's digest-only recommendation:
+      the digest satisfies "at a glance" while the toggle removes the "open a file to learn why"
+      friction that motivated the story. CONSEQUENCE the spec must own: this adds a post-run
+      interaction to a flow whose prompts were all pre-run in `[E6.F2.H1]`. Declining the toggle,
+      or cancelling at it, must not change the outcome already rendered nor the exit code (H1's
+      property "completed + persisted -> 0"), and it lands after persistence, so it can never
+      affect whether the run was recorded. Existing scripted-prompter test doubles will need the
+      extra scripted answer.
+    recorded_at: "2026-08-29T15:50:00Z"
+  - id: e6f2h2-D2
+    checkpoint_id: cp-proposal-result-rendering
+    selected_option_id: picocolors-only
+    free_text: "Solo picocolors"
+    rationale: >-
+      Q2 (runtime dependency). `picocolors` only, ratified and exact-pinned at design per the
+      `@clack/prompts` precedent from `[E6.F2.H1]`; `marked-terminal` is rejected for the MVP
+      (the backlog itself marks it optional). CONSEQUENCE the spec must state honestly: with no
+      markdown renderer, the full view prints the engine's raw markdown text — colorized where
+      the severity convention matches — and is NOT a rendered-markdown view. Narrows
+      risk-e6f2h2-002 to a single small dependency.
+    recorded_at: "2026-08-29T15:50:00Z"
+  - id: e6f2h2-D3
+    checkpoint_id: cp-proposal-result-rendering
+    selected_option_id: extraction-in-tui-adapter
+    free_text: "En el adaptador TUI"
+    rationale: >-
+      Q3 (where severity/finding extraction lives). An adapter-side heuristic over the harness
+      `[SEV: level] file:line — summary` convention, inside `src/adapters/driving/tui/`, with
+      graceful degradation to plain output when the engine does not comply. Keeps the story
+      presentational: zero core changes, blast radius of one renderer plus its call sites. The
+      core findings model was explicitly rejected as scope expansion — this CLOSES the level-C
+      escalation vector recorded as risk-e6f2h2-004.
+    recorded_at: "2026-08-29T15:50:00Z"
+  - id: e6f2h2-D4
+    checkpoint_id: cp-proposal-result-rendering
+    selected_option_id: tui-only
+    free_text: "Solo TUI"
+    rationale: >-
+      Q4 (CLI scope). The rich surface is TUI-only. The CLI's review block is a deliberately
+      machine-parseable `key<TAB>value` contract for pipes and scripting (`REVIEW_OUTCOME_FIELDS`
+      in `cli/render/format-review.ts`); decorating it would break that contract, and the
+      `adapters-isolated` guard forbids sharing code between driving adapters anyway. Confirms
+      the proposal's Q9 finding: H1's `formatTuiErrorLine` duplication does not materially grow,
+      so the recorded revisit is performed and the duplication stays.
+    recorded_at: "2026-08-29T15:50:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-
@@ -118,8 +176,10 @@ open_risks:
       declared-only recommendations in docs/setup-tecnico-sentinel.md §4 (marked-terminal is
       flagged optional there and in the backlog), and neither is installed. Adding a runtime dep is
       a B-level decision ratified at design with justification, per the `[E6.F2.H1]` precedent —
-      not pre-approved by this proposal.
-    severity: medium
+      not pre-approved by this proposal. NARROWED by e6f2h2-D2: `picocolors` only (exact-pinned
+      at design), `marked-terminal` rejected for the MVP. Residual risk is one small dependency
+      and the honesty constraint that the full view is raw markdown, not rendered markdown.
+    severity: low
   - id: risk-e6f2h2-003
     summary: >-
       This story must supersede acceptance criteria of a completed story. `[E6.F2.H1]` AC-7 pinned
@@ -134,14 +194,19 @@ open_risks:
       domain knowledge (a structured findings model beside the verdict parser in `src/core/run/`),
       the blast radius jumps from one presentation adapter to a core hot path and the story stops
       being `[E6.F2.H2]`. Treat that outcome as level C — stop and ask — rather than absorbing it.
-    severity: medium
+      CLOSED by e6f2h2-D3: extraction stays in the TUI adapter; a core findings model is rejected.
+      Retained as a standing guard — if execution finds itself editing `src/core/**`, stop.
+    severity: low
 next_action:
-  kind: wait_for_approval
-  target: cp-proposal-result-rendering
+  kind: delegate_stage
+  target: sddl-spec
   summary: >-
-    Present the proposal checkpoint to the user: approve and route to sddl-spec, revise, or stop —
-    and decide the four B-level questions (rendering depth, runtime dependency, where finding
-    extraction lives, CLI scope). On approval the next stage is sddl-spec, which must formalize
-    the ACs, resolve the five A-level questions, and explicitly supersede `[E6.F2.H1]` AC-7.
+    Proposal approved and all four B-level questions decided (e6f2h2-D1..D4). sddl-spec formalizes
+    the acceptance criteria over that firm ground: digest + opt-in full view (D1), picocolors only
+    with the full view as raw markdown (D2), adapter-side `[SEV: ...]` extraction with graceful
+    degradation (D3), TUI-only (D4). It must also resolve the five A-level questions, state the
+    post-run-prompt semantics D1 introduces (decline/cancel changes neither the rendered outcome
+    nor the exit code; it lands after persistence), and explicitly supersede `[E6.F2.H1]` AC-7
+    rather than silently editing its pinned assertions.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T15:35:00Z"
+updated_at: "2026-08-29T15:50:00Z"

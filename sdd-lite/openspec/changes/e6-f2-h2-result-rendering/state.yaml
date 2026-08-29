@@ -158,26 +158,36 @@ stages:
     status: in_progress
     started_at: "2026-08-29T18:00:00Z"
     notes: >-
-      S1 (dependency gate) DONE; S2-S7 pending. `npm i -E picocolors` resolved **exactly 1.1.1** —
-      the version design.md and the orchestrator probe were written against — so the level-B
-      escalation branch of risk-e6f2h2-007 did not fire. `dependencies` carries a bare
-      `"picocolors": "1.1.1"` (no caret, no range); the lockfile change is the promotion of the
-      already-hoisted transitive dev copy (`"dev": true` removed), same `resolved`/`integrity`.
-      Runtime probe writing no file — `node --input-type=module -e 'import pc from "picocolors";
-      …'` — printed `function function function function` for red/green/yellow/dim (also bold,
-      cyan, gray); the default-import form is confirmed correct on the resolved version, closing
-      the open half of risk-e6f2h2-007 (the interop half was already closed by the orchestrator
-      probe, so **no `tsconfig.json` edit was needed or made**). Env behaviour re-confirmed in this
-      environment for the S3/S6 AC-14 harness and M2: ambient is colour-OFF (`isColorSupported`
-      false), `FORCE_COLOR=1` emits real SGR sequences, `NO_COLOR=1` forces off. Quick checks:
-      `npm run check` clean (biome 156 files, tsc silent, depcruise 103 modules / 247 dependencies,
-      no violations); full `npm test` **754 tests / 45 files passed** — the inherited baseline is
-      **CONFIRMED exactly**, no correction needed (unlike the [E6.F2.H1] 707->708 precedent), and
-      every later stage compares against 754/45. Changed files are exactly the planned scope:
-      `package.json` + `package-lock.json`; `git diff --stat src/` empty and
-      `grep -rn picocolors src/` = 0 hits (the single-importer rule lands at S3). No deviation, no
-      blocker, no scope drift, no new risk. QA review deferred (no source touched); no git side
-      effects — the working tree carries the two files uncommitted for the orchestrator.
+      S1 and the S2/S3 batch are DONE; S4-S7 pending. S1 (committed as `b0a3a04`): `npm i -E
+      picocolors` resolved exactly 1.1.1, bare-pinned, four colour functions confirmed on the
+      default export, `npm run check` clean, inherited baseline CONFIRMED at 754 tests / 45 files;
+      risk-e6f2h2-007 fully closed and no `tsconfig.json` edit needed or made. S2+S3 (batched
+      under the same approval, uncommitted): NEW `tui/findings.ts` (86 lines, zero imports —
+      `matchFindingLine` / `extractFindings`, the design's rule verbatim, with the regex
+      alternation deliberately left as the SOLE severity gate so M1 stays observable) plus NEW
+      `__test__/findings.test.ts` (228 lines, 24 tests, both positive fixture cases read from the
+      real `fixtures/claude-code/valid-verdict.json`); NEW `tui/colors.ts` (76 lines, `TuiPalette`
+      / `TUI_PALETTE` / `PLAIN_PALETTE`, the SOLE `picocolors` importer via the default form) and
+      `__test__/tui-test-doubles.ts` +22/-0 adding the exported `stripAnsi` (existing doubles
+      byte-unchanged). Both mutation-verifies were really run: M1 (severity group widened to
+      `[a-z]+`) went RED with 2 failures — the unit `[SEV: critical]` case AND the extractor's
+      source-order case, which gained a `critical` finding — then was reverted to green; M2's
+      throwaway probe was GREEN under `FORCE_COLOR=1` (`TUI_PALETTE.bad` really emits SGR and
+      `stripAnsi` reverses it, closing the risk-e6f2h2-009 vacuity hole empirically) and RED under
+      `NO_COLOR=1` (proving it cannot be permanent), then deleted. Quick checks: `npm run check`
+      clean (biome 159 files, tsc silent — the real typecheck of the default import — depcruise
+      106 modules / 248 dependencies, no violations; no orphan rule, so the unimported modules are
+      legal); adapters project 429/429 identical under both `NO_COLOR=1` and `FORCE_COLOR=1`; full
+      `npm test` 778 tests / 46 files passed = 754 + 24 new, purely additive, zero failures;
+      `git diff --stat src/core` and `src/main` empty. ONE deviation, recorded: the plan's literal
+      confinement command `grep -rn "picocolors" src/` cannot return 1 hit because design.md
+      requires the header to state the single-importer rule in prose — it returns 9 hits in 2
+      files (8 prose/import in `colors.ts`, 1 prose in the test doubles), while the
+      statement-level `grep -rEn '^import .*"picocolors"' src/` returns exactly 1
+      (`colors.ts:34`); S7's sweep should use the statement-level form. No blocker, no scope
+      drift, no new risk, no git side effects. S4 was NOT started — it needs its own
+      `stage_approval`. Stage-mode QA review recommended (not run) at this checkpoint, per the
+      user's "stop after S3".
   sddl-qa-review:
     status: pending
 artifacts:
@@ -484,22 +494,23 @@ next_action:
   kind: run_stage
   target: sddl-executor
   summary: >-
-    S1 is DONE and clean — `picocolors` resolved to exactly **1.1.1**, bare-pinned, four colour
-    functions confirmed on the default export, `npm run check` clean and the inherited baseline
-    **CONFIRMED at 754 tests / 45 files** (no correction). Changed files: `package.json` +
-    `package-lock.json` only, uncommitted. risk-e6f2h2-007 is now fully closed and no
-    `tsconfig.json` edit was needed. Next: the orchestrator commits S1, then `sddl-executor` runs
-    the **S2 + S3 batch** under the already-granted `cp-stage-approval-s1-s3` — S2 adds
-    `tui/findings.ts` + `__test__/findings.test.ts` (the AC-3 matrix, both fixture lines read from
-    `fixtures/claude-code/valid-verdict.json`, mutation-verify M1); S3 adds `tui/colors.ts` as the
-    SOLE `picocolors` importer using the **default import form** (`import * as pc` is
-    runtime-wrong: `pc.red` is undefined) plus `stripAnsi` in `__test__/tui-test-doubles.ts`,
-    validated by `npm run check`, `grep -rn picocolors src/` = 1 hit, the adapters project green
-    under both `NO_COLOR=1` and `FORCE_COLOR=1`, and mutation-verify M2 (confirmed executable:
-    `FORCE_COLOR=1` really emits SGR sequences in this environment). The user asked to STOP after
-    S3 for the stage summary. Every later comparison uses the 754/45 baseline; S5 is the only
-    stage permitted to reduce it, by exactly the three superseded `formatTuiResult` cases. After
-    execution: a 4R code review over the frozen diff, then final QA — the only stage that may mark
-    this change completed.
+    S2 + S3 are DONE and green, uncommitted, and the user's stop point is reached. Landed:
+    `src/adapters/driving/tui/findings.ts` (NEW, pure, zero imports),
+    `src/adapters/driving/tui/__test__/findings.test.ts` (NEW, 24 tests, including the real
+    `fixtures/claude-code/valid-verdict.json` lines), `src/adapters/driving/tui/colors.ts` (NEW,
+    the sole `picocolors` importer, default import form) and `__test__/tui-test-doubles.ts`
+    (+22/-0, exported `stripAnsi`). Evidence: `npm run check` clean; full `npm test` 778 / 46
+    (= 754 + 24, purely additive); adapters project 429/429 identical under `NO_COLOR=1` and
+    `FORCE_COLOR=1`; the statement-level picocolors grep exactly 1 hit (`colors.ts:34`);
+    `git diff --stat src/core` empty. M1 verified RED then restored; M2 verified GREEN under
+    `FORCE_COLOR=1` and RED under `NO_COLOR=1`, then deleted. Next: the orchestrator commits
+    S2 + S3 and gives the stage summary the user asked for, optionally running a stage-mode
+    `sddl-qa-review` first (recommended, cheap — nothing imports the new modules yet). Then a NEW
+    `stage_approval` for S4 (`render.ts` additive: `formatResultDigest` + `formatFullView`,
+    `formatTuiResult` retained for exactly one more stage, plus the pure `PLAIN_PALETTE`
+    describes in `result.test.ts`) — S4 is NOT covered by `cp-stage-approval-s1-s3`. The baseline
+    for later comparisons is now 778 / 46 (S5 is still the only stage permitted to reduce it, by
+    exactly the three superseded `formatTuiResult` cases). After execution: 4R code review over
+    the frozen diff, then final QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T18:15:00Z"
+updated_at: "2026-08-29T18:20:00Z"

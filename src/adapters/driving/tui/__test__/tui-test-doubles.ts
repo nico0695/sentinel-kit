@@ -42,6 +42,28 @@ export function createCapturingTuiIo(): CapturingTuiIo {
   };
 }
 
+/**
+ * Removes ANSI SGR escape sequences (`\x1b[<params>m`) from a captured line
+ * (`[E6.F2.H2]`, #39; AC-14).
+ *
+ * The flow uses the real `TUI_PALETTE`, whose output depends on an ambient
+ * decision `picocolors` makes once at load time — off by default here, ON
+ * under `FORCE_COLOR=1` **and in any run that sets `CI`**. Flow assertions
+ * therefore compare stripped lines: a no-op when colour is off, a real
+ * removal when it is on, and the same expected strings either way. That
+ * identity is what the AC-14 dual run (`NO_COLOR=1` / `FORCE_COLOR=1`)
+ * verifies.
+ *
+ * Deliberately narrow — only SGR, no cursor or erase sequences, no terminal
+ * emulation. Mirrors `core/run`'s private `stripAnsiSgr`; the guards forbid
+ * importing it (and it is not exported), so the two-line body is duplicated
+ * rather than shared.
+ */
+export function stripAnsi(text: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the ESC (0x1b) control byte is the deliberate target — SGR sequences begin with it by definition.
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 /** Shorthand for scripting an answered prompt. */
 export function answer<T>(value: T): PromptOutcome<T> {
   return { kind: "answer", value };

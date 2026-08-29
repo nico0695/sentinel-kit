@@ -1,10 +1,26 @@
 /**
- * Driving adapter: tui — minimal rendering (`[E6.F2.H1]`, #38; AC-7, AC-9).
+ * Driving adapter: tui — result rendering (`[E6.F2.H2]`, #39; AC-1..AC-7,
+ * AC-12, AC-14).
  *
- * Deliberately minimal, per the H1/H2 boundary: the result step shows the
- * terminal state, the verdict when one exists, and the persisted run
- * directory — no markdown rendering, no severity highlighting. Rich
- * rendering is `[E6.F2.H2]`'s entire scope and will rewrite this surface.
+ * The whole module is pure: strings in, strings out. It holds no state,
+ * touches no stream, reads no `process` and knows nothing about a terminal —
+ * `tui-flow.ts` owns the writing, `colors.ts` owns the only terminal library
+ * import, and every renderer here takes its palette as a required argument so
+ * nothing can silently inherit `picocolors`' ambient, load-time colour
+ * decision.
+ *
+ * Two surfaces: {@link formatResultDigest}, the compact block the result step
+ * always shows, and {@link formatFullView}, the engine's own markdown emitted
+ * verbatim behind the opt-in prompt. Findings are recognized by the
+ * `[SEV: …]` heuristic in `findings.ts`, decoration is chosen per fact, and
+ * every coloured fact is also plain text on the same line — stripping the
+ * colour loses nothing.
+ *
+ * `[E6.F2.H1]`'s minimal result block — state, verdict only when one
+ * existed, run directory — is **superseded** by {@link formatResultDigest},
+ * not wrapped: its renderer is deleted, not deprecated. H1 AC-7 pinned that
+ * block to keep H2's surface from slipping in early, and this story is that
+ * surface (AC-15).
  */
 
 import { join } from "node:path";
@@ -22,6 +38,23 @@ import {
 const ABSENT = "-";
 
 /**
+ * Collapses every newline — and the whitespace hugging it — into a single
+ * space (`[E6.F2.H2]` D9, AC-6).
+ *
+ * Both consumers render one fact per physical line, so a message that broke a
+ * line would break the block. And such messages are ordinary, not exotic:
+ * `git-cli.ts` builds port errors as `` `${message}: ${asError.message}` ``
+ * over an execa error, and a bad ref makes `git worktree add` reject with a
+ * three-line message containing a blank line. `run-review.ts` returns that as
+ * a *failure* rather than throwing, so it reaches the digest on a perfectly
+ * normal path. The CLI's `render/format-review.ts` `field()` collapses the
+ * same value for the same reason.
+ */
+function collapseToOneLine(raw: string): string {
+  return raw.replace(/\s*\n\s*/g, " ").trim();
+}
+
+/**
  * Reduces any throwable to a single human-readable line.
  *
  * DELIBERATE DUPLICATION of the CLI's `render/format-error.ts`
@@ -32,7 +65,7 @@ const ABSENT = "-";
  */
 export function formatTuiErrorLine(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
-  const collapsed = raw.replace(/\s*\n\s*/g, " ").trim();
+  const collapsed = collapseToOneLine(raw);
 
   if (collapsed !== "") {
     return collapsed;
@@ -44,27 +77,6 @@ export function formatTuiErrorLine(error: unknown): string {
 }
 
 /**
- * The minimal result block (AC-7): state, verdict when present, run
- * directory. `runDir` renders as `-` when persistence failed — nothing was
- * written, so no directory is fabricated (mirrors the CLI's D13 semantics).
- */
-export function formatTuiResult(
-  state: TerminalState,
-  verdict: Verdict | undefined,
-  runDir?: string,
-): readonly string[] {
-  return [
-    `State: ${state}`,
-    ...(verdict !== undefined ? [`Verdict: ${verdict}`] : []),
-    `Run directory: ${runDir ?? ABSENT}`,
-  ];
-}
-
-/* ------------------------------------------------------------------ */
-/*  `[E6.F2.H2]` (#39) — the result digest and the full view           */
-/* ------------------------------------------------------------------ */
-
-/**
  * Everything the result step renders, and nothing else (`[E6.F2.H2]`, #39).
  *
  * Deliberately carries no branch on `state`: the markdown-dependent parts of
@@ -72,7 +84,9 @@ export function formatTuiResult(
  * `src/core/run/run-review.ts` documents a parse-stage fault as
  * `engine-error` carrying `engineOutput` AND `failure` together. Both
  * optional shapes are the public core types the flow already holds, so the
- * persisted path passes `record.failure` straight through.
+ * persisted path hands `record.failure` over as it stands — its `message` is
+ * the only value normalised, and only for line breaks (D9; see
+ * {@link collapseToOneLine}).
  */
 export interface TuiResultDigest {
   readonly state: TerminalState;
@@ -243,7 +257,7 @@ export function formatResultDigest(
   if (digest.failure !== undefined) {
     lines.push(
       `Failure: ${palette.bad(
-        `${digest.failure.stage} — ${digest.failure.message}`,
+        `${digest.failure.stage} — ${collapseToOneLine(digest.failure.message)}`,
       )}`,
     );
   }

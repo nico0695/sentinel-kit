@@ -1,16 +1,27 @@
 /**
- * The minimal result step and persistence (AC-7, AC-8, AC-12).
+ * The result step, its persistence contract and the pure renderers
+ * (`[E6.F2.H2]`, #39; AC-1..AC-7, AC-12, AC-14, AC-15).
  *
- * Two contracts under guard:
+ * Three contracts under guard:
  *
- * - **AC-7 / H1-H2 boundary**: the result block is exactly state, verdict
- *   when present, and run directory — asserted as the literal tail of
- *   `stdout`, so no markdown or severity rendering can slip in unnoticed.
- * - **AC-8**: `persistRun` runs exactly once per completed run whatever the
- *   terminal state; when it throws, the outcome is still shown with `-` for
- *   the run directory, a no-history diagnostic lands on `stderr`, and the
- *   exit code is non-zero. A completed AND persisted run exits 0 regardless
- *   of terminal state (design §Interfaces, recorded A-level decision).
+ * - **The digest IS the result step's output.** The tail of `stdout` is
+ *   asserted against this story's contract — state, verdict (an explicit
+ *   "none" line when nothing was parsed), failure, findings, run paths —
+ *   through `stripAnsi`, so the same strings hold whether the ambient colour
+ *   decision is on or off (AC-1..AC-7, AC-14).
+ * - **AC-15, the supersession.** `[E6.F2.H1]` AC-7 pinned a literal
+ *   `State:` / `Verdict:` / `Run directory:` tail precisely to stop H2's
+ *   surface from slipping in early. That purpose is now served: the four
+ *   literal-tail assertions are rewritten against the digest contract, and
+ *   the renderer that produced that block — together with its three unit
+ *   cases — is deleted rather than deprecated. What must NOT be swept away
+ *   with them is H1's AC-8 coverage, preserved below unchanged.
+ * - **AC-8, preserved.** `persistRun` runs exactly once per completed run
+ *   whatever the terminal state; when it throws, the outcome is still shown
+ *   with `-` for the run directory, a no-history diagnostic lands on
+ *   `stderr`, and the exit code is non-zero. A completed AND persisted run
+ *   exits 0 regardless of terminal state (design §Interfaces, recorded
+ *   A-level decision).
  */
 
 import { readFileSync } from "node:fs";
@@ -34,7 +45,6 @@ import { PLAIN_PALETTE, type TuiPalette } from "../colors.js";
 import {
   formatFullView,
   formatResultDigest,
-  formatTuiResult,
   type TuiResultDigest,
 } from "../render.js";
 import { createTui } from "../tui-flow.js";
@@ -42,9 +52,27 @@ import {
   answer,
   createScriptedPrompter,
   createTuiTestDeps,
+  stripAnsi,
 } from "./tui-test-doubles.js";
 
 const RUN_DIR = "/tmp/sentinel-test/runs/owner__repo/20260829-000000-abc";
+
+/**
+ * A real `git worktree add` rejection against a bad ref, measured — three
+ * physical lines with a blank one in the middle. `git-cli.ts` wraps it,
+ * `run-review.ts` returns it as a *failure* rather than throwing, and
+ * `persist-run.ts` copies it into `record.failure.message` verbatim, so this
+ * is what the digest is handed on an ordinary path (D9, AC-6).
+ */
+const MULTILINE_GIT_FAILURE = [
+  "Command failed with exit code 128: git worktree add /tmp/wt definitely-not-a-ref",
+  "",
+  "fatal: invalid reference: definitely-not-a-ref",
+].join("\n");
+
+/** {@link MULTILINE_GIT_FAILURE} as the single line the digest must render. */
+const COLLAPSED_GIT_FAILURE =
+  "Command failed with exit code 128: git worktree add /tmp/wt definitely-not-a-ref fatal: invalid reference: definitely-not-a-ref";
 
 const config: GlobalConfig = {
   defaultEngine: "claude-code",
@@ -139,32 +167,7 @@ function harness(
   };
 }
 
-describe("formatTuiResult (AC-7)", () => {
-  it("renders state, verdict and run directory when all are present", () => {
-    expect(formatTuiResult("ok", "approve", RUN_DIR)).toEqual([
-      "State: ok",
-      "Verdict: approve",
-      `Run directory: ${RUN_DIR}`,
-    ]);
-  });
-
-  it("omits the verdict line when no verdict exists", () => {
-    expect(formatTuiResult("timeout", undefined, RUN_DIR)).toEqual([
-      "State: timeout",
-      `Run directory: ${RUN_DIR}`,
-    ]);
-  });
-
-  it("renders `-` rather than fabricating a run directory", () => {
-    expect(formatTuiResult("ok", "approve")).toEqual([
-      "State: ok",
-      "Verdict: approve",
-      "Run directory: -",
-    ]);
-  });
-});
-
-describe("result step per terminal state (AC-7, AC-8)", () => {
+describe("result step per terminal state (AC-1, AC-7, AC-8)", () => {
   const failedStates: readonly TerminalState[] = [
     "ambiguous",
     "engine-error",
@@ -172,19 +175,29 @@ describe("result step per terminal state (AC-7, AC-8)", () => {
     "validation-failed",
   ];
 
-  it("renders the minimal block and exits 0 for a persisted ok run", async () => {
+  it("renders the digest and exits 0 for a persisted ok run", async () => {
     const h = harness();
 
     const code = await h.run();
 
     expect(code).toBe(0);
-    // The literal tail of stdout IS the minimal block — nothing rendered
-    // after it, no markdown, no severities (H1/H2 boundary).
-    expect(h.deps.io.out.slice(-3)).toEqual([
-      "State: ok",
+    // AC-15, rewrite 1 of 4 (was H1's literal `State:` tail): the tail of
+    // stdout is the digest of the record that was persisted, compared
+    // through `stripAnsi` so it holds under NO_COLOR=1 and FORCE_COLOR=1
+    // alike (AC-14).
+    expect(h.deps.io.out.slice(-3).map(stripAnsi)).toEqual([
+      "Review result: ok",
       "Verdict: approve",
       `Run directory: ${RUN_DIR}`,
     ]);
+    // …and it is that digest rather than a look-alike: the very strings the
+    // pure renderer produces for the same record.
+    expect(h.deps.io.out.slice(-3).map(stripAnsi)).toEqual(
+      formatResultDigest(
+        { state: "ok", verdict: "approve", runDir: RUN_DIR },
+        PLAIN_PALETTE,
+      ),
+    );
     expect(h.persistRunRequests).toHaveLength(1);
     expect(h.deps.io.err).toEqual([]);
   });
@@ -203,8 +216,12 @@ describe("result step per terminal state (AC-7, AC-8)", () => {
       // contract; a completed, persisted interactive run exits 0.
       expect(code).toBe(0);
       expect(h.persistRunRequests).toHaveLength(1);
-      expect(h.deps.io.out.slice(-2)).toEqual([
-        `State: ${state}`,
+      // AC-15, rewrite 2 of 4: H1 silently omitted the verdict line for a
+      // verdictless run; the digest says so in words instead (AC-1), so the
+      // tail is three lines rather than two.
+      expect(h.deps.io.out.slice(-3).map(stripAnsi)).toEqual([
+        `Review result: ${state}`,
+        "Verdict: none — no verdict was parsed for this run.",
         `Run directory: ${RUN_DIR}`,
       ]);
     },
@@ -232,11 +249,17 @@ describe("persistence failure (AC-8, D13 mirror)", () => {
 
     await h.run();
 
-    expect(h.deps.io.out.slice(-3)).toEqual([
-      "State: ok",
+    // AC-15, rewrite 3 of 4: same digest contract, `-` for the directory
+    // that was never written — and no pointer at a `result.md` that does not
+    // exist either (AC-7).
+    expect(h.deps.io.out.slice(-3).map(stripAnsi)).toEqual([
+      "Review result: ok",
       "Verdict: approve",
       "Run directory: -",
     ]);
+    expect(
+      h.deps.io.out.some((line) => stripAnsi(line).startsWith("Full review:")),
+    ).toBe(false);
   });
 
   it("emits the no-history diagnostic and the failure, and exits non-zero", async () => {
@@ -268,10 +291,91 @@ describe("persistence failure (AC-8, D13 mirror)", () => {
     const code = await h.run();
 
     expect(code).toBe(1);
-    expect(h.deps.io.out.slice(-2)).toEqual([
-      "State: engine-error",
+    // AC-15, rewrite 4 of 4 — inside a preserved AC-8 case: the title and
+    // the exit-code assertion are H1's, only the rendered tail is this
+    // story's.
+    expect(h.deps.io.out.slice(-3).map(stripAnsi)).toEqual([
+      "Review result: engine-error",
+      "Verdict: none — no verdict was parsed for this run.",
       "Run directory: -",
     ]);
+  });
+});
+
+describe("the flow builds the digest from what it persisted (AC-5, AC-6, AC-7)", () => {
+  it("renders the record's findings section and the result.md pointer", async () => {
+    const h = harness({
+      record: {
+        ...okRecord,
+        verdict: "request-changes",
+        engineOutput: "[SEV: blocker] calc.js:6 — no guard\n[SEV: nit] naming",
+      },
+    });
+
+    const code = await h.run();
+
+    // AC-5: the markdown-keyed sections reach stdout for an `ok` run exactly
+    // as they would for any other state — the flow branches on the record's
+    // `engineOutput`, never on its state.
+    expect(code).toBe(0);
+    expect(h.deps.io.out.slice(-6).map(stripAnsi)).toEqual([
+      "Review result: ok",
+      "Verdict: request-changes",
+      "Findings: 1 blocker, 1 nit",
+      "  [blocker] calc.js:6 — no guard",
+      `Run directory: ${RUN_DIR}`,
+      `Full review: ${RUN_DIR}/result.md`,
+    ]);
+  });
+
+  it("collapses a multi-line failure message from the persisted record", async () => {
+    const h = harness({
+      record: {
+        ...withoutVerdict(okRecord),
+        state: "engine-error",
+        failure: { stage: "worktree", message: MULTILINE_GIT_FAILURE },
+      },
+      result: { state: "engine-error", cleanup: { attempted: false } },
+    });
+
+    const code = await h.run();
+
+    // D9 end to end on the persisted path: `persist-run.ts` copies the
+    // message verbatim, so the digest's own reduction is the only thing
+    // keeping one failure on one line.
+    expect(code).toBe(0);
+    expect(h.deps.io.out.slice(-4).map(stripAnsi)).toEqual([
+      "Review result: engine-error",
+      "Verdict: none — no verdict was parsed for this run.",
+      `Failure: worktree — ${COLLAPSED_GIT_FAILURE}`,
+      `Run directory: ${RUN_DIR}`,
+    ]);
+    expect(h.deps.io.out.some((line) => line.includes("\n"))).toBe(false);
+  });
+
+  it("reduces the raw failure to one line when the run could not be persisted", async () => {
+    const h = harness({
+      persistRunFails: new Error("Failed to persist run at /runs/owner__repo"),
+      result: {
+        state: "engine-error",
+        failure: { stage: "worktree", error: new Error(MULTILINE_GIT_FAILURE) },
+        cleanup: { attempted: false },
+      },
+    });
+
+    const code = await h.run();
+
+    // The persist-failure branch holds a raw throwable, not a record, so it
+    // normalises with `formatTuiErrorLine` before handing the digest AC-6's
+    // `{ stage, message }` shape.
+    expect(code).toBe(1);
+    expect(h.deps.io.out.slice(-4).map(stripAnsi)).toEqual([
+      "Review result: engine-error",
+      "Verdict: none — no verdict was parsed for this run.",
+      `Failure: worktree — ${COLLAPSED_GIT_FAILURE}`,
+      "Run directory: -",
+    ]);
+    expect(h.deps.io.err).toHaveLength(2);
   });
 });
 
@@ -281,9 +385,8 @@ describe("persistence failure (AC-8, D13 mirror)", () => {
 /*  Nothing below drives the flow: these are string-in / strings-out    */
 /*  functions, given `PLAIN_PALETTE` so the assertions compare exact    */
 /*  strings and can never inherit the ambient, `CI`-dependent colour    */
-/*  decision (AC-14). The flow half of these ACs lands with the call    */
-/*  sites; the four literal-tail assertions above still pin H1's        */
-/*  surface until then.                                                */
+/*  decision (AC-14). The flow half of these ACs is asserted above,     */
+/*  through `stripAnsi`, now that both call sites render the digest.    */
 /* ------------------------------------------------------------------ */
 
 /** The five states, so "keyed on the data, never on the state" is exhaustive. */
@@ -579,18 +682,40 @@ describe("formatResultDigest — failure honesty (AC-6)", () => {
   });
 
   it("never breaks a line and never leaks a stack frame", () => {
+    // The message is the measured three-line `git worktree add` rejection,
+    // blank line included — an input that CAN break the block, so this
+    // assertion is not vacuous (D9, closing QA-S4-01: it used to be fed
+    // `"spawn failed"`, which structurally cannot contain a newline).
     const lines = formatResultDigest(
       {
         state: "engine-error",
-        failure: { stage: "engine", message: "spawn failed" },
+        failure: { stage: "worktree", message: MULTILINE_GIT_FAILURE },
         engineOutput: "[SEV: nit] n",
         runDir: RUN_DIR,
       },
       PLAIN_PALETTE,
     );
 
+    expect(MULTILINE_GIT_FAILURE.split("\n")).toHaveLength(3);
     expect(lines.some((line) => line.includes("\n"))).toBe(false);
     expect(lines.some((line) => line.includes(" at "))).toBe(false);
+  });
+
+  it("collapses a multi-line message onto the single Failure line", () => {
+    expect(
+      formatResultDigest(
+        {
+          state: "engine-error",
+          failure: { stage: "worktree", message: MULTILINE_GIT_FAILURE },
+        },
+        PLAIN_PALETTE,
+      ),
+    ).toEqual([
+      "Review result: engine-error",
+      "Verdict: none — no verdict was parsed for this run.",
+      `Failure: worktree — ${COLLAPSED_GIT_FAILURE}`,
+      "Run directory: -",
+    ]);
   });
 });
 

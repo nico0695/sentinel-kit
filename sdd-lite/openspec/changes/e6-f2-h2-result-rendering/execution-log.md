@@ -1,7 +1,7 @@
 # Execution Log
 
 - change_name: e6-f2-h2-result-rendering
-- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4)
+- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5)
 - plan source: `plan.md` (Stage Plan table, authoritative)
 
 ## Stage Overview
@@ -12,7 +12,7 @@
 | S2 | `findings.ts` (pure `[SEV: …]` matcher/extractor) + its AC-3 matrix | done — 24 tests, M1 verified red |
 | S3 | `colors.ts` (sole `picocolors` importer) + test-side `stripAnsi` | done — M2 proved the palette really colours |
 | S4 | `render.ts` additive: `formatResultDigest` / `formatFullView` + pure tests | done — +45 tests (823 / 46), `formatTuiResult` retained, H1 tails still green |
-| S5 | Supersession: flow call sites → digest, delete `formatTuiResult`, rewrite the four H1 tails (AC-15) | pending |
+| S5 | Supersession: flow call sites → digest, delete the legacy renderer, rewrite the four H1 tails (AC-15) + the D9 amendment | done — 824 / 46 (823 − 3 + 4), the digest is now the product's output |
 | S6 | `offerFullView` + `full-view.test.ts` (AC-8/9/10/12/13) | pending |
 | S7 | CLAUDE.md closeout + final evidence sweep (AC-14/16/17) | pending |
 
@@ -295,3 +295,121 @@ Not a deviation, but worth stating so a reviewer does not read it as one: a find
 - git: **no commits, no stashes, no resets** — the orchestrator owns git. The working tree carries `render.ts` and `result.test.ts` modified, plus this log and the `state.yaml` stage entry, uncommitted.
 - QA handoff: **recommended, not run.** The stage adds a ~236-line public surface with 45 tests, and it is the last point at which the digest's copy and role assignment can be reviewed *before* S5 wires them into the flow and deletes the H1 assertions that currently pin the old output. A stage-mode `sddl-qa-review` here is cheap (runtime blast radius is still nil) and reviews the copy contract against `design.md` while reverting is trivial. The orchestrator decides between that and going straight to the S5 approval.
 - next action: orchestrator commits S4, then obtains a **new `stage_approval` for S5** — switch both `tui-flow.ts` result call sites to `formatResultDigest` (conditional spreads, `exactOptionalPropertyTypes`), delete `formatTuiResult` and its three unit cases, rewrite the four literal-tail assertions through `stripAnsi`, and replace `render.ts`'s H1 boundary doc comment with an H2 one. S5 is the only stage permitted to reduce the test count, and only by those three cases. It must not be started under `cp-stage-approval-s4`.
+
+## S5 — the supersession: both call sites on the digest, H1 AC-7 superseded, D9 folded in
+
+- approval: `stage_approval` granted by the user — checkpoint `cp-stage-approval-s5`, decisions `e6f2h2-D8` (S4) and **`e6f2h2-D9`** (the QA-S4-01 amendment, folded into this stage). This invocation is scoped to **S5 only**; **S6 was not started** — no `offerFullView`, no fifth prompt, no `TuiPrompter.confirm` beyond the pre-run gate.
+- precondition check: working tree **clean** at stage start (`git status --porcelain` empty) at `2531fe0` on branch `claude/project-post-merge-analysis-a4tcbl`, with S1–S4 committed. `plan.md`, `spec.md`, `design.md`, `qa-report.md` and the three target files re-read at stage start. Baseline in force: **823 tests / 46 files**. No contradiction with the tree.
+- **This is the stage where behaviour changed.** After it, `formatResultDigest` — not H1's minimal block — is what a `sentinel` run prints. Both `return` statements and the exit-code contract (completed + persisted → 0, persist failure → 1) are untouched, byte for byte.
+
+### Changed files — the complete list
+
+| File | Change | Diff |
+|---|---|---|
+| `src/adapters/driving/tui/render.ts` | module doc rewritten to the H2 boundary; `collapseToOneLine` extracted; **the legacy `formatTuiResult` deleted**; the digest's failure message normalised (D9) | `+43 / −29` |
+| `src/adapters/driving/tui/tui-flow.ts` | both result call sites build a `TuiResultDigest` and render it with `TUI_PALETTE`; import block widened | `+45 / −8` |
+| `src/adapters/driving/tui/__test__/result.test.ts` | header rewritten; the three superseded unit cases deleted; the four literal tails rewritten through `stripAnsi`; one vacuous case repaired; four cases added | `+177 / −52` |
+
+`git status --porcelain` lists exactly those three files — the ones `plan.md`'s S5 row names, and no others. `src/core`, `src/main`, `tui-deps.ts`, `index.ts`, `clack-prompter.ts`, `findings.ts`, `colors.ts`, `tui-test-doubles.ts`, `tsconfig.json`, `.dependency-cruiser.cjs`, `biome.json`, `vitest.config.ts`, `tsup.config.ts`, `package.json`, `CLAUDE.md`, `docs/`, `harnesses/`, `fixtures/`, `history/` — all verified untouched by an explicit `git diff --stat` over each path (all empty).
+
+### The two call sites
+
+Both build the digest with **conditional spreads** (`exactOptionalPropertyTypes: true` — `verdict: undefined` does not typecheck) and both render with `TUI_PALETTE`:
+
+- **persist-failure branch** (the `catch`): built from the in-memory `result`. No `runDir` key at all, so the digest renders `-` and withholds the `Full review` pointer (AC-7). The raw `result.failure.error` is reduced with `formatTuiErrorLine` into AC-6's `{ stage, message }` shape — the second intra-TUI consumer spec A5 predicted. The two `io.stderr` lines and `return 1` are unchanged.
+- **success branch**: built from `persisted.record` plus `persisted.runDir`. The record — what was actually written — is the source, so the findings section and the pointer follow `record.engineOutput` and nothing else (AC-5). `return 0` unchanged.
+
+### `e6f2h2-D9` — the recorded amendment, applied
+
+`design.md` says the persisted path passes `record.failure` "straight through untouched". **Spec AC-6 is authoritative over that sentence**, and this stage applies the amendment rather than the design's wording — recorded here as an amendment (D9), not a silent deviation. `design.md`'s sentence is now superseded on this one point; the `TuiResultDigest` doc comment in `render.ts` was updated to say so.
+
+The fix is `render.ts`'s own established behaviour, promoted to a shared module-private helper: `collapseToOneLine(raw) = raw.replace(/\s*\n\s*/g, " ").trim()`, previously inline in `formatTuiErrorLine` ten lines above. `formatTuiErrorLine` is otherwise **behaviourally byte-identical** — the single changed line substitutes the helper for the inline expression. Nothing was imported across adapters; the `adapters-isolated` guard is untouched and green.
+
+### AC-15 checklist
+
+**The four preserved H1 AC-8 cases, present by name and green** (verified in a verbose run, not by eye):
+
+1. `hands persistRun the run it just completed, exactly once`
+2. `emits the no-history diagnostic and the failure, and exits non-zero`
+3. `attempted persistence exactly once — no retry, no second run`
+4. `shows a failed run's outcome too when its record could not be written`
+
+Case 4 is also one of the four rewritten tails: its **title, its `expect(code).toBe(1)` and its persistence assertions are H1's, unchanged** — only the rendered tail is this story's.
+
+**What each of the four rewritten assertions became** (all now `.map(stripAnsi)` over the captured stdout):
+
+| Site (S4 line) | Case | Was | Is |
+|---|---|---|---|
+| `:183` `slice(-3)` | *renders the minimal block and exits 0 for a persisted ok run* → **renamed** *renders the digest and exits 0 for a persisted ok run* | literal `State: ok` / `Verdict: approve` / `Run directory: …` | `Review result: ok` / `Verdict: approve` / `Run directory: …`, **plus** an equality against `formatResultDigest({state:"ok",verdict:"approve",runDir}, PLAIN_PALETTE)` — so the flow emits *the digest*, not a look-alike |
+| `:206` `slice(-2)` | *persists once and still exits 0 for a completed %s run* (title kept) | 2-line tail, verdict line silently absent | **3-line** tail: `Review result: <state>` / `Verdict: none — no verdict was parsed for this run.` / `Run directory: …` — the clearest single expression of the supersession (H1 omitted the line, H2 states it, AC-1) |
+| `:235` `slice(-3)` | *still shows the outcome, with `-` for the run directory* (title kept) | literal `State:` tail with `-` | digest tail with `-`, **plus** a new assertion that no `Full review:` line is emitted for a run whose `result.md` does not exist (AC-7) |
+| `:271` `slice(-2)` | *shows a failed run's outcome too when its record could not be written* (title kept — preserved AC-8 case 4) | 2-line tail | 3-line digest tail with the explicit no-verdict line and `-` |
+
+**Doc comments refreshed** (deferred from S4 to here, by plan):
+- `render.ts`'s module comment no longer claims "no markdown rendering, no severity highlighting"; it now states the module's purity contract, its two surfaces, and the supersession explicitly.
+- `result.test.ts`'s header now names three contracts — the digest as the result step's output, AC-15 (what was rewritten and what must not be swept away with it), and AC-8 preserved.
+- The in-file `[E6.F2.H2]` banner no longer says "the four literal-tail assertions above still pin H1's surface until then".
+
+**A-level decision (authorship `claude`), recorded rather than assumed**: both refreshed doc comments were first written naming `formatTuiResult` literally, which would have left `grep -rn "formatTuiResult" src/` at 2 prose hits and made the plan's mechanical acceptance check ambiguous — the same shape as the orchestrator's recorded `picocolors` grep correction. They were reworded to describe the superseded block ("state, verdict only when one existed, run directory") without the identifier. The supersession stays explicit and reviewable; the grep is honestly **0**.
+
+### Test-count arithmetic
+
+**823 − 3 + 4 = 824** (files unchanged at 46). `result.test.ts`: 58 → 59.
+
+- **−3**, the only reduction this stage is permitted: the `formatTuiResult (AC-7)` describe — *renders state, verdict and run directory when all are present*, *omits the verdict line when no verdict exists*, *renders `-` rather than fabricating a run directory*. All three were already replaced by S4's pure `formatResultDigest` describes.
+- **+1 pure** (AC-6 / D9): *collapses a multi-line message onto the single Failure line* — asserts the whole 4-line digest, so the collapsed text is pinned exactly.
+- **+3 flow** (`the flow builds the digest from what it persisted (AC-5, AC-6, AC-7)`): *renders the record's findings section and the result.md pointer* (AC-5's flow half — the first test that drives the record's `engineOutput` through the flow, and the only coverage the success branch's conditional spreads would otherwise have); *collapses a multi-line failure message from the persisted record* (D9 end to end on the persisted path); *reduces the raw failure to one line when the run could not be persisted* (AC-6 on the raw path, through `formatTuiErrorLine`).
+- **repaired in place, no count change**: *never breaks a line and never leaks a stack frame*.
+
+These three flow tests are S5's assigned half of AC-5/AC-6/AC-7 per `plan.md`'s AC → stage map ("AC-5 → S4 (pure keying) + S5 (sections/path line)"). They are not scope drift: without them the new call-site spreads for `failure` and `engineOutput` are executed by no test at all.
+
+### Non-vacuity — how the repaired failure test was established as real
+
+Not argued, **measured**. `collapseToOneLine(digest.failure.message)` was reverted to the bare interpolation in `formatResultDigest` (the D9 fix only; `formatTuiErrorLine`'s own call left intact), the file having been backed up byte-for-byte first.
+
+Result: **RED — 3 failed | 56 passed (59)**:
+- *collapses a multi-line message onto the single Failure line* (pure)
+- *never breaks a line and never leaks a stack frame* (pure — the repaired case; it passed vacuously before the repair because `"spawn failed"` structurally cannot contain a newline)
+- *collapses a multi-line failure message from the persisted record* (flow)
+
+The failure diff is the real thing, not a proxy: `Failure: worktree — Command failed with exit code 128: …` followed by the message continuing onto further physical lines.
+
+**The fourth case stayed green, and that is the point**: *reduces the raw failure to one line when the run could not be persisted* travels the persist-failure branch, where `formatTuiErrorLine` already normalises at the call site. The two paths have separate defences; only the persisted one was undefended, which is exactly what QA-S4-01 said. `render.ts` was then restored from the backup (helper call confirmed back by grep) and the suite re-run → **59 passed (59)**.
+
+### Second non-vacuity probe (unplanned, recorded) — is `stripAnsi` load-bearing?
+
+The AC-15 rewrite's whole claim is "digest-contract assertions over ANSI-stripped output". If the flow emitted no ANSI under test, `stripAnsi` would be decorative and the rewrite no stronger than the literals it replaced. `.map(stripAnsi)` was therefore dropped from rewrite 1 and the file run under both envs:
+
+- `NO_COLOR=1` → **59 passed** (colour off, strip is a no-op — as expected)
+- `FORCE_COLOR=1` → **1 failed**, with the diff `- "Review result: ok"` / `+ "Review result: \x1b[32mok\x1b[39m"`
+
+So the flow really does emit SGR through `TUI_PALETTE`, and `stripAnsi` really removes it. This also closes the gap `qa-report.md` flagged as "verified by reading, not by running" (no test injected `TUI_PALETTE`): from this stage on, `risk-e6f2h2-009`'s identity is exercised, not inferred. The file was restored and both envs re-run → 59 / 59.
+
+### Quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| **`npm test`** (full, non-negotiable for S5) | yes | **46 files passed (46), 824 tests passed (824)**, 0 failed, exit 0 |
+| `npm run check` (biome + tsc + depcruise) | yes | **clean**, exit 0 — biome 159 files, no fixes applied; `tsc --noEmit` silent; depcruise **no violations**, 106 modules / **253** dependencies (252 at S4; the one new edge is `tui-flow.ts` → `colors.ts`) |
+| `grep -rn "formatTuiResult" src/` | yes | **0** — no code reference and no prose mention |
+| `npx vitest run --project adapters result.test.ts` | narrowed check | **59 passed (59)** |
+| `NO_COLOR=1` / `FORCE_COLOR=1` over the adapters project | not required until S6; run anyway | **475 / 475 identical under both** — and now non-vacuously so (probe above) |
+| `git diff --stat src/core` · `src/main` | standing guard (AC-16) | **both empty** |
+| `git diff --stat` over the eight forbidden TUI/config paths | handoff constraint | **all empty** |
+| `grep -rn "offerFullView" src/` · `prompter.confirm` in `tui-flow.ts` | S6 boundary | **0** hits · exactly **1** (the pre-run gate). The prompter scripts stay four-answer |
+
+### Deviations
+
+Two, both stated rather than smoothed over; neither is a scope change.
+
+1. **`design.md` is contradicted on one sentence** — "the persisted path passes `record.failure` straight through untouched". Applied under decision **D9** with spec AC-6 as the authority. This is an approved amendment, not an implementation liberty; `render.ts`'s `TuiResultDigest` doc was updated so the file no longer repeats the superseded claim.
+2. **One test renamed**: *renders the minimal block and exits 0 for a persisted ok run* → *renders the digest and exits 0 for a persisted ok run*. "Minimal block" is H1's term for the surface this stage deletes. The renamed case is **not** one of the four protected AC-8 titles; all four of those are untouched.
+
+Not a deviation, but recorded so a reviewer does not read it as one: the two known-and-accepted items were left alone exactly as instructed — **QA-S4-02** (a defined-but-empty `engineOutput` still gets the `Full review` pointer while S6 will withhold the prompt; spec A9's deliberate asymmetry) and the one trailing space on a finding with empty text.
+
+- blockers: none.
+- scope / drift / blast-radius: none. Actual scope equals planned scope exactly.
+- risks: no new risk. **`risk-e6f2h2-008` (the legacy export carried across one stage boundary) is now CLOSED** — the transitional state ended as predicted, with a green tree on both sides. **`risk-e6f2h2-010` (QA-S4-01) is CLOSED** by D9, with a measured red-then-green proof. **`risk-e6f2h2-009` is materially narrowed**: the ANSI-strip identity is now exercised by real flow tests under `FORCE_COLOR=1` instead of being argued by composition. **`risk-e6f2h2-003` (a completed story's AC superseded) is now DISCHARGED in the diff** — its remaining half is the PR description, which the orchestrator owns.
+- git: **no commits, no stashes, no resets** — the orchestrator owns git. The working tree carries the three source files modified, plus this log and the `state.yaml` stage entry, uncommitted.
+- QA handoff: **recommended, not run.** This is the first stage that changes observable behaviour and it discharges AC-15, so the supersession is best reviewed on its own diff, before S6 adds a prompt on top of it. A stage-mode `sddl-qa-review` should check: the four preserved AC-8 titles, the four rewritten tails against the spec's contract (not against the old literals), the D9 amendment against AC-6, and that both `return` statements are untouched.
+- next action: orchestrator commits S5, then obtains a **new `stage_approval` for S6** — `offerFullView` at the end of both persist branches (blank-guard → one `confirm` → print only on `answer(true)`, returning `void`), the new `__test__/full-view.test.ts`, the AC-11 `prompts.length === 4` assertion in `result.test.ts`, and mutation-verifications M3/M4/M5. S6 must not be started under `cp-stage-approval-s5`. New baseline for every later comparison: **824 tests / 46 files**.

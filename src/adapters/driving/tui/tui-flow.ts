@@ -32,7 +32,12 @@
  */
 
 import { resolveReviewRequest } from "../../../core/run/index.js";
-import { formatTuiErrorLine, formatTuiResult } from "./render.js";
+import { TUI_PALETTE } from "./colors.js";
+import {
+  formatResultDigest,
+  formatTuiErrorLine,
+  type TuiResultDigest,
+} from "./render.js";
 import type { TuiDeps, TuiIo } from "./tui-deps.js";
 
 /** The TUI surface `src/main/cli.ts` drives on a bare `sentinel`. */
@@ -204,8 +209,30 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
   } catch (error) {
     // D13 mirror: the review itself is finished — minutes of engine work —
     // and its outcome must not be swallowed because the record could not be
-    // written. `runDir` renders as `-` because no directory exists.
-    for (const line of formatTuiResult(result.state, result.verdict)) {
+    // written. No `runDir` key at all: nothing was written, so the digest
+    // renders `-` rather than fabricating a directory (AC-7).
+    //
+    // `exactOptionalPropertyTypes` is on, so every optional part is a
+    // conditional spread — `verdict: undefined` would not typecheck.
+    const unpersisted: TuiResultDigest = {
+      state: result.state,
+      ...(result.verdict !== undefined ? { verdict: result.verdict } : {}),
+      ...(result.failure !== undefined
+        ? {
+            failure: {
+              stage: result.failure.stage,
+              // AC-6: the raw throwable reduced to the one line the persisted
+              // path already carries in `record.failure.message`.
+              message: formatTuiErrorLine(result.failure.error),
+            },
+          }
+        : {}),
+      ...(result.engineOutput !== undefined
+        ? { engineOutput: result.engineOutput }
+        : {}),
+    };
+
+    for (const line of formatResultDigest(unpersisted, TUI_PALETTE)) {
       io.stdout(line);
     }
     io.stderr(
@@ -215,11 +242,21 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
     return 1;
   }
 
-  for (const line of formatTuiResult(
-    persisted.record.state,
-    persisted.record.verdict,
-    persisted.runDir,
-  )) {
+  // The record is what was actually written, so it — not the in-memory
+  // result — is what the digest reports (AC-5: the findings section and the
+  // `Full review` pointer are keyed on `engineOutput`, never on the state).
+  const { record } = persisted;
+  const digest: TuiResultDigest = {
+    state: record.state,
+    ...(record.verdict !== undefined ? { verdict: record.verdict } : {}),
+    ...(record.failure !== undefined ? { failure: record.failure } : {}),
+    ...(record.engineOutput !== undefined
+      ? { engineOutput: record.engineOutput }
+      : {}),
+    runDir: persisted.runDir,
+  };
+
+  for (const line of formatResultDigest(digest, TUI_PALETTE)) {
     io.stdout(line);
   }
 

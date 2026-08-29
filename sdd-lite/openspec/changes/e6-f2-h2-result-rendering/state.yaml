@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -198,7 +198,36 @@ stages:
       run): S4 is the last point at which the digest copy and role assignment can be reviewed before
       S5 wires them in and deletes the assertions that currently pin the old output.
   sddl-qa-review:
-    status: pending
+    status: completed
+    mode: stage
+    started_at: "2026-08-29T20:45:00Z"
+    completed_at: "2026-08-29T21:05:00Z"
+    notes: >-
+      Stage-mode review of the frozen range `b0a3a04..442e705` (S1, S2+S3, S4) by a fresh delegated
+      worker, read-only on `src/`. Verdict **pass_with_warnings**. Gates re-run by the reviewer, not
+      taken from the log: `npm run check` green (106 modules cruised, no guard violation), `npm test`
+      **823 / 46**, adapters project 474/474 identical under `NO_COLOR=1` and `FORCE_COLOR=1`,
+      `git diff --stat` empty for both `src/core` and `src/main`, statement-level picocolors grep = 1
+      (`colors.ts:34`), and an independent `node --input-type=module` probe reproducing S1's claim
+      (default import gives four functions; the namespace form yields `pc.red === undefined`).
+      The digest's literal copy was compared programmatically against design.md and is byte-identical
+      (U+2026 and U+2014 included); colour is decoration only (the `MARKED`-palette test asserts
+      strip-equals-plain as an equality) and the role assignment matches the design.
+      Pure halves of AC-1, AC-2, AC-3, AC-4, AC-5, AC-7, AC-12, AC-14 PASS, as does AC-16 for this
+      range. ONE MEDIUM FINDING, QA-S4-01 (AC-6): `formatResultDigest` interpolates
+      `digest.failure.message` with no whitespace reduction, so the persisted path renders a
+      multi-line `Failure:` entry whenever `record.failure.message` carries a newline — reachable
+      today, since `git-cli.ts:354` embeds execa's message verbatim (measured: a bad-ref
+      `git worktree add` rejects with a 3-line message) and `run-review.ts` returns it as an
+      `engine-error` failure rather than rejecting. The CLI collapses the same value on purpose
+      (`format-review.ts` `field()`); the TUI's guarding test ("never breaks a line") is vacuous,
+      feeding a single-line message. Carried into S5's scope rather than a fix loop — S5 owns both
+      call sites — and noted as a small design correction, since design.md says the persisted path
+      passes `record.failure` through untouched. One low finding (QA-S4-02) recorded for awareness
+      only. Known-and-accepted items (stale H1 doc comments, transitional `formatTuiResult`,
+      `formatTuiErrorLine` duplication, unwired modules) were re-confirmed and deliberately not
+      reported. Stage mode: the change is NOT closed and stays `implementing`.
+      Report: `sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md`.
 artifacts:
   state: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/proposal.md
@@ -532,6 +561,43 @@ open_risks:
       under `NO_COLOR=1`) — plus the permanent env-independent invariants added in
       `full-view.test.ts` at S6.
     severity: low
+  - id: risk-e6f2h2-010
+    summary: >-
+      Multi-line failure message on the persisted path (QA-S4-01, raised by the S4 stage-mode QA
+      review; AC-6 "exactly one message line"). `formatResultDigest` (`render.ts:243-249`)
+      interpolates `digest.failure.message` with no whitespace reduction. On the persisted path that
+      value is `record.failure.message`, copied verbatim by `core/history/persist-run.ts:91-95` from
+      `failure.error.message`; `adapters/driven/git/git-cli.ts:354` builds port errors as
+      `${message}: ${asError.message}` where `asError` is an execa error, and a bad-ref
+      `git worktree add` was measured rejecting with a 3-line message. `run-review.ts:496-517`
+      returns such an error as an `engine-error` FAILURE (it does not reject), so the TUI persists and
+      renders it: a `Failure:` entry spanning three physical lines with a blank line inside, on an
+      ordinary failure path. The CLI collapses the same value deliberately
+      (`cli/render/format-review.ts` `field()`: `.replace(/[\t\r\n]+/g, " ")`), so the two surfaces
+      also diverge. The guarding test is vacuous — `result.test.ts` "never breaks a line and never
+      leaks a stack frame" feeds `message: "spawn failed"`, an input that cannot break a line.
+      Mitigation: fold the fix into S5, which switches both `tui-flow.ts` call sites — collapse
+      whitespace on the message inside `formatResultDigest` (the CLI's reduction, or
+      `formatTuiErrorLine`'s `replace(/\s*\n\s*/g, " ")`) and add one pure case carrying an embedded
+      `\n`. Note this contradicts design.md's "the persisted path passes `record.failure` straight
+      through untouched", so it is a small design correction to record, not a silent implementation
+      fix.
+    severity: medium
+qa_summary:
+  mode: stage
+  verdict: pass_with_warnings
+  summary: >-
+    Frozen range `b0a3a04..442e705` (S1, S2+S3, S4) reviewed read-only. Gates re-run by the reviewer:
+    `npm run check` green, `npm test` 823 / 46, adapters 474/474 identical under `NO_COLOR=1` and
+    `FORCE_COLOR=1`, `src/core` and `src/main` diffs empty, statement-level picocolors grep = 1. The
+    digest copy is byte-identical to design.md and colour carries no information of its own. Pure
+    halves of AC-1/2/3/4/5/7/12/14 pass, plus AC-16 for this range. AC-6 is partial: QA-S4-01
+    (medium, `risk-e6f2h2-010`) — a multi-line `record.failure.message` renders as a multi-line
+    `Failure:` entry, reachable via execa-backed git errors, guarded only by a vacuous test. No
+    BLOCKER/CRITICAL, so no fix loop: the finding is carried into S5's scope. QA-S4-02 (low) recorded
+    for awareness. Stage mode — the change is not closed.
+  reported_at: "2026-08-29T21:05:00Z"
+  report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
 next_action:
   kind: run_stage
   target: sddl-executor
@@ -565,4 +631,4 @@ next_action:
     (`src/adapters/driving/tui/colors.ts:34`), re-confirmed at S4. After execution: 4R code review
     over the frozen diff, then final QA — the only stage that may mark this change completed.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T20:10:00Z"
+updated_at: "2026-08-29T21:05:00Z"

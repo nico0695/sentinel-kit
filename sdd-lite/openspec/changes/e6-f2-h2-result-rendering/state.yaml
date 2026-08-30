@@ -82,6 +82,49 @@ stages:
       carrying the line remainder verbatim, A9 blank-vs-absent `engineOutput`). No level-C item
       arose: no acceptance criterion requires touching `src/core/**`. No new B-level question
       arose. Two new risks appended (005, 006).
+
+      AMENDMENT 1 (2026-08-30, fix round 1 of 2; authority: user decision e6f2h2-D12 at
+      cp-review-gate-round-1). spec.md AMENDED, not rewritten — every original criterion stays
+      readable with its supersession marked inline ([E5.F1.H2] design Amendment 1 precedent).
+      Cause: this story created the first path by which engine output (the stdout of an external
+      agent reviewing possibly untrusted code) reaches the user's terminal, with no
+      control-character handling at any layer. AC-12 was the reason the spec had to reopen at
+      all: it MANDATED `stripAnsi(emitted) === engineOutput.split("\n")` and the suite asserted
+      it, so any sanitisation contradicted the accepted contract. AC-12's byte-verbatim identity
+      is SUPERSEDED and replaced by printable-text fidelity — the intent it was protecting —
+      restated as three testable properties: (a) completeness (emitted line count equals
+      `md.split("\n").length`, element i from source line i; nothing dropped, merged, elided or
+      reordered), (b) restricted identity (the ORIGINAL equality still holds byte-for-byte on
+      every input carrying no control code point, so the old contract is narrowed rather than
+      discarded), (c) non-executability (no code point of the neutralised set survives, once the
+      palette's own SGR is stripped). Four criteria added: AC-18 the neutralisation contract
+      (set N = C0 except LF and HT, DEL, C1 incl. 8-bit CSI/OSC, U+2028/U+2029; visible
+      `\xNN` / `\uNNNN` tokens; properties P1 visibility, P2 idempotence, P3 transparency;
+      `splitEngineLines` consumes one trailing CR per line so the element count is exactly
+      `split("\n").length`), AC-19 R1-003 (a finding whose text carries an interior control
+      character or line separator is never silently absent from BOTH the counts and the list —
+      closed at two independent layers, neutralise-before-match AND the remainder group widened
+      from `(.*)` to `([^\n]*)`, each asserted separately), AC-20 R3-002 + R3-001 (AC-14's
+      verification made non-vacuous: no decoration assertion may use the ambient `TUI_PALETTE`,
+      which is global `String` under the mandated local gate, and the flow's palette choice must
+      be observable at all three call sites), AC-21 R2-001 (four bare AC citations in
+      `tui-flow.ts` qualified as [E6.F2.H2]). AC-2, AC-3, AC-6, AC-13 and AC-14 amended in
+      place. AC-3's PARSING tolerance is explicitly preserved — the remainder is still never
+      re-split, so `file:line` ranges, em-dashes, plain hyphens and no separator all survive;
+      only its RENDERING changes, so "verbatim" now means "never re-parsed, re-split,
+      summarised, truncated or reordered", not "byte-identical". A third engine-derived channel
+      was found that the ledger did not name and is now covered by AC-6: claude-code's
+      `buildReviewErrorMessage` (`engines/claude-code/envelope.ts:63-65`) returns
+      `envelope.result` — the engine's own text — VERBATIM as the error message on the
+      `is_error` path, and it reaches the digest's `Failure:` line, which [E6.F2.H1]'s block did
+      not have; `collapseToOneLine`'s `/\s*\n\s*/g` removes neither ESC nor a lone CR. Two
+      assertions change by name and must be called out in the PR beside AC-15's supersession:
+      `result.test.ts:900` (`["a\r", "b"]` -> `["a", "b"]`) and `findings.test.ts:223` (the
+      `extractFindings` signature). Two risks appended (011 printable-text spoofing is a named
+      non-goal; 012 the CLI `runs show` and the H1 catch-all carry the same exposure and stay
+      out of scope by D4 and `adapters-isolated`). No level-C item: nothing here requires
+      `src/core/**`, and `risk-e6f2h2-004`'s guard still stands. No new B-level item. No source,
+      test or config file was touched by this stage — artifacts only.
   sddl-design:
     status: completed
     started_at: "2026-08-29T16:20:00Z"
@@ -113,6 +156,49 @@ stages:
       rejects `import pc from "picocolors"` under `verbatimModuleSyntax` with no `esModuleInterop`,
       the `allowSyntheticDefaultImports` fix edits repo-wide config and must be escalated, not
       applied silently.
+
+      AMENDMENT 1 (2026-08-30, folded into the sddl-spec amendment pass under e6f2h2-D12).
+      design.md gains a §Amendment 1 section (A-1..A-9) and inline supersession markers on the
+      three passages the amendment invalidates (the "Full view" paragraph's byte-verbatim
+      rationale, the heuristic's trailing-CR note, and the AC-3 / AC-12 coverage rows). D1-D5
+      and all ten original A-level decisions stand unreopened: the module split, the
+      required-argument palette, the four roles, blocker-before-major grouping, label padding
+      before colouring and `node:path.join` are unchanged. Mechanism: ONE new pure module
+      `src/adapters/driving/tui/engine-text.ts` (zero imports, the `findings.ts` shape) exporting
+      `splitEngineLines(markdown)`, `neutralizeControls(text)` and `toSafeLines(markdown)`; the
+      order split -> neutralise -> match -> colour is load-bearing, because the palette's own SGR
+      is added AFTER neutralisation and so is never escaped. `render.ts` computes
+      `toSafeLines(md)` once per digest and shares it with the findings section;
+      `extractFindings` changes signature to take `readonly string[]` (keeps `findings.ts` at
+      zero imports and makes the ordering explicit and single-sourced rather than hidden);
+      `matchFindingLine` keeps its signature and gains a documented already-neutralised
+      precondition, safe to re-apply because neutralisation is idempotent. Empirical section A-1
+      records six probes run against the target's own modules before writing: R1-003 reproduced
+      (interior CR / U+2028 / U+2029 each return NO MATCH against the shipped regex while the
+      tested trailing-CR case still matches, which is why it survived review); `([^\n]*)` alone
+      restores the match but carries the RAW control into the printed text, so it fixes the
+      disappearance and leaves the injection; neutralise-then-match fixes both with the regex
+      untouched; neutralisation is idempotent and byte-transparent on clean input, which is what
+      preserves every existing fixture assertion; CRLF splitting is line-count-safe; and
+      `picocolors.js:22` (`let f = enabled ? formatter : () => String`) makes
+      `TUI_PALETTE.good === String` true under the local gate, confirming R3-002 at source while
+      `createColors(true)` is available for a deterministic alternative. Two A-level exclusions
+      from the neutralised set are argued rather than assumed: LF (the splitter's separator) and
+      HT (forward-only, cannot reposition, erase or introduce a sequence, and escaping it would
+      render every quoted code excerpt unreadable). The token mapping is deliberately NOT
+      injective — a literal `\x1b` in the source and a real ESC render alike — because making it
+      injective would require escaping the backslash and mangling every path and regex in a
+      review; what matters is that nothing executes and nothing is lost, not invertibility. The
+      CRLF terminator is dropped rather than escaped so a CRLF review does not show `\x0d` on
+      every line; a LONE CR is neutralised. A-7 offers two admissible mechanisms per test repair
+      with a recommendation (deterministic `MARKED` palette for R3-002; a file-scoped
+      `vi.mock("../colors.js")` for R3-001, already house-style in the engine adapter suites and
+      explicitly NOT via `TuiDeps`, which would reopen a rejected alternative and edit
+      `src/main/container.ts`). Placement is argued: the neutraliser stays in the TUI adapter
+      because `adapters-isolated` forbids driving -> driving imports, so sharing it with the
+      CLI's `format-runs.ts:188` would need either a sixth guard exemption or a second copy —
+      the same reasoning that keeps `formatTuiErrorLine` duplicated (Q9). Zero `src/core/**`,
+      zero `src/main/**`, zero `tui-deps.ts`, zero `package.json`, no new dependency.
   sddl-plan:
     status: completed
     started_at: "2026-08-29T17:30:00Z"
@@ -842,6 +928,28 @@ open_risks:
       through untouched", so it is a small design correction to record, not a silent implementation
       fix.
     severity: medium
+  - id: risk-e6f2h2-011
+    summary: >-
+      Appended by Amendment 1. AC-18 neutralises terminal CONTROL, not visual spoofing by
+      printable code points: bidi overrides (U+202A-U+202E, U+2066-U+2069), homoglyphs, and a
+      finding whose plain text simply reads `Verdict: approve` all survive by design. Accepted
+      and named as a non-goal — the three confirmed findings are control-sequence findings, and
+      widening the set to bidi controls would mangle legitimate RTL review text. Bounded by
+      structure: every listed finding is indented two spaces behind a `[blocker]`/`[major]`
+      label, so forged text cannot occupy a digest field's position. Revisit at E7 dogfooding.
+    severity: medium
+  - id: risk-e6f2h2-012
+    summary: >-
+      Appended by Amendment 1. The same engine bytes still reach two surfaces this story does
+      not own: the CLI's `runs show` (`cli/render/format-runs.ts:188` emits
+      `record.engineOutput.split("\n")` byte-verbatim) and [E6.F2.H1]'s catch-all
+      `io.stderr(formatTuiErrorLine(error))`. Out of scope by e6f2h2-D4 (the CLI is untouched)
+      and by the `adapters-isolated` guard (driving -> driving imports are forbidden, so the CLI
+      would need its own copy). Recorded so the gap is a decision, not an oversight; candidate
+      for an E7 story. The TUI catch-all is materially lower risk: `run-review.ts:475` converts
+      engine faults into a `failure` VALUE rather than a rejection, so engine text does not
+      normally reach it.
+    severity: low
 qa_summary:
   mode: stage
   verdict: pass_with_warnings
@@ -859,30 +967,33 @@ qa_summary:
   report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
 next_action:
   kind: run_stage
-  target: sddl-code-review
+  target: sddl-plan
   summary: >-
-    **S7 is DONE and green, uncommitted — all seven planned stages are executed and
-    `sddl-executor` has nothing left to run for this change.** Changed: `CLAUDE.md` ONLY, +4/-4,
-    exactly the plan's S7 scope; no source change was needed. The four edits: heading `E0–E6
-    implemented` -> `E0–E6 complete`; the "Current state" paragraph now covers E6.F2 as a whole,
-    describes H2 by what `formatResultDigest` really emits, adds `picocolors` (exact-pinned `1.1.1`,
-    confined to `tui/colors.ts`) to the runtime-dep list, and states that E6's ⚪ `[E6.F2.H3]` is
-    SKIPPED rather than built; "Remaining MVP work" becomes E7-only with E7 left entirely open; and
-    the Architecture "Driving surfaces" sentence generalises the terminal-library confinement rule to
-    both libraries — the stage's ONE deviation, A-level, inside the `CLAUDE.md`-only scope but beyond
-    AC-17's literal wording. Final evidence sweep, all real output: `src/core` and `src/main` diffs
-    **both empty**; statement-level picocolors grep **= 1** (`colors.ts:34`) while the naive grep now
-    reads 11, re-confirming the orchestrator's correction; the bare pin intact in `package.json` AND
-    `package-lock.json`; `npm run check` **clean**; full `npm test` **856 / 47**; adapters **507 /
-    507 identical** under `NO_COLOR=1` and `FORCE_COLOR=1`; consistency read clean. Arithmetic from
-    the story baseline: 754/45 -> +0 (S1) -> +24/+1f (S2+S3) = 778/46 -> +45 (S4) = 823/46 -> -3+4
-    (S5) = 824/46 -> +32/+1f (S6) = 856/47 -> +0 (S7) = **856 / 47**, matching the measurement.
-    AC-14, AC-16, AC-17 satisfied. REPORTED, NOT EDITED — orchestrator decides: `README.md` lines
-    13-17 still say "Status: pre-MVP … Epic E0 is complete … the real engines are spiked", false on
-    two counts since E4; it is `[E7.F2.H1]` territory, so a one-line status fix here is defensible
-    but a rewrite is not. `CONTRIBUTING.md` is clean. Next per `e6f2h2-D11`: the orchestrator commits
-    S7, runs the **4R code review over the frozen diff** (`sddl-code-review`, ledger orchestrator-
-    owned), and only then **final QA (`sddl-qa-review`, `final` mode)** — the only stage that may
-    mark this change `completed`. S7 claims neither.
+    **Amendment pass DONE — spec.md and design.md amended for fix round 1 of 2 under
+    e6f2h2-D12. No source, test or config file was touched.** AC-12's byte-verbatim identity is
+    superseded (it IS R1-002); printable-text fidelity replaces it as three testable properties
+    (completeness, restricted identity on control-free input, non-executability). AC-18..AC-21
+    added, AC-2/3/6/13/14 amended, every original text kept visible with its supersession marked
+    inline. Mechanism in design.md §Amendment 1: one new pure module
+    `src/adapters/driving/tui/engine-text.ts` (`splitEngineLines`, `neutralizeControls`,
+    `toSafeLines`), the order split -> neutralise -> match -> colour, `extractFindings(lines)`,
+    the `FINDING_LINE` remainder widened to `([^\n]*)` as a second layer, and neutralisation of
+    the digest's `Failure:` message (a third engine-derived channel the ledger did not name:
+    claude-code's `buildReviewErrorMessage` returns `envelope.result` verbatim as the error
+    message). NEXT per the orchestrator contract: `sddl-plan` writes a FIX STAGE seeded from the
+    confirmed ledger ids R1-001, R1-002, R1-003 plus the three D12 info rows R3-002, R3-001,
+    R2-001. Recommended stage order — `engine-text.ts` + `__test__/engine-text.test.ts` FIRST
+    (nothing else can be validated before it exists), then `findings.ts` (signature + regex +
+    AC-19 cases), then `render.ts` (composition + failure-line neutralisation + the AC-2/6/12
+    cases and the two NAMED assertion changes at `result.test.ts:900` and `findings.test.ts:223`),
+    then the A-7 test repairs (AC-20), then the `tui-flow.ts` comment pass (AC-21). Then
+    `stage_approval`, then `sddl-executor`; confirmed severe findings never trigger direct edits.
+    Gate to restore: `npm run check` clean and `npm test` at or above 856 / 47, adapters
+    identical under `NO_COLOR=1` and `FORCE_COLOR=1`, `src/core` and `src/main` diffs empty.
+    Two items REPORTED, NOT DECIDED, for the orchestrator: (1) A-7 leaves two admissible
+    mechanisms per test repair with a recommendation each — the plan should pick one explicitly
+    rather than leave it to the executor; (2) `risk-e6f2h2-012` names the CLI `runs show`
+    exposure, which is deliberately out of scope here and is E7 material.
+
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-29T22:35:00Z"
+updated_at: "2026-08-30T00:00:00Z"

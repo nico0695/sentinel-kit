@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -530,6 +530,29 @@ checkpoints:
       free_text: "S7 y después review 4R."
       responded_at: "2026-08-29T22:22:00Z"
     resolved_at: "2026-08-29T22:22:00Z"
+  - id: cp-review-gate-round-1
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      Full-4r over `59b806e..d8ad970` returned 3 CRITICAL (all R1, all deterministic evidence) and 11
+      info rows. The three severe findings share one cause: this change created the first path by
+      which ENGINE OUTPUT — the stdout of an AI agent reviewing arbitrary, possibly untrusted code —
+      reaches the terminal, and it carries no control-character handling. R1-001 the digest prints
+      engine text with ANSI/OSC intact, unconditionally and BEFORE any prompt; R1-002 `formatFullView`
+      is byte-verbatim including OSC 52 clipboard writes, which AC-12 REQUIRES, so fixing it needs a
+      spec amendment; R1-003 an interior `\r`/U+2028/U+2029 makes the matcher fail entirely, silently
+      deleting a blocker from the digest and its counts with no degradation notice.
+    question: >-
+      Fix all three (with the AC-12 spec amendment), fix only the two that do not touch the contract,
+      or defer all three to a follow-up issue? And should the fix stage also repair info-tier rows?
+    free_input_allowed: true
+    created_at: "2026-08-29T23:30:00Z"
+    response:
+      free_text: >-
+        Fix all three with the spec amendment; additionally repair R3-002 (tautological palette
+        assertions), R2-001 (AC-numbering collision) and R3-001 (flow palette coverage).
+      responded_at: "2026-08-29T23:35:00Z"
+    resolved_at: "2026-08-29T23:35:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -669,6 +692,30 @@ decisions:
       `[E6.F2.H1]`'s only CRITICAL — a defect 749 green tests had missed. Final QA follows the
       review and is the only stage that may mark the change completed.
     recorded_at: "2026-08-29T22:22:00Z"
+  - id: e6f2h2-D12
+    checkpoint_id: cp-review-gate-round-1
+    selected_option_id: fix-all-three-with-spec-amendment
+    free_text: "Arreglar las tres, con enmienda de spec + R3-002, R2-001, R3-001"
+    rationale: >-
+      All three CRITICALs are this change's own threat surface, not inherited debt: before it, zero
+      engine bytes reached the TUI terminal. Leaving them open would ship the defect the change
+      introduced. R1-002 additionally routes through a spec amendment because AC-12 mandates
+      `stripAnsi(emitted) === engineOutput.split("\n")` — any neutralisation contradicts the accepted
+      contract, so the contract is what must change first; the intent AC-12 was protecting is
+      PRINTABLE-TEXT fidelity, and that intent survives an amendment that renders control sequences
+      visible instead of executable.
+      Three info rows join the fix stage while it is open, chosen because two of them are the same
+      vacuity species this change has already produced twice: R3-002 (the six "real palette"
+      assertions are `x === x` identities whenever `CI`/`FORCE_COLOR` are unset — precisely the
+      mandated local gate — while the block's doc-comment claims the opposite), R3-001 (no assertion
+      distinguishes the flow passing `TUI_PALETTE` from `PLAIN_PALETTE`, so AC-14's only user-visible
+      behaviour is untested at both call sites), and R2-001 (four comments cite H2 criteria by bare
+      number in a file anchored to H1, where one of those numbers denotes the very criterion this
+      change deletes).
+      Routing per the orchestrator contract: R1-002 reopens spec/design first; then sddl-plan inserts
+      a fix stage seeded from the confirmed ledger ids; then stage_approval; then sddl-executor.
+      Confirmed severe findings never trigger direct edits. Fix round 1 of 2.
+    recorded_at: "2026-08-29T23:35:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

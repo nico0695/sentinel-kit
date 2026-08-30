@@ -1,4 +1,4 @@
-# S29 — [E6.F2.H2] Terminal result rendering, two fix rounds, final QA blocked
+# S29 — [E6.F2.H2] Terminal result rendering, two fix rounds, PR #76
 
 - **Date**: 2026-08-30
 - **Branch**: `claude/project-post-merge-analysis-a4tcbl`
@@ -27,14 +27,19 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
 | S29-D10 | Spend the last fix round on RR1-001 + RR2-001 (e6f2h2-D16) | RR1-001 alone; stop and hand the ledger to the user | Round 1 introduced RR1-001; leaving it would ship a silent-deletion defect. RR2-001 rode along since the stage was open | `claude→user` |
 | S29-D11 | Repair RR1-001 at **all nine** structural positions (e6f2h2-D17) | Repair only the leading position the ledger row named | One id, one mechanism, one failure mode. The row understated it: 45 of 45 combinations, reproduced by the orchestrator. Repairing one position would have left eight alive — precisely how round 1 failed | `claude` |
 | S29-D12 | Qualify the fifth bare `AC-8` citation (e6f2h2-D15) | Leave it, as outside the four ledger ids | AC-21's own verifier requires every H2 citation qualified; `:278` is H2's while `:207` is H1's, 71 lines apart. Leaving it makes AC-21 fail its own check | `claude` |
+| S29-D13 | Accept the change at `pass_with_warnings` and close it (e6f2h2-D18) | Hold in `reviewing`; open a third fix round | No residual is severe and each carries a disposition. The single medium (`risk-e6f2h2-014`) is exactly what `[E7.F1.H1]`'s E2E smoke exists to cover — closing it here would mean building the next story early. The protocol caps the lineage at two rounds | `claude→user` |
+| S29-D14 | Correct the README status line in this PR | Leave it entirely to `[E7.F2.H1]` | It was false on two counts — only E0 complete, engines still "spiked" — since E4. One line; the PR already touches CLAUDE.md for the same reason. The full rewrite stays with `[E7.F2.H1]` | `claude→user` |
 
 ## Deviations
 
-- **STOP — final QA never ran.** The `sddl-qa-review` worker died on an API session rate limit
-  (resets 19:40 UTC) before writing `qa-report.md`. Final QA is the **only** stage that may set
-  `lifecycle_status: completed`, and running it inline would violate the fresh-review rule since this
-  session orchestrated every stage. The change stays `implementing`. Nothing was left half-written —
-  the worker made no edits and the tree is clean at `f35d984`.
+- **A STOP occurred and was resolved.** The first `sddl-qa-review` worker died on an API session
+  rate limit before writing anything; the change was left at `implementing` with a history entry, and
+  running the stage inline was **declined** — final QA is the only stage that may set `completed`, and
+  this session orchestrated every stage, so doing it here would have violated the fresh-review rule.
+  Re-launched after the limit reset and completed normally. Nothing was ever left half-written.
+- **Final QA withheld `completed` on its own judgement** and set `reviewing`, routing to a
+  `final_review` checkpoint: with the fix budget exhausted, "ship with these named residuals" is a
+  human acceptance decision rather than a stage's. The user accepted (S29-D13).
 - **Fix round 1 introduced the defect it was convened to close.** It closed R1-003's interior-control
   position and created an identical silent-deletion mode in the leading position. `design.md:53` recorded
   "the trim itself is unchanged" without tracing the consequence, and every test the round added placed
@@ -76,20 +81,26 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
   [state.yaml](../../sdd-lite/openspec/changes/e6-f2-h2-result-rendering/state.yaml); findings in
   [review-ledger.md](../../sdd-lite/openspec/changes/e6-f2-h2-result-rendering/review-ledger.md).
 
+- **Final QA** (`ccf849a`): `pass_with_warnings`, 21/21 ACs independently re-verified, 0 open severe.
+  Its AC-19 sweep was wider than anything the change had run — 11,765 combinations plus 123 structural
+  positions derived *independently* of the plan's enumeration, `LOST: 0`, plus a 200,000-case fuzz — and
+  it found no eighth instance of the vacuity species. Appended `risk-e6f2h2-014`.
+- **Acceptance and closeout** (`a6bfd72`): change `completed`, README status line corrected, gates
+  re-run (check clean, 995/49).
+- **PR #76 opened**: https://github.com/nico0695/sentinel-kit/pull/76 (Closes #39).
+
 ## Pending and next steps
 
-- **Claude**: run `sddl-qa-review` in `final` mode once the rate limit resets — the only stage that may
-  mark the change `completed`. It must be a fresh worker.
-- **Claude**: open the PR `[E6.F2.H2] Terminal result rendering` (Closes #39) after a passing final QA.
-- **User**: decide whether this PR carries a one-line `README.md` status correction. `README.md:13-17`
-  still says "Status: pre-MVP. Epic E0 — Foundations is complete … the rest develops against `FakeEngine`
-  while the real engines are spiked" — false on two counts since E4. Reported by S7, not edited; it is
-  `[E7.F2.H1]` territory.
+- **User**: review and merge PR #76 (workflow contract: the human merges everything). **E6 closes with
+  this merge** — only E7 remains.
+- **Claude, next session**: E7. `[E7.F1.H1]` (E2E smoke) is the natural entry point and must carry
+  `risk-e6f2h2-014` + info row R4-002 as named inputs — the process-level blind spot this story could
+  not close from inside a doubles-based suite.
 - **E7 candidates recorded, not fixed**: `risk-e6f2h2-012` (the CLI's `runs show` carries the same
   control-sequence exposure; `adapters-isolated` forbids sharing and a core-shared primitive is level C)
   and `risk-e6f2h2-013` (a leading non-whitespace-class control still prevents recognition — not a
-  regression, pinned by decided-negative assertions).
+  regression, pinned by decided-negative assertions). `[E7.F2.H1]` still owns the full README rewrite.
 
 ## Open questions for the user
 
-- Whether the README status line is corrected in this PR or left to `[E7.F2.H1]`.
+—

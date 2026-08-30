@@ -1175,10 +1175,8 @@ describe("formatFullView — printable-text fidelity without the terminal channe
     expect(IN_N.test(HOSTILE_REVIEW)).toBe(true);
 
     const plain = formatFullView(HOSTILE_REVIEW, PLAIN_PALETTE);
-    const stripped = formatFullView(HOSTILE_REVIEW, TUI_PALETTE).map(stripAnsi);
 
     expect(plain.some((line) => IN_N.test(line))).toBe(false);
-    expect(stripped.some((line) => IN_N.test(line))).toBe(false);
     // Paired: the OSC 52 payload and the forged verdict are still on screen,
     // escaped rather than deleted — the whole reason for neutralising instead
     // of stripping.
@@ -1188,8 +1186,152 @@ describe("formatFullView — printable-text fidelity without the terminal channe
     expect(plain[2]).toBe("\\x1b]52;c;cm9ndWU=\\x07clipboard");
     expect(plain[5]).toBe("\\x9b2K eight-bit");
     expect(plain[6]).toBe("del\\x7fgone\\u2028separated");
-    // The palette's own SGR is added AFTER neutralisation, so stripping it
-    // returns exactly the plain render — the ordering, asserted.
-    expect(stripped).toEqual(plain);
+    // RR2-001's repair. The palette's own SGR is added AFTER neutralisation,
+    // and that ordering is now proved where it CANNOT be a no-op: `MARKED`
+    // decorates unconditionally, so the decoration is visibly wrapped around
+    // the NEUTRALISED text and removing it returns the plain render exactly.
+    // The two `TUI_PALETTE` assertions that used to stand here proved
+    // neither — under the mandated local gate (`CI` / `FORCE_COLOR` unset)
+    // picocolors binds all four roles to the global `String`, which made them
+    // byte-identical duplicates of the two `PLAIN_PALETTE` ones above. They
+    // survive, labelled for what they are, in the case below.
+    const decorated = formatFullView(HOSTILE_REVIEW, MARKED);
+
+    expect(decorated[1]).toBe(
+      "<bad>[SEV: blocker] auth.ts:12\\x1b[1A\\x1b[2KVerdict: approve</bad>",
+    );
+    expect(decorated.map(stripMarks)).toEqual(plain);
+  });
+
+  it("keeps the real palette strippable — the ENV-DEPENDENT case", () => {
+    // Deliberately kept, deliberately labelled, on the pattern its sibling at
+    // `full-view.test.ts` already established. This is the one case whose
+    // strength depends on the ambient decision: where colour is off it is a
+    // no-op comparison, and where it is on (`FORCE_COLOR=1`, or any run that
+    // sets `CI`) it is the real check that `stripAnsi` removes exactly what
+    // `TUI_PALETTE` added and no more. It is what makes the AC-14 dual run
+    // meaningful; it is NOT what proves decoration, which is the
+    // deterministic work above.
+    const stripped = formatFullView(HOSTILE_REVIEW, TUI_PALETTE).map(stripAnsi);
+
+    expect(stripped.some((line) => IN_N.test(line))).toBe(false);
+    expect(stripped).toEqual(formatFullView(HOSTILE_REVIEW, PLAIN_PALETTE));
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Fix round 2 (RR1-001) — a control BEFORE the marker, end to end     */
+/*                                                                      */
+/*  Round 1 asserted only controls INSIDE the finding text. Moving       */
+/*  neutralisation upstream of the matcher made every structural         */
+/*  whitespace position blind to the five members of N that JS           */
+/*  whitespace absorbs, so a finding whose marker was preceded or        */
+/*  interrupted by one vanished from the counts AND the listed           */
+/*  blockers — with no degradation notice, because another finding      */
+/*  matched. This is that failure, end to end, on both surfaces.         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A **new** corpus, deliberately not an insertion into
+ * {@link HOSTILE_LINES}: that array's assertions are index-coupled
+ * (`HOSTILE_MARKERS` in source order, plus `plain[1]`, `plain[2]`,
+ * `plain[5]` and `plain[6]`), so inserting a line would silently move them
+ * (decision F7).
+ *
+ * Three findings, each carrying a different whitespace-class member of N at a
+ * different structural position — leading, after a list marker, and inside
+ * the marker itself. Against the round-1 pipeline this review rendered
+ * `Findings: none in the [SEV: …] format`; against the pipeline before the
+ * round it rendered all three. Both surfaces are asserted, because the
+ * digest renders the matcher's REMAINDER group while the full view renders
+ * the whole neutralised line: a repair that normalised one input for matching
+ * and another for rendering would count findings the full view never tints.
+ */
+const STRUCTURAL_LINES: readonly string[] = [
+  "# Review",
+  `${cp(0x0b)}[SEV: blocker] auth.ts:12 — token never expires`,
+  `- ${cp(0x0d)}[SEV: major] calc.js:6-8 — dropped guard`,
+  `[SEV:${cp(0x2028)}minor] naming is inconsistent`,
+  "VERDICT: request-changes",
+];
+
+const STRUCTURAL_REVIEW = STRUCTURAL_LINES.join("\n");
+
+/** The digest of {@link STRUCTURAL_REVIEW}, rendered once per case. */
+function structuralDigest(): readonly string[] {
+  return formatResultDigest(
+    {
+      state: "ok",
+      verdict: "request-changes",
+      engineOutput: STRUCTURAL_REVIEW,
+      runDir: RUN_DIR,
+    },
+    PLAIN_PALETTE,
+  );
+}
+
+describe("formatResultDigest — a structural control never deletes a finding (RR1-001)", () => {
+  it("counts all three levels and never reaches the degradation line", () => {
+    // Non-vacuity guard, the M11 pattern: the corpus really is hostile, so a
+    // future edit that sanitised it would fail here rather than quietly turn
+    // every case below into a happy-path test.
+    expect(IN_N.test(STRUCTURAL_REVIEW)).toBe(true);
+
+    const lines = structuralDigest();
+
+    expect(lines).toContain("Findings: 1 blocker, 1 major, 1 minor");
+    expect(lines.some((line) => line.includes("none in the [SEV: …]"))).toBe(
+      false,
+    );
+  });
+
+  it("lists the blocker and the major with their own text", () => {
+    const lines = structuralDigest();
+
+    // The half of AC-19 the counts alone do not cover: a finding can be
+    // counted and still be missing from the list.
+    expect(lines).toContain("  [blocker] auth.ts:12 — token never expires");
+    expect(lines).toContain("  [major]   calc.js:6-8 — dropped guard");
+  });
+
+  it("carries nothing executable, and carries the findings", () => {
+    const lines = structuralDigest();
+
+    expect(lines.some((line) => IN_N.test(line))).toBe(false);
+    // Paired, per the house rule: unpaired, the negative above is also
+    // satisfied by the findings having been deleted — which is RR1-001's own
+    // failure mode, so the assertion written to prove the fix would pass on
+    // the very bug it was written for.
+    expect(lines).toContain("Findings: 1 blocker, 1 major, 1 minor");
+    expect(lines).toContain("  [blocker] auth.ts:12 — token never expires");
+  });
+
+  it("tints in the full view exactly what the digest counted", () => {
+    const full = formatFullView(STRUCTURAL_REVIEW, MARKED);
+
+    // Surface synchronisation — the assertion the design question exists for.
+    // The digest counted three findings; the full view decorates three lines,
+    // the same three, each with its severity's own role, and leaves the prose
+    // and the verdict alone.
+    expect(structuralDigest()).toContain(
+      "Findings: 1 blocker, 1 major, 1 minor",
+    );
+    expect(full.filter((line) => line.startsWith("<"))).toHaveLength(3);
+    expect(full[0]).toBe("# Review");
+    expect(full[1]).toBe(
+      "<bad>\\x0b[SEV: blocker] auth.ts:12 — token never expires</bad>",
+    );
+    expect(full[2]).toBe(
+      "<warn>- \\x0d[SEV: major] calc.js:6-8 — dropped guard</warn>",
+    );
+    expect(full[3]).toBe(
+      "<muted>[SEV:\\u2028minor] naming is inconsistent</muted>",
+    );
+    expect(full[4]).toBe("VERDICT: request-changes");
+    // …and the decoration is still decoration only: stripping it reproduces
+    // the plain render, so nothing the palette added changed the text.
+    expect(full.map(stripMarks)).toEqual(
+      formatFullView(STRUCTURAL_REVIEW, PLAIN_PALETTE),
+    );
   });
 });

@@ -1,7 +1,7 @@
 # Execution Log
 
 - change_name: e6-f2-h2-result-rendering
-- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7; S8; S9; S10 — the seven original stages plus all three of fix round 1. No stage remains; the change now routes to the scoped re-review, then final QA)
+- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7; S8; S9; S10; S11 — the seven original stages, all three of fix round 1, and the single stage of fix round 2. No stage remains; the change now routes to the scoped re-review over the round-2 delta, then final QA)
 - plan source: `plan.md` (Stage Plan table, authoritative)
 
 ## Stage Overview
@@ -18,6 +18,7 @@
 | S8 | Fix round 1 (`e6f2h2-D12`): the neutralisation primitive `engine-text.ts` + its AC-18 suite, imported by nothing yet | done — 2 NEW files, **908 / 48** (+52), M6/M7 verified red then reverted |
 | S9 | Fix round 1: the rewiring — `toSafeLines` in `render.ts`, `extractFindings(lines)`, the widened remainder group, the neutralised `Failure:` line | done — 5 MOD files, **927 / 48** (+19), M8/M9/M10/M11 all observed and reverted; R1-001/002/003 closed |
 | S10 | Fix round 1: verification repairs (AC-20 palette assertions, `palette-wiring.test.ts`, the AC-21 comment pass) | done — 4 MOD + 1 NEW, **931 / 49** (+4), M12 and all three M13 runs observed and reverted; R3-002/R3-001/R2-001/R2-002 closed |
+| S11 | Fix round 2 (final): RR1-001's structural-whitespace repair in `findings.ts` + RR2-001's verification repair | done — 3 MOD (1 production), **995 / 49** (+64), M14 (both halves), M15, M16, M17 and M18 (both halves) all observed and reverted; RR1-001 and RR2-001 closed |
 
 ## S1 — Dependency gate: `picocolors` install, pin, export-shape and baseline confirmation
 
@@ -1065,3 +1066,182 @@ Not deviations, but recorded so a reviewer does not read them as oversights:
 - git: **no commits, no stashes, no resets, no branch change.** The orchestrator owns git; the tree carries four modified files, one new file, this log entry and the `state.yaml` update, all uncommitted.
 - QA handoff: **deferred to the orchestrator.** Per `plan.md`, S10 is followed by a **scoped re-review over the fix delta**, checked id by id against `review-ledger.md` (round 1 of 2 consumed), and then `sddl-qa-review` in `final` mode — the only stage that may mark this change `completed`. This stage ran neither and claims neither.
 - next action: the orchestrator commits S10, decides the `:278` question (deviation 1), then routes the scoped re-review. **Fix round 1 is complete**: all three stages executed, all six selected ledger ids closed.
+
+
+## S11 — Fix round 2 (final): RR1-001's structural-whitespace repair, and RR2-001's verification repair
+
+- approval: `stage_approval` granted — checkpoint `cp-stage-approval-s11`, decisions `e6f2h2-D16` (fix round **2 of 2** authorised; scope is exactly the two ledger ids `RR1-001` and `RR2-001`) and `e6f2h2-D17` (the nine-position ruling: repair **every** structural position of the same defect, not only the leading one the ledger row's prose named).
+- **This was the last round.** There is no round 3, so nothing below was reasoned about on paper: the mechanism was probed against the real modules before and after the edit, and every mutation was applied to the real files.
+- precondition check: working tree **clean** at stage start (`git status --short` empty) at `db2d6a9`, branch `claude/project-post-merge-analysis-a4tcbl`. The inherited baseline was **re-measured before touching anything**: `npm test` → **931 passed / 49 files**, matching the plan's plan-time measurement exactly. No contradiction with `plan.md`, `design.md` or `spec.md`; no stop rule fired.
+
+### Changed files — the complete list
+
+| File | Kind | Change |
+|---|---|---|
+| `src/adapters/driving/tui/findings.ts` | MOD, **the only production file** | the C-D mechanism: one shared `SPACE` class source, a new `LEADING_SPACE` strip, and the widened `LIST_OR_QUOTE_PREFIX` / `FINDING_LINE`, plus the invariant and its `engine-text.ts` coupling written into the module doc-comment |
+| `src/adapters/driving/tui/__test__/findings.test.ts` | MOD, test | **+59 tests**: the 9 × 5 structural matrix, the 9 HT rows, the 2 decided negatives, the 72-line differential invariant against a reimplemented pre-round matcher, the corpus-size guard, and the trailing/separator token case |
+| `src/adapters/driving/tui/__test__/result.test.ts` | MOD, test | **+5 tests**: a NEW `STRUCTURAL_LINES` corpus with four end-to-end cases (counts, listed lines, non-executability, surface synchronisation), and RR2-001's repair splitting AC-12(c) into a deterministic `MARKED` half and a labelled ENV-DEPENDENT half |
+
+`git status --short` lists **exactly those three files** — no fourth file, no new file, no deletion. `git diff --stat src/core` and `git diff --stat src/main` are both **empty**. `package.json`, `package-lock.json`, `tsconfig.json`, `.dependency-cruiser.cjs`, `biome.json`, `vitest.config.ts`, `tsup.config.ts`, `CLAUDE.md`, `docs/`, `harnesses/`, `fixtures/` and `history/` are untouched. **No dependency added; `findings.ts` still has zero imports.**
+
+### The mechanism, as implemented (plan decision F4 / C-D)
+
+One shared source fragment, composed once and used at every structural position the matcher previously spelled `\s`:
+
+- `SPACE` — `(?:\s|\\x0b|\\x0c|\\x0d|\\u2028|\\u2029)`: real JS whitespace **plus** the five AC-18 tokens standing for `N ∩ (WhiteSpace ∪ LineTerminator)`. `\s` is kept rather than replaced, which is what keeps HT and every ordinary space matching, and what keeps AC-19's layer 2 (un-neutralised input) working exactly as before.
+- `LEADING_SPACE` — `^SPACE+`, applied **after** `line.trim()` and **before** the list/quote strip. `trim()` stays: it still removes the real whitespace it always removed, and the two compose, so `·\x0b·[SEV: …]` reaches its marker.
+- `LIST_OR_QUOTE_PREFIX` — the separator after each marker becomes `SPACE+`, which is what reaches a control **after** a list marker (`- \x0d[SEV: …]`) and inside a quoted bullet (`> \x0b- [SEV: …]`). Neither is reachable from the leading position, which is why the rejected C-A ("trim the raw line first") was measured not to fix the defect.
+- `FINDING_LINE` — built with `new RegExp` from the same fragment, `i` flag preserved, remainder group `([^\n]*)` **unchanged** (AC-19 layer 2), and the remainder's trailing `.trim()` **unchanged** (so a token inside or at the end of the finding text is still rendered, never deleted).
+
+`new RegExp` composition over five inline copies of a 40-character alternation is decision **F6**; `biome check` is clean on the patched file and `useRegexLiterals` does not fire, because the arguments are interpolated rather than constant.
+
+**Interpretation taken, stated rather than smoothed over (level A, authorship `claude`).** `plan.md`'s step 4 says "its **three** `\s*` become `<class>*`"; the same plan's position table, the ledger row and the handoff all say **five**, and M17's expected reds name **four** intra-marker positions (after `[`, before `:`, after `:`, before `]`). `FINDING_LINE` in fact carries five `\s*`. **All five were widened**, on the handoff's letter — "at every structural position where the matcher used `\s`". The fifth is the separator between `]` and the remainder, and widening it has one observable consequence, measured: `[SEV: nit]\x0bx` now yields text `"x"` where the un-widened variant yields `"\x0bx"`. That **restores** pre-round parity (the old matcher's `\s*` absorbed the raw VT there identically), so the widening moves toward the round's goal rather than away from it. It is asserted explicitly, next to decision F8's opposite case, in `keeps a token trailing the finding text, and absorbs one in the separator position`. Had the four-position reading been taken instead, M17 would still have gone red on exactly the same rows — the two readings are not distinguished by any planned mutation, which is why the choice is recorded here.
+
+### `findings.ts` gained no import — and what happened to its doc comment
+
+The module is still **pure with zero imports**; nothing was imported from `engine-text.ts`, so the intra-adapter-import question the standards block raised never arose and the module's "zero imports" claim stands as written.
+
+What the doc comment gained is the *coupling*, which is real even though the import is not. A new paragraph states the invariant in one sentence — an AC-18 token standing for a code point that JS whitespace itself absorbed is treated as that whitespace, at every structural position of this matcher, and nowhere else — says why (without it, neutralising upstream silently deletes the finding, the exact outcome AC-19 forbids), and names the coupling explicitly: `SPACE` spells the tokens `engine-text.ts`' `tokenFor` produces, so a change to their casing or format must be mirrored here. It is called a coupling to a **contract** (AC-18's token shape), not an import. `SPACE`, `LEADING_SPACE`, `LIST_OR_QUOTE_PREFIX` and `FINDING_LINE` each carry their own doc explaining what changed and why the five and no others.
+
+### The differential probe — part of the deliverable, re-run on the final tree
+
+Pre-round matcher (`ed3ba28`'s regexes, fed the **raw** line) vs the shipped pipeline (`extractFindings(toSafeLines(raw))`), over the 9 structural positions × {VT, FF, CR, LS, PS, HT, ESC, NUL}. `Y` = recognised, printed as `old/new`:
+
+```
+1 leading                VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+2 leading+spaces         VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+3 before a list marker   VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+4 after a list marker    VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+5 inside a quoted bullet VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+6 after [                VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+7 before :               VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+8 after :                VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+9 before ]               VT:Y/Y  FF:Y/Y  CR:Y/Y  LS:Y/Y  PS:Y/Y  HT:Y/Y  ESC:n/n  NUL:n/n
+parity=72 mismatch=0 total=72
+45-case severity+sentinel failures: none
+trailing token  old: "x"  new: "x\\x0b"
+after ] token   old: "x"  new: "x"
+```
+
+The identical probe, run against the **shipped (pre-S11)** `findings.ts` (`ed3ba28`) with everything else unchanged:
+
+```
+1 leading                VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+2 leading+spaces         VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+3 before a list marker   VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+4 after a list marker    VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+5 inside a quoted bullet VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+6 after [                VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+7 before :               VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+8 after :                VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+9 before ]               VT:Y/n  FF:Y/n  CR:Y/n  LS:Y/n  PS:Y/n  HT:Y/Y  ESC:n/n  NUL:n/n
+parity=27 mismatch=45 total=72
+5000-line hostile review: 0 findings in 4.2 ms
+```
+
+That is RR1-001 measured on the real module rather than argued: **45 of 45**, and a 5000-line review of nothing but leading-VT blockers producing **zero** findings — every one of them deleted from the counts and the list with no degradation notice.
+
+Read against it: **45 of 45 restored, 0 regressions, and the two decided negatives (leading ESC, leading NUL) are `n/n` on both sides** — pre-round behaviour, not something this round introduced. The only text divergence is the trailing token, decision F8, kept because this renderer escapes rather than deletes.
+
+**ReDoS / pathological-input sanity**, same probe, on the patched tree: a 5000-repetition `- ` list prefix matches in **0.05 ms**, a 5000-repetition `\x0b ` token prefix in **2.3 ms**, and a 5000-line hostile review extracts 5000 findings in **6.3 ms**. The alternation is effectively deterministic — `\s` and `\\x0b…` cannot both match at the same first character — so no backtracking blow-up exists to find.
+
+### The whitespace-sensitivity audit, re-confirmed rather than assumed
+
+The plan's claim that `findings.ts` is the **only** consumer of already-neutralised text that is whitespace-sensitive was re-checked against the real tree (`grep -rn "toSafeLines\|neutralizeControls\|splitEngineLines" src --include=*.ts`, excluding tests and the defining module). Three production call sites exist, and only they:
+
+- `render.ts:296` — `formatFindingsSection(toSafeLines(engineOutput), palette)` → `extractFindings`. **Repaired.**
+- `render.ts:346` — `formatFullView` → `matchFindingLine` on the same neutralised lines. **The same predicate**, which is precisely why C-D was chosen: the two surfaces cannot desynchronise by construction.
+- `render.ts:285-287` — `neutralizeControls(collapseToOneLine(message))`. `collapseToOneLine` runs on the **raw** message and neutralisation is last; nothing downstream inspects whitespace. Not affected.
+
+`tui-flow.ts:317`'s blank guard (`engineOutput.trim() === ""`) reads the **raw** `engineOutput`, before any neutralisation. Not affected. **No second site needs the same repair**, so the audit stands and there is nothing to stop and report.
+
+### Evidence — commands and their real output
+
+- baseline, before any edit: `npm test` → `Test Files 49 passed (49)` / `Tests 931 passed (931)`.
+- after the production edit **alone**, before a single test was added: `npm test` → **`931 passed (931)` / `49 passed (49)`**. This is the pre-commitment being met: the plan predicted no named assertion would move, and none did.
+- final: `npm test` → `Test Files 49 passed (49)` / `Tests 995 passed (995)`.
+- `npm run check` → `biome check .` `Checked 163 files… No fixes applied.`, `tsc --noEmit` silent, `depcruise src` → `✔ no dependency violations found (107 modules, 254 dependencies cruised)` — **the exact module and dependency counts of the gate to restore**.
+- AC-14 dual run: `NO_COLOR=1 npx vitest run --project adapters` → `28 passed (28)` / `646 passed (646)`; `FORCE_COLOR=1 npx vitest run --project adapters` → `28 passed (28)` / `646 passed (646)`. **Identical**, and 646 = the 582 of the round-1 gate plus this stage's 64.
+- `git diff --stat src/core` → empty. `git diff --stat src/main` → empty.
+- statement-level confinement grep: `grep -rEn '^import .*"picocolors"' src/` → **1** hit, `src/adapters/driving/tui/colors.ts:34`.
+
+One formatting correction was needed and taken: `biome check` rejected a single over-long `expect(structuralDigest()).toContain(…)` line in the new end-to-end case, fixed with `biome check --write` on that file only. Nothing else was reformatted.
+
+### Test-count arithmetic
+
+| | before | after | delta |
+|---|---|---|---|
+| `findings.test.ts` | 30 | **89** | +59 — 1 corpus guard, 45 structural rows (9 × 5), 9 HT rows, 2 decided negatives, 1 differential invariant, 1 trailing/separator token |
+| `result.test.ts` | 72 | **77** | +5 — 4 end-to-end structural cases, plus the ENV-DEPENDENT half split out of AC-12(c) by RR2-001's repair |
+| full suite | 931 / 49 | **995 / 49** | **+64**, no test file added, none deleted, none renamed |
+
+The 72 figure is directly observed (the M18 half-(b) run against `HEAD`'s `result.test.ts` reported `1 passed | 71 skipped (72)`); 30 follows from 89 − 59, and 931 + 64 = 995 closes the arithmetic on the full suite.
+
+**No named assertion changed.** Every pre-existing assertion in the repository passed unmodified against the patched production file, verified by running the full suite after the production edit and **before** adding any test. The AC-12(c) rewrite in `result.test.ts` is not an exception to that pre-commitment: it is `RR2-001`'s own repair, mandated by the plan and inside the round's approved scope by `e6f2h2-D16`, and it was applied to assertions that were **passing** — vacuously, which is the finding — not to assertions the fix had broken.
+
+### Mutation verification — five mutations, all applied to the real files, all observed, all reverted
+
+**M14 — restore `findings.ts` to its `ed3ba28` state.** Both halves observed, which is the half that matters:
+
+- *red half*: **51 failures**, and exactly the expected families — all **45** structural rows (9 positions × VT/FF/CR/LS/PS), the differential invariant, the trailing/separator token case, and **all 4** end-to-end cases in `result.test.ts`.
+- *green half*: **every round-1 interior-control case stayed green** under the identical mutation — the 5 cases of `extractFindings — an interior control never deletes a finding (AC-19, layer 2)` and the 5 of `formatResultDigest — an interior control never deletes a finding (AC-19, layer 1)`. The 9 HT rows and the 2 decided negatives also stayed green. The two failure families are therefore **independent**: round 1's tests could not have caught RR1-001, and these cannot be satisfied by round 1's fix.
+
+**M15 — delete only the `LEADING_SPACE` strip.** 20 reds, and only the leading family: the 15 rows of positions `leading`, `leading, mixed with spaces` and `before a list marker` (× 5 code points), the differential invariant, and the 4 end-to-end cases (whose corpus opens with a leading-VT blocker). The `after a list marker`, `inside a quoted bullet` and all four intra-marker families **stayed green**.
+
+**M16 — revert only `LIST_OR_QUOTE_PREFIX`'s class to `\s+`.** 15 reds, and only the list/quote family: the 10 rows of `after a list marker` and `inside a quoted bullet`, the differential invariant, and the 4 end-to-end cases (whose corpus carries a post-list-marker CR major). Every leading and every intra-marker row **stayed green**.
+
+**M17 — revert only `FINDING_LINE`'s classes to `\s*`.** 25 reds, and only the intra-marker family: the 20 rows of `after the opening bracket`, `before the colon`, `after the colon` and `before the closing bracket`, the trailing/separator token case (the fifth `\s*`), the differential invariant, and **3** of the 4 end-to-end cases. The fourth, `lists the blocker and the major with their own text`, correctly **stayed green** — the corpus's intra-marker finding is a `minor`, which the digest counts but does not list. A position-specific signal, not a blanket one.
+
+M15/M16/M17 were run as three separate mutations precisely so that no structural position could be covered by accident, and the three red sets are **disjoint** apart from the two whole-corpus assertions that are meant to span them.
+
+**M18 — RR2-001's repair, on round 1's M12 pattern.** Run with `CI`, `FORCE_COLOR` and `NO_COLOR` all **unset** (verified and printed before the run), which is the gate under which picocolors binds all four roles to the global `String`:
+
+- *half (a), the rewritten assertions*: swapping `MARKED` for `PLAIN_PALETTE` → **FAILS**, `AssertionError: expected '[SEV: blocker] auth.ts:12\\x1b[1A\\x1b[…' to be '<bad>[SEV: blocker] auth.ts:12\\x1b[1A…'`.
+- *half (b), the pre-fix assertions*: the identical mutation applied to `HEAD`'s version (`TUI_PALETTE` → `PLAIN_PALETTE`) → **PASSES**, `1 passed | 71 skipped (72)`.
+
+That contrast is the whole finding: the assertions the round-1 delta shipped could not distinguish the real palette from no palette at all, and the ones replacing them can. Both halves are recorded, as the plan required.
+
+All five mutations were reverted; `diff` against the pre-mutation copies confirms `findings.ts` and `result.test.ts` are byte-identical to the delivered versions, and `npm run check` + `npm test` were re-run **after** the last revert (`995 / 49`, gate clean) rather than trusted.
+
+### RR2-001 — what was actually wrong, and what replaced it
+
+The old AC-12(c) case computed `formatFullView(HOSTILE_REVIEW, TUI_PALETTE).map(stripAnsi)` and asserted two things about it: that no code point of N survives, and that it equals the `PLAIN_PALETTE` render. Under the mandated local gate both are byte-identical duplicates of the `PLAIN_PALETTE` assertions two lines above, and its closing comment claimed to prove the colour-after-neutralisation ordering, which in that environment it cannot. The repair follows its already-repaired sibling at `full-view.test.ts:557-577` exactly:
+
+- the ordering is now proved **deterministically**, where it cannot be a no-op: `formatFullView(HOSTILE_REVIEW, MARKED)[1]` is asserted to be `<bad>` wrapped around the **neutralised** text, and `.map(stripMarks)` is asserted equal to the plain render — decoration added after neutralisation, and removing cleanly;
+- the `TUI_PALETTE` half **survives, labelled** as `— the ENV-DEPENDENT case`, with the sibling's honest comment: colour-off makes it a no-op comparison, colour-on (`FORCE_COLOR=1`, or any run setting `CI`) makes it the real check that `stripAnsi` removes exactly what the palette added. It is what makes the AC-14 dual run meaningful; it is not what proves decoration.
+
+### Negative-assertion pairing — applied without exception
+
+Every "contains no code point in N" assertion added by this stage sits beside a positive one naming what must be **present**, because unpaired it is also satisfied by the finding having been deleted — RR1-001's own failure mode, and the reason round 1's tests passed on the bug:
+
+- the 45 structural rows pair "recognised" with `severity === "blocker"` **and** the text still starting with `START` and ending with `END`, so a matcher that recognises the line but eats its text still fails;
+- `carries nothing executable, and carries the findings` pairs `lines.some(IN_N)` → `false` with the exact counts line **and** the exact listed blocker line;
+- the two decided negatives pair "the leading ESC/NUL line is **not** recognised" with "the same code point one step to the right **is**", so the negative is about the position and not about a malformed corpus line;
+- the differential invariant carries its own non-vacuity guard: the 72-line corpus must contain exactly **18** pre-round negatives, or the parity equality would also hold for a matcher that recognised everything;
+- the corpus-size guard (`9`, `5`, `45`) exists so a later edit cannot shrink the table while every remaining case still passes — which is, structurally, how this defect shipped.
+
+### Quick checks
+
+- planned (from `plan.md`'s S11 validation strategy): full `npm test` at or above 931 / 49; `npm run check` clean at 107 modules / 254 dependencies; adapters identical under `NO_COLOR=1` and `FORCE_COLOR=1`; empty `src/core` and `src/main` diffs; statement-level picocolors grep = 1; the differential probe pasted into this log; the ReDoS sanity check; M14–M18.
+- run: **all of them.** Nothing planned was skipped, nothing was substituted for a cheaper check.
+- failures: **none.** Every mutation went red (or green) exactly as predicted, so no unpredicted-mutation investigation was needed.
+
+### Deviations
+
+One, stated plainly, plus two notes recorded so a reviewer does not read them as oversights.
+
+1. **`FINDING_LINE`'s fifth `\s*` was widened too, where `plan.md`'s step 4 says "three".** The plan's own position table, the ledger row, the handoff and the file itself all say five; M17's expected reds name four intra-marker positions. All five were widened, on the handoff's letter ("every structural position where the matcher used `\s`"). The single observable consequence — a token in the separator position between `]` and the text is absorbed rather than rendered — **restores** pre-round parity rather than departing from it, is measured in the probe above, and is asserted in a named case. Level **A** (technical, reversible, inside one adapter, no public API), authorship `claude`. Flagged because no planned mutation distinguishes the two readings, so a reviewer would otherwise have to infer the choice from the diff.
+
+Not deviations:
+
+- **The AC-12(c) rewrite is not a "named assertion change".** It is RR2-001's mandated repair, applied to assertions that were passing vacuously, not to assertions the production fix broke. The pre-commitment ("if an existing assertion moves, stop and report") was tested where it applies — the full suite after the production edit and before any new test — and it held at 931 / 49.
+- **The named residue was not fixed, by design.** A leading member of N that is not whitespace-class (ESC, NUL, DEL, C1) still prevents recognition. It is not a round-1 regression — the probe shows the pre-round matcher dropping it identically — it sits outside AC-19's letter, and it is now **asserted as a decided negative** so the boundary is explicit rather than accidental. It is already recorded as `risk-e6f2h2-013`; this stage neither widened it nor wrote the risk block.
+
+### Stage close
+
+- blockers: none. **`RR1-001` and `RR2-001` are closed by this stage** — 45 of 45 structural combinations restored with 0 regressions, both rendering surfaces asserted to stay synchronised, and the vacuous palette pair replaced by a deterministic one plus a labelled env-dependent one.
+- scope / drift / blast-radius: none. Planned scope was three files, one of them production; actual scope is exactly those three. `src/core` and `src/main` are untouched, no dependency was added, no import was added, no config file was edited, and the level-C standing guard (`risk-e6f2h2-004`) never came near firing.
+- risks: no new risk. `risk-e6f2h2-013` (the leading non-whitespace-class control) is unchanged, still open, now pinned by two decided-negative assertions and recommended for E7 beside `risk-e6f2h2-012`, which is also unchanged — S11 touched no CLI file.
+- git: **no commits, no stashes, no resets, no branch change.** The orchestrator owns git; the tree carries three modified source files plus this log entry and the `state.yaml` update, all uncommitted.
+- QA handoff: **deferred to the orchestrator.** Per `plan.md`, S11 is followed by a **scoped re-review over the round-2 fix delta**, checked id by id against `review-ledger.md` for `RR1-001` and `RR2-001`, and then `sddl-qa-review` in `final` mode — the only stage that may mark this change `completed`. This stage ran neither and claims neither.
+- next action: the orchestrator commits S11, then routes the scoped re-review. **The fix budget is now exhausted**: fix round 2 of 2 is complete, and a severe finding surviving this round returns the decision to the user.

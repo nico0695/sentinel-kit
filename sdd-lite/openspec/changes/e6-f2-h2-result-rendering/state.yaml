@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-spec
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -202,7 +202,7 @@ stages:
   sddl-plan:
     status: completed
     started_at: "2026-08-29T17:30:00Z"
-    completed_at: "2026-08-29T17:55:00Z"
+    completed_at: "2026-08-30T00:55:00Z"
     notes: >-
       plan.md written from design.md (authoritative for mechanism and file layout) + spec.md
       (authoritative for the 17 ACs), grounded in direct reads of the current
@@ -240,6 +240,77 @@ stages:
       the orchestrator probe); no level-C item — nothing in the plan requires `src/core/**`, and
       the standing guard to stop if execution finds itself there is carried into the artifact.
       Two low risks appended (008 transitional export, 009 AC-14 vacuity).
+      FIX-ROUND APPEND (second invocation, 2026-08-30, under `e6f2h2-D12` at
+      `cp-review-gate-round-1`): three stages APPENDED to the Stage Plan table — S8, S9, S10 —
+      without rewriting S1-S7's rows or their history. S8 lands the new pure module
+      `tui/engine-text.ts` (`splitEngineLines`, `neutralizeControls`, `toSafeLines`) plus
+      `__test__/engine-text.test.ts`, with zero imports and nothing importing it, so AC-18's
+      contract is proved before any call site moves (the S2/S3 shape). S9 is the rewiring and the
+      only stage with production blast radius: the load-bearing order split -> neutralise ->
+      match -> colour installed in `render.ts` with `toSafeLines` computed once per digest,
+      `extractFindings(lines)`, the widened `FINDING_LINE` remainder group, and neutralisation of
+      the digest `Failure:` message (the third engine-derived channel, `claude-code`'s
+      `buildReviewErrorMessage`, fixed IN THE TUI ADAPTER so the blast radius does not widen into
+      a second adapter), together with the two NAMED assertion changes at `result.test.ts:900`
+      and `findings.test.ts:223`. S10 carries the verification repairs and the comment pass with
+      zero production behaviour change. Strictly sequential, no batching, one `stage_approval`
+      each. Ledger ids covered: R1-001, R1-002, R1-003, R3-002, R3-001, R2-001. ACs: AC-18..AC-21
+      new, AC-2/3/6/12/13/14 amended.
+      TWO DECISIONS TAKEN (both level A, both flagged by the spec worker as reported-not-decided).
+      F1 — the A-7 mechanisms: (a) R3-002 is repaired against the `MARKED` deterministic palette,
+      NOT `pc.createColors(true)`, and the plan records a CORRECTION to A-7's rationale — its
+      parenthetical "the test tree is not `src/`" is factually wrong in this repo, the TUI suites
+      live at `src/adapters/driving/tui/__test__/`, so a picocolors import in a test file would
+      make the fix round's own mandated statement-level grep return 2 and fail the gate; option 1
+      is therefore the only one compatible with the gate, not merely the preferred one.
+      (a-bis) `MARKED`/`stripMarks` are PROMOTED to `tui-test-doubles.ts` and imported by both
+      suites rather than copied, because a third copy across exactly the two files R2-005 flagged
+      would reproduce the reviewed defect inside the round convened to remove it — a recorded
+      delta from design A-9, test-tree only, with a type-only `TuiPalette` import so no runtime
+      `colors.js` (hence no picocolors) load is added. (b) R3-001 is repaired with the
+      `vi.mock("../colors.js", ...)` marking palette in a DEDICATED new file
+      `__test__/palette-wiring.test.ts` (vi.mock is hoisted file-wide — the
+      `opencode-adapter.test.ts:495-497` hazard — and would neuter `full-view.test.ts`'s own
+      palette comparisons); option 2 was rejected because it is vacuous under the mandated local
+      gate, i.e. the same species the round exists to eliminate. Not via `TuiDeps`.
+      F2 — `risk-e6f2h2-012` DISPOSITION: deferred to E7 as a named story candidate, not fixed
+      here and not carried into round 2. The CLI's `runs show`
+      (`cli/render/format-runs.ts:188`) has the same exposure, but D4 keeps the CLI untouched and
+      `adapters-isolated` forbids the driving-to-driving import; the only in-guard fixes are a
+      second copy under `cli/render/` (the Q9 / `formatTuiErrorLine` precedent, RECOMMENDED as an
+      E7 story) or moving the primitive into `src/core/shared/`, which is level C and out of
+      bounds under `risk-e6f2h2-004`. The H1 catch-all rides along in the same E7 story.
+      ORCHESTRATOR ACTION: carry this disposition into `open_risks[risk-e6f2h2-012]` and the
+      history entry — this stage did not write that block.
+      MUTATION-VERIFIES M6..M13 appended, each with its expected red: M6 widen N to include HT
+      (boundary table red), M7 drop the CRLF rule (split case red), M8 revert the widened
+      remainder group (findings unit cases red), M9 remove the neutralise-before-match ordering
+      (digest end-to-end cases red, while the finding is still counted — which is exactly why the
+      two AC-19 layers need separate assertions), M10 drop the failure-message neutralisation
+      (AC-6 case red), M11 bypass `toSafeLines` in `formatFullView` plus a permanent in-test guard
+      that the hostile fixture really carries a control code point, M12 swap the deterministic
+      palette for `PLAIN_PALETTE` (the six rewritten assertions red, where the pre-fix versions
+      PASS), M13 three separate `TUI_PALETTE`-to-`PLAIN_PALETTE` mutations in `tui-flow.ts`, one
+      per call site, so no site is covered by accident. A NEGATIVE-ASSERTION PAIRING RULE is added
+      as mandatory: every "contains no code point in N" assertion must be paired with a positive
+      assertion naming the line that must be present, because unpaired it is satisfied by the
+      finding being DELETED — R1-003's own failure mode, so the assertion written to prove the fix
+      would pass on the bug. That is the fourth instance of this change's recurring vacuity
+      species.
+      VALIDATION: the gate to restore is `npm run check` clean, `npm test` at or above 856 / 47,
+      adapters identical under `NO_COLOR=1` and `FORCE_COLOR=1`, `git diff --stat src/core` and
+      `src/main` empty. File-count expectations are stated per stage (48, 48, 49) so a silent loss
+      is visible, and the CORRECTED confinement check is recorded: the statement-level picocolors
+      grep over `src/` returns 1, while the plan's original naive `grep -rn "picocolors" src/`
+      literal in S3/S7 now returns 11 and is wrong. Verified at plan time.
+      ONE OPEN LEVEL-B QUESTION, Q-F1, default DECLINE, for the orchestrator at
+      `cp-stage-approval-s9`: whether S9 should also add an AC-4 degradation case driven by the
+      real `fixtures/claude-code/noisy-output.json` (zero `[SEV: ...]` matches, so the degradation
+      path is the common real path yet is asserted only against a hand-written string). Arguably
+      the same vacuity species, but not one of the six ledger ids, and the fix-stage rule is
+      "exactly the confirmed ids, nothing else". No level-C item; nothing in S8-S10 requires
+      `src/core/**` and `risk-e6f2h2-004`'s standing guard is restated in the artifact.
+      Planning only: no `src/**`, test or config file was touched, and no commit was made.
   sddl-executor:
     status: completed
     started_at: "2026-08-29T18:00:00Z"
@@ -966,34 +1037,43 @@ qa_summary:
   reported_at: "2026-08-29T21:05:00Z"
   report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: stage_approval
+  target: sddl-executor
   summary: >-
-    **Amendment pass DONE — spec.md and design.md amended for fix round 1 of 2 under
-    e6f2h2-D12. No source, test or config file was touched.** AC-12's byte-verbatim identity is
-    superseded (it IS R1-002); printable-text fidelity replaces it as three testable properties
-    (completeness, restricted identity on control-free input, non-executability). AC-18..AC-21
-    added, AC-2/3/6/13/14 amended, every original text kept visible with its supersession marked
-    inline. Mechanism in design.md §Amendment 1: one new pure module
-    `src/adapters/driving/tui/engine-text.ts` (`splitEngineLines`, `neutralizeControls`,
-    `toSafeLines`), the order split -> neutralise -> match -> colour, `extractFindings(lines)`,
-    the `FINDING_LINE` remainder widened to `([^\n]*)` as a second layer, and neutralisation of
-    the digest's `Failure:` message (a third engine-derived channel the ledger did not name:
-    claude-code's `buildReviewErrorMessage` returns `envelope.result` verbatim as the error
-    message). NEXT per the orchestrator contract: `sddl-plan` writes a FIX STAGE seeded from the
-    confirmed ledger ids R1-001, R1-002, R1-003 plus the three D12 info rows R3-002, R3-001,
-    R2-001. Recommended stage order — `engine-text.ts` + `__test__/engine-text.test.ts` FIRST
-    (nothing else can be validated before it exists), then `findings.ts` (signature + regex +
-    AC-19 cases), then `render.ts` (composition + failure-line neutralisation + the AC-2/6/12
-    cases and the two NAMED assertion changes at `result.test.ts:900` and `findings.test.ts:223`),
-    then the A-7 test repairs (AC-20), then the `tui-flow.ts` comment pass (AC-21). Then
-    `stage_approval`, then `sddl-executor`; confirmed severe findings never trigger direct edits.
-    Gate to restore: `npm run check` clean and `npm test` at or above 856 / 47, adapters
-    identical under `NO_COLOR=1` and `FORCE_COLOR=1`, `src/core` and `src/main` diffs empty.
-    Two items REPORTED, NOT DECIDED, for the orchestrator: (1) A-7 leaves two admissible
-    mechanisms per test repair with a recommendation each — the plan should pick one explicitly
-    rather than leave it to the executor; (2) `risk-e6f2h2-012` names the CLI `runs show`
-    exposure, which is deliberately out of scope here and is E7 material.
+    **FIX STAGE APPENDED — `plan.md` now carries S8, S9, S10 for fix round 1 of 2 under
+    `e6f2h2-D12`. Planning only: no source, test or config file was touched, no commit made.**
+    S1-S7's rows and history are untouched. The three stages are strictly sequential and each
+    needs its own `stage_approval`; the next one to approve is **S8**.
+    S8 — NEW `src/adapters/driving/tui/engine-text.ts` (`splitEngineLines`, `neutralizeControls`,
+    `toSafeLines`) and NEW `__test__/engine-text.test.ts`. Pure, zero imports, nothing imports it
+    yet, so AC-18's contract is proved before any call site moves. Validation: narrowed adapters
+    run on the new file, `npm run check`, exactly two new paths in the diff, `src/core` and
+    `src/main` diffs empty. Mutation-verify M6 (add HT to N) and M7 (drop the CRLF rule).
+    S9 — the rewiring: `findings.ts` (`extractFindings(lines)`, widened remainder group),
+    `render.ts` (the load-bearing order split -> neutralise -> match -> colour, `toSafeLines`
+    once per digest, neutralised `Failure:` message), and the three TUI suites, including the two
+    NAMED assertion changes at `result.test.ts:900` and `findings.test.ts:223`. Full `npm test`,
+    dual-env, guards. Mutation-verify M8-M11.
+    S10 — verification repairs and comment hygiene, zero production behaviour change: the six
+    tautological palette assertions rewritten against `MARKED` (promoted to `tui-test-doubles.ts`),
+    NEW `__test__/palette-wiring.test.ts` using `vi.mock("../colors.js", ...)` to prove all three
+    `TUI_PALETTE` call sites, and the four bare AC citations in `tui-flow.ts` qualified.
+    Mutation-verify M12, M13.
+    TWO DECISIONS TAKEN by the plan, both level A: F1 picks the `MARKED` palette and the dedicated
+    `vi.mock` file (recording that design A-7's "the test tree is not `src/`" rationale is
+    factually wrong here — a picocolors import in a test file would make the mandated
+    statement-level grep return 2 and fail the round's own gate); F2 defers `risk-e6f2h2-012` to
+    E7 as a named story recommending a second copy under `cli/render/`, never a `src/core/shared/`
+    move (level C).
+    ORCHESTRATOR ACTIONS: (1) carry F2's disposition into `open_risks[risk-e6f2h2-012]` — this
+    stage does not write that block; (2) answer the single open level-B question **Q-F1**
+    (default DECLINE) at `cp-stage-approval-s9`: whether S9 should also add an AC-4 degradation
+    case driven by the real `fixtures/claude-code/noisy-output.json`, which is arguably the same
+    vacuity species but is not one of the six ledger ids. The corrected confinement literal is
+    recorded in `plan.md`: the statement-level picocolors grep over `src/` = 1, while the plan's
+    original naive `grep -rn "picocolors" src/` now returns 11 and is wrong.
+    After S10: a scoped re-review over the fix delta, checked id by id against
+    `review-ledger.md` (round 1 of 2 consumed), then `sddl-qa-review` in `final` mode.
 
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T00:00:00Z"
+updated_at: "2026-08-30T00:55:00Z"

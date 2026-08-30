@@ -312,9 +312,10 @@ stages:
       `src/core/**` and `risk-e6f2h2-004`'s standing guard is restated in the artifact.
       Planning only: no `src/**`, test or config file was touched, and no commit was made.
   sddl-executor:
-    status: completed
+    status: in_progress
     started_at: "2026-08-29T18:00:00Z"
     completed_at: "2026-08-29T22:35:00Z"
+    last_updated_at: "2026-08-30T02:00:00Z"
     notes: >-
       ALL SEVEN planned stages are executed: S1, the S2/S3 batch, S4, S5, S6 and S7 are DONE. S1 (committed `b0a3a04`): picocolors
       pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
@@ -456,6 +457,46 @@ stages:
       rewrite is not. `README.md`'s packaging and licence caveats are still accurate, and
       `CONTRIBUTING.md` is clean — it states no progress facts and every command it names matches
       `package.json`. No git side effects; S7 claims neither the 4R review nor final completion.
+
+      **S8 (uncommitted) opens fix round 1 — the neutralisation primitive, and nothing else.** `completed_at`
+      above marks the end of the ORIGINAL seven stages; the stage is back to `in_progress` because S9 and S10
+      of fix round 1 remain, each needing its own `stage_approval`. Approved by `cp-stage-approval-s8-s10` /
+      `e6f2h2-D12` + `e6f2h2-D13`. Changed files: exactly the two NEW paths plan.md names —
+      `src/adapters/driving/tui/engine-text.ts` (143 lines: `splitEngineLines`, `neutralizeControls`,
+      `toSafeLines`, the private `NEUTRALIZED` class and `tokenFor`) and `__test__/engine-text.test.ts`
+      (470 lines, 52 tests). NO existing file was touched: `findings.ts`, `render.ts`, `tui-flow.ts`,
+      `colors.ts`, every existing test and every config file are untouched, and `git status --porcelain` is
+      exactly two `??` lines. The module has **zero imports** (grep for an import/require/export-from line
+      returns nothing; the only two occurrences of the word are prose in its header) and depcruise confirms
+      it independently: 107 modules cruised, up from 106, against an UNCHANGED 253 dependencies — no edge in,
+      no edge out. Set N is the five contiguous ranges U+0000-U+0008, U+000B-U+001F, U+007F-U+009F, U+2028,
+      U+2029; HT and LF are excluded with the argument written into the doc comment; the token is `\xNN` /
+      `\uNNNN`, ASCII-only, recorded as deliberately non-injective; `splitEngineLines` consumes exactly one
+      trailing CR per element so the element count equals the plain LF split's. Evidence, all measured:
+      narrowed adapters run **52 / 52 exit 0**; `npm run check` **clean** (biome 162 files no fixes, tsc
+      silent, depcruise no violations); full `npm test` **908 passed (908) / 48 files** (856/47 + 52/+1,
+      purely additive, hitting the 48 plan.md predicted); `git diff --stat src/core` and `src/main` both
+      EMPTY; statement-level picocolors grep still **1** (`colors.ts:34`). BOTH mutation-verifies were RUN,
+      not assumed, and both went red as predicted, then reverted: **M6** (HT added to N) -> 4 failed / 48
+      passed, the predicted HT boundary row first with `expected 'A\x09B' to be 'A\tB'`, plus three
+      unpredicted P3 reds showing the transparency block is load-bearing; **M7** (trailing-CR drop removed)
+      -> 5 failed / 47 passed, the predicted CRLF case first with `expected [ 'a\r', 'b', 'c' ] to deeply
+      equal [ 'a', 'b', 'c' ]`, and the element-count property correctly stayed GREEN, which is why the CRLF
+      behaviour needs its own cases. The negative-assertion pairing rule is applied without exception: every
+      "no code point in N" assertion sits beside a positive naming the text that must be present, and the
+      hostile fixture is asserted hostile BEFORE it is rendered. ONE DEVIATION, level A, authorship `claude`:
+      design.md §A-2's prose ("a lone CR — interior, or trailing with no LF — is neutralised") contradicts
+      spec.md AC-18, design §A-2's own signature comment, plan.md's S8 gotcha and the stage handoff, which
+      all say "one trailing CR removed per element". They differ only for an input ending in CR with no LF
+      (`"a\r"`); implemented as the four say (-> `["a"]`), covered by a named test whose comment states the
+      reasoning and by the module doc comment. It is a fidelity nit, not a safety hole — the caller writes
+      its own line break after the last line. If the orchestrator prefers the prose reading it is one line in
+      `splitEngineLines` plus one expectation, cheapest at S9. The AC-14 dual-env run was deliberately
+      SKIPPED (plan.md assigns it to S9/S10; S8 adds no colour-dependent code). No new risk;
+      `risk-e6f2h2-011` and `risk-e6f2h2-012` are now named inside the new module's doc comment.
+      `risk-e6f2h2-004`'s level-C guard was never approached. QA handoff deferred — the plan routes the fix
+      round to a scoped re-review over the fix delta after S10, then final QA. No git side effects. S9 was
+      NOT started.
   sddl-qa-review:
     status: completed
     mode: stage
@@ -914,6 +955,25 @@ decisions:
       the letter of the fix-stage rule while leaving its purpose unserved. Added to S9's stated
       scope so the scoped re-review sees it as in-scope rather than as drift.
     recorded_at: "2026-08-30T00:25:00Z"
+  - id: e6f2h2-D14
+    checkpoint_id: cp-stage-approval-s8-s10
+    selected_option_id: crlf-follow-ac18-correct-design-prose
+    rationale: >-
+      S8 surfaced a contradiction BETWEEN APPROVED ARTIFACTS rather than silently picking a side:
+      design.md §A-2's prose said a lone CR "interior, or trailing with no LF" is neutralised, while
+      AC-18, §A-2's own signature comment, plan.md's S8 gotcha and the S8 handoff all say one
+      trailing CR is consumed per element. The executor implemented the four-source reading and
+      flagged the divergence instead of smoothing it over.
+      RULING: the four prevail — AC-18 is the acceptance criterion and is unambiguous — and the
+      design PROSE is corrected so the artifacts stop disagreeing, rather than leaving a latent
+      contradiction for the re-review or final QA to trip on. The divergence is one input (`"a\r"`)
+      and is a fidelity nit, not a safety hole: the caller writes its own line break after the last
+      line, so a surviving CR could only return the cursor to a column immediately left, with
+      nothing rendered after it to overwrite. Spec-consistent too — AC-12(b)'s restricted identity
+      covers only inputs with no code point in N, and CR is in N.
+      Level A: technical, reversible, aligned with the acceptance criterion. Reopening a spec stage
+      for one contradicted sentence would be disproportionate ceremony.
+    recorded_at: "2026-08-30T01:05:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-
@@ -1088,40 +1148,38 @@ next_action:
   kind: stage_approval
   target: sddl-executor
   summary: >-
-    **FIX STAGE APPENDED — `plan.md` now carries S8, S9, S10 for fix round 1 of 2 under
-    `e6f2h2-D12`. Planning only: no source, test or config file was touched, no commit made.**
-    S1-S7's rows and history are untouched. The three stages are strictly sequential and each
-    needs its own `stage_approval`; the next one to approve is **S8**.
-    S8 — NEW `src/adapters/driving/tui/engine-text.ts` (`splitEngineLines`, `neutralizeControls`,
-    `toSafeLines`) and NEW `__test__/engine-text.test.ts`. Pure, zero imports, nothing imports it
-    yet, so AC-18's contract is proved before any call site moves. Validation: narrowed adapters
-    run on the new file, `npm run check`, exactly two new paths in the diff, `src/core` and
-    `src/main` diffs empty. Mutation-verify M6 (add HT to N) and M7 (drop the CRLF rule).
-    S9 — the rewiring: `findings.ts` (`extractFindings(lines)`, widened remainder group),
-    `render.ts` (the load-bearing order split -> neutralise -> match -> colour, `toSafeLines`
-    once per digest, neutralised `Failure:` message), and the three TUI suites, including the two
-    NAMED assertion changes at `result.test.ts:900` and `findings.test.ts:223`. Full `npm test`,
-    dual-env, guards. Mutation-verify M8-M11.
+    **S8 IS DONE (uncommitted). The next stage to approve is S9.** Fix round 1 of 2 is one third
+    executed: the neutralisation primitive `src/adapters/driving/tui/engine-text.ts` and its
+    52-test `__test__/engine-text.test.ts` are in the tree, imported by nothing, with `npm run
+    check` clean, the full suite at **908 / 48**, `src/core` and `src/main` diffs empty, and both
+    mutation-verifies (M6 HT-in-N, M7 CRLF-rule-dropped) observed red and reverted. AC-18 is
+    satisfied by the primitive; R1-001, R1-002 and R1-003 now have their mechanism but are NOT
+    yet closed — nothing calls it.
+    ORCHESTRATOR ACTIONS: (1) commit S8; (2) rule on the one deviation S8 recorded, level A and
+    already resolved toward the spec — `design.md` §A-2's prose says a lone CR "trailing with no
+    LF" is neutralised, while `spec.md` AC-18, design §A-2's own signature comment, `plan.md`'s
+    S8 gotcha and the stage handoff all say "one trailing CR removed per element". The readings
+    differ only for an input ending in CR with no LF, implemented as the four say. If the prose
+    reading is preferred it is one line in `splitEngineLines` plus one expectation, cheapest to
+    take at S9 while `render.ts` is open; otherwise consider amending that sentence of the design
+    so the artifacts stop disagreeing; (3) approve **S9**.
+    S9 — the rewiring: `findings.ts` (`extractFindings(lines)`, remainder group widened to
+    not-LF), `render.ts` (the load-bearing order split -> neutralise -> match -> colour,
+    `toSafeLines` computed once per digest, neutralised `Failure:` message), and the three TUI
+    suites including the two NAMED assertion changes at `result.test.ts:900` and
+    `findings.test.ts:223`. Validation: full `npm test` (must not fall below 908 / 48 — S8's
+    additions are now part of the floor), `npm run check`, the AC-14 dual-env adapters run,
+    `src/core` and `src/main` diffs empty, statement-level picocolors grep = 1. Mutation-verify
+    M8, M9, M10, M11, and the negative-assertion pairing rule is mandatory for every added case.
+    Q-F1 is already settled by `e6f2h2-D13` (accepted), so S9's scope includes it.
     S10 — verification repairs and comment hygiene, zero production behaviour change: the six
-    tautological palette assertions rewritten against `MARKED` (promoted to `tui-test-doubles.ts`),
-    NEW `__test__/palette-wiring.test.ts` using `vi.mock("../colors.js", ...)` to prove all three
-    `TUI_PALETTE` call sites, and the four bare AC citations in `tui-flow.ts` qualified.
-    Mutation-verify M12, M13.
-    TWO DECISIONS TAKEN by the plan, both level A: F1 picks the `MARKED` palette and the dedicated
-    `vi.mock` file (recording that design A-7's "the test tree is not `src/`" rationale is
-    factually wrong here — a picocolors import in a test file would make the mandated
-    statement-level grep return 2 and fail the round's own gate); F2 defers `risk-e6f2h2-012` to
-    E7 as a named story recommending a second copy under `cli/render/`, never a `src/core/shared/`
-    move (level C).
-    ORCHESTRATOR ACTIONS: (1) carry F2's disposition into `open_risks[risk-e6f2h2-012]` — this
-    stage does not write that block; (2) answer the single open level-B question **Q-F1**
-    (default DECLINE) at `cp-stage-approval-s9`: whether S9 should also add an AC-4 degradation
-    case driven by the real `fixtures/claude-code/noisy-output.json`, which is arguably the same
-    vacuity species but is not one of the six ledger ids. The corrected confinement literal is
-    recorded in `plan.md`: the statement-level picocolors grep over `src/` = 1, while the plan's
-    original naive `grep -rn "picocolors" src/` now returns 11 and is wrong.
+    tautological palette assertions rewritten against `MARKED` (promoted to
+    `tui-test-doubles.ts`), NEW `__test__/palette-wiring.test.ts` using `vi.mock("../colors.js",
+    ...)` to prove all three `TUI_PALETTE` call sites, and the four bare AC citations in
+    `tui-flow.ts` qualified. Mutation-verify M12, M13. Expected file count 49.
     After S10: a scoped re-review over the fix delta, checked id by id against
-    `review-ledger.md` (round 1 of 2 consumed), then `sddl-qa-review` in `final` mode.
+    `review-ledger.md` (round 1 of 2 consumed), then `sddl-qa-review` in `final` mode — the only
+    stage that may mark this change completed.
 
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T00:55:00Z"
+updated_at: "2026-08-30T02:00:00Z"

@@ -1,7 +1,7 @@
 # Execution Log
 
 - change_name: e6-f2-h2-result-rendering
-- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7 — all seven planned stages executed)
+- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7; S8 — the seven original stages plus fix round 1's first stage; S9 and S10 remain)
 - plan source: `plan.md` (Stage Plan table, authoritative)
 
 ## Stage Overview
@@ -15,6 +15,9 @@
 | S5 | Supersession: flow call sites → digest, delete the legacy renderer, rewrite the four H1 tails (AC-15) + the D9 amendment | done — 824 / 46 (823 − 3 + 4), the digest is now the product's output |
 | S6 | `offerFullView` + `full-view.test.ts` (AC-8/9/10/12/13) | done — 856 / 47 (824 + 31 + 1), M3/M4/M5 all verified red then reverted |
 | S7 | CLAUDE.md closeout + final evidence sweep (AC-14/16/17) | done — `CLAUDE.md` only, 4 insertions / 4 deletions; sweep green, count unchanged at **856 / 47** |
+| S8 | Fix round 1 (`e6f2h2-D12`): the neutralisation primitive `engine-text.ts` + its AC-18 suite, imported by nothing yet | done — 2 NEW files, **908 / 48** (+52), M6/M7 verified red then reverted |
+| S9 | Fix round 1: the rewiring — `toSafeLines` in `render.ts`, `extractFindings(lines)`, the widened remainder group, the neutralised `Failure:` line | pending — its own `stage_approval` invocation |
+| S10 | Fix round 1: verification repairs (AC-20 palette assertions, `palette-wiring.test.ts`, the AC-21 comment pass) | pending — its own `stage_approval` invocation |
 
 ## S1 — Dependency gate: `picocolors` install, pin, export-shape and baseline confirmation
 
@@ -634,3 +637,119 @@ Not deviations, but recorded so a reviewer does not read them as oversights:
 - git: **no commits, no stashes, no resets.** The orchestrator owns git. The tree carries `CLAUDE.md`, this log and the `state.yaml` stage entry, uncommitted.
 - QA handoff: **not this stage's call.** S7 touched no code, so a stage-mode QA over it would review a documentation diff. The plan's post-execution route stands and is unchanged: **4R code review over the frozen diff** (`e6f2h2-D11`), then **final QA (`sddl-qa-review`, `final` mode)** — the only stage that may mark this change `completed`. This stage claims neither.
 - next action: the orchestrator commits S7, then runs the 4R code review over the frozen diff, then final QA. All seven planned stages are executed; `sddl-executor` has nothing left to run for this change.
+
+## S8 — Fix round 1, step 1: the neutralisation primitive (`engine-text.ts`)
+
+- approval: `stage_approval` granted — checkpoint `cp-stage-approval-s8-s10`, decisions `e6f2h2-D12` (the fix round exists, scoped to the six confirmed ledger ids) and `e6f2h2-D13` (S8–S10 run sequentially, one `sddl-executor` invocation each; Q-F1 accepted). This invocation is scoped to **S8 only** — S9 rewires the call sites and is a separate invocation, not started here.
+- precondition check: working tree **clean** at stage start (`git status --porcelain` empty), `HEAD` at `7795489` (`docs(sddl): [E6.F2.H2] stage_approval S8-S10 + D13 accepts Q-F1`). `plan.md`'s Fix Round 1 section, `design.md` §A-2 and `spec.md` AC-18 are all present and mutually consistent on everything S8 needs except one sentence, recorded under Deviations below. No contradiction with the approved artifacts; the level-C guard (`risk-e6f2h2-004`) never came near firing — nothing in this stage wants `src/core/**` or `src/main/**`.
+- why this stage is alone: nothing imports the new module yet, so the contract is proved before a single call site moves — the S2/S3 shape. A reviewer sees the primitive and its suite as one clean diff, and S9's diff is then only the rewiring.
+
+### Changed files — the complete list
+
+| File | Change |
+|---|---|
+| `src/adapters/driving/tui/engine-text.ts` | **NEW** — 143 lines. `splitEngineLines`, `neutralizeControls`, `toSafeLines`, plus the module-private `NEUTRALIZED` character class and `tokenFor` |
+| `src/adapters/driving/tui/__test__/engine-text.test.ts` | **NEW TEST** — 470 lines, 52 tests |
+
+`git status --porcelain` after the stage is exactly two `??` lines, one per path above. **No existing file was touched** — not `findings.ts`, not `render.ts`, not `tui-flow.ts`, not `colors.ts`, not any existing test, not a config file, not `package.json`. Those belong to S9 and S10.
+
+### The contract as implemented (AC-18, design §A-2)
+
+- **Neutralised set N**, as the five contiguous ranges the plan names: `U+0000-U+0008`, `U+000B-U+001F`, `U+007F-U+009F`, `U+2028`, `U+2029`. The contiguous `U+000B-U+001F` already covers CR (`U+000D`) and ESC (`U+001B`); `U+007F-U+009F` covers DEL plus the whole C1 block, including the 8-bit CSI (`U+009B`) and the 8-bit OSC (`U+009D`).
+- **Deliberately outside N**, both argued in the module's own doc comment rather than left implicit: `U+000A` (the splitter's separator) and `U+0009` (HT — forward-only, cannot reposition, erase or introduce a sequence, and is the indentation byte of every quoted code excerpt; escaping it would render real review output as a run of `\x09` tokens for no safety gain).
+- **Token**: `\xNN` for `cp <= U+00FF`, `\uNNNN` for U+2028/U+2029, lowercase `x`/`u` and lowercase hex, ASCII-only. The doc comment records the mapping as **deliberately non-injective** — a literal `\x1b` typed in the reviewed source and a real ESC byte render alike — because injectivity would require escaping the backslash itself and would mangle every Windows path and regex in a review.
+- **CRLF**: `splitEngineLines` consumes **one** trailing CR per element, so the element count is exactly `markdown.split("\n").length`. A second trailing CR, and every interior CR, survive the split and are neutralised.
+- **Zero imports**: a grep for a line starting `import` / `require` / `export … from` over the new module returns **nothing** (exit 1). The only two occurrences of the word "import" in the file are prose inside the module header (lines 20 and 23). `depcruise` confirms it independently: **107 modules** cruised (was 106) against an **unchanged 253 dependencies** — a new module with neither an edge out nor an edge in.
+- **biome-ignore**: the character class carries `// biome-ignore lint/suspicious/noControlCharactersInRegex:` with a real justification, following the in-repo convention at `core/run/builtin-verdict-extraction.ts:81` and `__test__/tui-test-doubles.ts:63`.
+
+### The suite — 52 tests, and why each block bites
+
+| Block | Cases | What makes it non-vacuous |
+|---|---|---|
+| `neutralizeControls — the boundary table (AC-18)` | 20 rows + 1 token-shape case | Every row asserts the **exact** resulting string for `A<cp>B`, which is what makes "and performs **no other** transformation" checkable: a row cannot pass because something else was trimmed, collapsed or dropped. Rows cover every range edge (0x00, 0x08, 0x0b, 0x1f, 0x7f, 0x80, 0x9f, U+2028, U+2029), the two deliberate exclusions (0x09, 0x0a), the highest-value member (0x1b ESC), the 8-bit CSI (0x9b), and the nearest printable neighbours on either side of each edge (0x20, 0x7e, 0xa0, U+2027, U+202A), so neither widening nor narrowing N can pass silently |
+| `no other transformation` | 5 | no trim, no whitespace or control collapsing, no case or order change, no truncation (a 10 004-character result asserted by length **and** by both of its 5 000-character halves), empty string unchanged |
+| `P1 visibility` | 2 | the hostile fixture is asserted to be **actually hostile before it is rendered**, then the negative, then six `toContain` assertions naming every payload that must survive. A second case proves the escaping cannot be reassembled into a sequence |
+| `P2 idempotence` | 2 | second pass equals first, over the hostile fixture and over every boundary row; paired with a `toContain` and a length-growth assertion, so stability-at-the-empty-string cannot satisfy it |
+| `P3 transparency` | 2 | control-free markdown (headings, an em-dash finding line with a `file:line` range, tab-indented code, accented prose) returned **byte-identical** via `toBe` |
+| `splitEngineLines — the CRLF rule` | 8 (one of them a 9-input `it.each`) | the CRLF case, a lone interior CR (kept, so the escaper can show it), a double trailing CR (exactly one consumed), a trailing CR with no LF, the empty string, a newline-terminated input, source-order preservation, and the element-count property over nine inputs |
+| `toSafeLines` | 4 | the composition identity, the hostile fixture asserted as an exact 6-element array, no element containing a line separator, and clean markdown identical to its plain LF split |
+
+**Negative-assertion pairing rule — applied without exception.** Every "contains no code point in N" assertion in this file sits in the same `it` as a positive assertion naming text that must be present: the boundary table pairs the negative with exact-string equality; P1 pairs it with six `toContain`s over the neutralised payloads plus a standing "the fixture really is hostile" guard on the input; `toSafeLines`' per-line negative loop runs **after** the exact 6-element `toEqual` has already named every line. Unpaired, each of those negatives would also be satisfied by the content having been deleted — R1-003's own failure mode. The suite header states the rule so a later editor does not reintroduce the species.
+
+The test file also restates N independently (`IN_N`), on purpose: an edit that widens or narrows the module's own class does not move the test's copy, so the boundary table fails instead of agreeing with itself. M6 below is the proof that this actually works.
+
+### Evidence — commands and their real output
+
+| # | Command | Required | Actual output |
+|---|---|---|---|
+| 1 | `npx vitest run --project adapters src/adapters/driving/tui/__test__/engine-text.test.ts` | green | **`Test Files 1 passed (1)`, `Tests 52 passed (52)`**, exit 0, 427 ms |
+| 2 | `npm run check` | clean | **exit 0** — biome `Checked 162 files in 225ms. No fixes applied.`; `tsc --noEmit` silent; depcruise `✔ no dependency violations found (107 modules, 253 dependencies cruised)`. All five guards green; the unimported new module is legal (no orphan rule — the S2 precedent) |
+| 3 | `git status --porcelain` | exactly the two new paths | **exactly two lines**: `?? src/adapters/driving/tui/__test__/engine-text.test.ts` and `?? src/adapters/driving/tui/engine-text.ts` |
+| 4 | `git diff --stat src/core` | empty (AC-16) | **empty** — no output at all |
+| 4b | `git diff --stat src/main` | empty (standing guard) | **empty** |
+| 5 | `npm test` (full suite — reported although S8 only required the narrowed run) | at or above 856 / 47 | **`Test Files 48 passed (48)`, `Tests 908 passed (908)`**, exit 0, 16.65 s |
+| 6 | statement-level picocolors grep over `src/` | exactly 1 | **exactly 1** — `src/adapters/driving/tui/colors.ts:34`. S8 adds no terminal-library import anywhere |
+| 7 | zero-import check on the new module | no import statement | **no match, exit 1**; a `grep -rn "engine-text" src/` finds exactly one importer, its own test file |
+
+### Test-count arithmetic
+
+| Stage | Δ tests | Δ files | Running total |
+|---|---|---|---|
+| S7 (inherited baseline) | — | — | **856 / 47** |
+| **S8** | **+52** | **+1** | **908 / 48** |
+
+Purely additive: no test was edited or deleted, so the S5 "a fall needs a named justification" rule does not engage. The file count reaches the **48** `plan.md` predicted for S8, and the measured 908 equals 856 plus the 52 the narrowed run reported.
+
+### Mutation verification — both run, both observed, both reverted
+
+**M6 — would the boundary table be just as happy with an over-wide N?** Mutation: the first range widened from `U+0000-U+0008` to `U+0000-U+0009`, putting HT into N. Predicted red: the HT row of the boundary table, the tab escaped instead of surviving.
+
+- Observed: **4 failed | 48 passed (52)**, and the predicted row is the first of them.
+  - `neutralizeControls — the boundary table (AC-18) > 'U+0009 HT' 'survives' …` → `AssertionError: expected 'A\x09B' to be 'A\tB' // Object.is equality` — exactly the predicted failure, at the exact-equality assertion.
+  - Three further reds the prediction did not name, all transparency: `returns control-free markdown byte-identical`; `keeps tabs, newlines and non-ASCII prose exactly as they were` (`AssertionError: expected '# Review\n\n[SEV: major] calc.js:6-8 …' to contain '\n\tif (b === 0) {\n'`); and `toSafeLines … leaves control-free markdown identical to its plain LF split`, whose diff shows the tab-indented code block turning into `"\\x09if (b === 0) {"` / `"\\x09\\x09return NaN;"` / `"\\x09}"`. Stronger than predicted: the HT exclusion is pinned by four independent assertions, and the P3 block is demonstrably load-bearing rather than decorative.
+- Reverted; the narrowed run is back to **52 passed**.
+
+**M7 — is the CRLF rule really asserted?** Mutation: `splitEngineLines` reduced to a plain `markdown.split("\n")`, dropping the trailing-CR consumption entirely. Predicted red: the CRLF split case, with the first element keeping its CR.
+
+- Observed: **5 failed | 47 passed (52)**, the predicted one first.
+  - `splitEngineLines — the CRLF rule (AC-18) > consumes the CRLF terminator without merging or losing a line` → `AssertionError: expected [ 'a\r', 'b', 'c' ] to deeply equal [ 'a', 'b', 'c' ]` — the first element keeping its CR, precisely as M7 predicted.
+  - Also red: `consumes exactly one trailing CR, keeping any second one` (`[ 'a\r\r', 'b' ]` against `[ 'a\r', 'b' ]`); `consumes a trailing CR on the final element even with no LF after it` (`[ 'a\r' ]` against `[ 'a' ]`); `preserves source order, element by element` (`[ 'first\r', 'second\r', …(3) ]`); and `toSafeLines … renders the hostile fixture inert, line by line, losing nothing`, because that fixture is CRLF-joined and its exact 6-element assertion breaks too.
+  - Worth recording: the element-count `it.each` stayed **green** under this mutation, correctly — dropping a CR never changes how many elements there are, so the count property alone could never have caught it. That is exactly why the CRLF behaviour is asserted by its own cases rather than left to the property.
+- Reverted; narrowed run back to **52 passed**, `npm run check` clean, full suite back to **908 / 48**.
+
+Neither mutation was assumed. Both were applied to the real file, run, and their real output is transcribed above.
+
+### Quick checks
+
+| Command | Planned by plan.md | Outcome |
+|---|---|---|
+| narrowed adapters run on the new file | yes (S8's stated per-stage run) | **52 / 52, exit 0** |
+| `npm run check` | yes | **clean, exit 0** (107 modules / 253 dependencies) |
+| `git status --porcelain` equals the two new paths | yes | **exactly the two paths** |
+| `git diff --stat src/core` and `src/main` | yes (AC-16) | **both empty** |
+| full `npm test` | not required at S8; run and reported anyway | **908 / 48, exit 0** |
+| statement-level picocolors grep | every stage | **1** |
+| M6, M7 | yes | **both went red as predicted, both reverted** |
+
+The AC-14 dual-env adapters run was **not** performed: `plan.md` assigns it to S9 and S10, and S8 adds no colour-dependent code — the new module never touches a palette. Recorded as deliberately skipped, not forgotten.
+
+### Deviations
+
+One, stated rather than smoothed over.
+
+1. **A contradiction inside the approved artifacts about the final element's trailing CR, resolved toward the spec.** `design.md` §A-2's prose says *"A **lone** CR — interior, **or trailing with no LF** — is not a terminator and is neutralised."* The same section's own signature comment says *"`markdown.split("\n")`, with one trailing U+000D removed per element"*; `spec.md` AC-18 says *"with **one** trailing U+000D removed per element (the CRLF terminator)"*; `plan.md`'s S8 gotcha says *"drops **one** trailing U+000D per element"*; and the stage handoff glosses a lone CR as *"(interior, not before LF)"*. The two readings agree on every input **except** one: an input whose final element ends in CR with no LF after it (`"a\r"`), where the prose sentence would escape it and the other four sources drop it. Implemented as the four say — `splitEngineLines("a\r")` returns `["a"]` — because AC-18 is the acceptance criterion, it is unambiguous, and three further sources including the design's own code block agree with it. The residue is a fidelity nit, not a safety hole: the caller writes its own line break after the last line, so the dropped CR could only have returned the cursor to a column that is about to be left anyway, and nothing is rendered after it to forge with. The case is covered by a named test (`consumes a trailing CR on the final element even with no LF after it`) whose comment states the reasoning, and the module's doc comment states the consequence explicitly rather than leaving it to be discovered. Level **A**, authorship `claude`. If the orchestrator prefers the prose reading, the change is one line in `splitEngineLines` plus one expectation, and is cheapest to take at S9 while `render.ts` is already open.
+
+Not deviations, but recorded so a reviewer does not read them as oversights:
+
+- **The boundary table has 20 rows while the suite has 52 tests.** AC-18 lists 20 code points; the remaining cases are the token-shape case, the five "no other transformation" cases, P1/P2/P3 (six), the eight `splitEngineLines` cases and the four `toSafeLines` cases — every one of them named in AC-18's own evidence column. Nothing was invented beyond it.
+- **The full suite was run although S8 only required the narrowed one.** Reported because the handoff asked for the total; it cost 17 s and confirms nothing regressed.
+- **`U+00A0`, `U+2027` and `U+202A` are written as `\u` escapes in the test source** rather than pasted as literal characters, and every control-byte input is built with `String.fromCodePoint` rather than pasted. The test file therefore contains no invisible or control byte a reviewer could not see in a diff — checked, not assumed.
+
+### Stage close
+
+- blockers: none.
+- scope / drift / blast-radius: none. Planned scope was two new files; actual scope is those two files and nothing else in the tree moved. No stop rule fired.
+- risks: no new risk. `risk-e6f2h2-011` (printable-text spoofing is a named non-goal) and `risk-e6f2h2-012` (the CLI's `runs show` and the H1 catch-all carry the same exposure and stay out of scope) are both **named in the new module's own doc comment**, so the next reader of `engine-text.ts` learns what it does not defend against and why the primitive is not shared with the CLI. `risk-e6f2h2-004`'s level-C guard held without being approached.
+- git: **no commits, no stashes, no resets, no branch change.** The orchestrator owns git. The tree carries the two new files, this log entry and the `state.yaml` stage entry, uncommitted.
+- QA handoff: **deferred, deliberately.** S8 adds a module nothing imports; a stage-mode QA over it would review a diff with no product-visible effect, and `plan.md` routes the fix round to a **scoped re-review over the fix delta** after S10, then final QA. That route is unchanged and this stage claims neither.
+- next action: the orchestrator commits S8, then approves **S9** — the rewiring (`render.ts`, `findings.ts`, and the three existing TUI suites; full `npm test`, the AC-14 dual-env run, and mutation-verifies M8, M9, M10, M11) — as its own `sddl-executor` invocation. S9 was **not** started here.

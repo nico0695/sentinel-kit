@@ -23,7 +23,7 @@ complexity_assessment:
     than structured domain data. Risk low-medium.
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
-lifecycle_status: implementing
+lifecycle_status: reviewing
 current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
@@ -736,35 +736,78 @@ stages:
       user.**
   sddl-qa-review:
     status: completed
-    mode: stage
-    started_at: "2026-08-29T20:45:00Z"
-    completed_at: "2026-08-29T21:05:00Z"
+    mode: final
+    started_at: "2026-08-30T20:20:00Z"
+    completed_at: "2026-08-30T20:55:00Z"
     notes: >-
-      Stage-mode review of the frozen range `b0a3a04..442e705` (S1, S2+S3, S4) by a fresh delegated
-      worker, read-only on `src/`. Verdict **pass_with_warnings**. Gates re-run by the reviewer, not
-      taken from the log: `npm run check` green (106 modules cruised, no guard violation), `npm test`
-      **823 / 46**, adapters project 474/474 identical under `NO_COLOR=1` and `FORCE_COLOR=1`,
-      `git diff --stat` empty for both `src/core` and `src/main`, statement-level picocolors grep = 1
-      (`colors.ts:34`), and an independent `node --input-type=module` probe reproducing S1's claim
-      (default import gives four functions; the namespace form yields `pc.red === undefined`).
-      The digest's literal copy was compared programmatically against design.md and is byte-identical
-      (U+2026 and U+2014 included); colour is decoration only (the `MARKED`-palette test asserts
-      strip-equals-plain as an equality) and the role assignment matches the design.
-      Pure halves of AC-1, AC-2, AC-3, AC-4, AC-5, AC-7, AC-12, AC-14 PASS, as does AC-16 for this
-      range. ONE MEDIUM FINDING, QA-S4-01 (AC-6): `formatResultDigest` interpolates
-      `digest.failure.message` with no whitespace reduction, so the persisted path renders a
-      multi-line `Failure:` entry whenever `record.failure.message` carries a newline — reachable
-      today, since `git-cli.ts:354` embeds execa's message verbatim (measured: a bad-ref
-      `git worktree add` rejects with a 3-line message) and `run-review.ts` returns it as an
-      `engine-error` failure rather than rejecting. The CLI collapses the same value on purpose
-      (`format-review.ts` `field()`); the TUI's guarding test ("never breaks a line") is vacuous,
-      feeding a single-line message. Carried into S5's scope rather than a fix loop — S5 owns both
-      call sites — and noted as a small design correction, since design.md says the persisted path
-      passes `record.failure` through untouched. One low finding (QA-S4-02) recorded for awareness
-      only. Known-and-accepted items (stale H1 doc comments, transitional `formatTuiResult`,
-      `formatTuiErrorLine` duplication, unwired modules) were re-confirmed and deliberately not
-      reported. Stage mode: the change is NOT closed and stays `implementing`.
-      Report: `sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md`.
+      RUN 2 (final mode, 2026-08-30) — change-wide closeout over the frozen whole change
+      `59b806e..31b7fb4`, tree clean, by a fresh delegated worker, read-only on `src/`. Verdict
+      **pass_with_warnings**; completion deliberately WITHHELD. All 21 acceptance criteria were
+      re-verified independently against the source and the tests rather than replayed from
+      `execution-log.md` or taken from `review-ledger.md`: 21/21 PASS (AC-21 with a recorded nit).
+      Gates measured by this stage: `npm run check` exit 0 (biome 163 files, `tsc --noEmit` clean,
+      depcruise **no violations, 107 modules / 254 dependencies**); `npm test` **995 / 49**;
+      adapters project **646 / 28 identical** under `NO_COLOR=1` and under `FORCE_COLOR=1`;
+      `git diff --stat 59b806e..31b7fb4` EMPTY for both `src/core` and `src/main`; statement-level
+      `grep -rEn '^import .*"picocolors"' src/` = **1** (`colors.ts:34`, versus 18 for the naive
+      grep, which is not a valid check). Independent out-of-band verification: two esbuild-bundled
+      probes executed the SHIPPED modules outside vitest, with the neutralised set N rebuilt from
+      the AC-18 prose (65 code points) rather than read from the module's own character class —
+      AC-18 token/P1/P2/P3 over all 65 plus a non-N sweep; AC-12(a)(b)(c) over a hostile fixture
+      carrying OSC 52/0/8, CSI cursor+erase, BEL, DEL, 8-bit CSI/OSC, LS and PS; AC-13 at 500
+      lines; and an RR1-001 sweep of **11,765 combinations** (9 shapes x 65 code points x every
+      insertion index) giving `regressed = 0`, `newly-widened = 0`, plus **123 independently
+      derived structural positions x 5 whitespace-class code points = 615 cases, LOST = 0**, plus a
+      200,000-case fuzz with LOST = 0. All eight `verified` ledger rows (R1-001/002/003, R2-001,
+      R3-001/002, RR1-001, RR2-001) were independently reproduced as closed; 0 open severe
+      confirmed. AC-15's four preserved H1 AC-8 cases were run BY NAME and pass. AC-17's CLAUDE.md
+      closeout was read line by line and does not overstate: E6 complete, `[E6.F2.H3]` recorded as
+      skipped-not-built under workflow contract rule 7, remaining MVP work E7 only. VACUITY
+      JUDGEMENT (the eighth instance): none hidden. One structurally tautological pair survives
+      (`result.test.ts:1218`, `full-view.test.ts:570-574`) but is explicitly labelled
+      `— the ENV-DEPENDENT case` and is compensated by the `FORCE_COLOR=1` run, which QA verified
+      genuinely enables SGR and genuinely reaches the vitest worker; one self-referential oracle
+      (`full-view.test.ts:195-210` `expectedDigest()`) is layering, not vacuity. The round-1/round-2
+      suites are actively anti-vacuous (independent restatement of N, a re-implemented pre-round
+      matcher differential over a 72-line corpus with an explicit 18-real-negatives assertion, and
+      corpus-size guards). Four residual findings, none `high`: QA-F-01/02/03 low, QA-F-04 medium
+      (process-level behaviour of the post-run prompt is untested by construction — no real TTY, no
+      real stdin, empty `e2e` project — which is `[E7.F1.H1]`'s scope and NOT this change's debt,
+      but is exactly where accepted info row R4-002 lives). Completion withheld because the ledger's
+      own verdict is `pass_with_warnings` with 14 info rows and 3 named accepted risks still live,
+      because QA-F-04 is a real named validation gap, and because the fix budget is exhausted — so
+      the remaining judgement is human acceptance, not QA's. Report:
+      `sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md`.
+    previous_runs:
+      - mode: stage
+        completed_at: "2026-08-29T21:05:00Z"
+        verdict: pass_with_warnings
+        notes: >-
+          Stage-mode review of the frozen range `b0a3a04..442e705` (S1, S2+S3, S4) by a fresh delegated
+          worker, read-only on `src/`. Verdict **pass_with_warnings**. Gates re-run by the reviewer, not
+          taken from the log: `npm run check` green (106 modules cruised, no guard violation), `npm test`
+          **823 / 46**, adapters project 474/474 identical under `NO_COLOR=1` and `FORCE_COLOR=1`,
+          `git diff --stat` empty for both `src/core` and `src/main`, statement-level picocolors grep = 1
+          (`colors.ts:34`), and an independent `node --input-type=module` probe reproducing S1's claim
+          (default import gives four functions; the namespace form yields `pc.red === undefined`).
+          The digest's literal copy was compared programmatically against design.md and is byte-identical
+          (U+2026 and U+2014 included); colour is decoration only (the `MARKED`-palette test asserts
+          strip-equals-plain as an equality) and the role assignment matches the design.
+          Pure halves of AC-1, AC-2, AC-3, AC-4, AC-5, AC-7, AC-12, AC-14 PASS, as does AC-16 for this
+          range. ONE MEDIUM FINDING, QA-S4-01 (AC-6): `formatResultDigest` interpolates
+          `digest.failure.message` with no whitespace reduction, so the persisted path renders a
+          multi-line `Failure:` entry whenever `record.failure.message` carries a newline — reachable
+          today, since `git-cli.ts:354` embeds execa's message verbatim (measured: a bad-ref
+          `git worktree add` rejects with a 3-line message) and `run-review.ts` returns it as an
+          `engine-error` failure rather than rejecting. The CLI collapses the same value on purpose
+          (`format-review.ts` `field()`); the TUI's guarding test ("never breaks a line") is vacuous,
+          feeding a single-line message. Carried into S5's scope rather than a fix loop — S5 owns both
+          call sites — and noted as a small design correction, since design.md says the persisted path
+          passes `record.failure` through untouched. One low finding (QA-S4-02) recorded for awareness
+          only. Known-and-accepted items (stale H1 doc comments, transitional `formatTuiResult`,
+          `formatTuiErrorLine` duplication, unwired modules) were re-confirmed and deliberately not
+          reported. Stage mode: the change is NOT closed and stays `implementing`.
+          Report: `sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md`.
 artifacts:
   state: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/state.yaml
   proposal: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/proposal.md
@@ -1488,49 +1531,70 @@ open_risks:
       bracket in the escape itself. DISPOSITION: recorded as a decision rather than silently
       accepted; recommended as an E7 hardening story beside risk-e6f2h2-012.
     severity: low
+  - id: risk-e6f2h2-014
+    summary: >-
+      Recorded at final QA (QA-F-04). The story's headline behavioural change — the process now
+      WAITS for input after a finished review — has no test at process level anywhere in the repo:
+      the TUI suites use scripted prompter doubles and capturing IO by design (no real TTY, no real
+      stdin, no ambient `picocolors` decision) and the `e2e` vitest project is still empty. This is
+      deliberate and is `[E7.F1.H1]`'s scope, NOT this change's debt, but it is exactly the blind
+      spot where accepted info row R4-002 lives (the post-run `confirm` never settles on stdin EOF,
+      so the process exits 13 with a raw Node warning over the digest, losing the intended exit
+      code). DISPOSITION: carried forward as a named input to the E2E smoke story rather than
+      closed silently at E6. No fix in this change — the fix budget is exhausted and the residual
+      is below the severity floor.
+    severity: medium
 qa_summary:
-  mode: stage
+  mode: final
   verdict: pass_with_warnings
   summary: >-
-    Frozen range `b0a3a04..442e705` (S1, S2+S3, S4) reviewed read-only. Gates re-run by the reviewer:
-    `npm run check` green, `npm test` 823 / 46, adapters 474/474 identical under `NO_COLOR=1` and
-    `FORCE_COLOR=1`, `src/core` and `src/main` diffs empty, statement-level picocolors grep = 1. The
-    digest copy is byte-identical to design.md and colour carries no information of its own. Pure
-    halves of AC-1/2/3/4/5/7/12/14 pass, plus AC-16 for this range. AC-6 is partial: QA-S4-01
-    (medium, `risk-e6f2h2-010`) — a multi-line `record.failure.message` renders as a multi-line
-    `Failure:` entry, reachable via execa-backed git errors, guarded only by a vacuous test. No
-    BLOCKER/CRITICAL, so no fix loop: the finding is carried into S5's scope. QA-S4-02 (low) recorded
-    for awareness. Stage mode — the change is not closed.
-  reported_at: "2026-08-29T21:05:00Z"
+    Change-wide closeout over the frozen whole change `59b806e..31b7fb4`, tree clean, read-only on
+    `src/`. **21 of 21 acceptance criteria independently re-verified** against the source and the
+    tests (AC-21 with a recorded nit) — not replayed from the execution log and not taken on trust
+    from the ledger. Gates measured by QA: `npm run check` exit 0 with **no dependency violations**
+    (107 modules / 254 dependencies); `npm test` **995 / 49**; adapters **646 / 28 identical**
+    under `NO_COLOR=1` and `FORCE_COLOR=1`; `src/core` and `src/main` diffs **empty across the
+    whole change**; statement-level picocolors grep = **1**. Two esbuild-bundled probes executed
+    the shipped modules outside vitest, with N rebuilt from the AC-18 prose: AC-18 P1/P2/P3 over
+    all 65 code points, AC-12(a)(b)(c) over a hostile OSC/CSI/BEL/DEL/8-bit/LS/PS fixture, AC-13 at
+    500 lines, and an RR1-001 sweep of 11,765 combinations plus 615 structural cases plus a 200,000
+    fuzz — `regressed = 0`, `newly-widened = 0`, `LOST = 0`. All eight `verified` ledger rows
+    reproduced as genuinely closed; 0 open severe. AC-15's four preserved H1 AC-8 cases run by name
+    and pass. AC-17's CLAUDE.md closeout does not overstate. Vacuity judgement: **no hidden eighth
+    instance** — one surviving tautological pair is explicitly labelled ENV-DEPENDENT and
+    compensated by the verified `FORCE_COLOR=1` run; the fix-round suites are actively
+    anti-vacuous. Four residuals, none `high`: QA-F-01/02/03 low, QA-F-04 medium (process-level
+    behaviour untested by construction, `[E7.F1.H1]`'s scope, `risk-e6f2h2-014`). **Completion
+    WITHHELD**: the ledger verdict is `pass_with_warnings` with 14 info rows and 3 named accepted
+    risks still live, QA-F-04 is a real validation gap, and the fix budget is exhausted — so what
+    remains is a human acceptance decision, not a QA one. Nothing further should be fixed in this
+    change.
+  reported_at: "2026-08-30T20:55:00Z"
   report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
+
 next_action:
-  kind: review_output
-  target: sddl-code-review
+  kind: user_review
+  target: final_review
   summary: >-
-    **S11 IS EXECUTED AND FIX ROUND 2 OF 2 IS COMPLETE. THE FIX BUDGET IS EXHAUSTED — there is no
-    round 3.** The tree carries three uncommitted source files (`tui/findings.ts`,
-    `__test__/findings.test.ts`, `__test__/result.test.ts`), this stage's `execution-log.md` entry
-    and this state update. Suite **995 / 49** (baseline 931 / 49 plus 64 new tests, no file added or
-    deleted); `npm run check` clean at **107 modules / 254 dependencies**; adapters **646 / 28
-    identical** under `NO_COLOR=1` and `FORCE_COLOR=1`; `src/core` and `src/main` diffs empty;
-    statement-level picocolors grep = 1. **No named assertion changed** — verified by running the
-    full suite after the production edit and before any test was added (exactly 931 / 49), which is
-    the pre-commitment the plan set.
-    ORCHESTRATOR ACTIONS: (1) **Commit S11.** (2) **Route the scoped re-review over the round-2 fix
-    delta**, checked id by id against `review-ledger.md` for `RR1-001` and `RR2-001`; the executor
-    ran neither the re-review nor final QA and claims neither. (3) **Record the S11 outcome in the
-    ledger** — `RR1-001` closed with 45 of 45 structural combinations restored and 0 regressions
-    (measured: the shipped tree probed at `parity=27 mismatch=45`, the patched tree at `parity=72
-    mismatch=0`), `RR2-001` closed by splitting AC-12(c) into a deterministic `MARKED` half and a
-    labelled ENV-DEPENDENT half on the sibling's pattern. (4) **Read the one recorded deviation**
-    before the re-review: `FINDING_LINE`'s fifth `\s*` was widened as well, where plan step 4 says
-    "three" and the ledger, handoff and position table say five; the consequence restores pre-round
-    parity and is asserted in a named case, but no planned mutation distinguishes the two readings,
-    so it is called out rather than left to be inferred from the diff. Level A, authorship `claude`.
-    (5) `risk-e6f2h2-013` needs no change — the named residue (a LEADING non-whitespace-class
-    control still prevents recognition) is unchanged, is not a round-1 regression, and is now pinned
-    by two decided-negative assertions so the boundary is explicit; E7 still owns it.
-    After the re-review: `sddl-qa-review` in `final` mode, the only stage that may mark this change
-    `completed`.
+    **FINAL QA IS COMPLETE. VERDICT `pass_with_warnings`. THE CHANGE IS NOT MARKED `completed` —
+    `lifecycle_status` is `reviewing`.** All 21 ACs pass, both gates are green on numbers QA
+    measured itself (`npm run check` exit 0 / no guard violations; `npm test` 995 / 49; adapters
+    646 / 28 identical under both colour settings; `src/core` and `src/main` diffs empty;
+    statement-level picocolors grep = 1), 0 open severe, and every `verified` ledger row was
+    independently reproduced. ORCHESTRATOR ACTIONS: (1) **Raise the `final_review` checkpoint** —
+    QA did not create it, because checkpoints are orchestrator-owned and the handoff pinned the
+    count at 12; the closeout needs explicit user acceptance of the four residual findings in
+    `qa-report.md` (QA-F-01/02/03 low, QA-F-04 medium) alongside the ledger's 14 info rows and
+    `risk-e6f2h2-011/012/013`. (2) On acceptance, **commit and open the PR** for `[E6.F2.H2]`
+    (`Closes #39`), recording in the description the three reviewed supersessions — `[E6.F2.H1]`
+    AC-7 via AC-15, `result.test.ts:900`, `findings.test.ts:223` — plus QA-F-03's caveat that the
+    `— the ENV-DEPENDENT case` assertions carry weight only in the `FORCE_COLOR=1` / CI run. (3)
+    **Carry `risk-e6f2h2-014` (QA-F-04) and ledger row R4-002 into `[E7.F1.H1]`** as named inputs
+    to the E2E smoke story. (4) **Do NOT open a third fix round** — the budget is exhausted, no
+    finding is at or above the severity floor, and nothing in this change should be fixed further.
+    (5) E6 has no remaining required stories: `[E6.F2.H3]` is optional and skipped under workflow
+    contract rule 7, which CLAUDE.md now states correctly. After user acceptance the orchestrator
+    (not QA) may move the change to `completed`.
+
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T16:10:00Z"
+updated_at: "2026-08-30T20:55:00Z"

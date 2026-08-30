@@ -315,7 +315,7 @@ stages:
     status: in_progress
     started_at: "2026-08-29T18:00:00Z"
     completed_at: "2026-08-29T22:35:00Z"
-    last_updated_at: "2026-08-30T02:00:00Z"
+    last_updated_at: "2026-08-30T02:20:00Z"
     notes: >-
       ALL SEVEN planned stages are executed: S1, the S2/S3 batch, S4, S5, S6 and S7 are DONE. S1 (committed `b0a3a04`): picocolors
       pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
@@ -497,6 +497,61 @@ stages:
       `risk-e6f2h2-004`'s level-C guard was never approached. QA handoff deferred — the plan routes the fix
       round to a scoped re-review over the fix delta after S10, then final QA. No git side effects. S9 was
       NOT started.
+
+      **S9 (uncommitted) is the stage that CLOSES R1-001, R1-002 and R1-003 — the rewiring.** Approved by
+      `cp-stage-approval-s8-s10` / `e6f2h2-D12` + `e6f2h2-D13` (Q-F1 accepted) + `e6f2h2-D14` (the CRLF
+      ruling, not re-litigated). Changed files: exactly the FIVE plan.md names, all under
+      `src/adapters/driving/tui/` — `findings.ts` (`extractFindings(lines: readonly string[])`, remainder
+      group widened `(.*)` -> `([^\n]*)`, precondition documented), `render.ts` (imports
+      `neutralizeControls`/`toSafeLines`; `formatFindingsSection(safeLines, palette)`; `toSafeLines` called
+      ONCE per digest; `Failure:` = `neutralizeControls(collapseToOneLine(message))`; `formatFullView` maps
+      `toSafeLines`; docs rewritten around AC-12(a)(b)(c)), `__test__/findings.test.ts`,
+      `__test__/result.test.ts`, `__test__/full-view.test.ts`. NOTHING else moved: `engine-text.ts`,
+      `tui-flow.ts`, `colors.ts`, `index.ts`, `tui-deps.ts`, `clack-prompter.ts`, `tui-test-doubles.ts`
+      (S10 owns it), `src/adapters/driven/**` (INCLUDING `envelope.ts` — the third channel is fixed in the
+      TUI, per §A-5) and every config/doc/fixture file are untouched. The load-bearing order
+      split -> neutralise -> match -> colour is installed and ASSERTED, not merely arranged: AC-12(c)
+      requires `formatFullView(HOSTILE, TUI_PALETTE).map(stripAnsi)` to equal the `PLAIN_PALETTE` render, so
+      colouring before neutralising fails. AC-19's two layers are asserted SEPARATELY and in different files
+      (layer 2, un-neutralised inputs, in `findings.test.ts`; layer 1, end-to-end through
+      `formatResultDigest`, in `result.test.ts`), with a case stating explicitly that layer 2 is not a safety
+      property. AC-3's tolerance is proved byte-identical by running one hand-written corpus through BOTH the
+      raw LF split and `toSafeLines` and comparing all three ways. Q-F1's AC-4 case READS
+      `fixtures/claude-code/noisy-output.json` (0 recognised findings vs valid-verdict.json's 2) through a
+      new `fixtureResult(file)` helper, guarded on both the absent marker and the present verdict line.
+      Evidence, all measured: full `npm test` **927 passed (927) / 48 files** (908 + 19, files unchanged as
+      plan.md predicted; per file 24->30, 60->72, 31->32; ZERO tests deleted, so the S5 justification rule
+      does not engage); `npm run check` **clean** (biome 162 files no fixes, tsc silent, depcruise no
+      violations, 107 modules / 254 dependencies — the one new edge is render.ts -> engine-text.ts,
+      intra-adapter); adapters project **578 / 27 IDENTICAL** under `NO_COLOR=1` and `FORCE_COLOR=1`
+      (AC-14); `git diff --stat src/core` and `src/main` both EMPTY (AC-16); statement-level picocolors grep
+      **1**; `git status --porcelain` exactly five ` M` lines. ALL FOUR mutation-verifies were RUN and
+      OBSERVED, then reverted: **M8** (remainder back to `(.*)`) -> 4 failed / 26 passed with
+      `expected [] to have a length of 1` — the finding GONE, R1-003's signature; **M9** (raw LF split fed to
+      `extractFindings`) -> 5 failed / 67 passed, each failing on the listed-line assertion with the RAW
+      control in the digest while `Findings: 1 blocker` still PASSED, confirming the plan's prediction that
+      layer 2 keeps the count and that neither layer alone satisfies AC-19; **M10** (neutralisation dropped
+      from `Failure:`) -> 1 failed / 71 passed, received line carrying an invisible ESC and lone CR;
+      **M11(ii)** (`formatFullView` bypassing `toSafeLines`) -> 3 failed / 101 passed including AC-12(c) with
+      `expected true to be false`, and **M11(i)**'s permanent guard was verified by a decay probe that
+      stripped the hostile fixture to printable ASCII — the case went red AT THE GUARD
+      (`expected false to be true`) instead of passing for free. THREE DEVIATIONS, all level A, authorship
+      `claude`: (1) M8 turns THREE of the four `it.each` rows red, not four — the ESC row survives `(.*)`
+      because ESC is not a JS line terminator; the artifacts agree (design §A-1.1 and spec AC-19's evidence
+      column both say THREE `NO MATCH` inputs), the handoff's "four" is the slip, and the ESC row is
+      independently non-vacuous because M9 turns it red; counting the fifth case M8 reddens 4 cases in total.
+      (2) A `fixtureResult(file)` helper was introduced in `result.test.ts` so the noisy fixture is read
+      through one code path — a small reduction of R2-005's duplication, forced by Q-F1; the real R2-005 fix
+      stays with S10. (3) AC-12(c) imports `TUI_PALETTE` into `result.test.ts` so the criterion is asserted
+      in its literal "after stripAnsi" form; env-independent by construction, as the identical dual-env runs
+      show. The negative-assertion pairing rule is applied WITHOUT EXCEPTION — every "no code point in N"
+      assertion names, in the same case, the text that must be present. Two named assertion changes for the
+      PR description, both edits inside surviving cases (net 0 tests): `result.test.ts:900` now expects
+      `["a", "b"]` for `"a\r\nb"` (plus a NEW second assertion pinning that a non-terminator CR still
+      survives and is escaped) and `findings.test.ts:223` moved to the array signature with the input byte
+      identical. No new risk; `risk-e6f2h2-012` unchanged and still open (the CLI surface is out of scope by
+      decision F2). `risk-e6f2h2-004`'s level-C guard was never approached. QA handoff deferred — the scoped
+      re-review over the fix delta comes after S10, then final QA. No git side effects. S10 was NOT started.
   sddl-qa-review:
     status: completed
     mode: stage
@@ -1148,38 +1203,32 @@ next_action:
   kind: stage_approval
   target: sddl-executor
   summary: >-
-    **S8 IS DONE (uncommitted). The next stage to approve is S9.** Fix round 1 of 2 is one third
-    executed: the neutralisation primitive `src/adapters/driving/tui/engine-text.ts` and its
-    52-test `__test__/engine-text.test.ts` are in the tree, imported by nothing, with `npm run
-    check` clean, the full suite at **908 / 48**, `src/core` and `src/main` diffs empty, and both
-    mutation-verifies (M6 HT-in-N, M7 CRLF-rule-dropped) observed red and reverted. AC-18 is
-    satisfied by the primitive; R1-001, R1-002 and R1-003 now have their mechanism but are NOT
-    yet closed — nothing calls it.
-    ORCHESTRATOR ACTIONS: (1) commit S8; (2) rule on the one deviation S8 recorded, level A and
-    already resolved toward the spec — `design.md` §A-2's prose says a lone CR "trailing with no
-    LF" is neutralised, while `spec.md` AC-18, design §A-2's own signature comment, `plan.md`'s
-    S8 gotcha and the stage handoff all say "one trailing CR removed per element". The readings
-    differ only for an input ending in CR with no LF, implemented as the four say. If the prose
-    reading is preferred it is one line in `splitEngineLines` plus one expectation, cheapest to
-    take at S9 while `render.ts` is open; otherwise consider amending that sentence of the design
-    so the artifacts stop disagreeing; (3) approve **S9**.
-    S9 — the rewiring: `findings.ts` (`extractFindings(lines)`, remainder group widened to
-    not-LF), `render.ts` (the load-bearing order split -> neutralise -> match -> colour,
-    `toSafeLines` computed once per digest, neutralised `Failure:` message), and the three TUI
-    suites including the two NAMED assertion changes at `result.test.ts:900` and
-    `findings.test.ts:223`. Validation: full `npm test` (must not fall below 908 / 48 — S8's
-    additions are now part of the floor), `npm run check`, the AC-14 dual-env adapters run,
-    `src/core` and `src/main` diffs empty, statement-level picocolors grep = 1. Mutation-verify
-    M8, M9, M10, M11, and the negative-assertion pairing rule is mandatory for every added case.
-    Q-F1 is already settled by `e6f2h2-D13` (accepted), so S9's scope includes it.
+    **S9 IS DONE (uncommitted). The next stage to approve is S10.** Fix round 1 of 2 is two thirds
+    executed, and S9 is the stage that actually CLOSES the three CRITICALs: R1-001 (the finding
+    text printed with no prompt before it), R1-002 (the byte-verbatim full view) and R1-003 (an
+    interior control deleting a finding) are all fixed inside the TUI adapter, in five modified
+    files, with `npm run check` clean, the full suite at **927 / 48**, the adapters project
+    **578 / 27 identical** under `NO_COLOR=1` and `FORCE_COLOR=1`, `src/core` and `src/main` diffs
+    empty, the statement-level picocolors grep at 1, and all four mutation-verifies (M8, M9, M10,
+    M11 including its permanent-guard decay probe) observed red and reverted. AC-2, AC-3, AC-6,
+    AC-12, AC-13 and AC-19 are satisfied; Q-F1's real-fixture AC-4 case is in.
+    ORCHESTRATOR ACTIONS: (1) commit S9; (2) note the three level-A deviations S9 recorded, none of
+    which needs a ruling — chiefly that M8 reddens THREE of the four `it.each` rows because ESC is
+    not a JS line terminator, which matches `design.md` §A-1.1 and `spec.md` AC-19 (both say three
+    `NO MATCH` inputs) and makes the handoff's "four" the slip, not the test; (3) approve **S10**.
     S10 — verification repairs and comment hygiene, zero production behaviour change: the six
-    tautological palette assertions rewritten against `MARKED` (promoted to
-    `tui-test-doubles.ts`), NEW `__test__/palette-wiring.test.ts` using `vi.mock("../colors.js",
-    ...)` to prove all three `TUI_PALETTE` call sites, and the four bare AC citations in
-    `tui-flow.ts` qualified. Mutation-verify M12, M13. Expected file count 49.
+    tautological palette assertions rewritten against `MARKED` (promoted to `tui-test-doubles.ts`
+    and imported by both suites), NEW `__test__/palette-wiring.test.ts` using
+    `vi.mock("../colors.js", ...)` to prove all three `TUI_PALETTE` call sites in `tui-flow.ts`,
+    and the four bare AC citations in `tui-flow.ts` qualified (plus R2-002's "Four properties"
+    header over a five-item list). Validation: full `npm test` at or above **927 / 49** (S9's
+    additions are now part of the floor), `npm run check`, the dual-env adapters run, `src/core`
+    and `src/main` diffs empty, the statement-level picocolors grep still 1 — which is the reason
+    `MARKED` beats `pc.createColors(true)` (decision F1a) — and the `tui-flow.ts` diff checked
+    mechanically to be comment-only. Mutation-verify M12 and M13 (three separate M13 mutations,
+    one per call site).
     After S10: a scoped re-review over the fix delta, checked id by id against
     `review-ledger.md` (round 1 of 2 consumed), then `sddl-qa-review` in `final` mode — the only
     stage that may mark this change completed.
-
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T02:00:00Z"
+updated_at: "2026-08-30T02:20:00Z"

@@ -21,6 +21,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { toSafeLines } from "../engine-text.js";
 import { extractFindings, matchFindingLine } from "../findings.js";
 
 /** The `result` text of the real claude-code fixture: 1 major, 1 minor. */
@@ -179,7 +180,7 @@ describe("matchFindingLine — rejected shapes (AC-3)", () => {
 
 describe("extractFindings (AC-2)", () => {
   it("returns the fixture's two findings in source order", () => {
-    const findings = extractFindings(fixtureMarkdown());
+    const findings = extractFindings(fixtureMarkdown().split("\n"));
 
     expect(findings.map((finding) => finding.severity)).toEqual([
       "major",
@@ -202,7 +203,7 @@ describe("extractFindings (AC-2)", () => {
       "VERDICT: request-changes",
     ].join("\n");
 
-    expect(extractFindings(markdown)).toEqual([
+    expect(extractFindings(markdown.split("\n"))).toEqual([
       { severity: "nit", text: "naming" },
       { severity: "blocker", text: "auth.ts:12 — token never expires" },
       { severity: "major", text: "calc.js:6-8 — dropped guard" },
@@ -211,18 +212,121 @@ describe("extractFindings (AC-2)", () => {
 
   it("returns nothing for markdown that ignores the convention", () => {
     expect(
-      extractFindings("# Review\n\nLooks fine to me.\n\nVERDICT: approve\n"),
+      extractFindings(
+        "# Review\n\nLooks fine to me.\n\nVERDICT: approve\n".split("\n"),
+      ),
     ).toEqual([]);
   });
 
   it("returns nothing for empty markdown", () => {
-    expect(extractFindings("")).toEqual([]);
+    expect(extractFindings("".split("\n"))).toEqual([]);
   });
 
   it("handles CRLF line endings", () => {
-    expect(extractFindings("[SEV: major] a\r\n[SEV: nit] b\r\n")).toEqual([
+    expect(
+      extractFindings("[SEV: major] a\r\n[SEV: nit] b\r\n".split("\n")),
+    ).toEqual([
       { severity: "major", text: "a" },
       { severity: "nit", text: "b" },
     ]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Amendment 1 (fix round 1) — AC-3's tolerance and AC-19's layer 2    */
+/* ------------------------------------------------------------------ */
+
+/** One code point as a string — keeps the hostile inputs typo-proof. */
+function cp(codePoint: number): string {
+  return String.fromCodePoint(codePoint);
+}
+
+/**
+ * The separator and `file:line` shapes AC-3's tolerance exists for, and the
+ * exact texts the extractor produced **before** Amendment 1. They are written
+ * out by hand rather than derived from the input, so the assertion cannot
+ * agree with a bug in whichever pipeline produced them.
+ */
+const SEPARATOR_CORPUS: readonly string[] = [
+  "[SEV: major] calc.js:6-8 — dropped divide-by-zero guard",
+  "[SEV: major] calc.js:6 - dropped guard",
+  "[SEV: minor] calc.js:9 rename this",
+  "  [SEV: nit] naming  ",
+  "- [SEV: blocker] auth.ts:12 — token never expires",
+];
+
+const SEPARATOR_FINDINGS = [
+  { severity: "major", text: "calc.js:6-8 — dropped divide-by-zero guard" },
+  { severity: "major", text: "calc.js:6 - dropped guard" },
+  { severity: "minor", text: "calc.js:9 rename this" },
+  { severity: "nit", text: "naming" },
+  { severity: "blocker", text: "auth.ts:12 — token never expires" },
+];
+
+describe("extractFindings — the parsing tolerance survives the fix (AC-3)", () => {
+  it("carries ranges, em dashes, hyphens and no separator at all byte-identically, before and after neutralisation", () => {
+    const markdown = SEPARATOR_CORPUS.join("\n");
+
+    // "Before": the raw LF split the extractor was given pre-amendment.
+    expect(extractFindings(markdown.split("\n"))).toEqual(SEPARATOR_FINDINGS);
+    // "After": the same corpus through the real split-then-neutralise
+    // pipeline. AC-18 P3 (a string with no code point in N is returned
+    // unchanged) is what makes these two identical, and this is where that is
+    // proved for the shapes AC-3 names — the rendering fix did not buy safety
+    // by trading away the parsing tolerance.
+    expect(extractFindings(toSafeLines(markdown))).toEqual(SEPARATOR_FINDINGS);
+    expect(extractFindings(toSafeLines(markdown))).toEqual(
+      extractFindings(markdown.split("\n")),
+    );
+  });
+});
+
+/**
+ * AC-19's **second** layer, asserted on its own so it cannot rot behind the
+ * first. These inputs are deliberately NOT neutralised: they are what reaches
+ * `findings.ts` if some future caller forgets the ordering. The claim proved
+ * here is exactly one thing — the finding is still *recognised* — and it is
+ * not a safety claim: a raw ESC that survives extraction is still executable,
+ * which is why layer 1 exists and why the end-to-end digest cases in
+ * `result.test.ts` are asserted separately. What layer 2 buys is that a
+ * forgotten neutralisation degrades to a **visible, ugly** finding instead of
+ * a **silently deleted** one, and a deleted blocker is the worse outcome for
+ * a tool whose whole purpose is surfacing blockers.
+ */
+describe("extractFindings — an interior control never deletes a finding (AC-19, layer 2)", () => {
+  const INTERIOR: ReadonlyArray<{
+    readonly label: string;
+    readonly codePoint: number;
+  }> = [
+    { label: "an interior carriage return", codePoint: 0x0d },
+    { label: "U+2028 LINE SEPARATOR", codePoint: 0x2028 },
+    { label: "U+2029 PARAGRAPH SEPARATOR", codePoint: 0x2029 },
+    { label: "an ESC introducer", codePoint: 0x1b },
+  ];
+
+  it.each(INTERIOR)(
+    "keeps a blocker whose text carries $label",
+    ({ codePoint }) => {
+      const findings = extractFindings([
+        `[SEV: blocker] auth.ts:12${cp(codePoint)}real`,
+      ]);
+
+      // Paired on purpose: "the finding did not vanish" asserted alone is
+      // also satisfied by a matcher that returns an empty text, which is a
+      // near neighbour of R1-003's own failure mode.
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.severity).toBe("blocker");
+      expect(findings[0]?.text.startsWith("auth.ts:12")).toBe(true);
+      expect(findings[0]?.text.endsWith("real")).toBe(true);
+    },
+  );
+
+  it("is not a safety layer on its own: the raw control reaches the text", () => {
+    // The reason AC-19 needs both layers and neither alone satisfies it: this
+    // text is recognised, and still carries an executable byte. Only the
+    // neutralise-before-match ordering makes it inert.
+    expect(
+      extractFindings([`[SEV: blocker] auth.ts:12${cp(0x0d)}real`])[0]?.text,
+    ).toBe(`auth.ts:12${cp(0x0d)}real`);
   });
 });

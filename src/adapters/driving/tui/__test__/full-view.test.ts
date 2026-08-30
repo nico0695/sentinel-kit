@@ -68,6 +68,20 @@ const MARKDOWN = [
 
 const MARKDOWN_LINES = MARKDOWN.split("\n");
 
+/** One code point as a string — keeps the hostile input typo-proof. */
+function cp(codePoint: number): string {
+  return String.fromCodePoint(codePoint);
+}
+
+/**
+ * AC-18's neutralised set N, restated independently of the module under test
+ * so that widening or narrowing `engine-text.ts`' own class fails a case here
+ * instead of agreeing with itself. Used only for the negative half of an
+ * assertion, never on its own.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
+const IN_N = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/;
+
 const config: GlobalConfig = {
   defaultEngine: "claude-code",
   defaultBaseBranch: "main",
@@ -413,6 +427,36 @@ describe("no pager and no truncation (AC-13)", () => {
     // marker or a footer would sit after it.
     expect(h.stdout().at(-1)).toBe("[SEV: nit] finding 500");
     // One prompt for the full view, and no sixth prompt to page it.
+    expect(h.deps.prompter.prompts).toHaveLength(5);
+  });
+
+  it("emits all 500 lines when one of them carries a control sequence", async () => {
+    // Amendment 1 (AC-13, AC-12(a)): neutralisation must never become
+    // truncation. It changes bytes INSIDE a line, never the presence, count
+    // or order of lines, and it applies no length cap — so a pathological
+    // line is emitted whole rather than cut.
+    const forged = `[SEV: nit] finding 7${cp(0x1b)}[2Kforged`;
+    const lines = LONG_OUTPUT_LINES.map((line, index) =>
+      index === 6 ? forged : line,
+    );
+    const h = harness({
+      engineOutput: lines.join("\n"),
+      answers: [answer(true)],
+    });
+
+    const code = await h.run();
+
+    expect(code).toBe(0);
+    const emitted = h.stdout().slice(-lines.length);
+    expect(emitted).toHaveLength(500);
+    // Present: the injected line is still there, in its own position, whole
+    // and readable — escaped rather than dropped or shortened.
+    expect(emitted[6]).toBe("[SEV: nit] finding 7\\x1b[2Kforged");
+    expect(emitted[5]).toBe("[SEV: nit] finding 6");
+    expect(emitted[7]).toBe("[SEV: nit] finding 8");
+    // Absent: nothing executable, and still no marker after the last line.
+    expect(emitted.some((line) => IN_N.test(line))).toBe(false);
+    expect(h.stdout().at(-1)).toBe("[SEV: nit] finding 500");
     expect(h.deps.prompter.prompts).toHaveLength(5);
   });
 });

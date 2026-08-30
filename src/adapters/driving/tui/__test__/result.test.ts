@@ -41,7 +41,7 @@ import type {
   RunReviewResult,
   TerminalState,
 } from "../../../../core/run/index.js";
-import { PLAIN_PALETTE, type TuiPalette } from "../colors.js";
+import { PLAIN_PALETTE, TUI_PALETTE, type TuiPalette } from "../colors.js";
 import {
   formatFullView,
   formatResultDigest,
@@ -461,19 +461,32 @@ function stripMarks(line: string): string {
   return line.replace(/<\/?(?:good|warn|bad|muted)>/g, "");
 }
 
-/** The `result` text of the real claude-code fixture: 1 major, 1 minor. */
-function fixtureMarkdown(): string {
+/** The `result` text of one captured `claude-code` fixture. */
+function fixtureResult(file: string): string {
   const raw = readFileSync(
     fileURLToPath(
-      new URL(
-        "../../../../../fixtures/claude-code/valid-verdict.json",
-        import.meta.url,
-      ),
+      new URL(`../../../../../fixtures/claude-code/${file}`, import.meta.url),
     ),
     "utf-8",
   );
 
   return (JSON.parse(raw) as { readonly result: string }).result;
+}
+
+/** The real fixture the suite's happy path uses: 1 major, 1 minor. */
+function fixtureMarkdown(): string {
+  return fixtureResult("valid-verdict.json");
+}
+
+/**
+ * A real captured review that ignores the `[SEV: …]` convention entirely —
+ * prose headings and numbered sections, no marker anywhere. Among the
+ * captured `claude-code` fixtures this shape is the COMMON one, which is why
+ * AC-4's degradation path is asserted against it and not only against a
+ * hand-written string.
+ */
+function noisyFixtureMarkdown(): string {
+  return fixtureResult("noisy-output.json");
 }
 
 /** The fixture's line at `severity`, minus its marker. */
@@ -896,8 +909,16 @@ describe("formatFullView (AC-12)", () => {
     expect(lines.at(-1)).toBe("VERDICT: request-changes");
   });
 
-  it("keeps carriage returns intact on CRLF output", () => {
-    expect(formatFullView("a\r\nb", PLAIN_PALETTE)).toEqual(["a\r", "b"]);
+  it("consumes the CRLF terminator rather than rendering it", () => {
+    // NAMED ASSERTION CHANGE (Amendment 1 §A-2, decision e6f2h2-D14): this
+    // case asserted `["a\r", "b"]` before the fix. A CRLF terminator is a
+    // line ending, not content, so `splitEngineLines` consumes one trailing
+    // CR per element — rendering `\x0d` at the end of every line of a CRLF
+    // review would be noise a user would read as a sentinel bug. Every OTHER
+    // carriage return still survives the split and is neutralised, which is
+    // the case below.
+    expect(formatFullView("a\r\nb", PLAIN_PALETTE)).toEqual(["a", "b"]);
+    expect(formatFullView("a\rb", PLAIN_PALETTE)).toEqual(["a\\x0db"]);
   });
 
   it("preserves empty output and a trailing newline", () => {
@@ -916,5 +937,276 @@ describe("formatFullView (AC-12)", () => {
     );
     expect(emitted).toContain("# Review");
     expect(emitted.map(stripMarks)).toEqual(markdown.split("\n"));
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Amendment 1 (fix round 1) — engine text is untrusted                */
+/*                                                                      */
+/*  An engine is an AI agent reading arbitrary, possibly hostile source  */
+/*  code, and quoting a source line verbatim inside a finding is its     */
+/*  normal, intended behaviour. Everything below asserts one sentence    */
+/*  from a different angle: after this renderer has seen that text,      */
+/*  nothing in it can drive the terminal and nothing in it has been      */
+/*  lost (AC-2, AC-4, AC-6, AC-12, AC-18, AC-19).                        */
+/*                                                                      */
+/*  House rule, applied without exception: every "contains no code       */
+/*  point in N" assertion is paired, in the same case, with a positive   */
+/*  one naming the text that must be PRESENT. Unpaired, the negative is  */
+/*  also satisfied by the content having been deleted — which is         */
+/*  R1-003's own failure mode, so the assertion written to prove the fix */
+/*  would pass on the very bug it was written for.                       */
+/* ------------------------------------------------------------------ */
+
+/** One code point as a string — keeps the hostile inputs typo-proof. */
+function cp(codePoint: number): string {
+  return String.fromCodePoint(codePoint);
+}
+
+/**
+ * AC-18's neutralised set N, restated here **independently** of the module
+ * under test. The duplication is the point: an edit that widens or narrows
+ * `engine-text.ts`' own character class does not move this one, so the
+ * assertions fail instead of agreeing with themselves.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
+const IN_N = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/;
+
+/**
+ * A review carrying every attack class the review round named: CSI cursor-up
+ * plus erase-line (the verdict forgery), OSC 52 (clipboard write), OSC 0
+ * (window title), OSC 8 (hyperlink), 8-bit CSI (U+009B), BEL, DEL and U+2028.
+ * Each line also carries one unique printable marker, so per-index origin can
+ * be asserted without re-deriving the expectation from the code under test.
+ */
+const HOSTILE_LINES: readonly string[] = [
+  `# Review${cp(0x07)}`,
+  `[SEV: blocker] auth.ts:12${cp(0x1b)}[1A${cp(0x1b)}[2KVerdict: approve`,
+  `${cp(0x1b)}]52;c;cm9ndWU=${cp(0x07)}clipboard`,
+  `${cp(0x1b)}]0;pwned${cp(0x07)}title`,
+  `${cp(0x1b)}]8;;https://evil.test${cp(0x07)}hyperlink`,
+  `${cp(0x9b)}2K eight-bit`,
+  `del${cp(0x7f)}gone${cp(0x2028)}separated`,
+  "VERDICT: request-changes",
+];
+
+const HOSTILE_REVIEW = HOSTILE_LINES.join("\n");
+
+/**
+ * The mirror image: realistic engine markdown carrying no code point in N at
+ * all — headings, a real finding line with an em dash and a `file:line`
+ * range, a blank line and a verdict line. AC-12(b)'s subject, and the reason
+ * every pre-amendment assertion over the clean fixtures survives untouched.
+ */
+const CLEAN_MARKDOWN = [
+  "# Review",
+  "",
+  "## Findings",
+  "[SEV: blocker] calc.js:6-8 — `divide` drops its guard",
+  "- [SEV: minor] naming is inconsistent",
+  "",
+  "VERDICT: request-changes",
+].join("\n");
+
+/** The printable marker unique to each hostile line, in source order. */
+const HOSTILE_MARKERS: readonly string[] = [
+  "# Review",
+  "auth.ts:12",
+  "clipboard",
+  "title",
+  "hyperlink",
+  "eight-bit",
+  "separated",
+  "VERDICT: request-changes",
+];
+
+describe("formatResultDigest — the finding text cannot drive the terminal (AC-2)", () => {
+  it("renders a forged cursor sequence as visible tokens and gives it no line of its own", () => {
+    const lines = formatResultDigest(
+      {
+        state: "ok",
+        engineOutput: `[SEV: blocker] auth.ts:12${cp(0x1b)}[1A${cp(0x1b)}[2KVerdict: approve`,
+      },
+      PLAIN_PALETTE,
+    );
+
+    // Present: the finding is counted, listed, and readable in full.
+    expect(lines).toContain("Findings: 1 blocker");
+    expect(lines).toContain(
+      "  [blocker] auth.ts:12\\x1b[1A\\x1b[2KVerdict: approve",
+    );
+    // Absent: nothing executable survives, and the forged text cannot occupy
+    // a digest field's position — the only `Verdict:` line is the digest's.
+    expect(lines.some((line) => IN_N.test(line))).toBe(false);
+    expect(lines.filter((line) => line.startsWith("Verdict:"))).toEqual([
+      "Verdict: none — no verdict was parsed for this run.",
+    ]);
+  });
+});
+
+describe("formatResultDigest — degradation on a real engine fixture (AC-4)", () => {
+  it("says the convention matched nothing for claude-code's captured noisy output", () => {
+    const noisy = noisyFixtureMarkdown();
+
+    // Guard: this fixture is the degradation path only because it really
+    // carries no `[SEV: …]` marker. If a future capture adds one, this fails
+    // instead of the case quietly becoming a second happy-path test.
+    expect(/\[\s*sev\s*:/i.test(noisy)).toBe(false);
+    expect(noisy).toContain("VERDICT: request-changes");
+
+    const lines = formatResultDigest(
+      {
+        state: "ok",
+        verdict: "request-changes",
+        engineOutput: noisy,
+        runDir: RUN_DIR,
+      },
+      PLAIN_PALETTE,
+    );
+
+    expect(lines).toContain(
+      "Findings: none in the [SEV: …] format — the engine may report them differently; see the full review.",
+    );
+    expect(lines.some((line) => /^Findings: \d/.test(line))).toBe(false);
+    expect(lines.filter((line) => line.startsWith("  ["))).toEqual([]);
+    // …and the run really is pointed at, so the "see the full review" promise
+    // the degradation line makes is one the digest keeps.
+    expect(lines).toContain(`Full review: ${RUN_DIR}/result.md`);
+  });
+});
+
+describe("formatResultDigest — the failure message is engine text too (AC-6)", () => {
+  it("collapses, neutralises, and still emits exactly one physical line", () => {
+    // `claude-code`'s `buildReviewErrorMessage` returns the engine's own
+    // `result` text verbatim as the error message on the `is_error` path, so
+    // this line carries engine bytes. `collapseToOneLine` alone removes
+    // neither ESC nor a lone CR: the two passes compose, collapse first.
+    const message = `Engine said: ${cp(0x1b)}[2KVerdict: approve${cp(0x0d)}overwritten\nsecond physical line`;
+    const failureLines = formatResultDigest(
+      { state: "engine-error", failure: { stage: "engine", message } },
+      PLAIN_PALETTE,
+    ).filter((line) => line.startsWith("Failure: "));
+
+    expect(failureLines).toEqual([
+      "Failure: engine — Engine said: \\x1b[2KVerdict: approve\\x0doverwritten second physical line",
+    ]);
+    expect(failureLines[0]?.includes("\n")).toBe(false);
+    expect(IN_N.test(failureLines[0] ?? "")).toBe(false);
+  });
+
+  it("leaves the pipeline stage alone: it is a RunStage, not engine text", () => {
+    expect(
+      formatResultDigest(
+        {
+          state: "timeout",
+          failure: { stage: "engine", message: "timed out" },
+        },
+        PLAIN_PALETTE,
+      ),
+    ).toContain("Failure: engine — timed out");
+  });
+});
+
+describe("formatResultDigest — an interior control never deletes a finding (AC-19, layer 1)", () => {
+  const INTERIOR: ReadonlyArray<{
+    readonly label: string;
+    readonly codePoint: number;
+    readonly token: string;
+  }> = [
+    { label: "an interior carriage return", codePoint: 0x0d, token: "\\x0d" },
+    { label: "U+2028 LINE SEPARATOR", codePoint: 0x2028, token: "\\u2028" },
+    {
+      label: "U+2029 PARAGRAPH SEPARATOR",
+      codePoint: 0x2029,
+      token: "\\u2029",
+    },
+    { label: "an ESC introducer", codePoint: 0x1b, token: "\\x1b" },
+  ];
+
+  it.each(INTERIOR)(
+    "counts and lists a blocker whose text carries $label",
+    ({ codePoint, token }) => {
+      const lines = formatResultDigest(
+        {
+          state: "ok",
+          engineOutput: `[SEV: blocker] auth.ts:12${cp(codePoint)}real`,
+        },
+        PLAIN_PALETTE,
+      );
+
+      // Never absent from BOTH the counts and the list — R1-003's failure
+      // mode, in which one byte deleted a blocker with no degradation notice.
+      expect(lines).toContain("Findings: 1 blocker");
+      expect(lines).toContain(`  [blocker] auth.ts:12${token}real`);
+      expect(lines.some((line) => IN_N.test(line))).toBe(false);
+    },
+  );
+
+  it("never degrades to the AC-4 line when a control-carrying finding exists", () => {
+    const lines = formatResultDigest(
+      {
+        state: "ok",
+        engineOutput: `[SEV: blocker] auth.ts:12${cp(0x2028)}real`,
+      },
+      PLAIN_PALETTE,
+    );
+
+    expect(lines.some((line) => line.includes("none in the [SEV: …]"))).toBe(
+      false,
+    );
+    expect(lines).toContain("Findings: 1 blocker");
+  });
+});
+
+describe("formatFullView — printable-text fidelity without the terminal channel (AC-12)", () => {
+  it("(a) emits one line per source line, in order, losing nothing", () => {
+    const emitted = formatFullView(HOSTILE_REVIEW, PLAIN_PALETTE);
+
+    expect(emitted).toHaveLength(HOSTILE_REVIEW.split("\n").length);
+    expect(emitted).toHaveLength(HOSTILE_MARKERS.length);
+    // Per-index origin: emitted line i still carries source line i's own
+    // marker, so nothing was dropped, merged, elided or reordered.
+    for (const [index, marker] of HOSTILE_MARKERS.entries()) {
+      expect(emitted[index]).toContain(marker);
+    }
+  });
+
+  it("(b) reproduces markdown carrying nothing to neutralise byte for byte", () => {
+    // The restricted identity: the ORIGINAL AC-12 criterion, still exact, on
+    // the domain where it was safe. The guards are what restrict it — without
+    // them this case would silently stop testing the identity the day either
+    // input grew a control byte.
+    const fixture = fixtureMarkdown();
+
+    expect(IN_N.test(CLEAN_MARKDOWN)).toBe(false);
+    expect(IN_N.test(fixture)).toBe(false);
+    expect(formatFullView(CLEAN_MARKDOWN, PLAIN_PALETTE)).toEqual(
+      CLEAN_MARKDOWN.split("\n"),
+    );
+    expect(formatFullView(fixture, PLAIN_PALETTE)).toEqual(fixture.split("\n"));
+  });
+
+  it("(c) executes nothing: no code point in N survives a hostile review", () => {
+    // M11's permanent guard: without it the negatives below would pass just
+    // as well against a fixture that had decayed into a harmless one.
+    expect(IN_N.test(HOSTILE_REVIEW)).toBe(true);
+
+    const plain = formatFullView(HOSTILE_REVIEW, PLAIN_PALETTE);
+    const stripped = formatFullView(HOSTILE_REVIEW, TUI_PALETTE).map(stripAnsi);
+
+    expect(plain.some((line) => IN_N.test(line))).toBe(false);
+    expect(stripped.some((line) => IN_N.test(line))).toBe(false);
+    // Paired: the OSC 52 payload and the forged verdict are still on screen,
+    // escaped rather than deleted — the whole reason for neutralising instead
+    // of stripping.
+    expect(plain[1]).toBe(
+      "[SEV: blocker] auth.ts:12\\x1b[1A\\x1b[2KVerdict: approve",
+    );
+    expect(plain[2]).toBe("\\x1b]52;c;cm9ndWU=\\x07clipboard");
+    expect(plain[5]).toBe("\\x9b2K eight-bit");
+    expect(plain[6]).toBe("del\\x7fgone\\u2028separated");
+    // The palette's own SGR is added AFTER neutralisation, so stripping it
+    // returns exactly the plain render — the ordering, asserted.
+    expect(stripped).toEqual(plain);
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Driving adapter: tui — result rendering (`[E6.F2.H2]`, #39; AC-1..AC-7,
- * AC-12, AC-14).
+ * AC-12, AC-14, AC-18, AC-19).
  *
  * The whole module is pure: strings in, strings out. It holds no state,
  * touches no stream, reads no `process` and knows nothing about a terminal —
@@ -16,6 +16,17 @@
  * every coloured fact is also plain text on the same line — stripping the
  * colour loses nothing.
  *
+ * **Engine text is untrusted, and this module is where the order that makes
+ * it safe is written down** (Amendment 1 §A-3; AC-18, AC-19). Every
+ * engine-derived string — the finding text, the full view, and the failure
+ * message, which `claude-code`'s `buildReviewErrorMessage` fills with the
+ * engine's own `result` text — goes through `engine-text.ts` before anything
+ * else touches it. The order is **split → neutralise → match → colour** and
+ * it is load-bearing in both directions: matching sees text that can no
+ * longer break a line, and the palette's own SGR codes are added *after*
+ * neutralisation, so they are never themselves escaped. `toSafeLines` runs
+ * **once** per digest, so the pass is never duplicated.
+ *
  * `[E6.F2.H1]`'s minimal result block — state, verdict only when one
  * existed, run directory — is **superseded** by {@link formatResultDigest},
  * not wrapped: its renderer is deleted, not deprecated. H1 AC-7 pinned that
@@ -27,6 +38,7 @@ import { join } from "node:path";
 import type { RunFailureRecord } from "../../../core/history/index.js";
 import type { TerminalState, Verdict } from "../../../core/run/index.js";
 import type { TuiPalette } from "./colors.js";
+import { neutralizeControls, toSafeLines } from "./engine-text.js";
 import {
   extractFindings,
   type FindingSeverity,
@@ -199,12 +211,17 @@ function formatFindingCounts(findings: readonly TuiFinding[]): string {
  * grouping is what makes "blockers at a glance" true either way. Labels are
  * padded **before** colouring — padding a string that already carries SGR
  * codes would count the escapes and misalign the column.
+ *
+ * Takes the **safe lines**, not the markdown: the finding text is written to
+ * `stdout` with no prompt of any kind before it (R1-001), which makes it the
+ * digest's most exposed engine-derived channel, so the neutralisation must
+ * already have happened by the time this function is reached.
  */
 function formatFindingsSection(
-  markdown: string,
+  safeLines: readonly string[],
   palette: TuiPalette,
 ): readonly string[] {
-  const findings = extractFindings(markdown);
+  const findings = extractFindings(safeLines);
 
   if (findings.length === 0) {
     return [`Findings: ${palette.muted(NO_CONVENTION_FINDINGS_LINE)}`];
@@ -255,15 +272,29 @@ export function formatResultDigest(
   ];
 
   if (digest.failure !== undefined) {
+    // The third engine-derived channel (§A-5): `buildReviewErrorMessage`
+    // returns the engine's own `result` text verbatim as the error message on
+    // the `is_error` path, so this line carries engine bytes too. The two
+    // passes compose rather than replace one another and the order is fixed:
+    // `collapseToOneLine` first, so a real newline becomes a space rather
+    // than a `\x0a` token, then neutralisation for everything a
+    // whitespace-collapse cannot see — ESC and a lone CR among them.
+    // `stage` is a `RunStage` union member, not engine text, and is left be.
     lines.push(
       `Failure: ${palette.bad(
-        `${digest.failure.stage} — ${collapseToOneLine(digest.failure.message)}`,
+        `${digest.failure.stage} — ${neutralizeControls(
+          collapseToOneLine(digest.failure.message),
+        )}`,
       )}`,
     );
   }
 
   if (digest.engineOutput !== undefined) {
-    lines.push(...formatFindingsSection(digest.engineOutput, palette));
+    // Computed once, here, and handed down — the digest never neutralises the
+    // same output twice.
+    lines.push(
+      ...formatFindingsSection(toSafeLines(digest.engineOutput), palette),
+    );
   }
 
   lines.push(`Run directory: ${palette.muted(digest.runDir ?? ABSENT)}`);
@@ -278,21 +309,41 @@ export function formatResultDigest(
 }
 
 /**
- * The engine's own markdown, **verbatim** (AC-12): one emitted line per source
- * line, recognized findings tinted by severity and nothing else — no heading,
- * no separator, no footer, no truncation marker, no line numbers, no markdown
+ * The engine's own markdown (AC-12): one emitted line per source line,
+ * recognized findings tinted by severity and nothing else — no heading, no
+ * separator, no footer, no truncation marker, no line numbers, no markdown
  * rendering (D2: this is raw text, not rendered markdown).
  *
- * That is what makes the identity `stripAnsi(emitted) === markdown.split("\n")`
- * hold, and it is why the split is on `"\n"` and never `/\r?\n/`: a `\r?\n`
- * split would silently drop the carriage returns and break the identity on
- * CRLF output.
+ * The original criterion — `stripAnsi(emitted) === markdown.split("\n")` for
+ * every input — is **superseded**: it was the confirmed vulnerability R1-002,
+ * because byte-verbatim emission *mandated* replaying OSC 52 (clipboard), OSC
+ * 0 (window title), OSC 8 (hyperlink) and CSI cursor/erase straight into the
+ * user's terminal. What it was protecting is printable-text fidelity, and
+ * that survives intact, restated as three properties (§A-6):
+ *
+ * - **(a) completeness** — the emitted line count equals
+ *   `markdown.split("\n").length` and emitted line *i* comes from source line
+ *   *i*. Nothing is dropped, merged, elided, reordered or truncated, and no
+ *   length cap exists, so neutralisation can never become truncation (AC-13).
+ * - **(b) restricted identity** — for markdown carrying no code point in the
+ *   neutralised set, `stripAnsi(formatFullView(m, PLAIN_PALETTE))` still
+ *   equals `m.split("\n")` byte for byte. The old identity holds exactly, on
+ *   the domain where it was safe; the amendment narrowed its domain rather
+ *   than discarding it.
+ * - **(c) non-executability** — for *any* input, once the palette's own SGR
+ *   is stripped no emitted line contains a code point in that set.
+ *
+ * The split is `splitEngineLines`', which consumes one trailing CR per
+ * element: a CRLF terminator is a line ending, not content, and rendering
+ * `\x0d` at the end of every line of a CRLF review would be noise a user
+ * would read as a sentinel bug. Every other CR survives the split and is
+ * neutralised, because an interior CR is the line-overwrite forgery itself.
  */
 export function formatFullView(
   markdown: string,
   palette: TuiPalette,
 ): readonly string[] {
-  return markdown.split("\n").map((line) => {
+  return toSafeLines(markdown).map((line) => {
     const finding = matchFindingLine(line);
 
     return finding === undefined

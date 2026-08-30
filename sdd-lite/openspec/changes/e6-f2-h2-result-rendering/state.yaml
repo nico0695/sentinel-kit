@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped

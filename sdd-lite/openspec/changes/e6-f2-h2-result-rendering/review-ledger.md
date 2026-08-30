@@ -12,9 +12,9 @@
   target's own modules, plus independent orchestrator reproduction). Per the ledger contract, deterministic
   severe findings count as `confirmed` without a refuter pass. The one refutable inferential claim was
   refuted by a lens itself (see R4-001 / R3 cross-lens note).
-- counts: `confirmed: 4` · `suspect: 0` · `escalated: 0` · `info: 12`
-- open_severe_findings: **1** (RR1-001, introduced BY fix round 1; the original three are `verified`)
-- verdict: **`not_reached`** — one open severe finding, fix budget **1 of 2 used**, one round remains
+- counts: `confirmed: 4` · `suspect: 0` · `escalated: 0` · `info: 14`
+- open_severe_findings: **0** — all four confirmed severe findings are `verified`
+- verdict: **`pass_with_warnings`** — no open severe findings; only `info` rows remain. Fix budget **2 of 2 used**
 - reported_at: 2026-08-29 (lineage), scoped re-review 2026-08-30
 
 ## Findings
@@ -35,8 +35,8 @@
 | R4-001 | `tui/tui-flow.ts:278` | WARNING | info | The unguarded `await offerFullView(...)` lets a throw from the prompt seam escape into the catch-all, turning a completed+persisted review into exit 1 — violating the module's own documented Property 5 | introduced |
 | R4-002 | `tui/tui-flow.ts:319` (sites `:253`, `:278`) | WARNING | info | The post-run `confirm` never settles on stdin EOF, so the process exits 13 with a raw Node warning dumped over the digest, losing the intended exit code | worsened |
 | R4-003 | `tui/tui-flow.ts:253` + `:320` | SUGGESTION | info | On the persist-failure branch the in-memory markdown is the only copy in existence, yet a decline discards it irrecoverably with no last-copy signal | introduced |
-| **RR1-001** | `tui/findings.ts:72` + `tui/render.ts:296` | **CRITICAL** | **open** | **WIDENED at round-2 planning, confirmed by orchestrator probe: 45 of 45 combinations (9 structural positions × 5 code points), not the leading position alone.** EVERY `\s` in the matcher is affected — `trim()`, `LIST_OR_QUOTE_PREFIX`'s `\s+`, and the five `\s*` inside `FINDING_LINE` — because each matches a real VT/FF/CR/U+2028/U+2029 but not the printable token that replaces it. A finding carrying one of those five at any of: leading, leading-mixed-with-spaces, before a list marker, after a list marker, inside a quoted bullet, after `[`, before `:`, after `:`, before `]` is silently deleted from BOTH the counts and the listed blockers | **introduced by fix round 1** |
-| RR2-001 | `tui/__test__/result.test.ts:1177-1198` | WARNING | info | The new AC-12(c) case's two `TUI_PALETTE` assertions are byte-identical duplicates of the `PLAIN_PALETTE` ones under the mandated local gate, and its doc-comment claims to assert the colour-after-neutralisation ordering, which it cannot — the sixth instance of this change's recurring vacuity species, and unlabelled where its repaired sibling is labelled `— the ENV-DEPENDENT case` | introduced by fix round 1 |
+| **RR1-001** | `tui/findings.ts:72` + `tui/render.ts:296` | **CRITICAL** | **verified** | **WIDENED at round-2 planning, confirmed by orchestrator probe: 45 of 45 combinations (9 structural positions × 5 code points), not the leading position alone.** EVERY `\s` in the matcher is affected — `trim()`, `LIST_OR_QUOTE_PREFIX`'s `\s+`, and the five `\s*` inside `FINDING_LINE` — because each matches a real VT/FF/CR/U+2028/U+2029 but not the printable token that replaces it. A finding carrying one of those five at any of: leading, leading-mixed-with-spaces, before a list marker, after a list marker, inside a quoted bullet, after `[`, before `:`, after `:`, before `]` is silently deleted from BOTH the counts and the listed blockers | **introduced by fix round 1** |
+| RR2-001 | `tui/__test__/result.test.ts:1177-1198` | WARNING | **verified** | The new AC-12(c) case's two `TUI_PALETTE` assertions are byte-identical duplicates of the `PLAIN_PALETTE` ones under the mandated local gate, and its doc-comment claims to assert the colour-after-neutralisation ordering, which it cannot — the sixth instance of this change's recurring vacuity species, and unlabelled where its repaired sibling is labelled `— the ENV-DEPENDENT case` | introduced by fix round 1 |
 
 ## Corroboration
 
@@ -79,7 +79,7 @@ window and was never extended to the rendering path this change created.
 
 ## Fix Rounds
 
-- rounds used: **1 of 2** — one round remains, and there is no third
+- rounds used: **2 of 2 — exhausted.** Both rounds closed what they were convened for; round 1 introduced RR1-001, which round 2 closed
 - status: awaiting `review_gate` decision. Per the orchestrator contract, confirmed severe findings never
   trigger direct edits: fixes flow through `sddl-plan` (a fix stage seeded from confirmed ledger ids), then
   `stage_approval`, then `sddl-executor`.
@@ -157,3 +157,43 @@ recognition. This is **not** a round-1 regression — the pre-round matcher drop
 it sits outside AC-19's letter, which speaks about the remainder. Low reachability: quoted attacker
 text lands *after* the marker, and an SGR-coloured line fails to match under every variant because of
 the `[31m` itself. Recommended as an E7 hardening story beside `risk-e6f2h2-012`.
+
+
+## Fix Round 2 — outcome (scoped re-review, `ed3ba28..7e7cf3c`)
+
+**RR1-001 and RR2-001 both CLOSED. No new severe finding. `findings: []`.**
+
+The reviewer did not stop at the nine positions the plan enumerated — the trap that sank round 1, whose
+suites covered perfectly the space round 1 had itself defined. It ran an **exhaustive single-insertion
+differential**: 15 code points at *every index* of 16 base lines (6 ordinary, 10 exotic — `[ sev : Blocker ]`,
+`>>>`, `+ +`, `999)`, tabbed bullets, no separator, empty remainder), comparing the pre-neutralisation
+matcher at `d8ad970` on raw input against the shipped pipeline. Then **220,000 multi-insertion fuzz cases**.
+
+- **`LOST: 0` in every run** — the shipped pipeline never loses a line the pre-round matcher recognised.
+  Against round 1's tree it is a strict superset: `LOST: 0`, `GAINED: 7,299`.
+- **Surface synchronisation holds**: 60,000 fuzz inputs rendered through both surfaces, **0 cases** where
+  the digest counted a finding the full view did not tint, or the reverse. That was the hazard raised at
+  the round-2 gate, and the mechanism was chosen to make it impossible by construction.
+- **0 emitted lines carried any member of N** across 60,000 hostile inputs, through both surfaces plus
+  the failure line.
+- **AC-3 byte-identical**; both real fixtures unchanged through the shipped pipeline (2 and 0 findings).
+- **No ReDoS** from the nested-quantifier composition: linear, 1.66 ms at n = 60,000.
+- **No tenth structural position** — the index sweep covers insertion points nobody enumerated (inside
+  `sev`, inside the level word, between digits of an ordered marker, after `]`, end-of-line); all are
+  consistent between both matchers.
+- **No seventh vacuity instance** — six bundled mutants of `findings.ts`, all killed. Notably the
+  `only-the-fifth-\s*` mutant is killed by exactly one shipped assertion, which **pins the five-vs-three
+  deviation the executor flagged as unpinned**.
+
+### Two info rows added
+
+| id | severity | claim |
+|---|---|---|
+| RR3-001 | WARNING | `tokenFor`'s deliberate non-injectivity means a **literal** `\x0b` typed in reviewed source is now indistinguishable from a neutralised VT and acts as structural whitespace, manufacturing a finding the pre-round matcher rejected |
+| RR3-002 | SUGGESTION | `plan.md` step 4 says `FINDING_LINE` carries three `\s*`; it carries five, and the plan's own position table says five. Code and `execution-log.md` are right; only the plan text disagrees with itself |
+
+**RR3-001 is bounded, and the orchestrator verified the bound rather than accepting it**: a literal at a
+*non*-structural position still does not match, and — decisively — plain `[SEV: blocker]` **already**
+manufactured a finding before any of this work. The channel is a new spelling of an existing capability,
+not a new capability. The error direction is *more* findings, never a deleted one (`LOST: 0` everywhere),
+and findings feed no exit code. This is the species `risk-e6f2h2-011` names as a non-goal.

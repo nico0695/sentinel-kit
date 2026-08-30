@@ -202,7 +202,8 @@ stages:
   sddl-plan:
     status: completed
     started_at: "2026-08-29T17:30:00Z"
-    completed_at: "2026-08-30T00:55:00Z"
+    completed_at: "2026-08-30T15:45:00Z"
+    last_updated_at: "2026-08-30T15:45:00Z"
     notes: >-
       plan.md written from design.md (authoritative for mechanism and file layout) + spec.md
       (authoritative for the 17 ACs), grounded in direct reads of the current
@@ -311,6 +312,80 @@ stages:
       "exactly the confirmed ids, nothing else". No level-C item; nothing in S8-S10 requires
       `src/core/**` and `risk-e6f2h2-004`'s standing guard is restated in the artifact.
       Planning only: no `src/**`, test or config file was touched, and no commit was made.
+      FIX-ROUND-2 APPEND (third invocation, 2026-08-30, under `e6f2h2-D16` at
+      `cp-review-gate-round-2`): ONE stage APPENDED — S11 — without rewriting S1-S10's rows, the
+      fix-round-1 section, or the M1-M13 mutation tables. Scope is exactly the two ledger ids
+      RR1-001 (CRITICAL, introduced by fix round 1) and RR2-001.
+      THE DESIGN QUESTION `e6f2h2-D16` RAISED IS RESOLVED, BY PROBE RATHER THAN ON PAPER. Four
+      mechanisms were enumerated and their effect on BOTH rendering surfaces traced. (C-A) Trim the
+      raw line before neutralising for the match path — REJECTED: it desynchronises the digest
+      (which renders the matcher's remainder group) from the full view (which renders the
+      neutralised line) unless a second pipeline is threaded through both, it puts a raw trim
+      upstream of neutralisation against AC-18's wording, and it is INCOMPLETE — it cannot reach a
+      control sitting after a list marker or inside the marker itself. (C-B) Match on raw and
+      neutralise the extracted remainder — REJECTED: it inverts AC-19 layer 1 and restores the
+      fragile shape round 1 removed, a raw engine string in flight that is safe only while every
+      emission site remembers to neutralise it. (C-C) Drop leading members of N in
+      `splitEngineLines` — REJECTED: it deletes evidence, contradicts the module's "nothing is
+      removed" stance and would need an AC-18 amendment this round has no budget for. (C-D) CHOSEN:
+      `findings.ts` treats an AC-18 token standing for a whitespace-class code point as the
+      whitespace it replaced, at every structural position where the matcher used a whitespace
+      class. C-D keeps ONE pipeline, ONE input per line and ONE predicate shared by the digest and
+      the full view, so the two surfaces cannot diverge by construction; AC-18, AC-3, AC-12 and
+      AC-19 are all untouched and NO spec amendment is needed.
+      THE DEFECT IS WIDER THAN THE LEDGER ROW STATES, MEASURED: the row says the marker is
+      "immediately preceded" by one of the five code points; the differential probe (pre-round
+      matcher vs the shipped pipeline, over the real modules) shows 45 broken combinations — NINE
+      structural positions (leading, leading mixed with spaces, before a list marker, after a list
+      marker, inside a quoted bullet, after the opening bracket, before the colon, after the colon,
+      before the closing bracket) times the five code points, because every whitespace class in the
+      matcher is affected, not only the trim. End to end, a four-line hostile review whose findings
+      carry a leading VT, a post-marker CR and an intra-marker LS renders today as
+      `Findings: 1 nit` with nothing listed — a blocker, a major and a minor deleted from the counts
+      AND the list, with no degradation notice. With C-D the same input yields
+      `Findings: 1 blocker, 1 major, 1 minor, 1 nit`, both listed lines present, all four lines
+      tinted in the full view, and no raw code point of N anywhere.
+      PLAN-TIME MEASUREMENT, so execution is not a discovery exercise: a probe copy of the tree with
+      the patched `findings.ts` runs the FULL suite at 931 passed / 49 files (the exact baseline, no
+      assertion moved), `tsc --noEmit` clean, `biome check` clean on the patched file, depcruise 107
+      modules / 254 dependencies (the fix adds no import). AC-3's clean tolerance matrix and the
+      real fixtures are byte-identical before and after; the noisy fixture still yields 0 findings;
+      pathological inputs stay sub-millisecond. CONSEQUENCE recorded in the plan: no named assertion
+      change is expected in round 2, and if one appears the executor must STOP rather than edit it.
+      TESTS THE ROUND MUST ADD, the gap that let RR1-001 through: no test anywhere in this change
+      puts a control character BEFORE the marker. S11 adds the 9x5 structural-position matrix
+      through the real `toSafeLines` pipeline, the nine HT rows (must keep matching, HT is outside
+      N), leading ESC and NUL as decided negatives, a differential invariant asserted over the whole
+      corpus, and end-to-end digest cases on a NEW corpus constant — never an insertion into
+      `HOSTILE_LINES`, whose assertions are index-coupled — including the SURFACE-SYNCHRONISATION
+      assertion (the full view tints exactly what the digest counted) that would have caught a
+      C-A-shaped fix. Round 1's negative-assertion pairing rule is restated as mandatory.
+      FIVE MUTATION-VERIFIES with named expected reds: M14 restores the round-1 ordering (all 45
+      structural cases plus the end-to-end cases red, while every round-1 interior-control case
+      stays GREEN — the two families proved independent); M15, M16 and M17 are three separate
+      per-site mutations so no position is covered by accident (the M13 discipline); M18 is the M12
+      pattern for RR2-001 — the rewritten assertions fail under the `PLAIN_PALETTE` swap where the
+      pre-fix `TUI_PALETTE` versions pass.
+      DECISIONS, all level A, authorship `claude`: F3 the repair covers every structural position
+      rather than only the leading one (the same id's own mechanism — fixing one position would cost
+      more code and leave eight instances of the identical silent-deletion mode alive, which is how
+      round 1 failed; surfaced at the approval gate so the ruling is the user's); F4 the class is
+      exactly N intersected with WhiteSpace-union-LineTerminator, probed, not all of N; F5 the
+      leading non-whitespace-control residue is named, not fixed; F6 `new RegExp` composition over
+      five inline copies of the class; F7 a new corpus constant instead of inserting into
+      `HOSTILE_LINES`; F8 the trailing-token non-parity is asserted rather than left implicit. NO
+      level-B and NO level-C item is created: nothing in S11 needs `src/core/**` and no second
+      runtime dependency is introduced.
+      NEW NAMED RESIDUE FOR THE ORCHESTRATOR TO RECORD (this stage does not write `open_risks`): a
+      LEADING code point of N that is not whitespace-class — ESC, NUL, DEL, the C1 controls — still
+      prevents recognition, so such a finding is absent from both the counts and the list. It is NOT
+      a round-1 regression (the pre-round matcher dropped it identically) and it is outside AC-19's
+      letter, which speaks about the remainder; reachability is low, since the attacker-controlled
+      text an engine quotes lands AFTER the marker and the realistic leading-control case (an
+      SGR-coloured line) fails to match under every variant anyway. Recommended disposition: an E7
+      hardening story alongside `risk-e6f2h2-012`.
+      Planning only again: no `src/**`, test or config file was touched and no commit was made; the
+      only files written are `plan.md` (append) and this stage entry.
   sddl-executor:
     status: completed
     started_at: "2026-08-29T18:00:00Z"
@@ -918,6 +993,36 @@ checkpoints:
       free_text: "Ronda 2: arreglar RR1-001 + RR2-001."
       responded_at: "2026-08-30T03:15:00Z"
     resolved_at: "2026-08-30T03:15:00Z"
+  - id: cp-stage-approval-s11
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      STAGE S11 — the FINAL fix stage; round 2 of 2, no third round exists. Goal: close RR1-001 at
+      all nine structural positions (D17) and repair RR2-001's vacuous assertion. Scope: MOD
+      `tui/findings.ts` (the only production file — it is the sole consumer of already-neutralised
+      text; a whitespace-sensitivity audit confirmed `collapseToOneLine`/`formatTuiErrorLine` run on
+      RAW text and `tui-flow.ts`'s blank guard reads raw `engineOutput`), plus the test files.
+      Touches code: yes. Mechanism F4, chosen over three alternatives evaluated against BOTH
+      rendering surfaces: `findings.ts` treats an AC-18 token standing for a whitespace-class code
+      point as the whitespace it replaced, at every position the matcher used `\s`. One pipeline,
+      one input per line, one predicate shared by digest and full view — they cannot diverge by
+      construction. No import added, no spec amendment, AC-18/AC-3/AC-12/AC-19 untouched.
+      Validation: full `npm test` — the plan measured the patched tree at exactly **931/49 with NO
+      assertion moved**, so this stage EXPECTS no named assertion change; if one appears, STOP and
+      report rather than editing it. Plus `npm run check` clean, dual-env identical, empty
+      `src/core`/`src/main` diffs, statement-level picocolors grep = 1. Mutations M14-M18, including
+      the requirement that restoring `findings.ts` to `ed3ba28` reddens the 45 structural cases
+      WHILE every round-1 interior case stays green — proving the two families independent.
+    question: >-
+      Approve S11, the last fix stage this change is allowed?
+    free_input_allowed: true
+    created_at: "2026-08-30T03:55:00Z"
+    response:
+      free_text: >-
+        Approved — the user authorised round 2 for RR1-001 + RR2-001 at cp-review-gate-round-2
+        (e6f2h2-D16), and D17 rules the nine-position repair to be that same id rather than growth.
+      responded_at: "2026-08-30T03:56:00Z"
+    resolved_at: "2026-08-30T03:56:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -1153,6 +1258,25 @@ decisions:
       Budget: round 2 of 2. There is no third round, so a failure here leaves the change unable to
       close and the decision returns to the user.
     recorded_at: "2026-08-30T03:15:00Z"
+  - id: e6f2h2-D17
+    checkpoint_id: cp-review-gate-round-2
+    selected_option_id: repair-all-nine-structural-positions
+    rationale: >-
+      RULING on the plan's F3. The round-2 repair covers ALL NINE structural positions of RR1-001,
+      not only the leading one the ledger row's prose named. This is not scope growth: it is one id,
+      one mechanism, one failure mode. The row understated the finding, and the plan corrected it by
+      probing — 45 of 45 combinations (9 positions x 5 code points), reproduced independently by the
+      orchestrator. Every `\s` in the matcher is affected — `trim()`, the list/quote prefix's `\s+`,
+      and the five `\s*` inside FINDING_LINE — because each matches a real VT/FF/CR/U+2028/U+2029
+      but not the printable token that replaces it.
+      Repairing only the named position would leave EIGHT instances of the identical silent-deletion
+      mode alive, which is precisely how fix round 1 failed: it closed the interior position and
+      never tested the leading one. With no third round available, shipping a partial repair of the
+      same defect twice is the outcome most worth avoiding.
+      The ledger row was widened to match the evidence rather than left understating it, and the new
+      residue (leading NON-whitespace-class members of N) was recorded as risk-e6f2h2-013 with an
+      explicit not-a-regression finding and an E7 disposition.
+    recorded_at: "2026-08-30T03:50:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-
@@ -1308,6 +1432,19 @@ open_risks:
       `src/core/shared/`, which is level C and out of bounds under risk-e6f2h2-004. `[E6.F2.H1]`'s
       catch-all carries the same exposure and rides along in the same future story.
     severity: low
+  - id: risk-e6f2h2-013
+    summary: >-
+      Named residue from fix round 2 (plan-discovered, orchestrator-ruled). A LEADING code point of
+      the neutralised set N that is not whitespace-class — ESC, NUL, DEL, the C1 range — still
+      prevents `[SEV: ...]` recognition after the round-2 repair, because the repair teaches the
+      matcher to treat tokens standing for WHITESPACE-class code points as whitespace, and these are
+      not whitespace under any reading. Explicitly NOT a regression: the pre-round matcher dropped
+      these identically, so the round neither introduced nor worsened it, and it sits outside
+      AC-19's letter, which speaks about the remainder. Low reachability: quoted attacker text lands
+      after the marker, and an SGR-coloured line fails to match under every variant because of the
+      bracket in the escape itself. DISPOSITION: recorded as a decision rather than silently
+      accepted; recommended as an E7 hardening story beside risk-e6f2h2-012.
+    severity: low
 qa_summary:
   mode: stage
   verdict: pass_with_warnings
@@ -1324,38 +1461,37 @@ qa_summary:
   reported_at: "2026-08-29T21:05:00Z"
   report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
 next_action:
-  kind: review
-  target: sddl-code-review
+  kind: approval
+  target: sddl-executor
   summary: >-
-    **S10 IS DONE (uncommitted). FIX ROUND 1 IS COMPLETE — all three stages executed, all six
-    selected ledger ids closed.** S8 landed the neutralisation primitive, S9 closed R1-001, R1-002
-    and R1-003, and S10 closed R3-002, R3-001, R2-001 and R2-002 with zero production behaviour
-    change. Gate at S10's close: `npm run check` clean, full suite **931 / 49** (927 + 1 + 3, no
-    test deleted), adapters project **582 cases identical** under `NO_COLOR=1` and `FORCE_COLOR=1`
-    with 0 failures on both, `src/core` and `src/main` diffs empty, statement-level picocolors grep
-    still 1. Mutations observed, not assumed: **M12 in two halves** — the PRE-FIX assertions passed
-    11/11 under the same `PLAIN_PALETTE` mutation that turns all six REWRITTEN ones red, which is
-    the repair's proof — and **M13 as three separate per-site mutations**, each giving 1 failed /
-    2 passed on a different, correctly-named case. The `tui-flow.ts` diff was proved comment-only
-    two independent ways (all 16 changed lines are comment lines; comment-stripped bytes identical,
-    sha256 e38170ab...), after two vacuous verification attempts were caught by paired sanity
-    counters and redone.
-    ORCHESTRATOR ACTIONS: (1) commit S10; (2) RULE ON ONE LEVEL-B ITEM — a fifth bare `AC-8`
-    citation at `tui-flow.ts:278` (`// AC-8/A6: offered after the record was written...`, directly
-    above `await offerFullView(...)`) is arguably an H2 citation of exactly the species R2-001
-    flagged, but it is not in the ledger's four nor in AC-21's normative sentence, so S10 reported
-    it instead of widening a bounded round. Recommended: qualify it as "`[E6.F2.H2]` AC-8/A6", a
-    one-token comment edit, cheapest taken before the re-review sees it. (3) Note S10's one level-A
-    deviation, which needs no ruling: the marking palette inside `palette-wiring.test.ts`'s
-    `vi.mock` factory is declared inline rather than importing the promoted `MARKED`, because the
-    factory runs before the doubles module is evaluated and must be self-contained.
-    (4) Route the **scoped re-review over the fix delta** (`ab32082..HEAD` once S10 is committed),
-    checked id by id against `review-ledger.md`: R1-001, R1-002, R1-003, R3-002, R3-001, R2-001
-    should all be closable, plus R2-002 which rode along free. Fix round **1 of 2 is consumed**;
-    one round remains. The eight `info` rows never selected by `e6f2h2-D12` (R2-003, R2-004,
-    R2-005, R3-003, R4-001, R4-002, R4-003) are untouched and still open, with R4-002 the strongest
-    round-2 candidate. `risk-e6f2h2-012` stays open, deferred to E7 by decision F2.
-    (5) THEN `sddl-qa-review` in `final` mode — the only stage that may mark this change completed.
-    Neither the re-review nor final QA was run by the executor.
+    **FIX ROUND 2 IS PLANNED, NOT EXECUTED.** `plan.md` carries one appended stage, **S11**, whose
+    scope is exactly `RR1-001` + `RR2-001`, plus the S11 row in the Stage Plan table. S1-S10's rows,
+    the fix-round-1 section and the M1-M13 tables are untouched.
+    THE DESIGN QUESTION `e6f2h2-D16` RAISED IS ANSWERED: four mechanisms were enumerated and probed
+    against the real modules; the two-pipeline "trim the raw line first" fix (C-A) is REJECTED — it
+    desynchronises the digest from the full view and, measured, does not even fix the defect, which
+    spans NINE structural positions and 45 combinations rather than the single leading one the
+    ledger row describes. The chosen mechanism (C-D) makes `findings.ts` treat an AC-18 token
+    standing for a whitespace-class code point as the whitespace it replaced, at every structural
+    position: ONE pipeline, ONE predicate shared by both surfaces, one production file, no import
+    added, no spec amendment, AC-18 / AC-3 / AC-12 / AC-19 untouched.
+    ORCHESTRATOR ACTIONS: (1) **Take the `cp-stage-approval-s11` decision** — S11 is code-touching
+    and needs explicit `stage_approval`. (2) **Rule on decision F3**, which is level A but is the
+    one judgement a reviewer could read as scope growth: the repair covers all nine structural
+    positions of the same defect rather than only the leading one the ledger names. The plan's
+    "The defect is wider than the ledger row states" table is the evidence. (3) **Record the new
+    named residue in `open_risks`** — a LEADING non-whitespace control (ESC, NUL, DEL, C1) still
+    prevents recognition; not a round-1 regression, outside AC-19's letter, low reachability,
+    recommended as an E7 hardening story alongside `risk-e6f2h2-012`. This stage does not write that
+    block. (4) Consider amending the `RR1-001` ledger row's wording, which understates the finding's
+    extent. (5) After S11: the scoped re-review over the fix delta for RR1-001 and RR2-001, then
+    `sddl-qa-review` in `final` mode — the only stage that may mark this change completed.
+    PLAN-TIME MEASUREMENT the executor inherits: a probe copy of the tree with the patched
+    `findings.ts` runs the FULL suite at **931 / 49** — the exact baseline, with no assertion moved —
+    plus `tsc --noEmit` clean, `biome check` clean and depcruise at 107 modules / 254 dependencies.
+    So round 2 expects **no named assertion change**; if one appears the executor must STOP and
+    report rather than edit it. Five mutation-verifies (M14-M18) with named expected reds are
+    specified, including the proof that the round-1 interior-control cases stay green under the
+    mutation that reddens the new ones.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T02:45:00Z"
+updated_at: "2026-08-30T15:45:00Z"

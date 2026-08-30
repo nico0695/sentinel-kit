@@ -35,7 +35,7 @@
 | R4-001 | `tui/tui-flow.ts:278` | WARNING | info | The unguarded `await offerFullView(...)` lets a throw from the prompt seam escape into the catch-all, turning a completed+persisted review into exit 1 — violating the module's own documented Property 5 | introduced |
 | R4-002 | `tui/tui-flow.ts:319` (sites `:253`, `:278`) | WARNING | info | The post-run `confirm` never settles on stdin EOF, so the process exits 13 with a raw Node warning dumped over the digest, losing the intended exit code | worsened |
 | R4-003 | `tui/tui-flow.ts:253` + `:320` | SUGGESTION | info | On the persist-failure branch the in-memory markdown is the only copy in existence, yet a decline discards it irrecoverably with no last-copy signal | introduced |
-| **RR1-001** | `tui/findings.ts:72` + `tui/render.ts:296` | **CRITICAL** | **open** | A `[SEV: …]` finding whose marker is immediately preceded by a **leading** U+000B, U+000C, U+000D, U+2028 or U+2029 was recognised before fix round 1 and is now silently deleted from BOTH the counts and the listed blockers — R1-003's own failure mode in a new position | **introduced by fix round 1** |
+| **RR1-001** | `tui/findings.ts:72` + `tui/render.ts:296` | **CRITICAL** | **open** | **WIDENED at round-2 planning, confirmed by orchestrator probe: 45 of 45 combinations (9 structural positions × 5 code points), not the leading position alone.** EVERY `\s` in the matcher is affected — `trim()`, `LIST_OR_QUOTE_PREFIX`'s `\s+`, and the five `\s*` inside `FINDING_LINE` — because each matches a real VT/FF/CR/U+2028/U+2029 but not the printable token that replaces it. A finding carrying one of those five at any of: leading, leading-mixed-with-spaces, before a list marker, after a list marker, inside a quoted bullet, after `[`, before `:`, after `:`, before `]` is silently deleted from BOTH the counts and the listed blockers | **introduced by fix round 1** |
 | RR2-001 | `tui/__test__/result.test.ts:1177-1198` | WARNING | info | The new AC-12(c) case's two `TUI_PALETTE` assertions are byte-identical duplicates of the `PLAIN_PALETTE` ones under the mandated local gate, and its doc-comment claims to assert the colour-after-neutralisation ordering, which it cannot — the sixth instance of this change's recurring vacuity species, and unlabelled where its repaired sibling is labelled `— the ENV-DEPENDENT case` | introduced by fix round 1 |
 
 ## Corroboration
@@ -123,3 +123,37 @@ AC-19's layer 2 does **not** cover it: the failure is at the anchor, not in the 
 new interior-control test in the delta places the control **inside** the remainder; no case in the delta
 puts one before the marker. It violates AC-19's own invariant — "a finding is never silently absent from
 both the counts and the list".
+
+
+## Fix Round 2 — planning correction to RR1-001's extent
+
+The round-2 plan probed rather than reasoned, and the ledger row as first written **understated the
+finding**. Reproduced independently by the orchestrator, pre-round matcher vs shipped pipeline:
+
+```
+1 lider              | ROTO: VT,FF,CR,LS,PS      6 despues de [       | ROTO: VT,FF,CR,LS,PS
+2 lider+espacios     | ROTO: VT,FF,CR,LS,PS      7 antes de :         | ROTO: VT,FF,CR,LS,PS
+3 antes de lista     | ROTO: VT,FF,CR,LS,PS      8 despues de :       | ROTO: VT,FF,CR,LS,PS
+4 despues de lista   | ROTO: VT,FF,CR,LS,PS      9 antes de ]         | ROTO: VT,FF,CR,LS,PS
+5 vineta citada      | ROTO: VT,FF,CR,LS,PS      TOTAL: 45 de 45
+```
+
+This matters for the repair's shape, not just its bookkeeping: **fixing only the position the row's
+prose named would have left eight instances of the identical silent-deletion mode alive — precisely
+how fix round 1 failed**, by closing the interior position and never testing the leading one.
+
+Mechanism chosen (plan decision F4, one of four candidates evaluated against **both** rendering
+surfaces): `findings.ts` treats an AC-18 token standing for a whitespace-class code point as the
+whitespace it replaced, at every structural position where the matcher used `\s`. This keeps one
+pipeline, one input per line, and one predicate shared by the digest and the full view, so the two
+surfaces cannot diverge by construction. The rejected alternatives are recorded in `plan.md` with what
+each did to both surfaces — notably the obvious "trim raw before neutralising" was measured **not to
+fix the defect at all** (it cannot reach a control after a list marker or inside the marker).
+
+### New residue, recorded as a decision rather than left implicit
+
+A **leading** code point of N that is *not* whitespace-class (ESC, NUL, DEL, C1) still prevents
+recognition. This is **not** a round-1 regression — the pre-round matcher dropped it identically — and
+it sits outside AC-19's letter, which speaks about the remainder. Low reachability: quoted attacker
+text lands *after* the marker, and an SGR-coloured line fails to match under every variant because of
+the `[31m` itself. Recommended as an E7 hardening story beside `risk-e6f2h2-012`.

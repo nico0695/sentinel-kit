@@ -1020,6 +1020,13 @@ open_risks:
       for an E7 story. The TUI catch-all is materially lower risk: `run-review.ts:475` converts
       engine faults into a `failure` VALUE rather than a rejection, so engine text does not
       normally reach it.
+      DISPOSITION (orchestrator, from plan decision F2): DEFERRED TO E7 as a named story candidate —
+      not fixed in fix round 1, and deliberately not carried into round 2. e6f2h2-D4 keeps the CLI
+      untouched and `adapters-isolated` forbids the driving -> driving import, so the only in-guard
+      fixes are (i) a second copy of the neutraliser under `cli/render/`, following the
+      Q9/`formatTuiErrorLine` precedent, which the plan recommends, or (ii) moving the primitive to
+      `src/core/shared/`, which is level C and out of bounds under risk-e6f2h2-004. `[E6.F2.H1]`'s
+      catch-all carries the same exposure and rides along in the same future story.
     severity: low
 qa_summary:
   mode: stage

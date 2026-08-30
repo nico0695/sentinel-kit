@@ -23,7 +23,7 @@ complexity_assessment:
     than structured domain data. Risk low-medium.
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
-lifecycle_status: reviewing
+lifecycle_status: completed
 current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
@@ -1109,6 +1109,32 @@ checkpoints:
         (e6f2h2-D16), and D17 rules the nine-position repair to be that same id rather than growth.
       responded_at: "2026-08-30T03:56:00Z"
     resolved_at: "2026-08-30T03:56:00Z"
+  - id: cp-final-review
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA returned `pass_with_warnings`: 21/21 ACs independently re-verified, both gates
+      measured (check clean — 107 modules / 254 dependencies; `npm test` 995/49; adapters 646/28
+      identical under both colour envs; `src/core` and `src/main` empty across the whole change),
+      the ledger's verified rows independently reproduced, and no eighth instance of the change's
+      recurring vacuity species. It WITHHELD `completed` and set `reviewing`, because the fix budget
+      is exhausted and "ship with these named residuals" is a human acceptance decision, not a
+      stage's. Residuals: 14 ledger info rows, three named accepted risks (`-011` printable-text
+      spoofing as a non-goal, `-012` the CLI's `runs show` deferred to E7, `-013` a leading
+      non-whitespace-class control), and the new `risk-e6f2h2-014` — the story's headline
+      behavioural change (the process now WAITS after a run) has no process-level test anywhere,
+      which is exactly where accepted info row R4-002 (stdin EOF -> exit 13 over the digest, graded
+      `worsened`) lives.
+    question: >-
+      Accept the change with these named residuals and close it, or hold?
+    free_input_allowed: true
+    created_at: "2026-08-30T20:10:00Z"
+    response:
+      free_text: >-
+        Accepted: mark completed and open the PR; carry risk-014 and R4-002 into [E7.F1.H1]. Also
+        correct the README status line in this PR.
+      responded_at: "2026-08-30T20:15:00Z"
+    resolved_at: "2026-08-30T20:15:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -1363,6 +1389,22 @@ decisions:
       residue (leading NON-whitespace-class members of N) was recorded as risk-e6f2h2-013 with an
       explicit not-a-regression finding and an E7 disposition.
     recorded_at: "2026-08-30T03:50:00Z"
+  - id: e6f2h2-D18
+    checkpoint_id: cp-final-review
+    selected_option_id: accept-and-open-pr
+    free_text: "Aceptar y abrir el PR; corregir el README con una línea"
+    rationale: >-
+      Change accepted and closed at `pass_with_warnings`. No residual is severe, every one carries a
+      recorded disposition rather than being an omission, and the single medium (risk-e6f2h2-014,
+      the process-level validation blind spot) is precisely what `[E7.F1.H1]`'s E2E smoke exists to
+      cover — closing it here would mean building that story early. No third fix round: the protocol
+      caps the lineage at two, and the QA explicitly found nothing further worth fixing in this
+      change.
+      The user additionally authorised a ONE-LINE README status correction in this PR. It was false
+      on two counts — it claimed only E0 was complete and that the real engines were still being
+      spiked, when they landed at E4 — and the PR already touches CLAUDE.md for the same reason. The
+      full user-facing README rewrite stays with `[E7.F2.H1]`.
+    recorded_at: "2026-08-30T20:15:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

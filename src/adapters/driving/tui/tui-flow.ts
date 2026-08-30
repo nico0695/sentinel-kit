@@ -8,7 +8,7 @@
  * returning early on cancel (exit 0), empty state (exit 0) or error (throw →
  * one friendly line, exit 1).
  *
- * Four properties are load-bearing:
+ * Five properties are load-bearing:
  *
  * 1. **No cascade lives here.** `resolveReviewRequest` (core `run`, the CLI's
  *    D5) owns the registry lookup, the flag → repo → global precedence and
@@ -217,7 +217,7 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
     // D13 mirror: the review itself is finished — minutes of engine work —
     // and its outcome must not be swallowed because the record could not be
     // written. No `runDir` key at all: nothing was written, so the digest
-    // renders `-` rather than fabricating a directory (AC-7).
+    // renders `-` rather than fabricating a directory (`[E6.F2.H2]` AC-7).
     //
     // `exactOptionalPropertyTypes` is on, so every optional part is a
     // conditional spread — `verdict: undefined` would not typecheck.
@@ -228,8 +228,9 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
         ? {
             failure: {
               stage: result.failure.stage,
-              // AC-6: the raw throwable reduced to the one line the persisted
-              // path already carries in `record.failure.message`.
+              // `[E6.F2.H2]` AC-6: the raw throwable reduced to the one
+              // line the persisted path already carries in
+              // `record.failure.message`.
               message: formatTuiErrorLine(result.failure.error),
             },
           }
@@ -249,15 +250,16 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
 
     // Spec A6: offered here too — this is the one branch where the engine
     // output exists nowhere on disk. The exit code stays 1 whatever the
-    // answer (AC-10).
+    // answer (`[E6.F2.H2]` AC-10).
     await offerFullView(io, prompter, result.engineOutput);
 
     return 1;
   }
 
   // The record is what was actually written, so it — not the in-memory
-  // result — is what the digest reports (AC-5: the findings section and the
-  // `Full review` pointer are keyed on `engineOutput`, never on the state).
+  // result — is what the digest reports (`[E6.F2.H2]` AC-5: the findings
+  // section and the `Full review` pointer are keyed on `engineOutput`, never
+  // on the state).
   const { record } = persisted;
   const digest: TuiResultDigest = {
     state: record.state,
@@ -273,7 +275,7 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
     io.stdout(line);
   }
 
-  // AC-8/A6: offered after the record was written, on the data the record
+  // `[E6.F2.H2]` AC-8/A6: offered after the record was written, on the data the record
   // carries. Property 5: it cannot change what follows.
   await offerFullView(io, prompter, record.engineOutput);
 

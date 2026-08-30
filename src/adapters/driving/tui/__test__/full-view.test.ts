@@ -17,11 +17,17 @@
  * - **It hides nothing.** A 500-line output is emitted in full, with no
  *   pager, no truncation marker and no second prompt (AC-13).
  *
- * The palette invariants at the end are permanent and env-independent by
- * construction: they assert relations between `TUI_PALETTE`, `PLAIN_PALETTE`
- * and `stripAnsi` that hold identically under `NO_COLOR=1` and
- * `FORCE_COLOR=1`, which is what makes the AC-14 dual run meaningful rather
- * than a pair of runs that happen to agree.
+ * The palette block at the end proves AC-14's "colour is decoration only"
+ * against the deterministic `MARKED` palette, not against the ambient
+ * `TUI_PALETTE` (AC-20, ledger R3-002). The earlier version asserted that
+ * the *real* palette decorates and that stripping undoes it, and claimed to
+ * be env-independent; it was the opposite. With `CI` and `FORCE_COLOR`
+ * unset — the mandated local `npm test` gate — `picocolors` binds all four
+ * roles to the global `String`, so every one of those assertions reduced to
+ * `x === x` and would have passed just as well against `PLAIN_PALETTE`. The
+ * rewritten cases decorate unconditionally and therefore mean the same thing
+ * under `NO_COLOR=1` and `FORCE_COLOR=1`. Exactly one case still names the
+ * real palette, and it is labelled as the env-dependent one.
  */
 
 import { describe, expect, it } from "vitest";
@@ -43,7 +49,9 @@ import {
   cancel,
   createScriptedPrompter,
   createTuiTestDeps,
+  MARKED,
   stripAnsi,
+  stripMarks,
 } from "./tui-test-doubles.js";
 
 const RUN_DIR = "/tmp/sentinel-test/runs/owner__repo/20260829-000000-abc";
@@ -461,19 +469,37 @@ describe("no pager and no truncation (AC-13)", () => {
   });
 });
 
-describe("colour is decoration, whatever the terminal decided (AC-14)", () => {
+describe("colour is decoration, whatever the terminal decided (AC-14, AC-20)", () => {
   const ROLES = ["good", "warn", "bad", "muted"] as const;
 
-  // Everything below is an invariant BETWEEN the palettes and `stripAnsi`,
-  // never an assertion about the ambient decision `picocolors` made at load
-  // time. That is what lets the same file pass identically under NO_COLOR=1
-  // and FORCE_COLOR=1 — the AC-14 dual run — instead of passing under one
-  // and being vacuous or red under the other.
+  // What this block proves, and what it deliberately does not.
+  //
+  // "Colour is decoration only" has two halves: the renderer really uses the
+  // palette it is handed, and removing the decoration loses nothing. Both
+  // halves need a palette that decorates. `TUI_PALETTE` is not one under the
+  // mandated local gate: `picocolors` decides once at load time and, with
+  // `CI` and `FORCE_COLOR` unset, binds `good`/`warn`/`bad`/`muted` to the
+  // global `String`, so `TUI_PALETTE.good("x") === "x"` and the whole block
+  // used to assert nothing (R3-002). `MARKED` decorates in every
+  // environment, so these cases carry the same weight locally and in CI.
+  //
+  // Each case therefore pairs a POSITIVE assertion — this exact decorated
+  // string is present — with the round-trip. The positive half is what a
+  // mutation to `PLAIN_PALETTE` turns red (M12); the round-trip alone would
+  // survive it, which is precisely how the old block passed on the defect.
+  //
+  // The last case is the exception and says so: it is the env-dependent one,
+  // meaningful only where colour is actually on.
 
   it.each(ROLES)(
-    "stripping the real palette's %s role returns the input",
+    "the marking palette's %s role decorates, and stripping undoes it",
     (role) => {
-      expect(stripAnsi(TUI_PALETTE[role]("sentinel"))).toBe("sentinel");
+      const decorated = MARKED[role]("sentinel");
+
+      // Present: decoration really happened, with this exact shape.
+      expect(decorated).toBe(`<${role}>sentinel</${role}>`);
+      // Absent: nothing of it survives the strip, and nothing else is lost.
+      expect(stripMarks(decorated)).toBe("sentinel");
     },
   );
 
@@ -490,7 +516,50 @@ describe("colour is decoration, whatever the terminal decided (AC-14)", () => {
     );
   });
 
-  it("renders the digest identically once the real palette is stripped", () => {
+  it("renders the digest identically once the decoration is stripped", () => {
+    const digest = {
+      state: "engine-error",
+      failure: { stage: "parse", message: "no verdict found" },
+      engineOutput: MARKDOWN,
+      runDir: RUN_DIR,
+    } as const;
+
+    const decorated = formatResultDigest(digest, MARKED);
+
+    // Present: the renderer used the palette it was given, on the facts
+    // AC-14 names — the state, the failure line, and the listed blocker.
+    expect(decorated[0]).toBe("Review result: <bad>engine-error</bad>");
+    expect(decorated[2]).toBe("Failure: <bad>parse — no verdict found</bad>");
+    expect(
+      decorated.some((line) => line.includes("<bad>[blocker]</bad>")),
+    ).toBe(true);
+    // Absent: once the decoration is removed, nothing distinguishes it from
+    // the plain render — every fact colour carried is still plain text.
+    expect(decorated.map(stripMarks)).toEqual(
+      formatResultDigest(digest, PLAIN_PALETTE),
+    );
+  });
+
+  it("renders the full view identically once the decoration is stripped", () => {
+    const decorated = formatFullView(MARKDOWN, MARKED);
+
+    // Present: the recognized findings are tinted by severity — blocker as
+    // `bad`, minor as `muted` — and the whole source line is decorated.
+    expect(decorated[3]).toBe(`<bad>${MARKDOWN_LINES[3]}</bad>`);
+    expect(decorated[4]).toBe(`<muted>${MARKDOWN_LINES[4]}</muted>`);
+    // Absent: no decoration survives the strip, and the source lines come
+    // back byte for byte — including the prose lines nothing tinted.
+    expect(decorated.map(stripMarks)).toEqual(MARKDOWN_LINES);
+  });
+
+  it("keeps the real palette strippable — the ENV-DEPENDENT case", () => {
+    // Deliberately kept, deliberately labelled. This is the one case whose
+    // strength depends on the ambient decision: where colour is off it is a
+    // no-op comparison, and where it is on (`FORCE_COLOR=1`, or any run that
+    // sets `CI`) it is the real check that `stripAnsi` removes exactly what
+    // `TUI_PALETTE` added and no more. It is what makes the AC-14 dual run
+    // meaningful; it is NOT what proves decoration, which is the deterministic
+    // work above.
     const digest = {
       state: "engine-error",
       failure: { stage: "parse", message: "no verdict found" },
@@ -500,12 +569,6 @@ describe("colour is decoration, whatever the terminal decided (AC-14)", () => {
 
     expect(formatResultDigest(digest, TUI_PALETTE).map(stripAnsi)).toEqual(
       formatResultDigest(digest, PLAIN_PALETTE),
-    );
-  });
-
-  it("renders the full view identically once the real palette is stripped", () => {
-    expect(formatFullView(MARKDOWN, TUI_PALETTE).map(stripAnsi)).toEqual(
-      formatFullView(MARKDOWN, PLAIN_PALETTE),
     );
     expect(formatFullView(MARKDOWN, TUI_PALETTE).map(stripAnsi)).toEqual(
       MARKDOWN_LINES,

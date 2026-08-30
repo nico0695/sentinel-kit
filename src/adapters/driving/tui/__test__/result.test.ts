@@ -41,7 +41,7 @@ import type {
   RunReviewResult,
   TerminalState,
 } from "../../../../core/run/index.js";
-import { PLAIN_PALETTE, TUI_PALETTE, type TuiPalette } from "../colors.js";
+import { PLAIN_PALETTE, TUI_PALETTE } from "../colors.js";
 import {
   formatFullView,
   formatResultDigest,
@@ -53,7 +53,9 @@ import {
   answer,
   createScriptedPrompter,
   createTuiTestDeps,
+  MARKED,
   stripAnsi,
+  stripMarks,
 } from "./tui-test-doubles.js";
 
 const RUN_DIR = "/tmp/sentinel-test/runs/owner__repo/20260829-000000-abc";
@@ -441,25 +443,6 @@ const parseFailure: RunFailureRecord = {
   stage: "parse",
   message: "no verdict found in the engine output",
 };
-
-/**
- * Role markers instead of ANSI. A palette whose output is readable makes two
- * things assertable that `PLAIN_PALETTE` cannot: that the renderer really
- * uses the palette it is given (otherwise every plain assertion here would
- * pass vacuously), and that stripping the decoration reproduces the plain
- * render exactly — "colour is decoration only", as an equality.
- */
-const MARKED: TuiPalette = {
-  good: (text) => `<good>${text}</good>`,
-  warn: (text) => `<warn>${text}</warn>`,
-  bad: (text) => `<bad>${text}</bad>`,
-  muted: (text) => `<muted>${text}</muted>`,
-};
-
-/** Undoes {@link MARKED}. */
-function stripMarks(line: string): string {
-  return line.replace(/<\/?(?:good|warn|bad|muted)>/g, "");
-}
 
 /** The `result` text of one captured `claude-code` fixture. */
 function fixtureResult(file: string): string {

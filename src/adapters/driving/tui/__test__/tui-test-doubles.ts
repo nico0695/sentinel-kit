@@ -9,6 +9,7 @@
  * emulation, no `@clack/prompts` anywhere in the tests.
  */
 
+import type { TuiPalette } from "../colors.js";
 import type {
   PromptOutcome,
   TuiDeps,
@@ -62,6 +63,51 @@ export function createCapturingTuiIo(): CapturingTuiIo {
 export function stripAnsi(text: string): string {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: the ESC (0x1b) control byte is the deliberate target — SGR sequences begin with it by definition.
   return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/**
+ * A deterministic palette that marks its roles instead of colouring them
+ * (`[E6.F2.H2]`, #39; AC-14, AC-20).
+ *
+ * Two things become assertable that neither `PLAIN_PALETTE` nor the ambient
+ * `TUI_PALETTE` can prove: that a renderer really uses the palette it is
+ * given, and that stripping the decoration reproduces the plain render
+ * exactly — "colour is decoration only", as an equality rather than a hope.
+ *
+ * **Why not the real palette.** `picocolors` decides once at load time from
+ * `NO_COLOR` / `FORCE_COLOR` / TTY / `CI`, and when it decides OFF it binds
+ * all four roles to the global `String` (`picocolors.js`,
+ * `let f = enabled ? formatter : () => String`). Under the mandated local
+ * gate — `npm test` with `CI` and `FORCE_COLOR` unset — `TUI_PALETTE.good`
+ * therefore *is* the identity, so any assertion of the form "the real
+ * palette decorates, and stripping undoes it" is a tautology there. That was
+ * ledger finding R3-002. This palette decorates unconditionally, so the same
+ * assertion means the same thing in every environment.
+ *
+ * **Why not `pc.createColors(true)`.** It would put a second `picocolors`
+ * import inside `src/`, and the confinement rule AC-14 states is checked as
+ * `grep -rEn '^import .*"picocolors"' src/` returning exactly one hit. The
+ * test tree lives at `src/adapters/driving/tui/__test__/`, inside `src/`, so
+ * that grep would return 2 and the gate would fail (decision F1a). The
+ * `TuiPalette` import above is deliberately **type-only**: it is erased under
+ * `verbatimModuleSyntax`, so this module adds no runtime load of `colors.js`
+ * and therefore none of `picocolors` either.
+ *
+ * Shared here rather than copied into each suite: `result.test.ts` and
+ * `full-view.test.ts` are the exact two files R2-005 flagged for duplicating
+ * a helper, so a per-file copy would reproduce that defect inside the round
+ * convened to remove it (decision F1a-bis).
+ */
+export const MARKED: TuiPalette = {
+  good: (text) => `<good>${text}</good>`,
+  warn: (text) => `<warn>${text}</warn>`,
+  bad: (text) => `<bad>${text}</bad>`,
+  muted: (text) => `<muted>${text}</muted>`,
+};
+
+/** Undoes {@link MARKED}. The inverse of the decoration, and nothing else. */
+export function stripMarks(line: string): string {
+  return line.replace(/<\/?(?:good|warn|bad|muted)>/g, "");
 }
 
 /** Shorthand for scripting an answered prompt. */

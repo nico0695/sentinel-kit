@@ -312,10 +312,10 @@ stages:
       `src/core/**` and `risk-e6f2h2-004`'s standing guard is restated in the artifact.
       Planning only: no `src/**`, test or config file was touched, and no commit was made.
   sddl-executor:
-    status: in_progress
+    status: completed
     started_at: "2026-08-29T18:00:00Z"
-    completed_at: "2026-08-29T22:35:00Z"
-    last_updated_at: "2026-08-30T02:20:00Z"
+    completed_at: "2026-08-30T02:45:00Z"
+    last_updated_at: "2026-08-30T02:45:00Z"
     notes: >-
       ALL SEVEN planned stages are executed: S1, the S2/S3 batch, S4, S5, S6 and S7 are DONE. S1 (committed `b0a3a04`): picocolors
       pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
@@ -552,6 +552,70 @@ stages:
       identical. No new risk; `risk-e6f2h2-012` unchanged and still open (the CLI surface is out of scope by
       decision F2). `risk-e6f2h2-004`'s level-C guard was never approached. QA handoff deferred — the scoped
       re-review over the fix delta comes after S10, then final QA. No git side effects. S10 was NOT started.
+
+      **S10 (uncommitted) closes fix round 1 — verification repairs and comment hygiene, ZERO production
+      behaviour change.** Approved by `cp-stage-approval-s8-s10` / `e6f2h2-D12` + `e6f2h2-D13` + `e6f2h2-D14`.
+      Changed files: exactly the FIVE plan.md names, all under `src/adapters/driving/tui/` — MOD
+      `__test__/tui-test-doubles.ts` (`MARKED` and `stripMarks` PROMOTED here and exported, with a type-only
+      `TuiPalette` import so no runtime `colors.js`/`picocolors` load is added), MOD `__test__/result.test.ts`
+      (its local copies DELETED and imported instead; the now-unused `type TuiPalette` dropped), MOD
+      `__test__/full-view.test.ts` (the six tautological assertions rewritten against `MARKED`, one
+      explicitly-labelled env-dependent case kept, and BOTH lying doc comments corrected — the file header
+      and the describe block note), NEW `__test__/palette-wiring.test.ts` (the `vi.mock("../colors.js", ...)`
+      suite, three cases, one per call site), MOD `tui-flow.ts` (COMMENTS ONLY). Nothing else moved: no
+      `src/core/**`, no `src/main/**`, no `src/adapters/driven/**`, no config/doc/fixture/harness file, and
+      none of `engine-text.ts`, `findings.ts`, `render.ts`, `colors.ts`, `index.ts`, `tui-deps.ts`,
+      `clack-prompter.ts`. R3-002 fixed with `MARKED`, NOT `pc.createColors(true)` (decision F1a): the
+      design's stated reason for the alternative ("the test tree is not `src/`") is FACTUALLY WRONG — the TUI
+      suites live at `src/adapters/driving/tui/__test__/`, inside `src/` — so option 2 would take this
+      round's own mandated gate from 1 to 2 and fail it; option 1 was the only admissible choice, not merely
+      the preferred one. R3-001 fixed with `vi.mock` in its own file (decision F1b), because `vi.mock` is
+      hoisted file-wide and inside `full-view.test.ts` it would neuter that file's own palette comparisons.
+      Evidence, all measured: full `npm test` **931 passed (931) / 49 files** (927 + 1 + 3; +1 from splitting
+      the fused identity cases so the env-dependent one is separate and labelled, +3 the new suite; ZERO
+      tests deleted, so the S5 justification rule does not engage); `npm run check` **clean** (biome 163
+      files no fixes, tsc silent, depcruise 107 modules / 254 dependencies, no violations); adapters project
+      **582 cases IDENTICAL** under `NO_COLOR=1` and `FORCE_COLOR=1`, both 0 failures, sorted case lists
+      byte-equal (578 + 4, AC-14); `git diff --stat src/core` and `src/main` both EMPTY (AC-16);
+      statement-level picocolors grep still **1** (`colors.ts:34`; the naive grep is 17). BOTH mutation
+      families were RUN and OBSERVED, then reverted. **M12 was run in TWO halves so the contrast is on
+      record**: the PRE-FIX block, mutated `TUI_PALETTE` -> `PLAIN_PALETTE` before any edit, went **11 passed
+      / 0 failed** — the old assertions cannot tell the palettes apart at all, which IS the defect; the
+      POST-FIX block, mutated `MARKED` -> `PLAIN_PALETTE`, went **6 failed / 6 passed**, the six failures
+      being exactly the six rewritten assertions (`expected 'sentinel' to be '<good>sentinel</good>'` and its
+      three role siblings, `expected 'Review result: engine-error' to be 'Review result:
+      <bad>engine-error</bad>'`, and the full-view blocker line). **M13 was run as THREE separate mutations,
+      one per call site** (`:243`, `:274`, `:331` — shifted one to two lines from plan.md's `:242`/`:272`/
+      `:329` by this stage's own comment rewraps), each with `PLAIN_PALETTE` added to the import so the
+      mutation compiles: every run gave **1 failed / 2 passed** and a DIFFERENT case each time, matching its
+      own site by name, so no call site is covered by accident. The `tui-flow.ts` comment-only constraint was
+      verified MECHANICALLY two independent ways: (A) `git diff -U0` filtered to added/removed lines with
+      signs and indentation stripped -> 16 changed lines, **0 non-comment**; (B) HEAD and working tree both
+      run through the TypeScript compiler's `transpileModule` with `removeComments: true` -> **6358 bytes /
+      177 lines on both sides, diff empty, sha256 e38170ab555cfcae18a6aac2586211ff43764dbcea8b8739395040456aa1bb63
+      on both**. Check B was run THREE times and the two vacuous attempts are recorded in execution-log.md
+      rather than dropped: the first (esbuild with a file argument, which esbuild rejects) and the second (a
+      Node script importing `typescript` from the scratchpad, where it does not resolve) both produced 0
+      bytes on both sides and "passed" while proving nothing; both were caught by paired sanity counters on
+      the output, the same negative-assertion pairing rule turned on the verification itself. TWO DEVIATIONS.
+      **(1) level B, FOR THE ORCHESTRATOR**: a FIFTH bare `AC-8` citation at `tui-flow.ts:278`
+      (`// AC-8/A6: offered after the record was written...`, directly above `await offerFullView(...)`) is
+      arguably an `[E6.F2.H2]` citation of exactly the species R2-001 flagged, and a bare `AC-8` also resolves
+      to a live H1 criterion. It was NOT in the ledger's enumerated four nor in AC-21's normative sentence, so
+      it was REPORTED rather than fixed — qualifying it unilaterally would widen a bounded round, hiding it
+      would leave a defect for the re-review to rediscover. Recommendation: qualify as
+      "`[E6.F2.H2]` AC-8/A6", a one-token comment edit. The six citations at `:287`-`:325` are NOT in the same
+      position: they sit inside `offerFullView`'s doc comment, whose opening line already scopes the block.
+      **(2) level A, authorship `claude`**: the marking palette inside `palette-wiring.test.ts`'s `vi.mock`
+      factory is declared INLINE rather than importing the promoted `MARKED` — the factory runs before the
+      doubles module is evaluated, so it must be self-contained; the tokens are deliberately distinct
+      (`<wired-good>` vs `<good>`) and the reason is written into the file header. R3-002, R3-001, R2-001 and
+      R2-002 are CLOSED. R2-005 proper (the `fixtureMarkdown` duplication) is untouched and still open — not
+      selected by `e6f2h2-D12`. No new risk; `risk-e6f2h2-012` unchanged and still open (decision F2 defers
+      the CLI surface to E7). `risk-e6f2h2-004`'s level-C guard was never approached. QA handoff deferred —
+      the scoped re-review over the fix delta comes next, then final QA. No git side effects. **Fix round 1
+      is COMPLETE: S8, S9 and S10 all executed, all six selected ledger ids closed.** A fix round 2, if ever
+      spent, would reopen this stage.
   sddl-qa-review:
     status: completed
     mode: stage
@@ -1029,6 +1093,25 @@ decisions:
       Level A: technical, reversible, aligned with the acceptance criterion. Reopening a spec stage
       for one contradicted sentence would be disproportionate ceremony.
     recorded_at: "2026-08-30T01:05:00Z"
+  - id: e6f2h2-D15
+    checkpoint_id: cp-stage-approval-s8-s10
+    selected_option_id: qualify-the-fifth-citation
+    rationale: >-
+      S10 reported a FIFTH bare `AC-8` at `tui-flow.ts:278` and escalated it as level B rather than
+      widening scope on its own — the right call, since the fix-round rule is "exactly the listed
+      ids" and the ledger enumerated four citations.
+      RULING: qualify it. This is not scope widening but AC-21 compliance. AC-21's verification
+      column requires that a grep show "every H2 citation qualified and every remaining bare number
+      resolving to a live H1 criterion". The `:278` comment reads "offered after the record was
+      written", so its `AC-8` is H2's opt-in-full-view criterion — while 71 lines above it,
+      `:207`'s "persist exactly once (AC-8)" is H1's persistence criterion, which AC-21 explicitly
+      permits to stay bare. Two `AC-8` citations in one file denoting different stories is precisely
+      the collision R2-001 describes, so leaving it would make AC-21 fail its own stated verifier.
+      Level A, one comment token, zero behaviour. The orchestrator applied it inline (single file,
+      exact known text) and re-verified: the tui-flow.ts diff remains mechanically comment-only,
+      and every surviving bare citation either sits inside `offerFullView`'s doc-comment — whose
+      opening line already scopes the block to `[E6.F2.H2]` — or denotes a live H1 criterion.
+    recorded_at: "2026-08-30T02:10:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-
@@ -1200,35 +1283,38 @@ qa_summary:
   reported_at: "2026-08-29T21:05:00Z"
   report_path: sdd-lite/openspec/changes/e6-f2-h2-result-rendering/qa-report.md
 next_action:
-  kind: stage_approval
-  target: sddl-executor
+  kind: review
+  target: sddl-code-review
   summary: >-
-    **S9 IS DONE (uncommitted). The next stage to approve is S10.** Fix round 1 of 2 is two thirds
-    executed, and S9 is the stage that actually CLOSES the three CRITICALs: R1-001 (the finding
-    text printed with no prompt before it), R1-002 (the byte-verbatim full view) and R1-003 (an
-    interior control deleting a finding) are all fixed inside the TUI adapter, in five modified
-    files, with `npm run check` clean, the full suite at **927 / 48**, the adapters project
-    **578 / 27 identical** under `NO_COLOR=1` and `FORCE_COLOR=1`, `src/core` and `src/main` diffs
-    empty, the statement-level picocolors grep at 1, and all four mutation-verifies (M8, M9, M10,
-    M11 including its permanent-guard decay probe) observed red and reverted. AC-2, AC-3, AC-6,
-    AC-12, AC-13 and AC-19 are satisfied; Q-F1's real-fixture AC-4 case is in.
-    ORCHESTRATOR ACTIONS: (1) commit S9; (2) note the three level-A deviations S9 recorded, none of
-    which needs a ruling — chiefly that M8 reddens THREE of the four `it.each` rows because ESC is
-    not a JS line terminator, which matches `design.md` §A-1.1 and `spec.md` AC-19 (both say three
-    `NO MATCH` inputs) and makes the handoff's "four" the slip, not the test; (3) approve **S10**.
-    S10 — verification repairs and comment hygiene, zero production behaviour change: the six
-    tautological palette assertions rewritten against `MARKED` (promoted to `tui-test-doubles.ts`
-    and imported by both suites), NEW `__test__/palette-wiring.test.ts` using
-    `vi.mock("../colors.js", ...)` to prove all three `TUI_PALETTE` call sites in `tui-flow.ts`,
-    and the four bare AC citations in `tui-flow.ts` qualified (plus R2-002's "Four properties"
-    header over a five-item list). Validation: full `npm test` at or above **927 / 49** (S9's
-    additions are now part of the floor), `npm run check`, the dual-env adapters run, `src/core`
-    and `src/main` diffs empty, the statement-level picocolors grep still 1 — which is the reason
-    `MARKED` beats `pc.createColors(true)` (decision F1a) — and the `tui-flow.ts` diff checked
-    mechanically to be comment-only. Mutation-verify M12 and M13 (three separate M13 mutations,
-    one per call site).
-    After S10: a scoped re-review over the fix delta, checked id by id against
-    `review-ledger.md` (round 1 of 2 consumed), then `sddl-qa-review` in `final` mode — the only
-    stage that may mark this change completed.
+    **S10 IS DONE (uncommitted). FIX ROUND 1 IS COMPLETE — all three stages executed, all six
+    selected ledger ids closed.** S8 landed the neutralisation primitive, S9 closed R1-001, R1-002
+    and R1-003, and S10 closed R3-002, R3-001, R2-001 and R2-002 with zero production behaviour
+    change. Gate at S10's close: `npm run check` clean, full suite **931 / 49** (927 + 1 + 3, no
+    test deleted), adapters project **582 cases identical** under `NO_COLOR=1` and `FORCE_COLOR=1`
+    with 0 failures on both, `src/core` and `src/main` diffs empty, statement-level picocolors grep
+    still 1. Mutations observed, not assumed: **M12 in two halves** — the PRE-FIX assertions passed
+    11/11 under the same `PLAIN_PALETTE` mutation that turns all six REWRITTEN ones red, which is
+    the repair's proof — and **M13 as three separate per-site mutations**, each giving 1 failed /
+    2 passed on a different, correctly-named case. The `tui-flow.ts` diff was proved comment-only
+    two independent ways (all 16 changed lines are comment lines; comment-stripped bytes identical,
+    sha256 e38170ab...), after two vacuous verification attempts were caught by paired sanity
+    counters and redone.
+    ORCHESTRATOR ACTIONS: (1) commit S10; (2) RULE ON ONE LEVEL-B ITEM — a fifth bare `AC-8`
+    citation at `tui-flow.ts:278` (`// AC-8/A6: offered after the record was written...`, directly
+    above `await offerFullView(...)`) is arguably an H2 citation of exactly the species R2-001
+    flagged, but it is not in the ledger's four nor in AC-21's normative sentence, so S10 reported
+    it instead of widening a bounded round. Recommended: qualify it as "`[E6.F2.H2]` AC-8/A6", a
+    one-token comment edit, cheapest taken before the re-review sees it. (3) Note S10's one level-A
+    deviation, which needs no ruling: the marking palette inside `palette-wiring.test.ts`'s
+    `vi.mock` factory is declared inline rather than importing the promoted `MARKED`, because the
+    factory runs before the doubles module is evaluated and must be self-contained.
+    (4) Route the **scoped re-review over the fix delta** (`ab32082..HEAD` once S10 is committed),
+    checked id by id against `review-ledger.md`: R1-001, R1-002, R1-003, R3-002, R3-001, R2-001
+    should all be closable, plus R2-002 which rode along free. Fix round **1 of 2 is consumed**;
+    one round remains. The eight `info` rows never selected by `e6f2h2-D12` (R2-003, R2-004,
+    R2-005, R3-003, R4-001, R4-002, R4-003) are untouched and still open, with R4-002 the strongest
+    round-2 candidate. `risk-e6f2h2-012` stays open, deferred to E7 by decision F2.
+    (5) THEN `sddl-qa-review` in `final` mode — the only stage that may mark this change completed.
+    Neither the re-review nor final QA was run by the executor.
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T02:20:00Z"
+updated_at: "2026-08-30T02:45:00Z"

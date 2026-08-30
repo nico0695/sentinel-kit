@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-plan
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -710,6 +710,31 @@ checkpoints:
         assertions), R2-001 (AC-numbering collision) and R3-001 (flow palette coverage).
       responded_at: "2026-08-29T23:35:00Z"
     resolved_at: "2026-08-29T23:35:00Z"
+  - id: cp-stage-approval-s8-s10
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Fix round 1 execution, all three stages authorised to run in sequence without pausing between
+      them. S8 — the neutralisation primitive alone (NEW `tui/engine-text.ts` zero-import, NEW
+      `__test__/engine-text.test.ts`); nothing imports it, so the contract is proved before any call
+      site moves. S9 — the rewiring as one atomic unit (`findings.ts`, `render.ts` and three suites),
+      because `tsc` typechecks the test files and the `extractFindings` signature change breaks them
+      together; order `split -> neutralise -> match -> colour` is load-bearing. S10 — non-vacuous
+      verification and comment hygiene, zero production behaviour change. Touches code: yes; S9 is
+      the only one that changes observable behaviour. Gate to restore: `npm run check` clean,
+      `npm test` >= 856/47 rising to >= 856/49, adapters identical under `NO_COLOR=1` and
+      `FORCE_COLOR=1`, empty `src/core` and `src/main` diffs, statement-level picocolors grep = 1.
+      Mutation-verifies M6-M13 with their expected red, plus the plan's new negative-assertion
+      pairing rule.
+    question: >-
+      Approve S8 alone, or S8-S10 in sequence? And Q-F1 (level B, plan default DECLINE): should S9
+      also add an AC-4 degradation case driven by the real `noisy-output.json` fixture?
+    free_input_allowed: true
+    created_at: "2026-08-30T00:20:00Z"
+    response:
+      free_text: "S8, S9 y S10 de corrido. Q-F1: sí, sumarlo a S9."
+      responded_at: "2026-08-30T00:25:00Z"
+    resolved_at: "2026-08-30T00:25:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -873,6 +898,22 @@ decisions:
       a fix stage seeded from the confirmed ledger ids; then stage_approval; then sddl-executor.
       Confirmed severe findings never trigger direct edits. Fix round 1 of 2.
     recorded_at: "2026-08-29T23:35:00Z"
+  - id: e6f2h2-D13
+    checkpoint_id: cp-stage-approval-s8-s10
+    selected_option_id: approve-s8-s10-sequential-plus-qf1
+    free_text: "S8, S9 y S10 de corrido; Q-F1 aceptada"
+    rationale: >-
+      Execution authorised for the whole fix round without a pause between stages; the orchestrator
+      still validates each stage's gate before starting the next, and stops on any blocker.
+      Q-F1 ACCEPTED, overriding the plan's default decline. The orchestrator measured the deciding
+      fact rather than arguing it: `fixtures/claude-code/noisy-output.json` yields 0 recognised
+      `[SEV: ...]` findings against `valid-verdict.json`'s 2, so the AC-4 degradation path is the
+      COMMON real path among the captured fixtures, yet it is asserted only against a hand-written
+      string. That is the same vacuity species D12 widened this round for — an assertion whose input
+      is not the input reality produces — so excluding it on scope-discipline grounds would preserve
+      the letter of the fix-stage rule while leaving its purpose unserved. Added to S9's stated
+      scope so the scoped re-review sees it as in-scope rather than as drift.
+    recorded_at: "2026-08-30T00:25:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

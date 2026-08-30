@@ -6,26 +6,29 @@
 - project_root: /home/user/sentinel-kit
 - runtime_root: ./sdd-lite
 - generated_at: 2026-08-01T13:14:29Z
-- last_refreshed_at: 2026-08-28T00:00:00Z
-- generated_by: sddl-init (surgical refresh by orchestrator, post-E6.F1.H1)
+- last_refreshed_at: 2026-08-29T15:00:00Z
+- generated_by: sddl-init (surgical refresh by orchestrator, post-E6.F2.H1)
 
 ## Stack Summary
 
-> E0 through E6.F1.H2 have landed on `main` @ `ac7a442` (PR #74). The stack below is **observed** in the working tree.
+> E0 through E6.F2.H1 have landed on `main` @ `59b806e` (PR #75). The stack below is **observed** in the working tree.
 > Package: `@nico0695/sentinel` (ESM, bin `sentinel` + `snt`).
 
 | Area | Value | Evidence |
 |---|---|---|
 | languages | typescript 5.9.3 | `package.json` devDependencies; `tsconfig.json` at root |
-| frameworks | none — CLI application (`commander` installed; `@clack/prompts` still planned for the E6 TUI) | `docs/setup-tecnico-sentinel.md` §4; `package.json` dependencies |
+| frameworks | none — CLI application (`commander` for the CLI, `@clack/prompts` for the TUI, both installed) | `docs/setup-tecnico-sentinel.md` §4; `package.json` dependencies |
 | runtime | node >=22, runtime-agnostic code | `package.json` `engines.node: ">=22"`; `npm run dev` builds with tsup then runs `dist/cli.js` |
 | package_manager | npm | `package-lock.json` (lockfileVersion 3) present |
 
-Runtime dependencies installed: `commander ^15.0.0`, `execa ^9.6.1`, `yaml ^2.9.0`, `zod ^4.4.3`. Dev toolchain
-installed and green: @biomejs/biome 2.5.6, typescript 5.9.3, @types/node 22.20.1, vitest 4.1.10,
-dependency-cruiser 18.1.0, tsup 8.5.1. `commander` was ratified and installed by `[E6.F1.H1]` (the first E6
-runtime dep). Still pending: `@clack/prompts` / picocolors (E6 TUI, `[E6.F2.x]`), changesets (E7 release) —
-declared-only recommendations from `docs/setup-tecnico-sentinel.md` §4 until their story's design ratifies them.
+Runtime dependencies installed: `commander ^15.0.0`, `execa ^9.6.1`, `yaml ^2.9.0`, `zod ^4.4.3`,
+`@clack/prompts 1.7.0` (exact-pinned, no range). Dev toolchain installed and green: @biomejs/biome 2.5.6,
+typescript 5.9.3, @types/node 22.20.1, vitest 4.1.10, dependency-cruiser 18.1.0, tsup 8.5.1. `commander` was
+ratified and installed by `[E6.F1.H1]` (the first E6 runtime dep); `@clack/prompts` by `[E6.F2.H1]`'s design,
+and the `adapters-isolated` guard plus review finding R1-001 keep it confined to `tui/clack-prompter.ts`
+(the spinner is TUI-owned, not clack's). Still pending: picocolors / marked-terminal (result rendering,
+`[E6.F2.H2]`), changesets (E7 release) — declared-only recommendations from
+`docs/setup-tecnico-sentinel.md` §4 until their story's design ratifies them.
 
 ## Important Directories
 
@@ -34,7 +37,7 @@ declared-only recommendations from `docs/setup-tecnico-sentinel.md` §4 until th
 | `docs/` | Specification source of truth | PRD, technical setup, MVP backlog. The only authoritative content today. |
 | `sdd-lite/` | Vendored sdd-lite package + runtime root | Package files and generated runtime artifacts share this directory. |
 | `.claude/skills/` | Installed sdd-lite skills | Copy install, path-rewritten to project-relative. |
-| `src/` | Source root per PRD §4.2 | Implemented: `core/{repos,workspace,review,run,history,shared}`, `adapters/driven/{engines/{fake,claude-code,opencode},git,storage,exec}`, `adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands, renderers — from `[E6.F1.H1]`), `main/{cli.ts,container.ts,paths.ts}` (composition root — the only place adapters are instantiated). `adapters/driving/tui/` is **still an `export {}` placeholder** — the TUI is `[E6.F2.x]`. Tests live in `<module>/__test__/`. |
+| `src/` | Source root per PRD §4.2 | Implemented: `core/{repos,workspace,review,run,history,shared}`, `adapters/driven/{engines/{fake,claude-code,opencode},git,storage,exec}`, `adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands, renderers — from `[E6.F1.H1]`), `main/{cli.ts,container.ts,paths.ts}` (composition root — the only place adapters are instantiated; `cli.ts` dispatches bare argv to the TUI). `adapters/driving/tui/` is **implemented** since `[E6.F2.H1]`: `tui-flow.ts` (the 6-step navigation flow), `tui-deps.ts` (the `TuiDeps`/`TuiPrompter` seams), `render.ts` (**deliberately minimal — `[E6.F2.H2]` rewrites it**), `clack-prompter.ts` (the only `@clack/prompts` importer, owned spinner). Tests live in `<module>/__test__/`. |
 | `harnesses/` | Factory review harnesses (E3.F2) | `pr-review/`, `security/`, `quick/` — each `harness.md` + `output.md` + `skills.yaml`. Ships in the npm package. |
 | `skills/` | Shared harness skills (E3) | `code-quality.md`, `security.md`. Ships in the npm package. |
 | `fixtures/` | Real engine output fixtures (E1.F1.H3) | `claude-code/` (6 files) and `opencode/` (6 files) + provenance `README.md`. Feed the E4 adapter contract tests. |
@@ -52,13 +55,13 @@ declared-only recommendations from `docs/setup-tecnico-sentinel.md` §4 until th
 
 ## Quality Commands
 
-> All scripts are runnable. Verified exit 0 as of PR #74 merge against `main` @ `ac7a442`.
+> All scripts are runnable. Verified exit 0 as of PR #75 merge against `main` @ `59b806e`.
 
 | Command Type | Command | Status |
 |---|---|---|
 | install | `npm ci` | Runnable — lockfile v3, full toolchain installs clean. |
 | lint / typecheck / format / guards | `npm run check` | **Runnable, verified exit 0.** Full form: `biome check . && tsc --noEmit && depcruise src`, 0 violations. |
-| test | `npm test` (`vitest run`) | **Runnable, verified 707/707 passing across 39 files.** Projects: `core`, `adapters` (also covers `src/main/**`), `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
+| test | `npm test` (`vitest run`) | **Runnable, verified 754/754 passing across 45 files.** Projects: `core`, `adapters` (also covers `src/main/**`), `e2e` (`e2e/**` still has no files — the smoke suite is `[E7.F1.H1]`). |
 | dev | `npm run dev` | Runnable (`tsup --silent && node dist/cli.js`) — builds the bundle, then runs it. Changed in `[E6.F1.H1]`: NodeNext `.js` specifiers are not rewritten by `--experimental-strip-types`. |
 | build | `npm run build` (`tsup`) | Runnable — tsup 8.5.1 installed, `tsup.config.ts` at root. |
 
@@ -82,8 +85,8 @@ covers the five architecture guards via `.dependency-cruiser.cjs`: `core-no-adap
 - ~~Pre-implementation repository~~ **Resolved 2026-08-01**: `[E0.F1.H1]` landed (PR #47). CI green since
   `[E0.F1.H3]` (PR #49).
 - ~~Stack declared, not verified~~ **Resolved 2026-08-09**: the full toolchain is installed and verified together;
-  `npm run check` and `npm test` both exit 0. Only E6/E7 deps (commander, @clack/prompts, picocolors, changesets)
-  remain declared-only.
+  `npm run check` and `npm test` both exit 0. Only the remaining E6/E7 deps (picocolors / marked-terminal,
+  changesets) are still declared-only; commander and @clack/prompts are installed.
 - ~~Two engine spikes are unresolved unknowns~~ **Resolved 2026-08-08** (`[E1.F1.H1]`, `[E1.F1.H2]`, `[E1.F1.H3]`,
   PR #63): canonical headless invocation, permission posture, timeout/kill behavior and failure signatures are
   documented per engine in `docs/engines/`, with 12 real output fixtures in `fixtures/`. **E4.F2 must build on
@@ -93,8 +96,10 @@ covers the five architecture guards via `.dependency-cruiser.cjs`: `core-no-adap
   CLI is now reachable — `repo add|list`, `review`, `runs list|show`, `--version`, `--help`, each invoking its use
   case with zero logic in the command. `[E6.F1.H2]` (PR #74) added the documented exit-code contract
   (0 / configurable-default-1 / 2, fail-closed on ok-without-verdict, `--changes-exit-code`) for
-  non-interactive/scriptable use; the TUI is `[E6.F2.x]` (current story: `[E6.F2.H1]` navigation flow);
-  `[E7.F1.H1]` is what covers the flow end to end. Two spec-vs-behavior deltas carried
+  non-interactive/scriptable use, and `[E6.F2.H1]` (PR #75) landed the interactive TUI: bare `sentinel` on a
+  TTY runs repo → branch → harness → confirm → progress → result (non-TTY prints guidance and exits 1). The
+  current story is `[E6.F2.H2]` (result rendering — the last required E6 story); `[E7.F1.H1]` is what covers
+  the flow end to end. Two spec-vs-behavior deltas carried
   from `[E6.F1.H1]`: `risk-e6h1-011` (`repo add` on an already-cloned repo prints `-` where the spec promised the
   local path) and the D14 persistence-failure exit semantics (verdict on stdout, diagnostic on stderr, exit 1
   without a sixth terminal state).

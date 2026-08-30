@@ -10,11 +10,14 @@ The tool **orchestrates**; it does not build its own agent. Engines, git,
 storage, and future integrations are interchangeable adapters behind ports the
 core owns.
 
-> **Status: pre-MVP.** Epic **E0 — Foundations** is complete: hexagonal scaffold,
-> executable architecture guards in CI, the `ReviewEngine` port + run
-> terminal-state model, and a `FakeEngine` with a shared reusable contract suite.
-> The rest of the MVP develops against `FakeEngine` while the real engines are
-> spiked. Scope and progress: [docs/backlog-mvp-sentinel.md](./docs/backlog-mvp-sentinel.md).
+> **Status: pre-release.** Epics **E0–E6 are complete**: hexagonal scaffold with
+> executable architecture guards in CI, git worktrees and repo management, the
+> harness system, the review flow with the real `claude-code` and `opencode`
+> engine adapters (E4 — the spikes are resolved and the engines are no longer
+> stubbed), declared validations and run history, and both product surfaces —
+> the `sentinel` CLI and the interactive TUI. **E7 remains open**: E2E smoke,
+> dogfooding, user documentation, licence and release. Scope and progress:
+> [docs/backlog-mvp-sentinel.md](./docs/backlog-mvp-sentinel.md).
 
 ## Quick start (development)
 

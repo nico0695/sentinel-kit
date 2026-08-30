@@ -8,7 +8,7 @@
  * returning early on cancel (exit 0), empty state (exit 0) or error (throw →
  * one friendly line, exit 1).
  *
- * Four properties are load-bearing:
+ * Five properties are load-bearing:
  *
  * 1. **No cascade lives here.** `resolveReviewRequest` (core `run`, the CLI's
  *    D5) owns the registry lookup, the flag → repo → global precedence and
@@ -29,11 +29,23 @@
  *    contract, and the non-TTY guard guarantees no script consumes the TUI's
  *    exit code. Non-zero TUI exits mean *failures*: thrown errors (1) and
  *    the non-TTY guard (1).
+ * 5. **The post-run prompt cannot change the exit code** (`[E6.F2.H2]`
+ *    AC-10/AC-11). {@link offerFullView} returns `void` and is called only
+ *    after the `persistRun` `try`/`catch` has settled, on both branches: the
+ *    two `return` statements below it are unchanged, so accepting, declining
+ *    or cancelling the full view leaves both the rendered outcome and the
+ *    exit code exactly as (completed, persisted) decided them.
  */
 
 import { resolveReviewRequest } from "../../../core/run/index.js";
-import { formatTuiErrorLine, formatTuiResult } from "./render.js";
-import type { TuiDeps, TuiIo } from "./tui-deps.js";
+import { TUI_PALETTE } from "./colors.js";
+import {
+  formatFullView,
+  formatResultDigest,
+  formatTuiErrorLine,
+  type TuiResultDigest,
+} from "./render.js";
+import type { TuiDeps, TuiIo, TuiPrompter } from "./tui-deps.js";
 
 /** The TUI surface `src/main/cli.ts` drives on a bare `sentinel`. */
 export interface SentinelTui {
@@ -204,25 +216,119 @@ async function runTuiFlow(deps: TuiDeps): Promise<number> {
   } catch (error) {
     // D13 mirror: the review itself is finished — minutes of engine work —
     // and its outcome must not be swallowed because the record could not be
-    // written. `runDir` renders as `-` because no directory exists.
-    for (const line of formatTuiResult(result.state, result.verdict)) {
+    // written. No `runDir` key at all: nothing was written, so the digest
+    // renders `-` rather than fabricating a directory (`[E6.F2.H2]` AC-7).
+    //
+    // `exactOptionalPropertyTypes` is on, so every optional part is a
+    // conditional spread — `verdict: undefined` would not typecheck.
+    const unpersisted: TuiResultDigest = {
+      state: result.state,
+      ...(result.verdict !== undefined ? { verdict: result.verdict } : {}),
+      ...(result.failure !== undefined
+        ? {
+            failure: {
+              stage: result.failure.stage,
+              // `[E6.F2.H2]` AC-6: the raw throwable reduced to the one
+              // line the persisted path already carries in
+              // `record.failure.message`.
+              message: formatTuiErrorLine(result.failure.error),
+            },
+          }
+        : {}),
+      ...(result.engineOutput !== undefined
+        ? { engineOutput: result.engineOutput }
+        : {}),
+    };
+
+    for (const line of formatResultDigest(unpersisted, TUI_PALETTE)) {
       io.stdout(line);
     }
     io.stderr(
       "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
     );
     io.stderr(formatTuiErrorLine(error));
+
+    // Spec A6: offered here too — this is the one branch where the engine
+    // output exists nowhere on disk. The exit code stays 1 whatever the
+    // answer (`[E6.F2.H2]` AC-10).
+    await offerFullView(io, prompter, result.engineOutput);
+
     return 1;
   }
 
-  for (const line of formatTuiResult(
-    persisted.record.state,
-    persisted.record.verdict,
-    persisted.runDir,
-  )) {
+  // The record is what was actually written, so it — not the in-memory
+  // result — is what the digest reports (`[E6.F2.H2]` AC-5: the findings
+  // section and the `Full review` pointer are keyed on `engineOutput`, never
+  // on the state).
+  const { record } = persisted;
+  const digest: TuiResultDigest = {
+    state: record.state,
+    ...(record.verdict !== undefined ? { verdict: record.verdict } : {}),
+    ...(record.failure !== undefined ? { failure: record.failure } : {}),
+    ...(record.engineOutput !== undefined
+      ? { engineOutput: record.engineOutput }
+      : {}),
+    runDir: persisted.runDir,
+  };
+
+  for (const line of formatResultDigest(digest, TUI_PALETTE)) {
     io.stdout(line);
   }
 
+  // `[E6.F2.H2]` AC-8/A6: offered after the record was written, on the data the record
+  // carries. Property 5: it cannot change what follows.
+  await offerFullView(io, prompter, record.engineOutput);
+
   // Property 4 of the module doc-comment: completed + persisted → 0.
   return 0;
+}
+
+/**
+ * The opt-in full view (`[E6.F2.H2]`, #39; AC-8..AC-13, spec A6/A9).
+ *
+ * One `confirm`, asked only when there is something to show, printing the
+ * engine's own markdown verbatim only when the answer is yes. Three
+ * properties make it safe to bolt onto a finished run:
+ *
+ * - **It returns `void`.** Both call sites are the last statement before an
+ *   unchanged `return`, so accept / decline / cancel all leave the exit code
+ *   as (completed, persisted) decided it (AC-10). Cancel is a *value* here
+ *   too, never an exception and never a process exit: nothing in this
+ *   function installs a listener, touches raw mode or reads `process`.
+ * - **Blank or absent markdown asks nothing at all** (AC-9). The guard is
+ *   what keeps a completed run without engine output at exactly the four
+ *   pre-run prompts — deleting it makes every four-answer test script
+ *   overrun, which is how the absence is proved rather than assumed.
+ * - **No pager, no truncation, no second prompt** (AC-13): every line goes
+ *   to `stdout` as it stands, and terminal scrollback is the pager.
+ *
+ * Offered on the persist-failure branch too (spec A6): that is precisely the
+ * branch where the markdown exists nowhere on disk, so withholding it there
+ * would invert the story's motivation.
+ */
+async function offerFullView(
+  io: TuiIo,
+  prompter: TuiPrompter,
+  engineOutput: string | undefined,
+): Promise<void> {
+  // AC-9 / A9: the prompt promises content, so it needs non-blank markdown —
+  // deliberately stricter than the digest's `Full review` path line, which
+  // only promises the file `run-store-fs` writes for any defined value.
+  if (engineOutput === undefined || engineOutput.trim() === "") {
+    return;
+  }
+
+  const outcome = await prompter.confirm({
+    message: "Show the full review output?",
+  });
+
+  // AC-8: "no" and cancel are the same silence — the digest already on
+  // screen stands unchanged.
+  if (outcome.kind === "cancel" || !outcome.value) {
+    return;
+  }
+
+  for (const line of formatFullView(engineOutput, TUI_PALETTE)) {
+    io.stdout(line);
+  }
 }

@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -895,6 +895,29 @@ checkpoints:
       free_text: "S8, S9 y S10 de corrido. Q-F1: sí, sumarlo a S9."
       responded_at: "2026-08-30T00:25:00Z"
     resolved_at: "2026-08-30T00:25:00Z"
+  - id: cp-review-gate-round-2
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      The scoped re-review over `d8ad970..ed3ba28` verified all six ids fix round 1 selected — each
+      by execution against the real modules, not by reading the new tests — but found that the round
+      INTRODUCED the defect it was convened to close. RR1-001 (CRITICAL): neutralisation was
+      inserted upstream of `matchFindingLine`'s `line.trim()`, and JS `trim()` removes
+      WhiteSpace union LineTerminator, which contains VT, FF, CR, U+2028 and U+2029 — all five in
+      the neutralised set. They are printable tokens by the time `trim()` runs, so the `^\[` anchor
+      fails and a finding whose marker carries a LEADING control is silently deleted from both the
+      counts and the list. Reproduced independently by the orchestrator. AC-19's layer 2 does not
+      cover it: the failure is at the anchor, not the remainder. RR2-001 (WARNING) is the sixth
+      instance of the change's recurring vacuity species.
+    question: >-
+      Spend the last fix round on RR1-001 plus RR2-001, on RR1-001 alone, or stop and let the user
+      review with the ledger in hand?
+    free_input_allowed: true
+    created_at: "2026-08-30T03:10:00Z"
+    response:
+      free_text: "Ronda 2: arreglar RR1-001 + RR2-001."
+      responded_at: "2026-08-30T03:15:00Z"
+    resolved_at: "2026-08-30T03:15:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -1112,6 +1135,24 @@ decisions:
       and every surviving bare citation either sits inside `offerFullView`'s doc-comment — whose
       opening line already scopes the block to `[E6.F2.H2]` — or denotes a live H1 criterion.
     recorded_at: "2026-08-30T02:10:00Z"
+  - id: e6f2h2-D16
+    checkpoint_id: cp-review-gate-round-2
+    selected_option_id: round-2-rr1-001-plus-rr2-001
+    free_text: "Ronda 2: arreglar RR1-001 + RR2-001"
+    rationale: >-
+      The last fix round goes to RR1-001, and RR2-001 rides along because the stage is open anyway
+      and leaving an assertion whose comment claims something it cannot verify is what produced this
+      whole class of problem six times over.
+      This round carries a burden the first did not: it must fix a silent-deletion defect WITHOUT
+      introducing a third one. The open design question the plan must resolve before any code moves:
+      trimming the raw line before neutralising restores the old semantics for leading controls
+      (trim REMOVES them, so they never reach output), but the digest renders `finding.text` from
+      the remainder group while the full view renders the neutralised line — so a fix that trims raw
+      for matching while rendering from neutralised text could desynchronise the two surfaces. That
+      must be reasoned through, not patched around.
+      Budget: round 2 of 2. There is no third round, so a failure here leaves the change unable to
+      close and the decision returns to the user.
+    recorded_at: "2026-08-30T03:15:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

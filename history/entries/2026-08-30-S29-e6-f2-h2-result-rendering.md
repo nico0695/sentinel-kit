@@ -1,4 +1,4 @@
-# S29 — [E6.F2.H2] Terminal result rendering, two fix rounds, PR #76
+# S29 — [E6.F2.H2] Terminal result rendering, owner review, PR #77
 
 - **Date**: 2026-08-30
 - **Branch**: `claude/project-post-merge-analysis-a4tcbl`
@@ -29,6 +29,8 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
 | S29-D12 | Qualify the fifth bare `AC-8` citation (e6f2h2-D15) | Leave it, as outside the four ledger ids | AC-21's own verifier requires every H2 citation qualified; `:278` is H2's while `:207` is H1's, 71 lines apart. Leaving it makes AC-21 fail its own check | `claude` |
 | S29-D13 | Accept the change at `pass_with_warnings` and close it (e6f2h2-D18) | Hold in `reviewing`; open a third fix round | No residual is severe and each carries a disposition. The single medium (`risk-e6f2h2-014`) is exactly what `[E7.F1.H1]`'s E2E smoke exists to cover — closing it here would mean building the next story early. The protocol caps the lineage at two rounds | `claude→user` |
 | S29-D14 | Correct the README status line in this PR | Leave it entirely to `[E7.F2.H1]` | It was false on two counts — only E0 complete, engines still "spiked" — since E4. One line; the PR already touches CLAUDE.md for the same reason. The full rewrite stays with `[E7.F2.H1]` | `claude→user` |
+| S29-D15 | The owner's post-merge PR #76 review reopens the change; fix both findings and push (e6f2h2-D19) | Leave both as follow-up issues; fix only the bidi finding | Repo precedent (`[E5.F1.H2]`, `[E6.F1.H1]`): an owner's PR review reopens a "completed" change outside the normal 4R fix-round budget, which governs only the internal lineage. Both findings — bidi terminal injection and the exit-code flip on the optional post-run prompt — were independently confirmed real before agreeing to fix | `claude→user` |
+| S29-D16 | Correct the reachability prose for the exit-code-guard fix rather than the fix itself (e6f2h2-D20) | Leave the EPIPE/piped-reader narrative as written; rewrite the fix to match the wrong narrative | A fresh scoped re-review found the *justification* wrong in five places (code, two spec artifacts, the ledger, a test comment), not the fix: `sentinel \| head` never reaches this code (the TTY gate exits first), and Node's blocking TTY writes mean the actually-reachable failure is a synchronous write error (e.g. `EIO` on terminal hangup) or a prompter throwing, not an async EPIPE. Reproduced both sub-claims independently before correcting the prose only | `claude` |
 
 ## Deviations
 
@@ -59,6 +61,16 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
   three); `plan.md` step 4 said `FINDING_LINE` carries three `\s*` when it carries five.
 - **`[E6.F2.H1]`'s AC-7 was superseded** (AC-15) — the four literal stdout-tail assertions rewritten while
   H1's four AC-8 persistence cases were preserved by name.
+- **PR #76 was merged by the owner while this session was still validating their review comment.**
+  A routine reopening commit (`c8176d4`) landed on the local branch before the merge was noticed; the
+  first sign was `git push` printing `[new branch]` instead of a normal fast-forward range instead of
+  silently succeeding. Investigated rather than ignored: `git fetch origin` plus a `--stat` diff
+  confirmed main's new merge commit was byte-identical to the pre-merge branch tip, so nothing was lost.
+  Recovered with `git checkout -B claude/project-post-merge-analysis-a4tcbl origin/main` followed by
+  `git cherry-pick c8176d4` (→ `2d86545`), replaying only the genuinely-new commit onto the real history
+  instead of a stale copy. Publishing the rebuilt branch required `git push --force-with-lease`; the auto
+  mode permission classifier denied it, so the situation was explained in full and explicit authorization
+  was requested and given (S29-D15's `claude→user` companion) before the push ran.
 
 ## Work done
 
@@ -87,13 +99,38 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
   it found no eighth instance of the vacuity species. Appended `risk-e6f2h2-014`.
 - **Acceptance and closeout** (`a6bfd72`): change `completed`, README status line corrected, gates
   re-run (check clean, 995/49).
-- **PR #76 opened**: https://github.com/nico0695/sentinel-kit/pull/76 (Closes #39).
+- **PR #76 opened**: https://github.com/nico0695/sentinel-kit/pull/76 (Closes #39). **Merged by the
+  owner** (`7efbcda`) along with a 4R-style review comment raising two findings — bidi/RTL formatting
+  controls not neutralised by `engine-text.ts`'s escape (terminal injection), and the optional post-run
+  "show full output" prompt able to flip a successful run's exit code if it failed — plus a non-blocking
+  `TuiDeps` suggestion declined per S29-D15. Both findings independently confirmed real before fixing.
+- **Branch recovery** (`2d86545`): rebuilt the branch on the real post-merge `main` and replayed the
+  reopening commit, per the Deviations entry above. Pushed with authorized `--force-with-lease`.
+- **S12 fix** (`99ae485`): widened `engine-text.ts`'s `NEUTRALIZED` regex to also cover the nine bidi
+  formatting/isolate control points (U+202A–U+202E, U+2066–U+2069), deliberately leaving LRM/RLM
+  (U+200E/U+200F) alone — they mark direction for one character and don't open a reordering scope.
+  Added `offerFullViewSafely` in `tui-flow.ts`, wrapping both `offerFullView` call sites so a failure in
+  the optional post-run prompt can never flip a completed run's exit code — reports one stack-free
+  stderr line and never rethrows. New non-vacuous tests at both call sites and all nine bidi code
+  points (`engine-text.test.ts`, `result.test.ts`, `full-view.test.ts`).
+- **Reachability-claim correction** (`f2a7a48`, S29-D16): a fresh scoped re-review found the exit-code
+  guard's justification factually wrong in five places — corrected `tui-flow.ts`'s doc comments,
+  `spec.md`, `design.md`, `review-ledger.md` (`R4-001`), and the test file's comments to state the real
+  reachable scenario (a synchronous TTY write failure, e.g. `EIO`, or a rejecting prompter) instead of
+  the wrong one (an async EPIPE on a piped reader, which the TTY gate makes unreachable). No code or
+  test assertion changed — both already exercised the real scenario.
+- **Final QA run 3** (`862857e`): re-verified against the S12 fix, `pass_with_warnings`, change
+  `completed`.
+- **PR #77 opened**: https://github.com/nico0695/sentinel-kit/pull/77 — the follow-up fixing both of
+  PR #76's owner-review findings. CI green (`build`, `check`, `test (22)`, `test (24)`), `mergeable_state:
+  clean`. A reply comment was posted on PR #76 addressing both findings and pointing to PR #77.
 
 ## Pending and next steps
 
-- **User**: review and merge PR #76 (workflow contract: the human merges everything). **E6 closes with
-  this merge** — only E7 remains.
-- **Claude, next session**: E7. `[E7.F1.H1]` (E2E smoke) is the natural entry point and must carry
+- **User**: review and merge PR #77 (workflow contract: the human merges everything). PR #76 is
+  already merged, but E6 does not fully close until #77 lands — it fixes two real defects the #76
+  merge shipped. Subscribed to PR #77's activity; CI is green and no owner activity has arrived yet.
+- **Claude, next session**: once #77 merges, E7. `[E7.F1.H1]` (E2E smoke) is the natural entry point and must carry
   `risk-e6f2h2-014` + info row R4-002 as named inputs — the process-level blind spot this story could
   not close from inside a doubles-based suite.
 - **E7 candidates recorded, not fixed**: `risk-e6f2h2-012` (the CLI's `runs show` carries the same

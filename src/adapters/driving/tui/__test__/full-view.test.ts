@@ -46,10 +46,13 @@ import type { PromptOutcome } from "../tui-deps.js";
 import { createTui } from "../tui-flow.js";
 import {
   answer,
+  type CapturingTuiIo,
   cancel,
+  createCapturingTuiIo,
   createScriptedPrompter,
   createTuiTestDeps,
   MARKED,
+  type ScriptedPrompter,
   stripAnsi,
   stripMarks,
 } from "./tui-test-doubles.js";
@@ -87,8 +90,9 @@ function cp(codePoint: number): string {
  * instead of agreeing with itself. Used only for the negative half of an
  * assertion, never on its own.
  */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
-const IN_N = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/;
+const IN_N =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
 
 const config: GlobalConfig = {
   defaultEngine: "claude-code",
@@ -117,6 +121,70 @@ interface FullViewHarnessOptions {
   /** Answers scripted AFTER the four pre-run ones. */
   readonly answers?: ReadonlyArray<PromptOutcome<boolean>>;
   readonly persistRunFails?: boolean;
+  /**
+   * Amendment 2: the post-run confirm REJECTS instead of answering. The four
+   * pre-run prompts are untouched, so the failure lands exactly where the
+   * ledger row put it — after the run completed and the digest rendered.
+   */
+  readonly promptRejectsWith?: Error;
+  /**
+   * Amendment 2: `io.stdout` throws when handed this exact line. This is the
+   * seam that makes `R4-001` reachable without swapping the prompter at all —
+   * the real `io.stdout` is `process.stdout.write`, which fails synchronously
+   * on a real TTY write error (e.g. `EIO` on terminal hangup), not on a
+   * piped reader going away (Node's pipe writes fail asynchronously).
+   */
+  readonly stdoutThrowsOn?: {
+    readonly line: string;
+    readonly error: Error;
+  };
+}
+
+/**
+ * A capturing io whose `stdout` throws on one chosen line and records every
+ * other. Nothing about it is exotic: a real TTY write can fail the same way
+ * mid-print (e.g. the terminal hanging up) — TTY writes are synchronous on
+ * POSIX, which is what makes a synchronous throw here realistic.
+ */
+function throwingStdoutIo(line: string, error: Error): CapturingTuiIo {
+  const inner = createCapturingTuiIo();
+
+  return {
+    out: inner.out,
+    err: inner.err,
+    stdout: (text: string) => {
+      if (stripAnsi(text) === line) {
+        throw error;
+      }
+      inner.stdout(text);
+    },
+    stderr: inner.stderr,
+  };
+}
+
+/**
+ * A prompter that answers the four pre-run prompts from the script and then
+ * REJECTS the post-run confirm. The rejection is still recorded as a prompt,
+ * so "the prompt was asked" stays assertable next to "it failed".
+ */
+function rejectingPrompter(
+  base: ScriptedPrompter,
+  error: Error,
+): ScriptedPrompter {
+  return {
+    prompts: base.prompts,
+    spinnerEvents: base.spinnerEvents,
+    select: base.select,
+    spinner: base.spinner,
+    confirm: (input) => {
+      if (input.message !== FULL_VIEW_PROMPT) {
+        return base.confirm(input);
+      }
+      base.prompts.push({ kind: "confirm", message: input.message });
+
+      return Promise.reject(error);
+    },
+  };
 }
 
 interface FullViewHarness {
@@ -137,6 +205,14 @@ const PERSIST_FAILURE = new Error("Failed to persist run at /runs/owner__repo");
 function harness(options: FullViewHarnessOptions = {}): FullViewHarness {
   const persistRunRequests: PersistRunRequest[] = [];
 
+  const scripted = createScriptedPrompter([
+    answer("owner/repo"),
+    answer("feature"),
+    answer("pr-review"),
+    answer(true),
+    ...(options.answers ?? []),
+  ]);
+
   const result: RunReviewResult = {
     state: "ok",
     verdict: "request-changes",
@@ -155,13 +231,18 @@ function harness(options: FullViewHarnessOptions = {}): FullViewHarness {
   };
 
   const deps = createTuiTestDeps({
-    prompter: createScriptedPrompter([
-      answer("owner/repo"),
-      answer("feature"),
-      answer("pr-review"),
-      answer(true),
-      ...(options.answers ?? []),
-    ]),
+    prompter:
+      options.promptRejectsWith === undefined
+        ? scripted
+        : rejectingPrompter(scripted, options.promptRejectsWith),
+    ...(options.stdoutThrowsOn !== undefined
+      ? {
+          io: throwingStdoutIo(
+            options.stdoutThrowsOn.line,
+            options.stdoutThrowsOn.error,
+          ),
+        }
+      : {}),
     loadContext: () => Promise.resolve({ config, repos }),
     now: () => 1_700_000_000_000,
     useCases: {
@@ -572,6 +653,162 @@ describe("colour is decoration, whatever the terminal decided (AC-14, AC-20)", (
     );
     expect(formatFullView(MARKDOWN, TUI_PALETTE).map(stripAnsi)).toEqual(
       MARKDOWN_LINES,
+    );
+  });
+});
+
+describe("a failing full-view prompt cannot change the outcome (AC-10, Amendment 2)", () => {
+  // Ledger row `R4-001`, raised again by the repo owner on PR #76 and
+  // fixed here. Everything under test has already happened by the time
+  // the prompt runs: the review completed, `persistRun` settled and the
+  // digest is on screen. A failure in the OPTIONAL step that follows is a
+  // diagnostic, never a new outcome — which is what the module's own
+  // Property 5 claims, and what it did not enforce.
+  //
+  // Two seams, because the finding has two reachable causes: the prompter
+  // rejecting, and the print loop throwing. The second needs no double
+  // swap at all — `io.stdout` is `process.stdout.write`, which can fail
+  // synchronously on a real TTY write error (e.g. terminal hangup); a
+  // piped reader going away does not throw synchronously in Node.
+
+  const PROMPT_FAILURE = new Error("prompt seam collapsed");
+  const WRITE_FAILURE = new Error("write EIO");
+  const DIAGNOSTIC = "The full review output could not be shown:";
+
+  /** Three plain lines, none of which the digest itself ever prints. */
+  const PLAIN_OUTPUT = ["alpha", "bravo", "charlie"].join("\n");
+
+  it("exits 0 on the persisted path when the prompt itself throws", async () => {
+    const h = harness({
+      engineOutput: MARKDOWN,
+      promptRejectsWith: PROMPT_FAILURE,
+    });
+
+    const code = await h.run();
+
+    // The exit code is still a function of (completed, persisted) alone.
+    expect(code).toBe(0);
+    expect(h.persistRunRequests).toHaveLength(1);
+    expect(h.deps.prompter.prompts).toHaveLength(5);
+
+    // Present: the digest already rendered is untouched — the failure
+    // added nothing to stdout and removed nothing from it.
+    const digest = expectedDigest({
+      persisted: true,
+      engineOutput: MARKDOWN,
+    });
+    expect(h.stdout().slice(-digest.length)).toEqual(digest);
+
+    // …and exactly one diagnostic line, on stderr, naming the reason.
+    expect(h.deps.io.err).toEqual([`${DIAGNOSTIC} ${PROMPT_FAILURE.message}`]);
+  });
+
+  it("stays at 1 on the persist-failure path, with its two lines intact", async () => {
+    const h = harness({
+      engineOutput: MARKDOWN,
+      persistRunFails: true,
+      promptRejectsWith: PROMPT_FAILURE,
+    });
+
+    const code = await h.run();
+
+    expect(code).toBe(1);
+    expect(h.persistRunRequests).toHaveLength(1);
+
+    // The branch's own two diagnostics still stand, in order, and the new
+    // one is appended rather than replacing them. The exit code alone
+    // would not distinguish the fix from the bug on this branch — both
+    // give 1 — so what is asserted here is the REPORTING.
+    expect(h.deps.io.err).toEqual([
+      "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
+      "Failed to persist run at /runs/owner__repo",
+      `${DIAGNOSTIC} ${PROMPT_FAILURE.message}`,
+    ]);
+
+    const digest = expectedDigest({
+      persisted: false,
+      engineOutput: MARKDOWN,
+    });
+    expect(h.stdout().slice(-digest.length)).toEqual(digest);
+  });
+
+  it("exits 0 when the PRINT LOOP throws — the reachable path", async () => {
+    // No prompter double: the answer is a plain yes and the failure comes
+    // from writing, which is how a closed pipe presents itself.
+    const h = harness({
+      engineOutput: PLAIN_OUTPUT,
+      answers: [answer(true)],
+      stdoutThrowsOn: { line: "alpha", error: WRITE_FAILURE },
+    });
+
+    const code = await h.run();
+
+    expect(code).toBe(0);
+    expect(h.persistRunRequests).toHaveLength(1);
+
+    // Present: the digest is complete and is still the last thing on
+    // stdout — the throw happened on the first full-view line.
+    const digest = expectedDigest({
+      persisted: true,
+      engineOutput: PLAIN_OUTPUT,
+    });
+    expect(h.stdout().slice(-digest.length)).toEqual(digest);
+    expect(h.stdout()).not.toContain("alpha");
+    expect(h.deps.io.err).toEqual([`${DIAGNOSTIC} ${WRITE_FAILURE.message}`]);
+  });
+
+  it("keeps what it already printed when the print loop throws midway", async () => {
+    const h = harness({
+      engineOutput: PLAIN_OUTPUT,
+      answers: [answer(true)],
+      stdoutThrowsOn: { line: "bravo", error: WRITE_FAILURE },
+    });
+
+    const code = await h.run();
+
+    expect(code).toBe(0);
+    // Present: the line written before the failure survives, and nothing
+    // after it was invented.
+    expect(h.stdout().at(-1)).toBe("alpha");
+    expect(h.stdout()).not.toContain("charlie");
+    expect(h.deps.io.err).toEqual([`${DIAGNOSTIC} ${WRITE_FAILURE.message}`]);
+  });
+
+  it("stays at 1 when the print loop throws on the persist-failure path", async () => {
+    const h = harness({
+      engineOutput: PLAIN_OUTPUT,
+      answers: [answer(true)],
+      persistRunFails: true,
+      stdoutThrowsOn: { line: "alpha", error: WRITE_FAILURE },
+    });
+
+    expect(await h.run()).toBe(1);
+    expect(h.deps.io.err).toEqual([
+      "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
+      "Failed to persist run at /runs/owner__repo",
+      `${DIAGNOSTIC} ${WRITE_FAILURE.message}`,
+    ]);
+  });
+
+  it("reports the failure without a single stack frame", async () => {
+    // `[E6.F2.H1]` AC-9's bar, applied to the line this amendment adds.
+    const h = harness({
+      engineOutput: MARKDOWN,
+      promptRejectsWith: PROMPT_FAILURE,
+    });
+
+    await h.run();
+
+    // Non-vacuity guard, on `errors.test.ts`' pattern: the throwable does
+    // carry frames, so the negative below is about what was printed.
+    expect(PROMPT_FAILURE.stack ?? "").toContain("at ");
+    expect(h.deps.io.err).toHaveLength(1);
+    // …and it is THIS line that is stack-free, not merely some line: without
+    // this the case is also satisfied by the catch-all's own one-liner, which
+    // is the very outcome the amendment removes.
+    expect(h.deps.io.err[0]).toContain(DIAGNOSTIC);
+    expect([...h.deps.io.out, ...h.deps.io.err].join("\n")).not.toContain(
+      "at ",
     );
   });
 });

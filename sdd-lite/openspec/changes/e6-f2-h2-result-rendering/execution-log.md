@@ -1,7 +1,7 @@
 # Execution Log
 
 - change_name: e6-f2-h2-result-rendering
-- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7; S8; S9; S10; S11 — the seven original stages, all three of fix round 1, and the single stage of fix round 2. No stage remains; the change now routes to the scoped re-review over the round-2 delta, then final QA)
+- executor: sddl-executor (invocations so far: S1; the S2 + S3 batch; S4; S5; S6; S7; S8; S9; S10; S11; S12 — the seven original stages, all three of fix round 1, the single stage of fix round 2, and the owner-review fix round on PR #76. The change was reopened from `completed` to `implementing` for S12 under `e6f2h2-D19`)
 - plan source: `plan.md` (Stage Plan table, authoritative)
 
 ## Stage Overview
@@ -19,6 +19,7 @@
 | S9 | Fix round 1: the rewiring — `toSafeLines` in `render.ts`, `extractFindings(lines)`, the widened remainder group, the neutralised `Failure:` line | done — 5 MOD files, **927 / 48** (+19), M8/M9/M10/M11 all observed and reverted; R1-001/002/003 closed |
 | S10 | Fix round 1: verification repairs (AC-20 palette assertions, `palette-wiring.test.ts`, the AC-21 comment pass) | done — 4 MOD + 1 NEW, **931 / 49** (+4), M12 and all three M13 runs observed and reverted; R3-002/R3-001/R2-001/R2-002 closed |
 | S11 | Fix round 2 (final): RR1-001's structural-whitespace repair in `findings.ts` + RR2-001's verification repair | done — 3 MOD (1 production), **995 / 49** (+64), M14 (both halves), M15, M16, M17 and M18 (both halves) all observed and reverted; RR1-001 and RR2-001 closed |
+| S12 | Owner review of PR #76 (`e6f2h2-D19`): the nine bidi controls into N, and the optional post-run prompt guarded so it cannot change an already-decided exit code | done — 2 MOD production + 3 MOD test, **1037 / 49** (+42), M19 and M20 both halves observed and reverted; one named assertion change (`U+202A LRE` flips `survives` → `escaped`) |
 
 ## S1 — Dependency gate: `picocolors` install, pin, export-shape and baseline confirmation
 
@@ -1245,3 +1246,156 @@ Not deviations:
 - git: **no commits, no stashes, no resets, no branch change.** The orchestrator owns git; the tree carries three modified source files plus this log entry and the `state.yaml` update, all uncommitted.
 - QA handoff: **deferred to the orchestrator.** Per `plan.md`, S11 is followed by a **scoped re-review over the round-2 fix delta**, checked id by id against `review-ledger.md` for `RR1-001` and `RR2-001`, and then `sddl-qa-review` in `final` mode — the only stage that may mark this change `completed`. This stage ran neither and claims neither.
 - next action: the orchestrator commits S11, then routes the scoped re-review. **The fix budget is now exhausted**: fix round 2 of 2 is complete, and a severe finding surviving this round returns the decision to the user.
+
+## S12 — Owner review of PR #76: bidi controls in N, and a guarded optional prompt
+
+- approval: `stage_approval` granted — checkpoint `cp-pr76-owner-review`, decision `e6f2h2-D19`. The change was reopened from `completed` to `implementing` for this round. Scope is exactly the repo owner's two warnings, both **reproduced by the orchestrator against the shipped modules** before the handoff was written.
+- precondition check: working tree carried only `state.yaml` (orchestrator-owned) at stage start, at `c4199a2` on branch `claude/project-post-merge-analysis-a4tcbl`. The inherited baseline was **re-measured before touching anything**: `npm test` → **995 passed / 49 files**, `npm run check` clean at **107 modules / 254 dependencies**. No contradiction with `spec.md`, `design.md` or the standing guards; no stop rule fired.
+- **The owner's reported baseline failure could not be reproduced.** Their review mentions "one pre-existing baseline failure outside this PR's diff". The pre-edit `npm test` on this tree is **995 passed / 995**, zero failures, zero skipped, 49 of 49 files — recorded here as measured, neither suppressed nor invented. CI is also green on the PR (4/4).
+
+### Finding 1, reproduced before it was fixed
+
+Fed `'a' + ch + 'b'` through the shipped `NEUTRALIZED` class, one code point at a time:
+
+```
+U+202A LRE raw survives: true      U+202D LRO raw survives: true      U+2067 RLI raw survives: true
+U+202B RLE raw survives: true      U+202E RLO raw survives: true      U+2068 FSI raw survives: true
+U+202C PDF raw survives: true      U+2066 LRI raw survives: true      U+2069 PDI raw survives: true
+```
+
+Nine of nine reach `process.stdout` unchanged. `risk-e6f2h2-011` had named this a non-goal by grouping it with homoglyphs; Amendment 2 separates them, because the bidi set is nine discrete, enumerable code points that neutralise exactly like C1 while a homoglyph is genuinely unpreventable.
+
+### Changed files — the complete list
+
+| File | Kind | Change |
+|---|---|---|
+| `src/adapters/driving/tui/engine-text.ts` | MOD, production | `NEUTRALIZED` gains `\u202a-\u202e` and `\u2066-\u2069`; the set's doc-comment gains the bidi bullet and keeps the superseded exclusion visible; the `biome-ignore` suppression moves one line down (see Deviations) |
+| `src/adapters/driving/tui/tui-flow.ts` | MOD, production | `offerFullViewSafely` added, both call sites moved to it, Property 5 restated as unconditional |
+| `src/adapters/driving/tui/__test__/engine-text.test.ts` | MOD, test | **+23**: `IN_N` widened, 12 boundary rows (9 bidi + 3 printable neighbours), the bidi describe, the `toSafeLines` end-to-end case |
+| `src/adapters/driving/tui/__test__/result.test.ts` | MOD, test | **+13**: `IN_N` widened, the nine asserted end to end through `formatResultDigest` and `formatFullView`, plus the failure-message channel |
+| `src/adapters/driving/tui/__test__/full-view.test.ts` | MOD, test | **+6**: `IN_N` widened, a rejecting prompter and a throwing-`stdout` io added to the harness, six flow cases over {prompt rejects, print loop throws} × {persisted, persist-failed} |
+
+`git status --short` lists **exactly those five files** — no sixth file, no new file, no deletion. `git diff --stat src/core` and `git diff --stat src/main` are both **empty**. `findings.ts`, `render.ts`, `colors.ts`, `index.ts`, `tui-deps.ts`, `clack-prompter.ts`, `tui-test-doubles.ts`, `cli/**`, `package.json`, `package-lock.json`, `tsconfig.json`, `.dependency-cruiser.cjs`, `biome.json`, `vitest.config.ts`, `tsup.config.ts`, `CLAUDE.md`, `README.md`, `docs/`, `harnesses/`, `fixtures/` and `history/` are untouched. **No dependency added, no import added; `engine-text.ts` still has zero imports.**
+
+### Fix 1 — the set widens, and nothing else in the pipeline moves
+
+`NEUTRALIZED` goes from five ranges to seven. Everything downstream was checked rather than assumed:
+
+- **`tokenFor` is untouched.** All nine are above U+00FF, so they take the existing four-hex-digit form — the widening introduced **no new token shape** for any consumer to parse. Asserted directly (`U+202E` → its token, `U+2069` → its token) next to the two pre-existing token-shape assertions.
+- **`findings.ts` needs no edit, and this was measured, not argued.** The nine are not JS whitespace, so `trim()`, `LIST_OR_QUOTE_PREFIX` and `FINDING_LINE`'s `SPACE` class treat a raw bidi control and its six-character token identically — neither matches a structural whitespace position. Recognition parity is therefore exact before and after, and no RR1-001-shaped regression is possible. The 45-row structural matrix and the 9 HT rows stayed green throughout, including under M19.
+- **The three deliberately-excluded neighbours pin the new edges**: `U+202F` (narrow no-break space, immediately above RLO), `U+2065` (unassigned, immediately below LRI) and `U+206A` (a deprecated format control that reorders nothing, immediately above PDI) are all asserted to **survive**, so a future widening cannot happen silently.
+- **LRM/RLM and the rest of `U+206A–U+206F` were deliberately left out.** `U+200E`/`U+200F` mark direction for a single character without opening a reordering scope, and the `U+206A` block is deprecated and reorders nothing. Widening to them would have grown the blast radius without closing anything the owner reported. Level **A**, authorship `claude`.
+
+### Fix 2 — the guard, and why R3's refutation did not close R4-001
+
+`runTuiFlow` awaited `offerFullView` unguarded at both call sites, so a throw reached `createTui`'s catch-all and returned **1** for a run that had completed and been persisted — contradicting the module's own Property 5 and AC-10. The ledger recorded `R4-001` as `info` because R3 had refuted it for the shipped prompter seam (`@clack/core`'s promise takes no reject parameter, so `confirm` cannot reject). **R3 was right and the finding still stood**, but the S12 re-review found the reachability story attached to it was wrong: the print loop inside `offerFullView` calls `io.stdout`, which is `process.stdout.write` in the real container, (re-review correction, S12: a piped `sentinel | head` never reaches this code — `createTui.run()` gates the whole flow on both streams being real TTYs — and Node does not throw synchronously on EPIPE for a pipe write in any case; the write completes and the error surfaces later as an unhandled `'error'` event. The actually-reachable failure is a TTY write failing mid-print — e.g. `EIO` on terminal hangup, which is synchronous on POSIX unlike a pipe write — or a prompter throwing/rejecting synchronously).
+
+The fix is one wrapper:
+
+```ts
+async function offerFullViewSafely(io, prompter, engineOutput): Promise<void> {
+  try {
+    await offerFullView(io, prompter, engineOutput);
+  } catch (error) {
+    io.stderr(`${FULL_VIEW_FAILED} ${formatTuiErrorLine(error)}`);
+  }
+}
+```
+
+- A **wrapper** rather than a `try` inside `offerFullView`: the guard is then a named unit whose entire content is the invariant, `offerFullView` keeps its single-purpose body, and the two call sites stay symmetric — the shape a reviewer checks by eye. Level **A**.
+- **The exit codes themselves are unchanged.** `persistRun` still runs exactly once, strictly before the prompt, and the two `return 0` / `return 1` statements were not touched. On the persist-failure branch the code was already 1, so the fix is visible there only in the **reporting**: the branch's own two diagnostics stand and the new line is appended, instead of the raw throwable replacing everything at the catch-all. That is what the persist-failure cases assert, and it is why M20 reds them on the array rather than on the code.
+- **One line, `stderr`, stack-free**, reusing `formatTuiErrorLine` — the repo's convention, already used two lines above on the same branch.
+- **Not neutralised, deliberately.** The throwable comes from the io / prompter seam, not the engine; the only engine-derived text reachable at that point (`formatFullView`'s output) has already been neutralised on its way in. A defensive pass would mean importing `engine-text.js` into `tui-flow.ts` to protect a string that cannot carry engine bytes. Recorded so a reviewer reads it as a decision, not an omission. Level **A**.
+
+### Evidence — commands and their real output
+
+- baseline, before any edit: `npm test` → `Test Files 49 passed (49)` / `Tests 995 passed (995)`; `npm run check` → `Checked 163 files… No fixes applied.`, `tsc --noEmit` silent, `depcruise src` → `✔ no dependency violations found (107 modules, 254 dependencies cruised)`.
+- after the two production edits **alone**, before a single test was added: `npm test` → `Tests 1 failed | 994 passed (995)`, the one failure being the `U+202A LRE` boundary row asserting `survives`. That is the named assertion change, observed rather than predicted, and it is the **only** pre-existing assertion the widening moves.
+- final: `npm test` → `Test Files 49 passed (49)` / `Tests 1037 passed (1037)`.
+- final: `npm run check` → `Checked 163 files… No fixes applied.`, `tsc --noEmit` silent, `depcruise src` → `✔ no dependency violations found (107 modules, 254 dependencies cruised)` — **the exact module and dependency counts of the baseline gate, unchanged**.
+- AC-14 dual run: `NO_COLOR=1 npx vitest run --project adapters` → `28 passed (28)` / `688 passed (688)`; `FORCE_COLOR=1 npx vitest run --project adapters` → `28 passed (28)` / `688 passed (688)`. **Identical**, and 688 = the 646 of the round-2 gate plus this stage's 42.
+- `git diff --stat src/core` → empty. `git diff --stat src/main` → empty.
+- statement-level confinement grep: `grep -rEn '^import .*"picocolors"' src/` → **1** hit, `src/adapters/driving/tui/colors.ts:34`.
+
+Two formatting corrections were needed and taken, both by `biome check --write` on the single file concerned (`result.test.ts`, `full-view.test.ts`); nothing else was reformatted. A third — the suppression-comment move in `engine-text.ts` — is recorded under Deviations because it is a hand edit, not a formatter fix.
+
+### Test-count arithmetic
+
+| | before | after | delta |
+|---|---|---|---|
+| `engine-text.test.ts` | 52 | **75** | +23 — 11 net new boundary rows (12 added, 1 replaced), 9 per-control cases, all-nine-at-once, idempotence over the set, and the `toSafeLines` end-to-end case |
+| `result.test.ts` | 77 | **90** | +13 — 9 per-control digest cases, the failure-message channel, and 3 `formatFullView` cases (escaping, digest/full-view synchronisation, decorate-after-neutralise) |
+| `full-view.test.ts` | 33 | **39** | +6 — {prompt rejects, print loop throws} × {persisted, persist-failed}, plus the mid-print partial-output case and the stack-free reporting case |
+| full suite | 995 / 49 | **1037 / 49** | **+42**, no test file added, none deleted, none renamed |
+
+Every "before" figure is **directly observed**, not inferred: each file was temporarily restored from `HEAD`, run on its own, and restored from a byte-compared copy (`52`, `77`, `33`; `engine-text.test.ts` reported `1 failed | 51 passed (52)` against the widened set, which is the named assertion change again). 52 + 77 + 33 = 162 and 75 + 90 + 39 = 204, so +42 closes on the full suite: 995 + 42 = 1037.
+
+**One named assertion change**, called out here and to be repeated in the PR description beside AC-15's supersession and Amendment 1's two: `engine-text.test.ts`'s `U+202A LRE` boundary row flips from `outcome: "survives"` to `outcome: "escaped"`. The superseded values and rationale are kept verbatim in a comment on the row itself.
+
+### Mutation verification — two mutations, both halves each, applied to the real files, observed, reverted
+
+**M19 — remove the two bidi ranges from N** (`engine-text.ts`, one edit, everything else untouched).
+
+- *red half*: **35 failures**, and exactly the expected families — the 9 bidi boundary rows, the pre-existing token-shape case (which this round extended with two bidi assertions), the 9 per-control cases, all-nine-at-once, the idempotence-over-the-set case and the `toSafeLines` end-to-end case in `engine-text.test.ts`; the 9 per-control digest cases, the failure-message case and the 3 `formatFullView` cases in `result.test.ts`. 22 + 13 = 35.
+- *green half*: **1002 of 1037 passed, and not one failure lies outside the Amendment 2 blocks.** Every pre-Amendment-2 AC-18 case stayed green — the whole C0/C1/DEL/LS/PS boundary table, P1/P2/P3, the "no other transformation" cases, `splitEngineLines`' CRLF rule, the hostile-fixture `toSafeLines` cases, AC-19's two layers and RR1-001's 45-row structural matrix. The two failure families are therefore independent: nothing that shipped before this round could have caught the bidi pass-through, and the new cases cannot be satisfied by the old fix.
+- One honest subtlety, recorded rather than smoothed over: `is stable on every boundary row` (P2) **did not** go red under M19, correctly — it asserts idempotence and sentinel preservation, both of which a raw, unescaped bidi code point satisfies. It is not a bidi-detection case and was never meant to be; the 9 dedicated boundary rows are.
+
+**M20 — remove the guard** (both call sites back to a bare `await offerFullView(...)`).
+
+- *red half, first run*: **5 of the 6 new cases red.** Three failed on `AssertionError: expected 1 to be +0` — the exit code flipping from 0 to 1, exactly the owner's finding. The two persist-failure cases failed on the stderr array instead, because the exit code there is 1 either way:
+
+```
+- Expected
++ Received
+  [
+    "The review completed but its run could not be persisted: no history was written and `sentinel runs show` will not find it.",
+    "Failed to persist run at /runs/owner__repo",
+-   "The full review output could not be shown: prompt seam collapsed",
++   "prompt seam collapsed",
+  ]
+```
+
+  That contrast is the whole point of asserting the reporting on that branch: the exit code alone cannot distinguish the fix from the bug there.
+- *green half*: **1032 of 1037 passed** — the mutation is confined to the six cases written for it; nothing else in the repository depends on the guard.
+- **The sixth case did not go red, so it was strengthened rather than explained away.** `reports the failure without a single stack frame` asserted one `stderr` line with no `at ` frames, which the catch-all's own one-liner also satisfies. An assertion that the surviving line is *the diagnostic* was added, with a comment saying why. Re-run under the identical mutation: **6 of 6 red**. This is the "if a mutation does not go red as predicted, say so and investigate" rule doing its job — the case was measuring something real but not this.
+
+Both mutations were reverted and `diff` against the pre-mutation copies confirms `engine-text.ts` and `tui-flow.ts` are byte-identical to the delivered versions. `npm run check` and `npm test` were re-run **after** the last revert (`1037 / 49`, gate clean, 107 modules / 254 dependencies) rather than trusted.
+
+### Negative-assertion pairing — applied without exception
+
+Every "contains no code point in N" assertion added by this stage sits beside a positive one naming what must be **present**:
+
+- the 9 per-control boundary rows assert the **exact** resulting string (which pins the two sentinels as well as the token) before asserting `IN_N.test(actual) === false`;
+- the per-control digest cases pair `Findings: 1 blocker` **and** the exact listed line with the negative, so a renderer that recognised the finding and ate its text still fails;
+- the `toSafeLines` and `formatFullView` cases name every emitted line by value before the negative loop;
+- the all-nine-at-once case pairs the negative with a length assertion (`"head" + 9 × 6 + "tail"`), so a pass cannot come from deletion;
+- the two hostile fixtures carry a standing `IN_N.test(input) === true` guard, so a negative cannot pass against a fixture that decayed into a harmless one;
+- the guarded-prompt cases pair every exit-code assertion with the digest being byte-identical **and** the exact `stderr` array, so "it exited 0" cannot pass on a run that printed nothing.
+
+### Quick checks
+
+- planned (from the handoff): full `npm test` at or above 995 / 49; `npm run check` clean at 107 modules / 254 dependencies; adapters identical under `NO_COLOR=1` and `FORCE_COLOR=1`; empty `src/core` and `src/main` diffs; statement-level picocolors grep = 1; M19 and M20 with both halves each; the owner's reported baseline failure checked rather than assumed.
+- run: **all of them.** Nothing planned was skipped, nothing was substituted for a cheaper check. The per-file "before" counts were additionally measured directly rather than derived.
+- failures: **none.** One prediction missed — M20's sixth case — and it was investigated and fixed rather than reported as a pass.
+
+### Deviations
+
+Three, stated plainly.
+
+1. **The `biome-ignore` suppression in `engine-text.ts` moved one line down.** The widened class pushes the statement past the 80-column width, so it now reads `const NEUTRALIZED =` / suppression comment / regex. Biome suppressions apply to the *following* line, so leaving the comment above the `const` made `noControlCharactersInRegex` fire (observed: `Found 4 errors`). The same move was applied to the three test files' `IN_N` restatements for the same reason. No behaviour change; `biome check` clean on every one. Level **A**, authorship `claude`.
+2. **The sixth guarded-prompt case was strengthened after M20 failed to red it** — an assertion added, not a case rewritten, and recorded above with its reasoning. Level **A**.
+3. **`plan.md` was not amended with an S12 row.** The handoff assigns this stage `execution-log.md` (append) and the Amendment 2 additions to `spec.md` and `design.md`; `plan.md` is orchestrator/planner-owned and no round-3 plan section was handed over. The stage plan table therefore still ends at S11. Flagged so the orchestrator can decide whether to append one rather than discovering the gap at QA.
+
+Not deviations:
+
+- **`findings.ts` was not touched, and that is a measured result rather than an omission.** The nine are not JS whitespace, so recognition parity is exact across the widening; the 45-row structural matrix and the 9 HT rows confirm it, green throughout including under M19.
+- **The palette-injection suggestion was not implemented.** Declined by the orchestrator on the thread; recorded in `design.md` §B-3 with reasons.
+
+### Stage close
+
+- blockers: none. **Both of the owner's findings are closed**: nine of nine bidi controls neutralise and are asserted end to end on both surfaces the user reads, and the optional prompt can no longer change an already-decided exit code on either branch, through either of its two reachable failure paths.
+- scope / drift / blast-radius: none. Expected scope was `engine-text.ts` + `tui-flow.ts` + test files; actual scope is exactly that. No third production file was needed. `src/core` and `src/main` are untouched, no dependency was added, no import was added, no config file was edited, and the level-C standing guard (`risk-e6f2h2-004`) never came near firing.
+- risks: no new risk. `risk-e6f2h2-011` is **narrowed** — its bidi half is closed, its homoglyph half stands. `risk-e6f2h2-012`, `risk-e6f2h2-013` and `risk-e6f2h2-014` are unchanged; S12 touched no CLI file. Ledger row `R4-001` is addressed; `R4-002` (the prompt never settling on stdin EOF) is **not** — it is a different failure mode, still carried to `[E7.F1.H1]`.
+- git: **no commits, no stashes, no resets, no branch change.** The orchestrator owns git; the tree carries five modified source files plus this log entry, the `spec.md` / `design.md` amendments and the `state.yaml` update, all uncommitted.
+- QA handoff: **recommended.** This stage changed production behaviour on the two surfaces the earlier reviews found defects in, and it reopened a `completed` change. A scoped re-review over the S12 delta, checked against the owner's two findings and the Amendment 2 additions, then `sddl-qa-review` in `final` mode — the only stage that may mark the change `completed`. This stage ran neither and claims neither.
+- next action: the orchestrator reviews S12, commits it, replies on the PR thread (including the declined palette suggestion), and routes the scoped re-review.

@@ -161,3 +161,88 @@ It is **not** a clean `pass`, for reasons of evidence rather than doubt about th
 |---|---|---|---|---|
 | 1 | `stage` | `b0a3a04..442e705` (S1–S4) | `pass_with_warnings` | QA-S4-01 (AC-6, multi-line failure + vacuous guard test) → fixed in S5 under D9 |
 | 2 | `final` | `59b806e..31b7fb4` (whole change) | `pass_with_warnings` | This report. 21/21 ACs, gates measured, ledger reproduced, four `low`/`medium` residuals, completion withheld pending user acceptance |
+| 3 | `final` | `c4199a2..f2a7a48` (S12 delta), whole change re-checked `59b806e..f2a7a48` | `pass_with_warnings` | Post-merge fix round (owner review of PR #76, `99ae485`) plus a documentation-accuracy correction (`f2a7a48`). See §Run 3 below. **Completion granted this run** — see §Run 3 Verdict |
+
+## Run 3 — Post-Merge Fix Re-Review (`final` mode)
+
+### Digest
+
+- **mode**: `final`, third and current closeout run
+- **frozen delta**: `c4199a2..f2a7a48` on `claude/project-post-merge-analysis-a4tcbl` — two commits, tree clean
+- **whole-change re-check**: `59b806e..f2a7a48` for the gates that must hold across the entire change (AC-16)
+- **why this run exists**: PR #76 was merged after Run 2's `pass_with_warnings` was accepted, then the repo owner left a formal review raising two real findings; a fix commit (`99ae485`) closed both, and a second commit (`f2a7a48`) corrected a factually wrong reachability justification that a fresh-context scoped re-review (run by the orchestrator, not by this stage) found attached to one of the fixes
+- **verdict**: **`pass_with_warnings`** — same tier as Run 2, for the same class of reason (named residuals persist, none new), but with narrower live scope than before
+- **lifecycle_status**: set to **`completed`** this run (see §Run 3 Verdict for the reasoning)
+
+### 1. Delta scope, verified against the commits' own claims
+
+`git show --stat` on both commits was read directly, not taken from the commit message prose:
+
+| Commit | Claimed scope | QA's own read |
+|---|---|---|
+| `99ae485` (S12 fix) | 2 production files (`engine-text.ts`, `tui-flow.ts`) + sdd-lite artifacts + 3 test files | **Matches.** `src/adapters/driving/tui/engine-text.ts` (+55/-? widened regex), `src/adapters/driving/tui/tui-flow.ts` (+83, new `offerFullViewSafely`), `__test__/engine-text.test.ts`, `__test__/full-view.test.ts`, `__test__/result.test.ts`, plus `design.md`, `execution-log.md`, `review-ledger.md`, `spec.md`, `state.yaml`. No file outside those two production paths and their tests |
+| `f2a7a48` (doc correction) | Doc comments only + one test literal, no assertion change | **Matches.** `tui-flow.ts` diff is two doc-comment blocks only (no code line changed — confirmed by reading the full diff, not just the stat); `full-view.test.ts` diff is two doc comments plus `WRITE_FAILURE = new Error("write EPIPE")` → `new Error("write EIO")`, referenced only via the `WRITE_FAILURE` variable in every assertion, so no expectation string needed to change. The remaining four files touched are sdd-lite prose (`design.md`, `execution-log.md`, `review-ledger.md`, `spec.md`) and `state.yaml` |
+
+### 2. Both owner findings, independently confirmed fixed (not just read from the commit message)
+
+**Finding 1 — bidi controls bypassed neutralisation.** Read `engine-text.ts`'s `NEUTRALIZED` regex directly out of the shipped file (`[ ---  ‪-‮⁦-⁩]`) and reproduced it in an isolated Node script (not imported from the tree, to avoid trusting the module's own self-description) against all nine bidi code points (`U+202A`–`U+202E`, `U+2066`–`U+2069`). **All nine produce their `\uNNNN` token and none survive** — QA's own run, not a replay of the module's test suite. Then traced both call sites that actually reach the terminal: `render.ts:296` (`formatResultDigest`, via `toSafeLines(digest.engineOutput)`) and `render.ts:346` (`formatFullView`, via `toSafeLines(markdown)`) — both route through `neutralizeControls` with the widened set, so the fix is proven end to end, not only at the primitive.
+
+**Finding 2 — unguarded optional prompt could flip a successful run's exit code.** Read `tui-flow.ts` directly: both call sites (`:267`, persist-failure branch; `:293`, success branch) call `offerFullViewSafely`, not the raw `offerFullView`. `offerFullViewSafely` (`:336-346`) wraps the call in a `try { await offerFullView(...) } catch (error) { io.stderr(...) }` with no `throw`, `return` of the error, or rejected promise on any path — it cannot reject. Both call sites' subsequent statements (`return 1` / `return 0`) are unconditional and execute regardless of what happens inside the wrapped call. The exit codes themselves are otherwise unchanged: `return 1` on persist failure, `return 0` on success, matching Run 2's AC-10 matrix.
+
+### 3. The orchestrator's reachability correction, itself checked rather than trusted
+
+Two claims underlie `f2a7a48`; both were reproduced by this stage independently, not taken on the orchestrator's or the fresh-reviewer's word:
+
+- **TTY gate.** `tui-flow.ts:86-88` returns via `NON_TTY_GUIDANCE` before any review logic runs when `!deps.tty.stdin || !deps.tty.stdout`; `src/main/container.ts:300-302` wires those flags to `process.stdin.isTTY === true` / `process.stdout.isTTY === true`. A pipe (`sentinel | head`) makes `stdout.isTTY` `undefined`, which is `!== true`, so the gate trips and `offerFullView` is provably unreachable through a piped invocation. **Confirmed true.**
+- **EPIPE is not a synchronous throw.** Built an isolated Node reproduction: a child process performs 300,000 `process.stdout.write` calls into a pipe whose reader is destroyed after 50ms, wrapped in `try/catch`. Result: **`threw = false`** — the write loop completed with no synchronous exception — and the actual `EPIPE` surfaced afterward as an unhandled `'error'` event that crashed the child process (exit code 1) outside the `try/catch` entirely, matching the correction's claim exactly (own transcript, not reproduced from a shared script).
+
+Both sub-claims check out, so the correction is accurate, not merely different. The corrected framing (a TTY write failing mid-print, e.g. `EIO` on hangup — synchronous on POSIX unlike a pipe write — or a synchronously throwing/rejecting prompter) is the genuinely reachable case, and the guarding tests in `full-view.test.ts` already exercise a synchronous throw, so no test needed to change in substance — only the simulated error's name and the prose.
+
+### 4. Gates measured by this stage
+
+| Gate | Command | Result |
+|---|---|---|
+| Quality gate | `npm run check` | exit 0 — biome 163 files, `tsc --noEmit` clean, depcruise **no dependency violations (107 modules / 254 dependencies)** |
+| Test gate | `npm test` | exit 0 — **1037 tests / 49 files passed** |
+| Adapters, no colour | `NO_COLOR=1 npx vitest run --project adapters` | exit 0 — **688 / 28** |
+| Adapters, forced colour | `FORCE_COLOR=1 npx vitest run --project adapters` | exit 0 — **688 / 28**, identical counts |
+| Core isolation (whole change) | `git diff --stat 59b806e..f2a7a48 -- src/core` | empty |
+| Composition root (whole change) | `git diff --stat 59b806e..f2a7a48 -- src/main` | empty |
+| `picocolors` confinement | `grep -rEn '^import .*"picocolors"' src/` | exactly one hit: `src/adapters/driving/tui/colors.ts:34` |
+
+All seven gates measured by this stage directly, matching the numbers the commit messages and `state.yaml`'s prior entries claim. No gate skipped.
+
+### 5. Targeted acceptance-criteria confirmation (not a full 21-AC re-derivation — Run 2 already did that exhaustively)
+
+Per the handoff's explicit scoping, this run concentrated depth on the four ACs this delta could plausibly disturb, and did a scoped sufficiency check (not a full re-derivation) for the rest:
+
+- **AC-10 (exit-code invariance)** — **directly re-verified**, see §2 above: both call sites now use the non-rejecting wrapper; exit codes 0/1 unchanged on both branches.
+- **AC-18 (neutralisation contract)** — **directly re-verified**, see §2 above: all nine bidi code points added to N, correct token shape (`\uNNNN`, since all nine exceed `U+00FF`), P1/P2/P3 unaffected in form (idempotent ASCII tokens, transparency for non-N text untouched).
+- **AC-19 (two-layer defence, checked for a bad interaction with the bidi widening)** — **checked, no interaction found**. `findings.ts`'s `SPACE` regex fragment (`(?:\s|\\x0b|\\x0c|\\x0d|\\u2028|\\u2029)`) — the whitespace-class half of layer 2's leading-token repair — lists only the five whitespace-class members of N (VT, FF, CR, LS, PS); none of the nine bidi tokens appear in it. This matches the commit's own claim that "the nine bidi code points are not JS whitespace, so the widening does not interact with the S11 fix" — confirmed by reading the regex, not by re-trusting the claim. A bidi control at a line's leading position behaves like the already-accepted `risk-e6f2h2-013` (non-whitespace-class leading control), not a new defect; `findings.ts` itself was untouched by `99ae485` (absent from its file list).
+- **AC-16 (core/main untouched, across the whole change)** — **directly re-verified**, see §4: both diffs empty from `59b806e` through `f2a7a48`.
+- **All other ACs (AC-1 through AC-9, AC-11 through AC-15, AC-17, AC-20, AC-21)** — **scoped sufficiency check only, per the handoff's explicit instruction not to re-derive from scratch**: confirmed via the `git show --stat` file lists in §1 that neither commit touches `render.ts`, `findings.ts` (production), the CLI, `src/core`, or `src/main` — the surfaces those ACs are anchored to — so nothing in this delta could have disturbed them. This is a scope-based sufficiency argument, not a re-execution of Run 2's probes; Run 2's 21/21 verdict is relied upon for these.
+
+### 6. Residuals re-checked, not re-litigated
+
+- **`risk-e6f2h2-011`** — narrowing confirmed accurate: the summary now states the bidi half is closed (matches §2's independent confirmation) and the homoglyph half remains a named non-goal, severity correctly dropped to `low`. Not relitigated per the handoff.
+- **`risk-e6f2h2-012`** (CLI `runs show` exposure, deferred to E7), **`risk-e6f2h2-013`** (leading non-whitespace-class control, not a regression) — untouched by this delta; still accurate as written. `-013` is in fact restated by §5's AC-19 check above (a bidi control is exactly this risk's shape, not a new one).
+- **`risk-e6f2h2-014`** (process-level test coverage gap, carried to `[E7.F1.H1]`) — untouched; this delta added unit-level tests only, no process-level suite, so the gap is unchanged.
+- **14 ledger info rows** — none reference bidi or R4-001's reachability in a way this delta contradicts; `review-ledger.md`'s `R4-001` row itself was updated in-place (by the commits, not by this stage) to read "fixed (S12)" with the corrected reachability text, consistent with `f2a7a48`.
+- **Ledger and risk counts** — `state.yaml` carries 14 `open_risks` and 20 `decisions` (`e6f2h2-D19`, `e6f2h2-D20` added since Run 2, both level A/B decisions already recorded with authorship) and 14 `checkpoints` — all confirmed present by direct count before and after this stage's edits, none touched by this stage's own writes.
+
+### Run 3 Verdict
+
+**`pass_with_warnings`** — unchanged tier from Run 2, but **`lifecycle_status` moves to `completed`** this run. Reasoning:
+
+1. Both post-merge owner findings are independently confirmed fixed, with evidence this stage produced itself (an isolated bidi-neutralisation probe and a read of both guard call sites), not merely replayed from commit messages.
+2. The orchestrator's own reachability correction is independently confirmed accurate: the TTY gate and the asynchronous-EPIPE claim were each reproduced by this stage from scratch, not accepted on say-so.
+3. All seven measured gates are green, matching every number the delta's commits and `state.yaml` claim, with no discrepancy found.
+4. The bidi widening does not interact badly with AC-19's two-layer defence — checked directly against the `findings.ts` whitespace-class regex, not assumed.
+5. None of the previously-accepted residuals (`-012`, `-013`, `-014`, the 14 info rows) were reopened or worsened by this delta; `-011` narrowed exactly as claimed.
+6. Nothing in this delta reopens Run 2's four residual findings (QA-F-01 through QA-F-04) — they remain live and are why the verdict tier itself stays `pass_with_warnings` rather than a clean `pass` — but Run 2 already withheld completion *pending user acceptance*, and that acceptance was given (PR #76 was merged). This run's job is narrower: confirm the post-merge fix round is itself sound and does not reopen anything the user already accepted. It is. There is no further human acceptance decision pending on this delta — the owner's two findings, the reason the change was reopened, are both closed and independently confirmed, and the fix round introduced no new residual. Completion is therefore granted at this run, carrying forward the same named residuals (QA-F-01/02/03 low, QA-F-04 medium, now also tracked as `risk-e6f2h2-014`) that the user already accepted at Run 2's `cp-final-review` checkpoint. No new `final_review` checkpoint is raised, since no new acceptance question exists beyond the one already answered.
+
+### Run 3 Next Action
+
+1. Close out `sddl-qa-review`'s stage entry and `qa_summary` in `state.yaml` at `completed`, `lifecycle_status: completed`.
+2. **A new PR is required.** `origin/main` is still at `7efbcda` (the merge of PR #76, already closed); `99ae485` and `f2a7a48` are three commits ahead of `main` on `claude/project-post-merge-analysis-a4tcbl` and are not yet on any open PR (confirmed: `git log origin/main..HEAD` lists exactly these plus the reopen doc commit `2d86545`). Per the workflow contract (one PR per story, human merges), the orchestrator/user should open a new PR from this branch against `main` for these commits, referencing the same issue (#39) and noting it addresses the PR #76 owner review findings plus the reachability correction. QA does not open PRs or push — this is the orchestrator's/user's action.
+3. `risk-e6f2h2-014` and R4-002 remain carried forward to `[E7.F1.H1]` as before — unchanged by this run.

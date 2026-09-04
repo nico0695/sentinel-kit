@@ -1777,13 +1777,14 @@ next_action:
     scenario, and EPIPE really does not throw synchronously in Node. All measured gates green:
     `npm run check` clean (107 modules / 254 dependencies); `npm test` **1037 / 49**; adapters
     **688 / 28 identical** under both colour envs; `src/core`/`src/main` empty across the whole
-    change; picocolors grep = 1. No residual was reopened or worsened. **ONE ACTION REMAINS, NOT
-    QA'S**: `origin/main` is still at `7efbcda` (the PR #76 merge); `99ae485` and `f2a7a48` are
-    three commits ahead on `claude/project-post-merge-analysis-a4tcbl` and are not yet on any open
-    PR. Per the workflow contract, the orchestrator/user should open a new PR from this branch
-    against `main` referencing issue #39, noting it closes the PR #76 owner's review findings. No
+    change; picocolors grep = 1. No residual was reopened or worsened. **FOLLOW-UP PR OPENED**:
+    PR #77 (https://github.com/nico0695/sentinel-kit/pull/77) was opened from this branch against
+    `main`, referencing issue #39 and closing the PR #76 owner's review findings (`99ae485`,
+    `f2a7a48`, `862857e`); a reply comment addressing both findings was posted on PR #76. CI on #77 is
+    green (`build`, `check`, `test (22)`, `test (24)`), `mergeable_state: clean`, no reviews yet. No
     further fixing, review, or QA is needed on this change — `risk-e6f2h2-014` and ledger row
-    `R4-002` remain carried forward to `[E7.F1.H1]` as before, unchanged by this run.
+    `R4-002` remain carried forward to `[E7.F1.H1]` as before, unchanged by this run. The remaining
+    action is the human merge of PR #77, per the workflow contract.
 
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-09-04T12:10:00Z"
+updated_at: "2026-09-04T13:15:00Z"

@@ -23,7 +23,7 @@ complexity_assessment:
     than structured domain data. Risk low-medium.
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
-lifecycle_status: completed
+lifecycle_status: implementing
 current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
@@ -1135,6 +1135,31 @@ checkpoints:
         correct the README status line in this PR.
       responded_at: "2026-08-30T20:15:00Z"
     resolved_at: "2026-08-30T20:15:00Z"
+  - id: cp-pr76-owner-review
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      The repo owner's formal review on PR #76 raised two introduced warnings. Both were reproduced
+      by the orchestrator against the shipped modules before any decision.
+      (1) BIDI CONTROLS PASS THROUGH RAW: all nine of U+202A-U+202E and U+2066-U+2069 survive
+      `neutralizeControls` untouched and reach stdout, so reviewed source quoted by the engine can
+      visually reorder finding text or paths in any terminal applying bidi rendering.
+      (2) A FAILED OPTIONAL PROMPT CHANGES A COMPLETED RUN TO EXIT 1: `runTuiFlow` awaits
+      `offerFullView` unguarded, so a throw reaches `createTui`'s catch-all and returns 1 even though
+      the run was already persisted and rendered — contradicting the module's own stated Property 5.
+      This is R4-001, previously recorded as `info` because R3 refuted it for the SHIPPED prompter
+      seam (clack's promise has no reject path). The owner's framing is sharper and correct: the
+      invariant is stated unconditionally, its only defence is a runtime accident of the current
+      library, and the print loop inside `offerFullView` writes through `process.stdout.write`, which
+      throws on EPIPE — so the path is reachable without swapping the prompter at all.
+    question: >-
+      Fix both and push, fix only the exit-code contradiction, or defer both to E7 as recorded risks?
+    free_input_allowed: true
+    created_at: "2026-08-30T22:30:00Z"
+    response:
+      free_text: "Arreglar los dos y pushear."
+      responded_at: "2026-08-30T22:35:00Z"
+    resolved_at: "2026-08-30T22:35:00Z"
 decisions:
   - id: e6f2h2-D1
     checkpoint_id: cp-proposal-result-rendering
@@ -1405,6 +1430,29 @@ decisions:
       spiked, when they landed at E4 — and the PR already touches CLAUDE.md for the same reason. The
       full user-facing README rewrite stays with `[E7.F2.H1]`.
     recorded_at: "2026-08-30T20:15:00Z"
+  - id: e6f2h2-D19
+    checkpoint_id: cp-pr76-owner-review
+    selected_option_id: fix-both-amendment-2
+    free_text: "Arreglar los dos y pushear"
+    rationale: >-
+      The owner's PR review is a distinct channel from the sdd-lite review lineage, and this repo's
+      own precedent is that it REOPENS the change: `[E5.F1.H2]` (S25) reopened via design Amendment 1
+      and a new plan stage after the owner re-raised a CRITICAL, and `[E6.F1.H1]` (S26) ran a routed
+      S12 round for five issues the first final QA had missed. So the exhausted 2-of-2 fix budget
+      does not apply here — that cap governs the 4R lineage, not the human who merges.
+      Both findings are small, local, and in code this PR already owns, so they are implemented
+      rather than answered with a proposal.
+      On (1): `risk-e6f2h2-011` named printable-text spoofing a non-goal and lumped bidi in with
+      homoglyphs. That grouping was too coarse and the owner is right to separate them — a homoglyph
+      is genuinely unpreventable, but the bidi set is nine discrete, enumerable code points that
+      neutralise exactly like C1. Widening N is an AC-18 amendment, recorded as Amendment 2.
+      On (2): the finding stands even though R3's refutation was correct about the shipped seam.
+      "Unreachable through the current library" is not the same as "cannot happen", and the print
+      loop reaches `process.stdout.write` directly. Guarding the await makes Property 5 true
+      unconditionally instead of true by accident.
+      The non-blocking TuiDeps suggestion is DECLINED with reasons, answered on the thread rather
+      than silently ignored.
+    recorded_at: "2026-08-30T22:35:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

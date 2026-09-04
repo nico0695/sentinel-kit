@@ -1,6 +1,14 @@
 /**
  * Neutralisation of engine-produced text (`[E6.F2.H2]`, #39; AC-18, design
- * Amendment 1 §A-2).
+ * Amendment 1 §A-2 and Amendment 2 §B-1).
+ *
+ * **Amendment 2** (`e6f2h2-D19`) widened the neutralised set to the nine bidi
+ * formatting controls, which the owner's review of PR #76 showed passing
+ * through raw. They are covered twice here: as twelve new rows of the
+ * boundary table (the nine, plus the three printable neighbours that pin the
+ * two new edges), and as a describe of their own, because their failure mode
+ * is not the terminal executing something — it is the reader being shown a
+ * different order of characters than the engine reported.
  *
  * What is under guard here is a contract, not an implementation: engine
  * output is untrusted text, and after this module has seen it, **nothing in
@@ -53,8 +61,9 @@ function cp(codePoint: number): string {
  * The neutralised set N, restated here on purpose (see the header). Used only
  * for the P1-style negative half of an assertion, never on its own.
  */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
-const IN_N = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/;
+const IN_N =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
 
 /**
  * Every attack class the review named, in one multi-line CRLF fixture: CSI
@@ -234,11 +243,94 @@ const BOUNDARY: readonly BoundaryRow[] = [
     why: "the other JS line terminator",
   },
   {
+    // NAMED ASSERTION CHANGE (Amendment 2, `e6f2h2-D19`). This row read
+    // `outcome: "survives"` with `expected: "A\u202aB"` and the
+    // rationale "the neighbour immediately above PS — bidi spoofing is a
+    // named non-goal". That grouping was too coarse: a homoglyph is
+    // genuinely unpreventable here, these nine are not, and the owner's
+    // review of PR #76 separated them.
     label: "U+202A LRE",
-    outcome: "survives",
+    outcome: "escaped",
     codePoint: 0x202a,
-    expected: "A\u202aB",
-    why: "the neighbour immediately above PS — bidi spoofing is a named non-goal",
+    expected: "A\\u202aB",
+    why: "lower edge of the bidi embedding/override block, in N since Amendment 2",
+  },
+  {
+    label: "U+202B RLE",
+    outcome: "escaped",
+    codePoint: 0x202b,
+    expected: "A\\u202bB",
+    why: "right-to-left embedding",
+  },
+  {
+    label: "U+202C PDF",
+    outcome: "escaped",
+    codePoint: 0x202c,
+    expected: "A\\u202cB",
+    why: "pop directional formatting — the terminator half of a reordering attack",
+  },
+  {
+    label: "U+202D LRO",
+    outcome: "escaped",
+    codePoint: 0x202d,
+    expected: "A\\u202dB",
+    why: "left-to-right override",
+  },
+  {
+    label: "U+202E RLO",
+    outcome: "escaped",
+    codePoint: 0x202e,
+    expected: "A\\u202eB",
+    why: "right-to-left override — upper edge of the block, and the classic filename reversal",
+  },
+  {
+    label: "U+202F NARROW NO-BREAK SPACE",
+    outcome: "survives",
+    codePoint: 0x202f,
+    expected: "A\u202fB",
+    why: "the neighbour immediately above RLO — a printable space, not a reordering control",
+  },
+  {
+    label: "U+2065 (unassigned)",
+    outcome: "survives",
+    codePoint: 0x2065,
+    expected: "A\u2065B",
+    why: "the neighbour immediately below LRI — outside the isolates",
+  },
+  {
+    label: "U+2066 LRI",
+    outcome: "escaped",
+    codePoint: 0x2066,
+    expected: "A\\u2066B",
+    why: "lower edge of the bidi isolates, in N since Amendment 2",
+  },
+  {
+    label: "U+2067 RLI",
+    outcome: "escaped",
+    codePoint: 0x2067,
+    expected: "A\\u2067B",
+    why: "right-to-left isolate",
+  },
+  {
+    label: "U+2068 FSI",
+    outcome: "escaped",
+    codePoint: 0x2068,
+    expected: "A\\u2068B",
+    why: "first strong isolate",
+  },
+  {
+    label: "U+2069 PDI",
+    outcome: "escaped",
+    codePoint: 0x2069,
+    expected: "A\\u2069B",
+    why: "pop directional isolate — upper edge of the isolates",
+  },
+  {
+    label: "U+206A INHIBIT SYMMETRIC SWAPPING",
+    outcome: "survives",
+    codePoint: 0x206a,
+    expected: "A\u206aB",
+    why: "the neighbour immediately above PDI — a deprecated format control that reorders nothing",
   },
 ];
 
@@ -265,6 +357,10 @@ describe("neutralizeControls — the boundary table (AC-18)", () => {
     expect(neutralizeControls(cp(0x1b))).toBe("\\x1b");
     expect(neutralizeControls(cp(0x0b))).toBe("\\x0b");
     expect(neutralizeControls(cp(0x2028))).toBe("\\u2028");
+    // Amendment 2's nine all sit above U+00FF, so they reuse the existing
+    // four-hex-digit form: the widening introduced no new token shape.
+    expect(neutralizeControls(cp(0x202e))).toBe("\\u202e");
+    expect(neutralizeControls(cp(0x2069))).toBe("\\u2069");
   });
 });
 
@@ -367,6 +463,163 @@ describe("neutralizeControls — P3 transparency (AC-18)", () => {
     expect(neutralizeControls(CLEAN)).toContain(
       "[SEV: major] calc.js:6-8 — no divide-by-zero guard",
     );
+  });
+});
+
+/**
+ * The nine bidi formatting controls, enumerated **independently of the
+ * module under test** (Amendment 2, `e6f2h2-D19`; the owner's review of
+ * PR #76). Five embeddings/overrides and four isolates: the complete set
+ * of code points that can make a terminal show the reader a different
+ * order of characters than the engine reported. Enumerable and closed —
+ * which is exactly what separates them from the homoglyph problem
+ * `risk-e6f2h2-011` still names as a non-goal.
+ */
+const BIDI: ReadonlyArray<{
+  readonly label: string;
+  readonly codePoint: number;
+  readonly token: string;
+  readonly role: string;
+}> = [
+  {
+    label: "U+202A LRE",
+    codePoint: 0x202a,
+    token: "\\u202a",
+    role: "left-to-right embedding",
+  },
+  {
+    label: "U+202B RLE",
+    codePoint: 0x202b,
+    token: "\\u202b",
+    role: "right-to-left embedding",
+  },
+  {
+    label: "U+202C PDF",
+    codePoint: 0x202c,
+    token: "\\u202c",
+    role: "pop directional formatting",
+  },
+  {
+    label: "U+202D LRO",
+    codePoint: 0x202d,
+    token: "\\u202d",
+    role: "left-to-right override",
+  },
+  {
+    label: "U+202E RLO",
+    codePoint: 0x202e,
+    token: "\\u202e",
+    role: "right-to-left override",
+  },
+  {
+    label: "U+2066 LRI",
+    codePoint: 0x2066,
+    token: "\\u2066",
+    role: "left-to-right isolate",
+  },
+  {
+    label: "U+2067 RLI",
+    codePoint: 0x2067,
+    token: "\\u2067",
+    role: "right-to-left isolate",
+  },
+  {
+    label: "U+2068 FSI",
+    codePoint: 0x2068,
+    token: "\\u2068",
+    role: "first strong isolate",
+  },
+  {
+    label: "U+2069 PDI",
+    codePoint: 0x2069,
+    token: "\\u2069",
+    role: "pop directional isolate",
+  },
+];
+
+describe("neutralizeControls — the nine bidi controls (AC-18, Amendment 2)", () => {
+  it.each(BIDI)(
+    "$label ($role) becomes $token, leaving the text around it alone",
+    ({ codePoint, token }) => {
+      // A file path is the realistic carrier: an engine quoting one from
+      // reviewed source is doing its job, and a reordering control inside
+      // it is what makes the reader see a different path.
+      const raw = `src/auth${cp(codePoint)}.ts:12 — missing guard`;
+
+      // Non-vacuity guard: the input really carries a member of N, so the
+      // negative below cannot pass against already-harmless text.
+      expect(IN_N.test(raw)).toBe(true);
+
+      const actual = neutralizeControls(raw);
+
+      expect(actual).toBe(`src/auth${token}.ts:12 — missing guard`);
+      // Paired: nothing in N survives, AND the path and the prose are
+      // still there — escaped, not deleted.
+      expect(IN_N.test(actual)).toBe(false);
+      expect(actual).toContain("src/auth");
+      expect(actual).toContain(".ts:12 — missing guard");
+    },
+  );
+
+  it("neutralises all nine at once, in order, losing nothing", () => {
+    // The whole set in one string: a row-by-row pass could still miss an
+    // interaction, and this is also the shape a real override attack
+    // takes — an opener, the payload, and its pop.
+    const raw = `head${BIDI.map(({ codePoint }) => cp(codePoint)).join(
+      "",
+    )}tail`;
+
+    expect(IN_N.test(raw)).toBe(true);
+
+    const actual = neutralizeControls(raw);
+
+    expect(actual).toBe(`head${BIDI.map(({ token }) => token).join("")}tail`);
+    expect(IN_N.test(actual)).toBe(false);
+    expect(actual.startsWith("head")).toBe(true);
+    expect(actual.endsWith("tail")).toBe(true);
+    // Nine tokens of six characters each, and not one code point lost.
+    expect(actual).toHaveLength(
+      "head".length + BIDI.length * 6 + "tail".length,
+    );
+  });
+
+  it("is idempotent and order-preserving over the whole set", () => {
+    // P2, on Amendment 2's members specifically: the tokens are printable
+    // ASCII, so a defensive second pass changes nothing.
+    const once = neutralizeControls(
+      BIDI.map(({ codePoint }, index) => `${index}${cp(codePoint)}`).join("|"),
+    );
+
+    expect(neutralizeControls(once)).toBe(once);
+    // Paired positive: stability is not stability at the empty string.
+    for (const [index, { token }] of BIDI.entries()) {
+      expect(once).toContain(`${index}${token}`);
+    }
+  });
+});
+
+describe("toSafeLines — a bidi control reaches no terminal (AC-18, Amendment 2)", () => {
+  it("escapes an override inside a finding line, keeping the finding", () => {
+    // End to end through the composition every renderer uses, on the line
+    // shape that matters: a `[SEV: …]` finding whose file path carries an
+    // RLO. Before Amendment 2 this reached `process.stdout` untouched.
+    const raw = [
+      `[SEV: blocker] src/${cp(0x202e)}gnp.ts:4 — path shown reversed`,
+      `${cp(0x2066)}isolated${cp(0x2069)} prose`,
+    ].join("\r\n");
+
+    expect(IN_N.test(raw)).toBe(true);
+
+    const lines = toSafeLines(raw);
+
+    expect(lines).toEqual([
+      "[SEV: blocker] src/\\u202egnp.ts:4 — path shown reversed",
+      "\\u2066isolated\\u2069 prose",
+    ]);
+    // Paired negative, after the positive above has named both lines.
+    for (const line of lines) {
+      expect(IN_N.test(line)).toBe(false);
+    }
   });
 });
 

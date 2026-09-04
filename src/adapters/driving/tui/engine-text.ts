@@ -1,6 +1,6 @@
 /**
  * Driving adapter: tui — neutralisation of engine-produced text
- * (`[E6.F2.H2]`, #39; AC-18, design Amendment 1 §A-2).
+ * (`[E6.F2.H2]`, #39; AC-18, design Amendment 1 §A-2 and Amendment 2 §B-1).
  *
  * This is the module that knows engine output is **untrusted**. An engine is
  * an AI agent reading arbitrary, possibly hostile source code, and quoting a
@@ -17,6 +17,13 @@
  * was rejected because this tool's purpose is surfacing findings — silently
  * dropping part of one is a worse failure than showing it escaped.
  *
+ * **Amendment 2** (`e6f2h2-D19`, owner review of PR #76) widened the set to
+ * the nine bidi formatting controls. They execute nothing, but they reorder
+ * what the reader sees: a finding text or a file path can be made to *look*
+ * like a different one while the bytes stay honest. That is a discrete,
+ * enumerable set of nine code points, not the open-ended homoglyph problem
+ * it used to be grouped with, and it neutralises exactly like C1.
+ *
  * Pure, with **zero imports**: strings in, strings out. No state, no
  * `process`, no stream, no knowledge of a terminal — the `findings.ts` shape.
  * It lives inside the TUI adapter rather than being shared with the CLI
@@ -32,9 +39,10 @@
  */
 
 /**
- * The neutralised set **N**, as five contiguous ranges. Every member either
- * moves or erases the cursor, introduces a control sequence, or breaks a line
- * where the finding heuristic does not expect one:
+ * The neutralised set **N**, as seven contiguous ranges. Every member either
+ * moves or erases the cursor, introduces a control sequence, breaks a line
+ * where the finding heuristic does not expect one, or reorders what the
+ * reader sees:
  *
  * - `U+0000–U+0008` — NUL..BS; BS erases the previous cell, the rest are
  *   non-printing bytes a terminal may interpret.
@@ -47,6 +55,14 @@
  * - `U+2028`, `U+2029` — LS and PS. Not terminal-executable, but they are JS
  *   line terminators, which is exactly what makes a finding vanish from
  *   `findings.ts`' line-anchored regex (R1-003).
+ * - `U+202A–U+202E` — the bidi **embeddings and overrides** LRE, RLE, PDF,
+ *   LRO, RLO, and `U+2066–U+2069` — the bidi **isolates** LRI, RLI, FSI,
+ *   PDI (**Amendment 2**, `e6f2h2-D19`). In a terminal that applies bidi
+ *   rendering, one of these inside quoted source can visually reverse a
+ *   finding's text or a file path — the reader is shown something other than
+ *   what the engine reported, with the bytes themselves untouched. Nine
+ *   discrete code points, enumerable and closed, which is what separates
+ *   them from the homoglyph problem they were previously grouped with.
  *
  * **Deliberately outside N**, each an argued exclusion rather than an
  * oversight:
@@ -58,19 +74,32 @@
  *   ordinary indentation byte of the source excerpts an engine quotes.
  *   Escaping it would render every indented code excerpt as `\x09\x09…`: a
  *   real fidelity loss for no safety gain.
- * - Bidi overrides (`U+202A–U+202E`), homoglyphs, and plain text that merely
- *   *reads* like a verdict — out of scope by construction. This module
- *   defends against terminal **control**, not against plausible-looking
- *   printable text (`risk-e6f2h2-011`).
+ * - Homoglyphs, and plain text that merely *reads* like a verdict — out of
+ *   scope by construction: neither is an enumerable set, and no
+ *   transformation of the bytes distinguishes them from legitimate prose.
+ *   This module defends against terminal **control** and against the nine
+ *   **enumerable** reordering controls, not against plausible-looking
+ *   printable text (`risk-e6f2h2-011`, narrowed by Amendment 2).
+ *
+ * **Superseded text** (Amendment 1, kept visible): the bullet above used to
+ * read "Bidi overrides (`U+202A–U+202E`), homoglyphs, and plain text that
+ * merely *reads* like a verdict — out of scope by construction." The
+ * grouping was too coarse: a homoglyph is genuinely unpreventable here, the
+ * nine bidi controls are not, and the owner's review of PR #76 separated
+ * them. Note that the isolates `U+2066–U+2069` were not even named by the
+ * superseded bullet — they carry the same reordering effect.
  */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: the C0/C1 control bytes are the literal, deliberate target of this class — matching them is the entire point of the module.
-const NEUTRALIZED = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/g;
+const NEUTRALIZED =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the C0/C1 control bytes are the literal, deliberate target of this class — matching them is the entire point of the module.
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 /**
  * The visible replacement for one code point in N: `\xNN` for `cp ≤ U+00FF`,
- * `\uNNNN` above it (i.e. only LS and PS). Lowercase `x`/`u` and lowercase
- * hex digits, ASCII-only, so the token needs no particular font and reads the
- * way the developer audience of this TUI already writes escapes.
+ * `\uNNNN` above it (LS, PS and, since Amendment 2, the nine bidi controls —
+ * all of them above U+00FF, so the widening added no new token shape).
+ * Lowercase `x`/`u` and lowercase hex digits, ASCII-only, so the token needs
+ * no particular font and reads the way the developer audience of this TUI
+ * already writes escapes.
  *
  * The mapping is **deliberately not injective**: a literal four-character
  * `\x1b` typed in the reviewed source and a real ESC byte render identically.

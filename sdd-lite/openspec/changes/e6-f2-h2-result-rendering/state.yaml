@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-qa-review
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -389,8 +389,8 @@ stages:
   sddl-executor:
     status: completed
     started_at: "2026-08-29T18:00:00Z"
-    completed_at: "2026-08-30T16:10:00Z"
-    last_updated_at: "2026-08-30T16:10:00Z"
+    completed_at: "2026-09-04T11:30:00Z"
+    last_updated_at: "2026-09-04T11:30:00Z"
     notes: >-
       ALL SEVEN planned stages are executed: S1, the S2/S3 batch, S4, S5, S6 and S7 are DONE. S1 (committed `b0a3a04`): picocolors
       pinned at exactly 1.1.1, four colour functions confirmed on the default export, baseline
@@ -734,6 +734,33 @@ stages:
       scoped re-review over the round-2 delta comes next, then final QA. No git side effects.
       **THE FIX BUDGET IS NOW EXHAUSTED: a severe finding surviving this round returns the decision to the
       user.**
+      **S12 (uncommitted) is the owner-review fix round on PR #76** (`cp-pr76-owner-review` /
+      `e6f2h2-D19`; the change was reopened from `completed` to `implementing` for it). Two
+      production files, both inside the TUI adapter. (1) `engine-text.ts`: `NEUTRALIZED` gains
+      `u202a-u202e` and `u2066-u2069`, so the nine bidi formatting controls — all of which the
+      orchestrator reproduced passing through raw — are neutralised like C1. All nine are above
+      U+00FF, so they take the existing four-hex-digit token form and `tokenFor` is untouched;
+      `findings.ts` needed no edit, measured rather than argued, because the nine are not JS
+      whitespace and recognition parity across the widening is exact. (2) `tui-flow.ts`: a new
+      `offerFullViewSafely` wrapper catches a throw from the optional post-run prompt or from its
+      print loop, emits ONE stack-free `stderr` diagnostic reusing `formatTuiErrorLine`, and
+      leaves the unchanged `return 0` / `return 1` standing — ledger row `R4-001`, reachable
+      through the shipped seam because the print loop calls `io.stdout`, i.e.
+      `process.stdout.write`, which throws on EPIPE. `persistRun` still runs exactly once,
+      strictly before the prompt, and no exit code was changed. Three test files modified:
+      **1037 / 49** (995 + 23 + 13 + 6), every "before" count directly observed. `npm run check`
+      clean at 107 modules / 254 dependencies; adapters **688 / 28 identical** under `NO_COLOR=1`
+      and `FORCE_COLOR=1`; `src/core` and `src/main` diffs empty; statement-level picocolors grep
+      = 1. M19 (bidi removed from N) and M20 (guard removed) both observed with BOTH halves and
+      reverted; M20's sixth case did not red on the first run and was strengthened rather than
+      explained away, then re-observed at 6 of 6. ONE named assertion change: `engine-text.test.ts`'s
+      `U+202A LRE` boundary row flips `survives` -> `escaped`, with the superseded values kept in a
+      comment on the row. `spec.md` and `design.md` carry Amendment 2 (no new AC: AC-18's set
+      widened, AC-10 extended to a failing prompt, `risk-e6f2h2-011` narrowed to its homoglyph
+      half). The owner's reported "one pre-existing baseline failure" could NOT be reproduced —
+      the pre-edit suite is 995 / 995. `plan.md` was NOT amended with an S12 row: it is
+      planner-owned and no round-3 plan section was handed over. QA handoff RECOMMENDED — a scoped
+      re-review over the S12 delta, then final QA. No git side effects.
   sddl-qa-review:
     status: completed
     mode: final
@@ -1581,14 +1608,16 @@ open_risks:
     severity: medium
   - id: risk-e6f2h2-011
     summary: >-
-      Appended by Amendment 1. AC-18 neutralises terminal CONTROL, not visual spoofing by
-      printable code points: bidi overrides (U+202A-U+202E, U+2066-U+2069), homoglyphs, and a
-      finding whose plain text simply reads `Verdict: approve` all survive by design. Accepted
-      and named as a non-goal — the three confirmed findings are control-sequence findings, and
-      widening the set to bidi controls would mangle legitimate RTL review text. Bounded by
-      structure: every listed finding is indented two spaces behind a `[blocker]`/`[major]`
-      label, so forged text cannot occupy a digest field's position. Revisit at E7 dogfooding.
-    severity: medium
+      Appended by Amendment 1; NARROWED by Amendment 2 (S12, PR #76 owner review). The bidi half is
+      CLOSED: the repo owner's review argued the grouping of bidi overrides/isolates with homoglyphs
+      was too coarse — bidi is nine discrete, enumerable code points that neutralise exactly like
+      C1, unlike a genuinely unpreventable homoglyph — and S12 widened AC-18's neutralised set to
+      cover `U+202A-U+202E` and `U+2066-U+2069`. What remains a named non-goal: AC-18 still
+      neutralises terminal CONTROL, not visual spoofing by printable code points — homoglyphs and a
+      finding whose plain text simply reads `Verdict: approve` survive by design. Bounded by
+      structure: every listed finding is indented two spaces behind a `[blocker]`/`[major]` label,
+      so forged text cannot occupy a digest field's position. Revisit at E7 dogfooding.
+    severity: low
   - id: risk-e6f2h2-012
     summary: >-
       Appended by Amendment 1. The same engine bytes still reach two surfaces this story does
@@ -1664,27 +1693,29 @@ qa_summary:
 
 next_action:
   kind: user_review
-  target: final_review
+  target: stage_review
   summary: >-
-    **FINAL QA IS COMPLETE. VERDICT `pass_with_warnings`. THE CHANGE IS NOT MARKED `completed` —
-    `lifecycle_status` is `reviewing`.** All 21 ACs pass, both gates are green on numbers QA
-    measured itself (`npm run check` exit 0 / no guard violations; `npm test` 995 / 49; adapters
-    646 / 28 identical under both colour settings; `src/core` and `src/main` diffs empty;
-    statement-level picocolors grep = 1), 0 open severe, and every `verified` ledger row was
-    independently reproduced. ORCHESTRATOR ACTIONS: (1) **Raise the `final_review` checkpoint** —
-    QA did not create it, because checkpoints are orchestrator-owned and the handoff pinned the
-    count at 12; the closeout needs explicit user acceptance of the four residual findings in
-    `qa-report.md` (QA-F-01/02/03 low, QA-F-04 medium) alongside the ledger's 14 info rows and
-    `risk-e6f2h2-011/012/013`. (2) On acceptance, **commit and open the PR** for `[E6.F2.H2]`
-    (`Closes #39`), recording in the description the three reviewed supersessions — `[E6.F2.H1]`
-    AC-7 via AC-15, `result.test.ts:900`, `findings.test.ts:223` — plus QA-F-03's caveat that the
-    `— the ENV-DEPENDENT case` assertions carry weight only in the `FORCE_COLOR=1` / CI run. (3)
-    **Carry `risk-e6f2h2-014` (QA-F-04) and ledger row R4-002 into `[E7.F1.H1]`** as named inputs
-    to the E2E smoke story. (4) **Do NOT open a third fix round** — the budget is exhausted, no
-    finding is at or above the severity floor, and nothing in this change should be fixed further.
-    (5) E6 has no remaining required stories: `[E6.F2.H3]` is optional and skipped under workflow
-    contract rule 7, which CLAUDE.md now states correctly. After user acceptance the orchestrator
-    (not QA) may move the change to `completed`.
+    **S12 IS COMPLETE AND UNCOMMITTED.** The repo owner's two warnings on PR #76 are both closed,
+    both having been reproduced against the shipped modules first. (1) The nine bidi formatting
+    controls (U+202A-U+202E, U+2066-U+2069) are in the neutralised set and asserted end to end
+    through `formatResultDigest` and `formatFullView`, not only through the primitive. (2) The
+    optional post-run prompt is guarded: a rejection from the prompt seam or a throw from the
+    print loop is reported as one stack-free `stderr` line and cannot change the exit code on
+    either branch. Gates measured on this tree: `npm run check` exit 0 (107 modules / 254
+    dependencies, unchanged); `npm test` **1037 / 49** (995 + 42); adapters **688 / 28 identical**
+    under `NO_COLOR=1` and `FORCE_COLOR=1`; `git diff --stat src/core` and `src/main` empty;
+    statement-level picocolors grep = 1. Five files changed, two of them production, all inside
+    `src/adapters/driving/tui/`. ORCHESTRATOR ACTIONS: (1) **Review and commit S12** — the tree is
+    dirty by design, the executor performs no git side effects. (2) **Reply on the PR thread**,
+    including the declined palette-injection suggestion with its reasons (`design.md` §B-3). (3)
+    **Route a scoped re-review over the S12 delta**, checked against the owner's two findings and
+    Amendment 2, then `sddl-qa-review` in `final` mode — the only stage that may move the change
+    back to `completed`. (4) **Decide whether `plan.md` gains an S12 row**: the executor did not
+    add one, because `plan.md` is planner-owned and no round-3 plan section was handed over. (5)
+    **Carry ledger row `R4-002` forward unchanged** — the prompt never settling on stdin EOF is a
+    different failure mode from `R4-001` and is still an input to `[E7.F1.H1]`. (6) Note that the
+    owner's reported pre-existing baseline failure could not be reproduced: the pre-edit suite
+    measured 995 / 995 on this tree.
 
 created_at: "2026-08-29T15:20:00Z"
-updated_at: "2026-08-30T20:55:00Z"
+updated_at: "2026-09-04T11:30:00Z"

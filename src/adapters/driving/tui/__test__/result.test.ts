@@ -952,8 +952,9 @@ function cp(codePoint: number): string {
  * `engine-text.ts`' own character class does not move this one, so the
  * assertions fail instead of agreeing with themselves.
  */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
-const IN_N = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029]/;
+const IN_N =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: this class is the independent restatement of the contract's control-byte set — matching those bytes is what the assertion is for.
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
 
 /**
  * A review carrying every attack class the review round named: CSI cursor-up
@@ -1332,6 +1333,193 @@ describe("formatResultDigest — a structural control never deletes a finding (R
     // the plain render, so nothing the palette added changed the text.
     expect(full.map(stripMarks)).toEqual(
       formatFullView(STRUCTURAL_REVIEW, PLAIN_PALETTE),
+    );
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Amendment 2 (`e6f2h2-D19`) — the nine bidi controls, end to end     */
+/*                                                                      */
+/*  The owner's review of PR #76 showed all nine surviving              */
+/*  `neutralizeControls` and reaching `process.stdout` raw. Their        */
+/*  failure mode is not execution: in a terminal applying bidi           */
+/*  rendering they change the ORDER the reader sees, so a file path or   */
+/*  a finding's text can be shown as something other than what the       */
+/*  engine reported. `engine-text.test.ts` pins the primitive; this      */
+/*  block pins the two surfaces a user actually reads.                   */
+/* ------------------------------------------------------------------ */
+
+/** The nine, restated independently of the module under test. */
+const BIDI_CONTROLS: ReadonlyArray<{
+  readonly label: string;
+  readonly codePoint: number;
+  readonly token: string;
+  readonly role: string;
+}> = [
+  {
+    label: "U+202A LRE",
+    codePoint: 0x202a,
+    token: "\\u202a",
+    role: "left-to-right embedding",
+  },
+  {
+    label: "U+202B RLE",
+    codePoint: 0x202b,
+    token: "\\u202b",
+    role: "right-to-left embedding",
+  },
+  {
+    label: "U+202C PDF",
+    codePoint: 0x202c,
+    token: "\\u202c",
+    role: "pop directional formatting",
+  },
+  {
+    label: "U+202D LRO",
+    codePoint: 0x202d,
+    token: "\\u202d",
+    role: "left-to-right override",
+  },
+  {
+    label: "U+202E RLO",
+    codePoint: 0x202e,
+    token: "\\u202e",
+    role: "right-to-left override",
+  },
+  {
+    label: "U+2066 LRI",
+    codePoint: 0x2066,
+    token: "\\u2066",
+    role: "left-to-right isolate",
+  },
+  {
+    label: "U+2067 RLI",
+    codePoint: 0x2067,
+    token: "\\u2067",
+    role: "right-to-left isolate",
+  },
+  {
+    label: "U+2068 FSI",
+    codePoint: 0x2068,
+    token: "\\u2068",
+    role: "first strong isolate",
+  },
+  {
+    label: "U+2069 PDI",
+    codePoint: 0x2069,
+    token: "\\u2069",
+    role: "pop directional isolate",
+  },
+];
+
+/**
+ * A review whose blocker hides an RLO inside a file path, whose major is
+ * wrapped in an isolate pair, and whose prose carries an embedding. Each
+ * line also carries a unique printable marker, so per-line origin can be
+ * asserted without re-deriving it from the code under test.
+ */
+const BIDI_REVIEW = [
+  "# Review",
+  `[SEV: blocker] src/${cp(0x202e)}gnp.ts:4 — reversed path`,
+  `[SEV: major] ${cp(0x2066)}isolated${cp(0x2069)} finding text`,
+  `prose ${cp(0x202a)}embedded${cp(0x202c)} here`,
+  "VERDICT: request-changes",
+].join("\n");
+
+describe("formatResultDigest — a bidi control cannot reorder a finding (AC-2, AC-18)", () => {
+  it.each(BIDI_CONTROLS)(
+    "shows $label ($role) as $token inside the listed blocker",
+    ({ codePoint, token }) => {
+      const lines = formatResultDigest(
+        {
+          state: "ok",
+          engineOutput: `[SEV: blocker] src/auth${cp(codePoint)}.ts:12 — no guard`,
+        },
+        PLAIN_PALETTE,
+      );
+
+      // Present: still counted, still listed, and the reordering control
+      // is on screen as a readable token rather than acting on the line.
+      expect(lines).toContain("Findings: 1 blocker");
+      expect(lines).toContain(`  [blocker] src/auth${token}.ts:12 — no guard`);
+      // Absent, and only meaningful because of the two assertions above:
+      // unpaired, this also passes when the finding was deleted.
+      expect(lines.some((line) => IN_N.test(line))).toBe(false);
+    },
+  );
+
+  it("neutralises a bidi control in the failure message too (AC-6)", () => {
+    // The third engine-derived channel: `buildReviewErrorMessage` returns
+    // the engine's own text verbatim, so it carries whatever the reviewed
+    // source carried.
+    const lines = formatResultDigest(
+      {
+        state: "engine-error",
+        failure: {
+          stage: "engine",
+          message: `exit 1 in ${cp(0x202e)}txt.stluser — see log`,
+        },
+      },
+      PLAIN_PALETTE,
+    );
+
+    expect(lines).toContain(
+      `Failure: engine — exit 1 in \\u202etxt.stluser — see log`,
+    );
+    expect(lines.some((line) => IN_N.test(line))).toBe(false);
+  });
+});
+
+describe("formatFullView — a bidi control cannot reorder the review (AC-12, AC-18)", () => {
+  it("escapes every one of them while keeping each line in its place", () => {
+    // Non-vacuity guard: the fixture must really be hostile, or the
+    // negative below would pass against harmless markdown.
+    expect(IN_N.test(BIDI_REVIEW)).toBe(true);
+
+    const emitted = formatFullView(BIDI_REVIEW, PLAIN_PALETTE);
+
+    // (a) completeness — one emitted line per source line, in order.
+    expect(emitted).toHaveLength(BIDI_REVIEW.split("\n").length);
+    expect(emitted).toEqual([
+      "# Review",
+      "[SEV: blocker] src/\\u202egnp.ts:4 — reversed path",
+      "[SEV: major] \\u2066isolated\\u2069 finding text",
+      "prose \\u202aembedded\\u202c here",
+      "VERDICT: request-changes",
+    ]);
+    // (c) non-executability — paired with the exact lines above, so a
+    // renderer that deleted the text could not satisfy it.
+    expect(emitted.some((line) => IN_N.test(line))).toBe(false);
+  });
+
+  it("keeps the digest and the full view telling the same story", () => {
+    // The two surfaces run the same matcher over the same neutralised
+    // lines, so a bidi control cannot make one of them show a finding the
+    // other has lost.
+    const digest = formatResultDigest(
+      { state: "ok", engineOutput: BIDI_REVIEW },
+      PLAIN_PALETTE,
+    );
+    const full = formatFullView(BIDI_REVIEW, PLAIN_PALETTE);
+
+    expect(digest).toContain("Findings: 1 blocker, 1 major");
+    expect(digest).toContain("  [blocker] src/\\u202egnp.ts:4 — reversed path");
+    expect(digest).toContain("  [major]   \\u2066isolated\\u2069 finding text");
+    expect(full[1]).toContain("src/\\u202egnp.ts:4");
+    expect(full[2]).toContain("\\u2066isolated\\u2069");
+  });
+
+  it("decorates AFTER neutralising, on Amendment 2's members too", () => {
+    // The load-bearing ordering, proved where it cannot be a no-op:
+    // `MARKED` decorates unconditionally, so the decoration is visibly
+    // wrapped around the already-neutralised text.
+    const decorated = formatFullView(BIDI_REVIEW, MARKED);
+
+    expect(decorated[1]).toBe(
+      "<bad>[SEV: blocker] src/\\u202egnp.ts:4 — reversed path</bad>",
+    );
+    expect(decorated.map(stripMarks)).toEqual(
+      formatFullView(BIDI_REVIEW, PLAIN_PALETTE),
     );
   });
 });

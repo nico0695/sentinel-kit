@@ -8,14 +8,14 @@
 - digest_summary: Three pure modules inside `src/adapters/driving/tui/` — `findings.ts` (the `[SEV: …]` matcher), `colors.ts` (the ONLY `picocolors` importer, exporting a four-role palette plus an identity `PLAIN_PALETTE`), and a rewritten `render.ts` (`formatResultDigest` + `formatFullView`, both taking the palette as an explicit argument) — driven by two edited call sites and one shared post-persist `offerFullView` helper in `tui-flow.ts`. Colour determinism is dual: pure tests inject `PLAIN_PALETTE`; flow tests strip ANSI with a new test-double helper. Zero `src/core/**`, zero `src/main/**`, zero `tui-deps.ts` changes.
 - affected_areas_digest: NEW `tui/findings.ts`, `tui/colors.ts`, `tui/__test__/{findings,full-view}.test.ts` (+ **Amendment 1**: NEW `tui/engine-text.ts`, `tui/__test__/engine-text.test.ts`) · MODIFIED `tui/render.ts`, `tui/tui-flow.ts`, `tui/__test__/{result.test.ts,tui-test-doubles.ts}`, `package.json`, `CLAUDE.md` · UNTOUCHED `tui/{index,tui-deps,clack-prompter}.ts`, `src/main/**`, `src/core/**`, `cli/**`, `.dependency-cruiser.cjs`.
 - interfaces_digest: `matchFindingLine(line) → {severity,text} | undefined`; `extractFindings(lines) → readonly TuiFinding[]` (**Amendment 1**: takes already-neutralised lines, was `markdown: string`); `splitEngineLines(markdown) → readonly string[]`, `neutralizeControls(text) → string`, `toSafeLines(markdown) → readonly string[]` (**Amendment 1**, `engine-text.ts`); `TuiPalette` (`good`/`warn`/`bad`/`muted`); `formatResultDigest(digest, palette) → readonly string[]`; `formatFullView(markdown, palette) → readonly string[]`; `formatTuiErrorLine` unchanged.
-- design_status: complete, **amended once** — see §Amendment 1 (control-sequence neutralisation, fix round 1 of 2, `e6f2h2-D12`): the byte-verbatim full view is superseded by printable-text fidelity, engine text is neutralised before it renders or is matched, and R1-003's silent finding loss is closed at two layers. One conditional level-B escalation recorded earlier (tsconfig interop) has since been resolved at S1. No level-C item in either pass.
+- design_status: complete, **amended twice** — see §Amendment 1 (control-sequence neutralisation, fix round 1 of 2, `e6f2h2-D12`): the byte-verbatim full view is superseded by printable-text fidelity, engine text is neutralised before it renders or is matched, and R1-003's silent finding loss is closed at two layers. One conditional level-B escalation recorded earlier (tsconfig interop) has since been resolved at S1. No level-C item in either pass. See also §Amendment 2 (the repo owner's review of PR #76, `e6f2h2-D19`): the neutralised set widened to the nine bidi controls, and the optional post-run prompt guarded so it cannot change an already-decided exit code. Two files, both inside the TUI adapter; no level-B or level-C item.
 
 ## Summary
 
 - change_name: e6-f2-h2-result-rendering
 - objective: new-feature
 - route: continue-lite
-- design_status: designed; **amended once** (Amendment 1) — pending checkpoint on the amendment
+- design_status: designed; **amended twice** (Amendment 1; Amendment 2) — Amendment 2 approved at `cp-pr76-owner-review` (`e6f2h2-D19`)
 
 Turns spec.md's ACs (17, plus Amendment 1's AC-18..AC-21) into a file layout, four function signatures, the digest's literal copy, and the exact matching rule for the severity heuristic. D1–D5 are ratified as mechanisms, not reopened. Every AC is mapped to a mechanism and a file in §Acceptance Criteria Coverage.
 
@@ -329,3 +329,74 @@ Note on placement: the neutraliser stays inside the TUI adapter. `cli/render/for
 - New A-level decisions recorded, authorship `claude`: the neutralised set N and its two deliberate exclusions; the `\xNN`/`\uNNNN` token shape and its accepted non-injectivity; the CRLF drop-vs-escape rule; `engine-text.ts` as a separate module; `toSafeLines` as the single composition point; `extractFindings(lines)`; the widened `([^\n]*)` as a second layer; neutralising the failure message; and the two recommended test mechanisms in A-7.
 - Two risks appended: `risk-e6f2h2-011` (printable-text spoofing is a named non-goal), `risk-e6f2h2-012` (the CLI and the H1 catch-all carry the same exposure and stay out of scope).
 - Next stage: `sddl-plan` — a fix stage seeded from `R1-001`, `R1-002`, `R1-003`, `R3-002`, `R3-001`, `R2-001`, ordered `engine-text.ts` + its suite first (nothing else can be validated before it exists), then `findings.ts`, then `render.ts`, then the test repairs, then the comment pass. Then `stage_approval`, then `sddl-executor`. No direct edits.
+
+## Amendment 2 — bidi controls in N, and a guarded optional prompt (`cp-pr76-owner-review` / `e6f2h2-D19`)
+
+Fix round for the two warnings the repo owner raised on PR #76, both reproduced against the shipped modules before this section was written. It reopens **no** decision above and none of Amendment 1's: the module split, the pipeline order (split → neutralise → match → colour), the token shape, the CRLF rule, `toSafeLines` as the single composition point, the required-argument palette and `findings.ts`' `SPACE` class all stand unchanged. It changes **one character class** and adds **one wrapper function**. Zero `src/core/**`, zero `src/main/**`, zero `tui-deps.ts`, zero new dependency, zero new import.
+
+### B-0 — Empirical findings (probed against the shipped modules, not documentation)
+
+1. **All nine bidi controls pass through raw.** Feeding `'a' + ch + 'b'` through the shipped `NEUTRALIZED` class returns the input unchanged for U+202A LRE, U+202B RLE, U+202C PDF, U+202D LRO, U+202E RLO, U+2066 LRI, U+2067 RLI, U+2068 FSI and U+2069 PDI. They reach `process.stdout` exactly as the engine emitted them.
+2. **`tui-flow.ts` awaited `offerFullView` unguarded at both call sites.** A throw propagates through `runTuiFlow` into `createTui`'s catch-all, which prints one line and returns **1** — for a run that completed and was persisted, where the module's Property 5 and AC-10 both promise 0.
+3. **The failing path does not need a test double.** `offerFullView`'s print loop calls `io.stdout`, wired in `src/main/container.ts` to `process.stdout.write`, which throws on EPIPE. R3's refutation of `R4-001` (that `@clack/core`'s promise has no reject parameter, so the *prompt* cannot reject) is correct and does not cover the print loop.
+4. **Nothing else in the tree is whitespace- or order-sensitive to the widening.** The nine are not JS whitespace, so `findings.ts`' `SPACE` class, `trim()` and `LIST_OR_QUOTE_PREFIX` treat a raw bidi control and its token identically — both fail to match a structural whitespace position. Recognition parity is exact before and after, so no RR1-001-shaped regression is possible and `findings.ts` needs no edit.
+
+### B-1 — The neutralised set widens by two ranges
+
+`NEUTRALIZED` gains `\u202a-\u202e` and `\u2066-\u2069`. Nothing else in `engine-text.ts` changes:
+
+| | before | after |
+|---|---|---|
+| Ranges in N | 5 | **7** |
+| Token shape | `\xNN` for cp ≤ U+00FF, `\uNNNN` above | **unchanged** — all nine are above U+00FF, so they take the existing `\uNNNN` form |
+| `tokenFor` | — | **unchanged**, not one line |
+| P1 / P2 / P3 | hold | hold — the tokens are printable ASCII, so idempotence and transparency are unaffected |
+| Deliberate exclusions | LF, HT, bidi, homoglyphs | LF, HT, **homoglyphs only** |
+
+**Why these nine and not a wider Unicode "format character" class.** The nine are exactly the code points that instruct the bidi algorithm to reorder the surrounding run. `U+200E`/`U+200F` (LRM/RLM) mark direction for a single character without opening a scope, and `U+206A–U+206F` are deprecated format controls that reorder nothing; neither is a reordering scope, and pulling them in would widen the blast radius without closing anything the owner reported. The boundary table pins the two new edges with three printable neighbours — `U+202F`, `U+2065`, `U+206A` — so a future widening cannot happen silently.
+
+**Why this is not the homoglyph problem.** A homoglyph is unpreventable by any byte transformation: the code point is a legitimate letter and no rule distinguishes it from prose. The bidi set is finite, enumerable and closed, and its members have no legitimate role inside a quoted source excerpt. `risk-e6f2h2-011`'s original rationale — that neutralising bidi "would mangle legitimate RTL review text" — does not survive contact: a terminal renders RTL script right-to-left from the script's own character properties, without an explicit override in the byte stream.
+
+**Formatting note (level A, `claude`).** The widened class pushes the statement past the 80-column line width, so the `biome-ignore` suppression moved from above `const NEUTRALIZED =` to directly above the regex line — biome suppressions apply to the *next* line, and leaving it where it was made `noControlCharactersInRegex` fire. No behaviour change; verified by `biome check` on the file.
+
+### B-2 — The optional prompt is guarded at the call site
+
+One new private function in `tui-flow.ts`, and both call sites move to it:
+
+```ts
+async function offerFullViewSafely(io, prompter, engineOutput): Promise<void> {
+  try {
+    await offerFullView(io, prompter, engineOutput);
+  } catch (error) {
+    io.stderr(`${FULL_VIEW_FAILED} ${formatTuiErrorLine(error)}`);
+  }
+}
+```
+
+- **A wrapper, not a `try` inside `offerFullView`.** The guard is then a named, separately readable unit whose whole content is the invariant, and `offerFullView` keeps its single-purpose body. It also keeps the two call sites symmetric — the shape a reviewer checks by eye.
+- **The exit codes themselves are untouched.** `persistRun` still runs exactly once, strictly before the prompt; the two `return 0` / `return 1` statements are unchanged, and the guard adds one `stderr` line and nothing else. On the persist-failure branch the exit code was already 1, so the fix is visible there only in the *reporting*: the branch's own two diagnostics stand and the new one is appended, rather than the raw throwable replacing everything at the catch-all.
+- **One line, on `stderr`, stack-free.** The repo's split — user-facing output on `stdout`, diagnostics on `stderr`, never a raw stack — with `formatTuiErrorLine` reused, exactly as the persist-failure branch already does.
+- **Not neutralised, deliberately.** The throwable comes from the io / prompter seam, not from the engine, and the only engine-derived text reachable at that point (`formatFullView`'s output) has already been neutralised on its way in. Adding a defensive pass would mean importing `engine-text.js` into `tui-flow.ts` to protect a string that cannot carry engine bytes.
+- **Property 5 becomes unconditional.** The module doc-comment states the amendment inline, including why R3's refutation of `R4-001` did not close it: the invariant's only defence was a runtime accident of the current prompter library, and the print loop bypasses that accident entirely.
+
+### B-3 — Declined, and why it is recorded rather than silently skipped
+
+The owner's non-blocking suggestion to inject the palette through `TuiDeps` instead of importing `TUI_PALETTE` in `tui-flow.ts` is **declined**. It reopens the design's explicit rejection of a palette seam, would edit `src/main/container.ts` — forbidden by `risk-e6f2h2-004`'s standing guard and AC-16's empty-diff requirement — and AC-20(b)'s `palette-wiring.test.ts` already proves the flow passes the real palette at all three call sites without it. The orchestrator declined it on the thread with reasons.
+
+### B-4 — Affected areas delta
+
+| Path | Change | Risk |
+|---|---|---|
+| `tui/engine-text.ts` | **MODIFIED** — two ranges added to `NEUTRALIZED`; the set's doc-comment gains the bidi bullet and keeps the superseded exclusion visible; the suppression comment moves one line down | low — one character class, no control flow |
+| `tui/tui-flow.ts` | **MODIFIED** — `offerFullViewSafely` added, both call sites moved to it, Property 5 restated | low — additive, no branch removed, no exit code changed |
+| `tui/__test__/engine-text.test.ts` | **MODIFIED** — `IN_N` widened, 12 boundary rows added (9 bidi + 3 printable neighbours), two describes added. **NAMED ASSERTION CHANGE**: the `U+202A LRE` row flips `survives` → `escaped` | low |
+| `tui/__test__/result.test.ts` | **MODIFIED** — `IN_N` widened; the nine asserted end to end through `formatResultDigest` and `formatFullView`, plus the failure-message channel | low |
+| `tui/__test__/full-view.test.ts` | **MODIFIED** — `IN_N` widened; the harness gains a rejecting prompter and a throwing-`stdout` io; six flow cases over {prompt rejects, print loop throws} × {persisted, persist-failed} | low |
+| `src/core/**`, `src/main/**`, `tui/{findings,render,colors,index,tui-deps,clack-prompter}.ts`, `cli/**`, `package.json`, `.dependency-cruiser.cjs` | **UNTOUCHED** | guard |
+
+### Amendment 2 approval notes
+
+- No D-level decision reopened, no Amendment 1 mechanism reopened; no new B-level item (no dependency, no public API, no config format, no `tsconfig.json`); **no level-C item** — nothing here requires `src/core/**` or `src/main/**`.
+- New A-level decisions recorded, authorship `claude`: the two ranges and their three pinned neighbours; excluding LRM/RLM and the deprecated `U+206A–U+206F` block; the wrapper shape rather than an internal `try`; the single composed `stderr` line; not neutralising the diagnostic; and the suppression-comment move forced by line width.
+- One risk narrowed: `risk-e6f2h2-011` loses its bidi half and keeps its homoglyph half.
+- Mutation contract for the executor: **M19** (remove the bidi ranges from N — the new cases red, every pre-Amendment-2 AC-18 case green) and **M20** (remove the guard — the new cases red, with the persist-failure cells failing on the *reporting* rather than the exit code, which is 1 either way).

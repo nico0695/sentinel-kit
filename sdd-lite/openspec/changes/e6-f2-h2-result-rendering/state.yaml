@@ -24,7 +24,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-08-29T15:20:00Z"
 lifecycle_status: implementing
-current_stage: sddl-executor
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: skipped
@@ -1480,6 +1480,34 @@ decisions:
       The non-blocking TuiDeps suggestion is DECLINED with reasons, answered on the thread rather
       than silently ignored.
     recorded_at: "2026-08-30T22:35:00Z"
+  - id: e6f2h2-D20
+    checkpoint_id: cp-pr76-owner-review
+    selected_option_id: correct-reachability-claim
+    free_text: "Corregir la narrativa de alcanzabilidad de R4-001, no el codigo"
+    rationale: >-
+      A fresh-context scoped re-review of the S12 delta (fix for D19) verified the fix itself is
+      correct and safe, but found the REACHABILITY JUSTIFICATION attached to it — repeated verbatim
+      across `tui-flow.ts`'s doc comments and `design.md`/`execution-log.md`/`spec.md`/
+      `review-ledger.md` — was factually wrong on two independent grounds, both reproduced by the
+      orchestrator directly rather than taken on the reviewer's word: (a) `createTui.run()` gates
+      the entire interactive flow on `deps.tty.stdin && deps.tty.stdout`, so a piped
+      `sentinel | head` never reaches `offerFullView` at all — it exits via `NON_TTY_GUIDANCE`
+      first; (b) a Node reproduction (300k `process.stdout.write` calls into a pipe with an
+      immediately-exiting reader) showed the write loop completes with NO synchronous throw — the
+      real EPIPE surfaces later as an unhandled `'error'` event that crashes the process outside any
+      `try/catch`, which is not even the failure mode the guard could catch.
+      RULING: keep the code fix — `offerFullViewSafely` is still correct, safe, and the right
+      defensive posture regardless of which scenario reaches it, and the guarding tests already
+      exercise a SYNCHRONOUS throw, which is the real reachable shape (a TTY write failing
+      mid-print, e.g. `EIO` on terminal hangup — synchronous on POSIX unlike a pipe write — or a
+      prompter throwing/rejecting synchronously). Corrected the prose in all five locations plus the
+      test file's doc comments and simulated error (`EPIPE` -> `EIO`) to name the actually-reachable
+      case instead of the pipe/EPIPE one. No test assertion or production behaviour changed — this
+      is a documentation-accuracy fix, not a fix-round. `npm run check` and `npm test` (1037/49)
+      re-run clean after the correction.
+      Level A: technical, reversible, corrects the audit trail rather than the code. Not escalated
+      to a checkpoint because nothing about scope, contract, or observable behaviour changed.
+    recorded_at: "2026-08-31T00:05:00Z"
 open_risks:
   - id: risk-e6f2h2-001
     summary: >-

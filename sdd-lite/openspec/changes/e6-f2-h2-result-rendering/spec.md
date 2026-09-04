@@ -203,7 +203,7 @@ The repo owner reviewed PR #76 and raised two warnings the change had introduced
 
 ### On R4-001, and why R3's refutation did not close it
 
-Ledger row `R4-001` was recorded `info` because R3 refuted it for the shipped prompter seam: `@clack/core`'s promise takes no reject parameter, so `confirm` cannot reject. **R3 was right and the finding still stands.** The invariant is stated unconditionally, its only defence was a runtime accident of the current library, and — decisively — the print loop inside `offerFullView` calls `io.stdout`, which is `process.stdout.write` (`src/main/container.ts`) and **throws on EPIPE**. The path is reachable without swapping the prompter at all: `sentinel | head`, a closed pager, a terminal that goes away mid-print.
+Ledger row `R4-001` was recorded `info` because R3 refuted it for the shipped prompter seam: `@clack/core`'s promise takes no reject parameter, so `confirm` cannot reject. **R3 was right and the finding still stands.** The invariant is stated unconditionally, and its only defence was a runtime accident of the current library. The print loop inside `offerFullView` calls `io.stdout`, which is `process.stdout.write` (`src/main/container.ts`) (re-review correction, S12: a piped `sentinel | head` never reaches this code — `createTui.run()` gates the whole flow on both streams being real TTYs — and Node does not throw synchronously on EPIPE for a pipe write in any case; the write completes and the error surfaces later as an unhandled `'error'` event. The actually-reachable failure is a TTY write failing mid-print — e.g. `EIO` on terminal hangup, which is synchronous on POSIX unlike a pipe write — or a prompter throwing/rejecting synchronously).
 
 ### Scope of the amendment
 

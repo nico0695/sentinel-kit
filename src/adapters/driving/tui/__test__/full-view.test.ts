@@ -130,7 +130,9 @@ interface FullViewHarnessOptions {
   /**
    * Amendment 2: `io.stdout` throws when handed this exact line. This is the
    * seam that makes `R4-001` reachable without swapping the prompter at all —
-   * the real `io.stdout` is `process.stdout.write`, which throws on EPIPE.
+   * the real `io.stdout` is `process.stdout.write`, which fails synchronously
+   * on a real TTY write error (e.g. `EIO` on terminal hangup), not on a
+   * piped reader going away (Node's pipe writes fail asynchronously).
    */
   readonly stdoutThrowsOn?: {
     readonly line: string;
@@ -140,8 +142,9 @@ interface FullViewHarnessOptions {
 
 /**
  * A capturing io whose `stdout` throws on one chosen line and records every
- * other. Nothing about it is exotic: `process.stdout.write` behaves this way
- * the moment the reader goes away (`sentinel | head`, a closed pager).
+ * other. Nothing about it is exotic: a real TTY write can fail the same way
+ * mid-print (e.g. the terminal hanging up) — TTY writes are synchronous on
+ * POSIX, which is what makes a synchronous throw here realistic.
  */
 function throwingStdoutIo(line: string, error: Error): CapturingTuiIo {
   const inner = createCapturingTuiIo();
@@ -664,11 +667,12 @@ describe("a failing full-view prompt cannot change the outcome (AC-10, Amendment
   //
   // Two seams, because the finding has two reachable causes: the prompter
   // rejecting, and the print loop throwing. The second needs no double
-  // swap at all — `io.stdout` is `process.stdout.write`, which throws on
-  // EPIPE the moment the reader goes away.
+  // swap at all — `io.stdout` is `process.stdout.write`, which can fail
+  // synchronously on a real TTY write error (e.g. terminal hangup); a
+  // piped reader going away does not throw synchronously in Node.
 
   const PROMPT_FAILURE = new Error("prompt seam collapsed");
-  const WRITE_FAILURE = new Error("write EPIPE");
+  const WRITE_FAILURE = new Error("write EIO");
   const DIAGNOSTIC = "The full review output could not be shown:";
 
   /** Three plain lines, none of which the digest itself ever prints. */

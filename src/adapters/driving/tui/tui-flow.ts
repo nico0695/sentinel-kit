@@ -42,10 +42,12 @@
  *    call used to be a bare `await offerFullView(...)`, so a throw from the
  *    optional prompt or from the print loop reached {@link createTui}'s
  *    catch-all and turned an already-completed, already-persisted review
- *    into exit 1 — contradicting this property and AC-10. The path is
- *    reachable without swapping the prompter: the print loop calls
- *    `io.stdout`, which is `process.stdout.write` in the real container and
- *    throws on EPIPE. The guard is a diagnostic, never a new outcome.
+ *    into exit 1 — contradicting this property and AC-10. The reachable path
+ *    is not a piped stdout (this flow only runs when both streams are real
+ *    TTYs, gated below) but a TTY write failing mid-print (`EIO` on terminal
+ *    hangup — TTY writes are synchronous on POSIX, unlike pipe writes) or a
+ *    prompter that throws or rejects synchronously. The guard is a
+ *    diagnostic, never a new outcome.
  */
 
 import { resolveReviewRequest } from "../../../core/run/index.js";
@@ -313,11 +315,17 @@ const FULL_VIEW_FAILED = "The full review output could not be shown:";
  * {@link createTui}'s catch-all and returns 1, which is the wrong answer for
  * a review that succeeded and was persisted.
  *
- * The failure is reachable through the shipped seam, not only a test double:
- * the print loop calls `io.stdout`, wired to `process.stdout.write`
- * (`src/main/container.ts`), which throws on EPIPE when the reader has gone
- * away — `sentinel | head`, a closed pager, a terminal that disappeared
- * mid-print.
+ * CORRECTED (this stage's own re-review): a piped stdout is NOT the
+ * reachable case — `createTui.run()` gates the whole flow on
+ * `deps.tty.stdin && deps.tty.stdout`, so `sentinel | head` never reaches
+ * this code at all, and Node does not throw synchronously on `EPIPE` for a
+ * pipe write in any case (the write completes; the error surfaces later as
+ * an unhandled `'error'` event that would crash the process before this
+ * catch could run). The failure this guards against is a TTY write that
+ * fails mid-print — a real controlling terminal disappearing (`EIO` on
+ * hangup) is synchronous on POSIX, unlike a pipe write — or `prompter`
+ * throwing/rejecting synchronously, which R3 confirmed is not how the
+ * shipped clack seam behaves but is not guaranteed for every prompter.
  *
  * One line, no stack frame (`formatTuiErrorLine` collapses the message and
  * never touches `error.stack`), and no neutralisation pass: the throwable

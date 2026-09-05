@@ -93,17 +93,19 @@ When validating a stage, check the work against these docs + the guard file.
 - Record changed files, checks run, blockers, and next action in `execution-log.md`.
 - If a story conflicts with the PRD, or reality contradicts a documented assumption: stop and ask. Do not
   improvise scope.
-- E0 through `[E6.F2.H1]` have landed on `main` @ `59b806e` (PR #75). All four scripts (`check`, `test`, `build`,
-  `dev`) are runnable and green as of that merge (`check` clean, `npm test` 754/754 across 45 files).
-- `[E6.F1.H1]` filled `src/adapters/driving/cli/` (commander shell, `repo`/`runs`/`review` commands,
-  renderers) and replaced the `[E0.F1.H3]` stub: `src/main/` now holds `cli.ts`, `container.ts` and
-  `paths.ts`, and is the only place adapters are instantiated. `main/` wiring stays hot-path.
-  `[E6.F1.H2]` (PR #74) added the documented review exit-code contract (`cli/exit-code.ts`,
-  `ReviewExitSignal`, `--changes-exit-code`). `[E6.F2.H1]` (PR #75) filled
-  `src/adapters/driving/tui/` (`tui-flow.ts`, `tui-deps.ts`, `render.ts`, `clack-prompter.ts`) and made
-  bare `sentinel` on a TTY dispatch to it from `main/cli.ts`; `@clack/prompts` 1.7.0 is exact-pinned and
-  confined to `clack-prompter.ts` by the `adapters-isolated` guard. The current story is `[E6.F2.H2]`
-  (result rendering) — it rewrites the deliberately minimal `tui/render.ts`.
+- E0 through E6 have landed on `main` @ `cbc878b` (PRs #75-#78). All four scripts (`check`, `test`, `build`,
+  `dev`) are green at that commit from a clean `npm ci`: `check` clean (163 files, 107 modules cruised,
+  0 guard violations), `npm test` 1037/1037 across 49 files, `build` 124 KB ESM, `node dist/cli.js --version` OK.
+- `src/adapters/driving/cli/` holds the commander shell (`repo`/`runs`/`review` commands, renderers,
+  `exit-code.ts` + `ReviewExitSignal` + `--changes-exit-code`). `src/adapters/driving/tui/` holds the
+  interactive flow (`tui-flow.ts`, `tui-deps.ts`, `render.ts`, `clack-prompter.ts`, `colors.ts`) that bare
+  `sentinel` on a TTY dispatches to. `src/main/` (`cli.ts`, `container.ts`, `paths.ts`) is the only place
+  adapters are instantiated. Two runtime deps are exact-pinned and confined by the `adapters-isolated`
+  guard: `@clack/prompts` 1.7.0 to `clack-prompter.ts`, `picocolors` 1.1.1 to `colors.ts`.
+- E6 is complete; `[E6.F2.H3]` (`sentinel open`) is skipped per workflow contract rule 7. The current epic
+  is **E7 (wrap-up)** and the current story is **`[E7.F1.H1]`** (issue #41): the first E2E smoke test of the
+  full flow. The `e2e` vitest project has existed since E0 (`vitest.config.ts`, include `e2e/**/*.test.ts`)
+  but matches no files — this story creates the repo's first `e2e/` root.
 
 ### testing
 

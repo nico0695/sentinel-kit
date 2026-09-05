@@ -1,0 +1,112 @@
+version: "0.1"
+change_name: e7-f1-h1-e2e-smoke
+# The orchestrator's handoff objective is `implementer`; `state.schema.yaml` has no such
+# enum member, so the schema-valid equivalent for a backlog test-infrastructure story is
+# recorded here (the same mapping E6's stories used). Intent is unchanged: this change
+# runs through execution, it does not stop at plan.
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E7.F1.H1] (issue #41), first story of E7 (wrap-up) and the required predecessor of
+    the release pipeline [E7.F2.H3]: an end-to-end smoke test over the full flow — register a
+    repo, review a branch, read the run back out of history — driven against a temporary git
+    repository and the existing FakeEngine, asserting the persisted artifacts. Bounded scope
+    span: the repo's `e2e` vitest project has existed since E0 (`vitest.config.ts`, include
+    `e2e/**/*.test.ts`) but matches no files today, so the story creates the first `e2e/` root
+    rather than reshaping an existing suite. Blast radius is normally test-only, with ONE
+    material exception that is the load-bearing ambiguity of this change: the FakeEngine the
+    story names is not reachable through the CLI today. `EngineNameSchema` is
+    `z.enum(["claude-code", "opencode"])` (`src/core/repos/ports/config-schemas.ts:14`),
+    `createEngine` is a closed name-to-constructor lookup over those two
+    (`src/main/container.ts:118`), and `createWiringGraph` accepts only `env` and `homeDir` —
+    there is no seam to inject a `ReviewEngine`. Reaching the FakeEngine therefore requires a
+    production-code decision (a test-only injection seam in the composition root, a gated
+    `fake` engine name in the schema, or running in-process against `createCliDeps` and giving
+    up coverage of the built `dist/cli.js`), each with a different cost to the public surface.
+    Isolation itself is already solved and is not a risk: `SENTINEL_HOME` fully redirects
+    sentinel state (`src/main/paths.ts:68`). Medium ambiguity concentrated at the spec/design
+    boundary, low-medium risk.
+  confidence: medium
+  recorded_at: "2026-09-05T16:10:00Z"
+lifecycle_status: draft
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: pending
+  sddl-proposal:
+    status: in_progress
+    started_at: "2026-09-05T16:10:00Z"
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/state.yaml
+  proposal: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/proposal.md
+  spec: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/spec.md
+  design: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/design.md
+  plan: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/plan.md
+  execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
+checkpoints: []
+decisions:
+  - id: d-001
+    checkpoint_id: session-init
+    free_text: interactive
+    rationale: >-
+      Session execution mode, asked once per the orchestrator contract's Session
+      Initialization rule and cached for the session. Author: user. The user chose
+      `interactive` over `auto` on the recommendation that this change carries a real
+      design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
+    recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-002
+    checkpoint_id: bootstrap-preflight
+    free_text: surgical-refresh
+    rationale: >-
+      Bootstrap preflight read `stale`: `config.yaml`'s own recorded refresh trigger was
+      "E6 closed (E7 entry)", which is exactly this routing point. Refreshed surgically
+      by the orchestrator (not a full `sddl-init` run) against verified repo reality at
+      `main` @ cbc878b — check/test/build re-run from a clean `npm ci` (1037/49 tests,
+      0 guard violations), `picocolors` recorded as ratified, `marked-terminal` dropped
+      as a pending recommendation, and the missing `src/adapters/driving/tui/__test__`
+      root added to observed paths. Preflight is now `ready`, so code-touching execution
+      is not gated on stale bootstrap. Level A (technical, reversible, aligned with the
+      setup doc). Author: claude.
+    recorded_at: "2026-09-05T16:00:00Z"
+open_risks:
+  - id: risk-e7h1-001
+    summary: >-
+      The FakeEngine that story [E7.F1.H1] names as the e2e driver is unreachable through the
+      CLI: `EngineNameSchema` admits only `claude-code` and `opencode`, `createEngine` is a
+      closed lookup over those two, and the composition root exposes no `ReviewEngine`
+      injection seam. Every route to the story's acceptance criteria therefore touches
+      production code or trades away coverage of the real built binary. This must be settled
+      as an explicit decision at spec/design, not improvised at execution.
+    severity: medium
+  - id: risk-e7h1-002
+    summary: >-
+      The e2e test must run in CI (an explicit acceptance criterion) on ubuntu-latest across
+      the Node 22/24 matrix, which means it must create a temporary git repository with a
+      deterministic identity and no dependency on the developer's global git config
+      (`user.name`/`user.email`, `init.defaultBranch`, commit signing, `core.autocrlf`). The
+      existing git adapter suites already face this; whether they solved it reusably is
+      unverified and is proposal/design evidence, not an assumption to carry forward.
+    severity: low
+next_action:
+  kind: run_stage
+  target: sddl-proposal
+  summary: >-
+    Frame story [E7.F1.H1] as a change: confirm the real end-to-end surface the smoke test
+    must cover, gather the evidence needed to choose between the three FakeEngine-reachability
+    routes (risk-e7h1-001) without deciding it yet, and check how the existing suites isolate
+    git identity (risk-e7h1-002).
+created_at: "2026-09-05T16:10:00Z"
+updated_at: "2026-09-05T16:10:00Z"

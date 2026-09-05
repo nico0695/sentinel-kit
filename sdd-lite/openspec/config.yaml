@@ -21,14 +21,17 @@ paths:
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
 
-# NOTE: E0 through E6.F2.H1 have landed on `main` @ 59b806e (PR #75 merged). All four
-# scripts are runnable and verified exit 0 as of that merge: `npm run check` (biome +
-# tsc + depcruise, 0 violations — 156 files, 103 modules cruised), `npm test` (vitest,
-# 754/754 across 45 files), `npm run build` (tsup) and `npm run dev` (`tsup --silent &&
-# node dist/cli.js`). `[E6.F1.H1]` added the CLI adapter (`src/adapters/driving/cli/`),
-# the `commander` runtime dep, and the `src/main/` composition root (cli.ts,
-# container.ts, paths.ts); `[E6.F2.H1]` filled `src/adapters/driving/tui/` and added
-# the `@clack/prompts` runtime dep.
+# NOTE: E0 through E6 have landed on `main` @ cbc878b (PRs #75, #76, #77, #78 merged).
+# E6 is fully complete: `[E6.F2.H2]` (result rendering) shipped in PR #76 and its two
+# owner-review findings (bidi/RTL control neutralisation, the optional post-run prompt
+# flipping the exit code) were fixed in PR #77. `[E6.F2.H3]` (`sentinel open`) stays
+# skipped per workflow contract rule 7. All four scripts verified exit 0 at this commit
+# on a clean `npm ci`: `npm run check` (biome + tsc + depcruise, 0 violations — 163 files,
+# 107 modules / 254 dependencies cruised), `npm test` (vitest, 1037/1037 across 49 files),
+# `npm run build` (tsup, 124 KB ESM) and `node dist/cli.js --version`. Remaining MVP work
+# is E7 only: E2E smoke (#41), dogfooding (#42), user docs (#43), license (#44), release
+# pipeline (#45).
+
 quality_commands:
   install:
     - npm ci
@@ -48,21 +51,21 @@ bootstrap:
   strategy: shallow-high-signal
   generated_at: "2026-08-01T14:39:32Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-29T15:00:00Z"
-  # Surgical refresh 2026-08-29 by the orchestrator (not a full sddl-init run),
-  # post-E6.F2.H1 on `main` @ 59b806e, at the start of `[E6.F2.H2]`. What changed
-  # since the previous surgical entry: `[E6.F2.H1]` (PR #75) landed the TUI
-  # navigation flow — `src/adapters/driving/tui/` is no longer a placeholder
-  # (`tui-flow.ts`, `tui-deps.ts`, `render.ts`, `clack-prompter.ts` + 6 suites),
-  # `src/main/cli.ts` dispatches bare argv to the TUI, and `createWiringGraph` /
-  # `createTuiDeps` were extracted in `container.ts`. First TUI runtime dep
-  # ratified and installed: `@clack/prompts` 1.7.0 (exact-pinned, confined to
-  # `tui/clack-prompter.ts`); `npm test` grew from 707/39 to 754/45.
-  # `[E6.F2.H2]` (result rendering) is the last required E6 story and rewrites the
-  # deliberately minimal `tui/render.ts` surface that `[E6.F2.H1]` left behind.
-  # `picocolors` / `marked-terminal` stay declared-only recommendations
-  # (docs/setup-tecnico-sentinel.md §4) until this story's design ratifies them.
-  # Next refresh trigger: E6 closed (E7 entry), or a new runtime dep lands.
+  last_validated_at: "2026-09-05T16:00:00Z"
+  # Surgical refresh 2026-09-05 by the orchestrator (not a full sddl-init run), at the
+  # E7 entry — the trigger the previous entry itself named ("E6 closed (E7 entry), or a
+  # new runtime dep lands"). What changed since the previous surgical entry: `[E6.F2.H2]`
+  # landed (PR #76) and was then hardened by PR #77, closing E6. `src/adapters/driving/tui/`
+  # grew the result-rendering surface and its own `__test__` root (now recorded below —
+  # it was absent from the previous entry's observed test roots). One runtime dep was
+  # ratified and installed since: `picocolors` 1.1.1 (exact-pinned, confined to
+  # `tui/colors.ts`, whose palette the pure renderers take as a required argument);
+  # `marked-terminal` was NOT adopted and is no longer a pending recommendation.
+  # `npm test` grew from 754/45 to 1037/49.
+  # Next epic is E7 (wrap-up). Its first story `[E7.F1.H1]` (E2E smoke, issue #41) adds
+  # the repo's first `e2e/` test root — the `e2e` vitest project has existed in
+  # `vitest.config.ts` since E0 but matches no files today.
+  # Next refresh trigger: `e2e/` lands, or a new runtime dep lands, or E7 closes.
   refresh_recommended: false
   refresh_reason_codes: []
   observed_files:
@@ -102,6 +105,7 @@ bootstrap:
       - src/adapters/driven/git/__test__
       - src/adapters/driven/storage/__test__
       - src/adapters/driving/cli/__test__
+      - src/adapters/driving/tui/__test__
       - src/main/__test__
     fixture_roots:
       - fixtures

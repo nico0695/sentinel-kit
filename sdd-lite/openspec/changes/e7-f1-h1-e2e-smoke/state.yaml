@@ -31,7 +31,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-spec
 stages:
   sddl-deep-explorer:
     status: pending
@@ -59,8 +59,25 @@ stages:
       returns `Promise<number>` and never touches `process`, so exit codes are asserted
       in-process. Raised Q8 (A-level, design-owned).
   sddl-design:
-    status: in_progress
+    status: completed
     started_at: "2026-09-05T16:32:00Z"
+    completed_at: "2026-09-05T16:42:00Z"
+    notes: >-
+      Returned `success`. Settled Q8 as D-1/D-2: extend, do not restructure — declare
+      `engineOverride?: ReviewEngine` on both `CliDepsOptions` (public, `@internal`,
+      test-only TSDoc) and the private `WiringGraphOptions`, since `createCliDeps` already
+      forwards its whole options object into `createWiringGraph`; consume it as
+      `engine: options.engineOverride ?? createEngine(request.engineName, env)` inside the
+      existing `runReview` thunk. Omitted, the expression is today's call verbatim, so the
+      `UnknownEngineError` throw and the `SENTINEL_OPENCODE_MODEL` failure path stay
+      byte-identical; present, `??` short-circuits so the fake never demands an opencode
+      model. `sentinelPaths()` is still called once — property 1 intact. Also specified
+      `e2e/review-flow.test.ts` (2 tests) + `e2e/support/hermetic-git.ts`, per-test
+      SENTINEL_HOME via env injection, and three named AC-11 mutation points on different
+      layers (M1 rename metadata.json in run-store-fs, M2 hand runReview the wrong
+      worktrees dir, M3 make resolveReviewExitCode return 0 for request-changes).
+      Surfaced three code-evidence corrections to spec assertions (A-1/A-2/A-3), routed
+      back to sddl-spec as Amendment 1 rather than left as a silent contradiction.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -173,6 +190,28 @@ open_risks:
       existing git adapter suites already face this; whether they solved it reusably is
       unverified and is proposal/design evidence, not an assumption to carry forward.
     severity: low
+  - id: risk-e7h1-006
+    summary: >-
+      Three spec assertions were contradicted by code evidence found at design time, all
+      A-level and none a scope change: (A-1) `validations/` is written only when
+      `validationOutput` is non-empty (`run-store-fs.ts:237-240`) and `repo add` has no
+      `--validations` flag, so under the `quick` harness it never exists and the smoke must
+      assert it ABSENT; (A-2) `<SENTINEL_HOME>/config.yaml` is never written by any CLI path,
+      so only `repos.yaml` may be asserted; (A-3) `serializeRunMetadata` emits no `id` field —
+      the run id IS the directory name, so AC-5 is met by matching the directory name against
+      what `runs list` prints. Routed back to sddl-spec as Amendment 1 so spec and design do
+      not contradict each other on the record.
+    severity: low
+  - id: risk-e7h1-007
+    summary: >-
+      Two informational findings from design that the plan and QA must not lose: AC-7's
+      "existing wiring tests unmodified" clause is VACUOUS as written, because
+      `src/main/__test__/` holds only `paths.test.ts` — there is no container wiring test, so
+      the seam has to be verified by reading the diff; and `metadata.json#engine` will read
+      `claude-code` while the FakeEngine actually ran (the override interposes after name
+      resolution), so the smoke must never assert an engine name. Both folded into
+      Amendment 1.
+    severity: low
   - id: risk-e7h1-004
     summary: >-
       Raised by the spec stage (Q8, A-level, design-owned — no user input needed):
@@ -200,11 +239,11 @@ open_risks:
     severity: low
 next_action:
   kind: run_stage
-  target: sddl-design
+  target: sddl-spec
   summary: >-
-    Produce design.md from spec.md: the technical approach for the e2e harness, the shape of
-    the optional test-only ReviewEngine seam (settling Q8 / risk-e7h1-004 — extend
-    CliDepsOptions vs restructure the forwarding), the self-contained hermetic git fixture,
-    and the two quality-gate config edits. Awaiting user confirmation (interactive mode).
+    sddl-spec is re-running in amendment mode to absorb A-1/A-2/A-3 and the two
+    informational findings (risk-e7h1-006, risk-e7h1-007) into spec.md as Amendment 1,
+    preserving the existing AC numbering. Then route to sddl-plan, carrying the amendment
+    and design decisions D-1/D-2 into the validation strategy.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T16:32:00Z"
+updated_at: "2026-09-05T16:42:00Z"

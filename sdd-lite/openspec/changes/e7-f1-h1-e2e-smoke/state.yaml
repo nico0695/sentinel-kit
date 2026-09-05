@@ -30,8 +30,8 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: planned
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: pending
@@ -81,7 +81,20 @@ stages:
       Amendment 1 has since landed (see the sddl-spec notes), so spec and design are
       consistent on the record.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-09-05T16:55:00Z"
+    completed_at: "2026-09-05T17:02:00Z"
+    notes: >-
+      Returned `success`. Six strictly sequential code-touching stages, each gated by
+      stage_approval. ST-1 isolates the ONLY production change (the engineOverride seam) so
+      it is reviewable and revertible on its own. ST-2 lands the d-004 gate edits BEFORE any
+      e2e/ file exists, so a tsc/biome/tsup interaction is attributable to the config alone.
+      ST-3 adds the hermetic-git fixture + happy path (S1-S4), ST-4 the negative case (S5).
+      ST-5 is an explicit AC-11 mutation stage: M1/M2 (+optional M3) one at a time, red
+      assertion recorded, reverted, revert PROVEN by `git status --porcelain` plus per-file
+      diffs showing no residue. ST-6 proves the full gate plus the AC-8 deliberate-type-error
+      spot check. Amendment 1's corrections are written in as binding constraints on the
+      assertions ST-3/ST-4 may write.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -192,6 +205,13 @@ open_risks:
       existing git adapter suites already face this; whether they solved it reusably is
       unverified and is proposal/design evidence, not an assumption to carry forward.
     severity: low
+  - id: risk-e7h1-008
+    summary: >-
+      Sequencing risk raised by the plan: ST-2 is the first time tsc, biome and tsup ever see
+      an `e2e/` directory, so a pre-existing finding or a type-resolution interaction can
+      surface there. The plan binds this as a STOP-and-report, never a widened edit — the
+      config stage must stay attributable.
+    severity: low
   - id: risk-e7h1-006
     summary: >-
       Three spec assertions were contradicted by code evidence found at design time, all
@@ -240,8 +260,8 @@ open_risks:
       depcruise stays scoped to `src` deliberately.
     severity: low
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: wait_for_approval
+  target: sddl-executor
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
     ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
@@ -250,4 +270,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T16:50:00Z"
+updated_at: "2026-09-05T17:02:00Z"

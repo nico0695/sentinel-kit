@@ -31,7 +31,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-spec
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: pending
@@ -78,6 +78,8 @@ stages:
       worktrees dir, M3 make resolveReviewExitCode return 0 for request-changes).
       Surfaced three code-evidence corrections to spec assertions (A-1/A-2/A-3), routed
       back to sddl-spec as Amendment 1 rather than left as a silent contradiction.
+      Amendment 1 has since landed (see the sddl-spec notes), so spec and design are
+      consistent on the record.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -239,11 +241,13 @@ open_risks:
     severity: low
 next_action:
   kind: run_stage
-  target: sddl-spec
+  target: sddl-plan
   summary: >-
-    sddl-spec is re-running in amendment mode to absorb A-1/A-2/A-3 and the two
-    informational findings (risk-e7h1-006, risk-e7h1-007) into spec.md as Amendment 1,
-    preserving the existing AC numbering. Then route to sddl-plan, carrying the amendment
-    and design decisions D-1/D-2 into the validation strategy.
+    Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
+    ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
+    the e2e suite and hermetic-git fixture, the two quality-gate config edits, and the AC-11
+    mutation verification using design's three named mutation points. HELD: awaiting the
+    user's confirmation to route (interactive mode). No code-touching stage may start before
+    plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T16:42:00Z"
+updated_at: "2026-09-05T16:50:00Z"

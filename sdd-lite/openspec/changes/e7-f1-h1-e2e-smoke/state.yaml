@@ -31,7 +31,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-proposal
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: pending
@@ -46,9 +46,21 @@ stages:
       (risk-e7h1-003). Wrote proposal.md only; state.yaml left to the orchestrator as
       instructed.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-09-05T16:25:00Z"
+    completed_at: "2026-09-05T16:32:00Z"
+    notes: >-
+      Returned `success`. 12 acceptance criteria (AC-1..AC-12) and 6 behavior scenarios
+      (S1-S6). Both story checkboxes are bound: AC-10 = runs in CI on the existing `test`
+      job across Node 22/24 with no workflow change, AC-11 = "fails if any piece breaks",
+      demonstrated by at least two mutations on different layers, reverted, with QA
+      re-running one. d-003 and d-004 formalized as non-goals N-1 and N-2. Verified that
+      Q5 (exit-code assertions) IS reachable under route (a): `createCli(deps).run(argv)`
+      returns `Promise<number>` and never touches `process`, so exit codes are asserted
+      in-process. Raised Q8 (A-level, design-owned).
   sddl-design:
-    status: pending
+    status: in_progress
+    started_at: "2026-09-05T16:32:00Z"
   sddl-plan:
     status: pending
   sddl-executor:
@@ -80,7 +92,14 @@ checkpoints:
       gated by an env var, or (c) in-process against createCliDeps? Q2: does `e2e/` join
       tsconfig/biome (and does depcruise stay scoped to `src`)?
     free_input_allowed: true
+    response:
+      free_text: >-
+        Q1 = (a) optional ReviewEngine override in WiringGraphOptions, test-only.
+        Q2 = add e2e to tsconfig#include and biome.json#files.includes; depcruise stays
+        scoped to `src`.
+      responded_at: "2026-09-05T16:25:00Z"
     created_at: "2026-09-05T16:18:00Z"
+    resolved_at: "2026-09-05T16:25:00Z"
 decisions:
   - id: d-001
     checkpoint_id: session-init
@@ -105,6 +124,36 @@ decisions:
       is not gated on stale bootstrap. Level A (technical, reversible, aligned with the
       setup doc). Author: claude.
     recorded_at: "2026-09-05T16:00:00Z"
+  - id: d-003
+    checkpoint_id: cp-001
+    free_text: "Q1 = route (a)"
+    rationale: >-
+      The smoke run reaches the FakeEngine through an OPTIONAL `ReviewEngine` override in
+      `WiringGraphOptions`, typed as optional and documented as test-only. Chosen over route
+      (b) (a `fake` member in `EngineNameSchema`, gated by an env var) and route (c)
+      (in-process against `createCliDeps`). Rationale: (b) is the only route that covers
+      `dist/cli.js` as a real subprocess, but it puts a test engine into the user-facing
+      schema — `sentinel review --engine` validation and help, `config.yaml`'s
+      `defaultEngine`, and persisted run metadata all consume `EngineNameSchema`, so an env
+      gate narrows the exposure without removing it. Surface purity won. The cost is
+      explicit and must be written into the spec, not implied: `src/main/cli.ts` (argv
+      dispatch) and the built bundle stay outside the smoke's coverage, partially offset by
+      the existing CI `build` job running `node dist/cli.js --version`. Level B. Author:
+      user (options and recommendation presented by claude; claude recommended (a)).
+    recorded_at: "2026-09-05T16:25:00Z"
+  - id: d-004
+    checkpoint_id: cp-001
+    free_text: "Q2 = tsconfig + biome yes, depcruise scoped to src"
+    rationale: >-
+      `e2e` joins `tsconfig.json#include` and `biome.json#files.includes` so the smoke suite
+      is typechecked and linted like the rest of the repo, closing risk-e7h1-003. `depcruise`
+      stays scoped to `src`: the architecture guards are the core-extraction guarantee, and
+      `e2e/` is neither shipped (`package.json#files` is dist/harnesses/skills) nor subject
+      to the inward-dependency rule — it legitimately reaches into both `src/main` and
+      `src/adapters` at once. The exclusion is recorded as a deliberate decision rather than
+      left as an accident of scoping. Level B (repo structure + quality gate). Author: user
+      (claude recommended this option).
+    recorded_at: "2026-09-05T16:25:00Z"
 open_risks:
   - id: risk-e7h1-001
     summary: >-
@@ -124,20 +173,38 @@ open_risks:
       existing git adapter suites already face this; whether they solved it reusably is
       unverified and is proposal/design evidence, not an assumption to carry forward.
     severity: low
+  - id: risk-e7h1-004
+    summary: >-
+      Raised by the spec stage (Q8, A-level, design-owned — no user input needed):
+      `WiringGraphOptions` alone is insufficient to carry the route-(a) engine override,
+      because the smoke calls `createCliDeps`, whose `CliDepsOptions` is a separate
+      interface (`src/main/container.ts:78-87`) that forwards into the graph. Design decides
+      whether to extend `CliDepsOptions` or restructure the forwarding.
+    severity: low
+  - id: risk-e7h1-005
+    summary: >-
+      Accepted consequence of d-003: a test-only seam now exists in production code
+      (`src/main/container.ts`). Mitigated by spec AC-7, which requires the
+      `EngineNameSchema` diff to be empty and the existing wiring tests to be unmodified,
+      so the seam cannot silently widen the user-facing surface.
+    severity: low
   - id: risk-e7h1-003
     summary: >-
       New, found by the proposal stage: a top-level `e2e/` directory is invisible to all three
       quality-gate tools. `tsconfig.json` sets `"include": ["src"]`, `biome.json#files.includes`
       is an explicit allowlist, and `npm run check` runs `depcruise src`. Only `vitest.config.ts`
       already matches `e2e/**/*.test.ts`. Left unaddressed, the smoke suite would run unlinted
-      and untypechecked — the one directory in the repo outside the gate. Raised as Q2.
-    severity: medium
+      and untypechecked — the one directory in the repo outside the gate. Raised as Q2 and
+      RESOLVED by decision d-004: `e2e` joins tsconfig#include and biome.json#files.includes;
+      depcruise stays scoped to `src` deliberately.
+    severity: low
 next_action:
-  kind: ask_user
-  target: cp-001
+  kind: run_stage
+  target: sddl-design
   summary: >-
-    Resolve checkpoint cp-001 (Q1 engine reachability, Q2 e2e/ in the quality gate) with the
-    user, record both as decisions, then route to sddl-spec with the answers in the envelope.
-    Q3-Q7 are A-level and carry their recommendations forward into the spec without a gate.
+    Produce design.md from spec.md: the technical approach for the e2e harness, the shape of
+    the optional test-only ReviewEngine seam (settling Q8 / risk-e7h1-004 — extend
+    CliDepsOptions vs restructure the forwarding), the self-contained hermetic git fixture,
+    and the two quality-gate config edits. Awaiting user confirmation (interactive mode).
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T16:18:00Z"
+updated_at: "2026-09-05T16:32:00Z"

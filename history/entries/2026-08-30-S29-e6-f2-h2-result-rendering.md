@@ -1,4 +1,4 @@
-# S29 — [E6.F2.H2] Terminal result rendering, owner review, PR #77
+# S29 — [E6.F2.H2] Terminal result rendering, owner review, PR #77 merged — E6 complete
 
 - **Date**: 2026-08-30
 - **Branch**: `claude/project-post-merge-analysis-a4tcbl`
@@ -124,13 +124,15 @@ lines, and offers the engine's raw markdown behind one opt-in prompt.
 - **PR #77 opened**: https://github.com/nico0695/sentinel-kit/pull/77 — the follow-up fixing both of
   PR #76's owner-review findings. CI green (`build`, `check`, `test (22)`, `test (24)`), `mergeable_state:
   clean`. A reply comment was posted on PR #76 addressing both findings and pointing to PR #77.
+- **PR #77 merged** (`0a9c3aa`) by the owner, no further review comments. `main` now carries the S12
+  fix and the reachability correction. **E6 is fully complete**: all required E6 stories (`E6.F1.H1`,
+  `E6.F1.H2`, `E6.F2.H1`, `E6.F2.H2`) are merged, and the owner's two post-merge findings on #76 are
+  also resolved on `main`, not just left as open follow-up issues.
 
 ## Pending and next steps
 
-- **User**: review and merge PR #77 (workflow contract: the human merges everything). PR #76 is
-  already merged, but E6 does not fully close until #77 lands — it fixes two real defects the #76
-  merge shipped. Subscribed to PR #77's activity; CI is green and no owner activity has arrived yet.
-- **Claude, next session**: once #77 merges, E7. `[E7.F1.H1]` (E2E smoke) is the natural entry point and must carry
+- **PR #77 merged. E6 is closed.** No action remains on this story.
+- **Claude, next session**: E7. `[E7.F1.H1]` (E2E smoke) is the natural entry point and must carry
   `risk-e6f2h2-014` + info row R4-002 as named inputs — the process-level blind spot this story could
   not close from inside a doubles-based suite.
 - **E7 candidates recorded, not fixed**: `risk-e6f2h2-012` (the CLI's `runs show` carries the same

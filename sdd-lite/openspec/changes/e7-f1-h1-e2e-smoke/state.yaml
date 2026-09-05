@@ -30,14 +30,21 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: draft
+lifecycle_status: planning
 current_stage: sddl-proposal
 stages:
   sddl-deep-explorer:
     status: pending
   sddl-proposal:
-    status: in_progress
+    status: completed
     started_at: "2026-09-05T16:10:00Z"
+    completed_at: "2026-09-05T16:18:00Z"
+    notes: >-
+      Returned `partial`: proposal.md is complete and usable by sddl-spec, but two B-level
+      questions (Q1 engine reachability, Q2 e2e/ in the quality gate) gate a safe spec freeze.
+      Investigated both orchestrator risks with code evidence and surfaced a third
+      (risk-e7h1-003). Wrote proposal.md only; state.yaml left to the orchestrator as
+      instructed.
   sddl-spec:
     status: pending
   sddl-design:
@@ -56,7 +63,24 @@ artifacts:
   plan: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/plan.md
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
-checkpoints: []
+checkpoints:
+  - id: cp-001
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      The proposal returned two B-level questions that shape the spec's acceptance criteria.
+      Q1 decides how the smoke run reaches the FakeEngine, and with it how much of the real
+      binary the "fails if any piece of the flow breaks" criterion actually covers. Q2 decides
+      whether the new top-level `e2e/` directory joins the quality gate, which today is blind
+      to it (tsconfig `include` is `["src"]`, biome uses an explicit allowlist, and `check`
+      runs `depcruise src`).
+    question: >-
+      Q1: which route reaches the FakeEngine — (a) an optional ReviewEngine override in
+      WiringGraphOptions used only by the e2e harness, (b) a `fake` member in EngineNameSchema
+      gated by an env var, or (c) in-process against createCliDeps? Q2: does `e2e/` join
+      tsconfig/biome (and does depcruise stay scoped to `src`)?
+    free_input_allowed: true
+    created_at: "2026-09-05T16:18:00Z"
 decisions:
   - id: d-001
     checkpoint_id: session-init
@@ -100,13 +124,20 @@ open_risks:
       existing git adapter suites already face this; whether they solved it reusably is
       unverified and is proposal/design evidence, not an assumption to carry forward.
     severity: low
+  - id: risk-e7h1-003
+    summary: >-
+      New, found by the proposal stage: a top-level `e2e/` directory is invisible to all three
+      quality-gate tools. `tsconfig.json` sets `"include": ["src"]`, `biome.json#files.includes`
+      is an explicit allowlist, and `npm run check` runs `depcruise src`. Only `vitest.config.ts`
+      already matches `e2e/**/*.test.ts`. Left unaddressed, the smoke suite would run unlinted
+      and untypechecked — the one directory in the repo outside the gate. Raised as Q2.
+    severity: medium
 next_action:
-  kind: run_stage
-  target: sddl-proposal
+  kind: ask_user
+  target: cp-001
   summary: >-
-    Frame story [E7.F1.H1] as a change: confirm the real end-to-end surface the smoke test
-    must cover, gather the evidence needed to choose between the three FakeEngine-reachability
-    routes (risk-e7h1-001) without deciding it yet, and check how the existing suites isolate
-    git identity (risk-e7h1-002).
+    Resolve checkpoint cp-001 (Q1 engine reachability, Q2 e2e/ in the quality gate) with the
+    user, record both as decisions, then route to sddl-spec with the answers in the envelope.
+    Q3-Q7 are A-level and carry their recommendations forward into the spec without a gate.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T16:10:00Z"
+updated_at: "2026-09-05T16:18:00Z"

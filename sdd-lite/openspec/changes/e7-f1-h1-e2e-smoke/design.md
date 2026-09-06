@@ -6,6 +6,9 @@
 - objective: new-feature (story `[E7.F1.H1]`, #41)
 - route: continue-lite
 - digest_summary: >-
+  (**Amendment 1**: runs persist under one path segment, `runs/acme__widget/<ts>/` — the alias's
+  slash is normalised to `__` by `toRunStorageKey` — not under a nested alias path; D-7 corrected
+  in place, everything else stands.)
   One new `e2e/` root with a two-test smoke suite driving `createCli(createCliDeps({...})).run(argv)`
   over a hermetic temp git repo and the shipped FakeEngine, reached through one optional,
   test-only `engineOverride` field threaded through `CliDepsOptions` -> `WiringGraphOptions`
@@ -25,7 +28,9 @@
 - change_name: e7-f1-h1-e2e-smoke
 - objective: new-feature
 - route: continue-lite
-- design_status: ready-for-plan (Q8 decided; three A-level artifact-assertion corrections recorded
+- design_status: ready-for-plan, **amended once** — see §Amendment 1 (alias vs. run storage key; D-7
+  corrected in place after ST-3, no scope or approach change). (Q8 decided; three A-level
+  artifact-assertion corrections recorded
   in Open Technical Questions — none changes scope, all need acknowledging at QA)
 
 ## Design Overview
@@ -86,10 +91,12 @@ AC-3's "assert under the temp root" by construction.
 
 **D-7 — repo identity.** `repo add https://example.test/acme/widget.git --local-path <tmp repo>
 --base-branch main --harness quick`. The URL is never dialed (`registerRepo` skips `git.clone` when
-`localPath` is set) and `deriveAlias` yields the deterministic alias `acme/widget`; runs therefore
+`localPath` is set) and `deriveAlias` yields the deterministic alias `acme/widget`. ~~Runs therefore
 land under `<SENTINEL_HOME>/runs/acme/widget/<ts>/` (`repoName` is the argv alias, slash included,
-and `mkdir -p` handles the nesting). `--base-branch main` also skips `git.defaultBranch`, keeping the
-flow fully offline.
+and `mkdir -p` handles the nesting).~~ **SUPERSEDED by §Amendment 1**: the alias is normalised to a
+storage key before it reaches `RunStore`, so runs land under
+`<SENTINEL_HOME>/runs/acme__widget/<ts>/` and `metadata.json#repo` persists as `acme__widget`.
+`--base-branch main` also skips `git.defaultBranch`, keeping the flow fully offline.
 
 **D-8 — AC-11 mutation protocol.** Executor applies one mutation at a time, runs
 `npx vitest run --project e2e`, records the observed failing assertion, then `git checkout --
@@ -121,7 +128,7 @@ flow fully offline.
 - Consumption: `runReview: (request) => runReview(request, { git, engine: options.engineOverride ?? createEngine(request.engineName, env), harnesses, worktreesDir: paths.worktreesDir, processRunner })`.
 - `createEngine`, `EngineNameSchema`, `CliDeps`, `TuiDeps`, `TuiDepsOptions`, `RunRecord`, `metadata.json` shape: unchanged.
 - Engine script: `createFakeEngine({ ok: true, result: { output: "<markdown ending in `VERDICT: approve`>" } })` (single outcome repeats per call); the negative test scripts `VERDICT: request-changes`.
-- Asserted state after the happy path: `<HOME>/repos.yaml` contains `acme/widget`; `<HOME>/runs/acme/widget/<id>/metadata.json` parses with `repo: "acme/widget"`, `targetRef: <feature branch>`, `state: "ok"`, `verdict: "approve"`; `result.md` equals the scripted `output` exactly; `prompt.md` exists and is non-empty; `<id>` equals the id `runs list` printed.
+- Asserted state after the happy path (**corrected by §Amendment 1** — was `runs/acme/widget/` and `repo: "acme/widget"`): `<HOME>/repos.yaml` contains the alias `acme/widget`; `<HOME>/runs/acme__widget/<id>/metadata.json` parses with `repo: "acme__widget"` (the storage key), `targetRef: <feature branch>`, `state: "ok"`, `verdict: "approve"`; `result.md` equals the scripted `output` exactly; `prompt.md` exists and is non-empty; `<id>` equals the id `runs list` printed.
 
 ## Alternatives And Trade-Offs
 
@@ -153,3 +160,67 @@ flow fully offline.
   AC-5/S3 are demonstrated without changing what the smoke covers. `sddl-plan` should carry them into
   the validation strategy so the executor does not write assertions that cannot pass.
 - Recommended next stage: `sddl-plan`.
+
+## Amendment 1 — repo alias vs. run storage key (post-ST-3 factual correction)
+
+Written after ST-3 executed and the running code contradicted D-7. This is a **factual correction,
+not a scope change**: the approach, D-1..D-6 and D-8, the file layout, the seam and every acceptance
+criterion stand untouched. Only D-7's stated on-disk path — and the one Interfaces bullet that
+repeated it — were wrong, and a wrong path on the record would mislead the next reader and produce
+assertions that cannot pass. Re-verified in code before writing this section.
+
+### A1-1 — what is actually true
+
+`persistRun` does not hand the store the alias. It maps it first
+(`src/core/history/persist-run.ts:116`):
+
+```ts
+const record: RunRecord = { repoName: toRunStorageKey(request.repoName), ... };
+```
+
+`toRunStorageKey` (`src/core/history/run-storage-key.ts`) replaces every `/` and `\` with `__`, so
+`acme/widget` becomes `acme__widget`. The reason is a port contract, not cosmetics: `RunStore` turns
+`repoName` into a single filesystem path segment, and `RunRecordPathFieldsSchema` /
+`RunQueryFieldsSchema` (`src/core/history/ports/run-store-schemas.ts:24,38`) validate it with
+`PathSegmentSchema`, which rejects any `/` or `\` before a single byte of fs access happens. The
+mapping is idempotent (`f(f(x)) === f(x)`).
+
+Two consequences for this smoke:
+
+| Was stated in D-7 | Is actually true |
+|---|---|
+| runs land under `<HOME>/runs/acme/widget/<ts>/` | runs land under `<HOME>/runs/acme__widget/<ts>/` — one segment, no nesting |
+| `metadata.json#repo` is `acme/widget` | `metadata.json#repo` is `acme__widget` — `serializeRunMetadata` copies `record.repoName` verbatim |
+
+### A1-2 — the non-obvious half: the split is deliberate, and the smoke now covers both sides
+
+`toRunStorageKey` is applied on **every** entry into the module — `persistRun`, `list-runs.ts:21`
+and `get-run.ts:20` — and is deliberately **not** exported from `src/core/history/index.js`: the
+storage-key rule is a `history` implementation detail, not part of the core's public API. So the
+alias never has to leave the caller's hands. The `runs list <repo>` and `runs show <repo> <id>` legs
+of the smoke still pass the **alias** `acme/widget` on argv, and still get the alias echoed back —
+`format-runs.ts` prints the alias the caller typed, never `RunSummary.repoName` / `RunRecord.repoName`,
+precisely so a user who typed `owner/repo` is never shown `owner__repo`.
+
+The user-facing surface therefore speaks **aliases**, the filesystem speaks **storage keys**, and
+`toRunStorageKey` is the documented bridge between them. That split is exactly the kind of
+cross-layer fact no fake-based unit test can confirm end to end, and the smoke now pins **both**
+halves in one flow: argv and rendered output in alias form, the asserted directory and
+`metadata.json#repo` in storage-key form.
+
+### A1-3 — what changes in this design
+
+- **D-7**: the superseded sentence is struck in place and the corrected path stated beside it.
+- **Interfaces, Data, And State**: the asserted-state bullet now reads `runs/acme__widget/<id>/` and
+  `repo: "acme__widget"`, with a note that `repos.yaml` still holds the alias.
+- **Nothing else.** No decision is reopened, no AC is renegotiated, no file is added or removed from
+  §Affected Areas, and the AC-11 mutation points M1/M2/M3 are unaffected.
+
+### Amendment approval notes
+
+- Level **A** (factual correction to a documented path, reversible, aligned with the PRD and with
+  code that already shipped in E5). No level-B or level-C item; no user input required.
+- Follow-through for downstream stages: any plan, executor or QA text still asserting
+  `runs/acme/widget/` or `repo: "acme/widget"` is wrong and must use the storage key. A cheap
+  guard for QA: an assertion on the alias-shaped path would fail with ENOENT, so a green suite
+  already proves the corrected form is the one implemented.

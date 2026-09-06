@@ -16,6 +16,7 @@
 | ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | cp-004 (approved) | completed |
 | ST-4 | Negative case (S5) | cp-005 (approved) | completed |
 | ST-5 | AC-11 mutation verification | cp-006 (approved) | completed — with finding (M2 blind spot) |
+| ST-5b | Close the M2 blind spot: two worktree-location assertions | cp-007 (approved) | completed |
 | ST-6 | Full gate + closeout evidence | pending | pending |
 
 ## ST-1 — Test-only `ReviewEngine` seam in the composition root
@@ -737,3 +738,108 @@ closes the change — ST-6 is the last stage, so a gap accepted silently here sh
 Return to the orchestrator with the M2 blind spot as an open level-B decision (accept the gap, or
 approve a small follow-up stage that adds the worktree-location assertions and re-proves M2 red).
 ST-6 is not approved and was not started.
+
+## ST-5b — Close the M2 blind spot in the smoke
+
+- approval_reference: checkpoint `cp-007`, ST-5b only (stage inserted after ST-5's finding; decision
+  `d-010`, level B, user). ST-6 explicitly not approved and not started.
+- status: completed
+- planned_scope: `e2e/review-flow.test.ts` only — exactly two assertions added to the existing
+  happy-path test, then M2 re-applied and reverted as the red/green proof.
+- actual_changed_files: `e2e/review-flow.test.ts` (only). Net change under `src/`: none.
+
+### What was added
+
+Both assertions live at the end of the happy-path test, next to the existing `S6` isolation check,
+and both carry a comment naming the blind spot they close so a later reader does not delete them as
+redundant:
+
+1. `expect(readdirSync(join(sentinelHome, "worktrees"))).toEqual([basename(fixture.repoPath)])` —
+   the worktree root actually used. The worktree itself is gone by assertion time (cleanup removes it
+   on the success path, `run-review.ts` stage 9), so the observable is its **parent**: `git worktree
+   add` creates `<worktreesDir>/<repoBasename>/` on the way in and `git worktree remove` deletes only
+   the leaf, leaving that directory behind as a durable trace. `readdirSync` is deliberate over
+   `existsSync`: a directory that was never created makes it throw rather than pass vacuously, which
+   is exactly the failure mode M2 produces. No race is involved — the review has fully returned.
+2. `expect(existsSync(clonesDir) ? readdirSync(clonesDir) : []).toEqual([])` — `clones/` untouched by
+   a `--local-path` registration. The ternary tolerates the directory not existing at all (which is
+   the correct state today) without weakening the assertion when it does exist.
+
+`node:path`'s `basename` was added to the existing import. No third test, no new fixture.
+
+### Red/green proof (M2 as the ready-made mutation)
+
+| Step | Command | Result |
+|---|---|---|
+| 1 | `npx vitest run --project e2e` (assertions in place, clean tree) | 2/2 passed |
+| 2 | apply M2: `worktreesDir: paths.clonesDir` in `createWiringGraph` (`src/main/container.ts`) | `git diff --stat` = 1 file, 1 insertion, 1 deletion |
+| 3 | `npx vitest run --project e2e` | **RED** — 1 failed, 1 passed |
+| 3b | same, with assertion 1 temporarily neutralised, to prove assertion 2 bites independently | **RED** on assertion 2 |
+| 4 | `git checkout -- src/main/container.ts` | reverted |
+| 5 | `npx vitest run --project e2e` | 2/2 passed |
+| 6 | `git diff src/main/container.ts` | **empty (0 bytes)** |
+| 7 | `npm run check` | clean — biome 165 files, `tsc --noEmit` silent, depcruise 107 modules / 254 dependencies, no violations |
+
+Verbatim failure at step 3 (assertion 1, the first to run):
+
+```
+FAIL  |e2e| e2e/review-flow.test.ts > registers a repository, reviews a branch and reads the run back
+Error: ENOENT: no such file or directory, scandir '/tmp/sentinel-home-ApbJXq/worktrees'
+ ❯ e2e/review-flow.test.ts:237:10
+    237|   expect(readdirSync(join(sentinelHome, "worktrees"))).toEqual([
+```
+
+Verbatim failure at step 3b (assertion 2, proving it is not merely shadowed by assertion 1):
+
+```
+AssertionError: expected [ 'repo' ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "repo",
++ ]
+ ❯ e2e/review-flow.test.ts:244:63
+```
+
+The step-3b neutralisation was transient: the file was restored from a scratchpad copy immediately
+afterwards, and the step-5 green run plus the final `git status --porcelain` confirm the only
+surviving test-file change is the two assertions.
+
+`risk-e7h1-008` is therefore **closed**: re-pointing `worktreesDir` at `clonesDir` no longer leaves
+the suite green, and AC-11's claim ("fails if any piece of the flow breaks") no longer ships with a
+demonstrated counter-example inside its own story.
+
+### Quick checks
+
+Planned for ST-5b: e2e project green, M2 red, revert clean, `npm run check`. All run, as transcribed
+above. `npm test` and `npm run build` were **not** run, nor was AC-8's deliberate-type-error spot
+check — they belong to ST-6, which is not approved.
+
+### Blockers
+
+None. ST-5b completed.
+
+### Open risks carried forward
+
+- `risk-e7h1-008` — **closed** by this stage.
+- AC-8's deliberate-type-error spot check (ST-6) is still owed.
+- `risk-e7h1-005` and `risk-e7h1-007` carry forward unchanged.
+
+### Git discipline
+
+No commit, no stage, no branch, no stash. The only git write was
+`git checkout -- src/main/container.ts`, reverting the M2 mutation this stage applied itself — the
+one write the ST-5b handoff permits. `plan.md` shows as modified in `git status` because a plan
+worker is amending it concurrently; this stage did not touch it, nor `state.yaml`, `design.md`,
+`spec.md` or `proposal.md`.
+
+### QA handoff
+
+Recommended, together with ST-5. The change now touches the e2e suite's assertions, and the closing
+QA should confirm the two new assertions read as intentional and permanent.
+
+### Next action
+
+Return to the orchestrator. ST-6 (full gate: `npm test`, `npm run build`, AC-8 spot check, closeout
+evidence) is the remaining stage and requires its own approval.

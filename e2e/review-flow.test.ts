@@ -24,7 +24,7 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { createFakeEngine } from "../src/adapters/driven/engines/index.js";
 import { type CliIo, createCli } from "../src/adapters/driving/cli/index.js";
@@ -223,6 +223,27 @@ it("registers a repository, reviews a branch and reads the run back", async () =
 
   /* --- isolation (S6) --- */
   expect(existsSync(deadHomeDir)).toBe(false);
+
+  // Closes the blind spot ST-5 found: `createWiringGraph` could hand
+  // `runReview` the *clones* directory as `worktreesDir` and the whole suite
+  // still passed, because a `--local-path` registration leaves `clones/`
+  // empty and nothing observed where the worktree lived. The worktree itself
+  // is gone by now (cleanup removes it on the success path), but
+  // `git worktree add` creates `<worktreesDir>/<repoBasename>/` on the way in
+  // and `git worktree remove` only deletes the leaf — so that parent
+  // directory is the durable trace of the root actually used. Reading it with
+  // `readdirSync` is deliberate: if the directory was never created, this
+  // throws instead of silently passing.
+  expect(readdirSync(join(sentinelHome, "worktrees"))).toEqual([
+    basename(fixture.repoPath),
+  ]);
+
+  // The other half of the same property, from the opposite side: a
+  // `--local-path` registration clones nothing, so `clones/` must stay empty
+  // whether or not it was created. A worktree misdirected into it shows up
+  // here as a stray `<repoBasename>` entry.
+  const clonesDir = join(sentinelHome, "clones");
+  expect(existsSync(clonesDir) ? readdirSync(clonesDir) : []).toEqual([]);
 });
 
 it("reports a request-changes verdict with the configurable gate exit code", async () => {

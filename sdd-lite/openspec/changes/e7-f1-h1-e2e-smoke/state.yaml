@@ -169,6 +169,23 @@ stages:
       independently by the orchestrator: `git diff` empty on all three mutated files, `git
       diff --stat src e2e` empty, suite green 2/2. The executor did NOT swap M2 for an
       easier mutation.
+      ST-5b COMPLETE (`success`) — the M2 blind spot is CLOSED and the closure is proven.
+      Two assertions added to the existing happy-path test (no third test, no new fixture),
+      plus `basename` on the existing `node:path` import. The insight that made it
+      observable: `runReview`'s cleanup removes the worktree on the success path, so the
+      worktree itself is gone by assertion time — but its PARENT survives, because
+      `git worktree add` creates `<worktreesDir>/<repoBasename>/` and the adapter's
+      `worktree remove --force` deletes only the leaf. Assertion 1 uses `readdirSync` rather
+      than `existsSync` on purpose: a directory that was never created THROWS instead of
+      passing vacuously. Assertion 2 tolerates `clones/` not existing at all.
+      Red/green proof: baseline 2/2 green; M2 applied -> 1 failed 1 passed with
+      `ENOENT ... scandir '/tmp/sentinel-home-*/worktrees'` at review-flow.test.ts:237;
+      revert -> 2/2 green; `git diff src/main/container.ts` empty; `npm run check` clean.
+      The executor also checked, unprompted, that the two assertions are independent: with
+      assertion 1 transiently neutralised, assertion 2 bites on its own
+      (`expected [ 'repo' ] to deeply equal []`), so neither is dead weight shadowed by the
+      other. The orchestrator RE-RAN the entire red/green cycle itself — apply M2, observe
+      red, revert, confirm empty diff and green — rather than accepting the report.
       ST-6 not started — it still needs its own stage_approval.
   sddl-qa-review:
     status: pending
@@ -559,8 +576,10 @@ open_risks:
     severity: low
   - id: risk-e7h1-011
     summary: >-
-      DEMONSTRATED BLIND SPOT, found by ST-5's M2 and the single most important finding of
-      this story. Handing `runReview` `worktreesDir: paths.clonesDir` does NOT turn the smoke
+      CLOSED at ST-5b, closure independently re-verified by the orchestrator: with the two
+      new assertions in place, M2 turns the suite red (`ENOENT ... scandir
+      '<tmp>/worktrees'`). Originally a DEMONSTRATED BLIND SPOT found by ST-5's M2, and the
+      single most important finding of this story. Handing `runReview` `worktreesDir: paths.clonesDir` does NOT turn the smoke
       red — 2 of 2 still pass. The mutation is live, not dead code
       (`container.ts:256` -> `run-review.ts:402` -> `create-review-worktree.ts`, which builds
       `<worktreesDir>/<repoBasename>/<label>-<ts>`), so the worktree really is created in the
@@ -656,4 +675,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T18:45:00Z"
+updated_at: "2026-09-05T19:00:00Z"

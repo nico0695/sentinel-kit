@@ -98,7 +98,18 @@ stages:
   sddl-executor:
     status: in_progress
     started_at: "2026-09-05T17:10:00Z"
-    notes: "ST-1 approved via cp-002. ST-2..ST-6 not yet approved."
+    notes: >-
+      ST-1 COMPLETE and validated (`success`). Only `src/main/container.ts` touched, 25
+      insertions across 3 hunks. Validation, real outputs: `npm run check` clean (163 files,
+      107 modules / 254 deps, 0 violations); `npm test` 1037/1037 across 49 files — exact
+      baseline match; `git diff src/main/container.ts` limited to the three approved edits;
+      `git diff src/core/repos/ports/config-schemas.ts` EMPTY (AC-7). Orchestrator
+      independently re-verified both diff checks rather than taking the worker's word.
+      The design assumption was confirmed in code before editing: `createCliDeps` already
+      forwards its whole options object, so no forwarding rewrite was made. `createEngine`
+      gained no parameter, `sentinelPaths()` still called once, and with the field omitted
+      the `??` fallback is the pre-edit expression character for character.
+      ST-2..ST-6 not started — each still needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -316,4 +327,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:10:00Z"
+updated_at: "2026-09-05T17:20:00Z"

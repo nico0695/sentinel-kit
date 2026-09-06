@@ -13,7 +13,7 @@
 |---|---|---|---|
 | ST-1 | Add the optional, test-only `ReviewEngine` seam (D-1/D-2/D-3) | cp-002 (approved) | completed |
 | ST-2 | Bring `e2e/` into the quality gate (d-004, AC-8) | cp-003 (approved) | completed |
-| ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | pending | pending |
+| ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | cp-004 (approved) | completed |
 | ST-4 | Negative case (S5) | pending | pending |
 | ST-5 | AC-11 mutation verification | pending | pending |
 | ST-6 | Full gate + closeout evidence | pending | pending |
@@ -305,3 +305,164 @@ both exist — applies here too. The ST-1 review remains deferred, not skipped.
 Return to the orchestrator for `stage_approval` on ST-3 (hermetic git fixture
 `e2e/support/hermetic-git.ts` plus the happy-path smoke test `e2e/review-flow.test.ts`). ST-3 is not
 approved and was not started; no file exists under `e2e/`.
+
+## ST-3 — Hermetic git fixture + happy-path smoke
+
+- approval_reference: checkpoint `cp-004`, ST-3 only. ST-4, ST-5 and ST-6 explicitly not approved and
+  not started — no negative test was written, no mutation was applied, and the AC-8 deliberate-type-error
+  spot check was not run.
+- status: completed
+- planned_scope: two NEW files, `e2e/support/hermetic-git.ts` (D-5) and `e2e/review-flow.test.ts`
+  (D-4/D-6, test 1 only). No existing file modified.
+- actual_changed_files: `e2e/support/hermetic-git.ts` (new), `e2e/review-flow.test.ts` (new). Nothing
+  else: `git status --porcelain` reports the single untracked entry `?? e2e/` on top of ST-1's and
+  ST-2's already-modified files.
+
+### Pre-execution verification
+
+The Amendment-1 corrections were re-verified against the code before the assertions were written,
+because an assertion that merely *looks* right is the failure mode this stage exists to avoid:
+
+- `run-store-fs.ts` writes `validations/` only when `record.validationOutput` is non-empty, and
+  `harnesses/quick/skills.yaml` declares `skills: []` — so `validations/` is asserted **absent** (A-1).
+- No CLI path calls `ConfigStore.writeConfig`, so only `<SENTINEL_HOME>/repos.yaml` is asserted (A-2).
+- `serializeRunMetadata` (`run-layout.ts`) emits no `id` field, so run identity is verified by matching
+  the run directory's basename against the id `runs list` printed (A-3).
+- `metadata.json#engine` is **not** asserted, and the suite carries a comment saying why: the override
+  interposes after name resolution, so the field records `claude-code` while the FakeEngine ran.
+- `createFakeEngine` accepts a single `FakeReviewOutcome` that repeats on every call
+  (`fake/fake-engine.ts`); the happy path scripts `{ ok: true, result: { output: … } }` with an output
+  whose last line is `VERDICT: approve`, which is what `extractBuiltInVerdict`'s anchored
+  `/^VERDICT:\s*(approve|request-changes|comment)$/` matches inside its tail window.
+
+### Two corrections to the planned assertions (decision level A)
+
+Both are factual corrections of the same family as Amendment 1 — the code disagreed with an artifact,
+and the code won. Neither changes scope, and both make the assertion stronger rather than weaker:
+
+1. **Run directory path.** `design.md` D-7 states runs land under `<SENTINEL_HOME>/runs/acme/widget/`.
+   They do not. `persistRun` maps the alias through `toRunStorageKey` (`owner/repo` → `owner__repo`,
+   `run-storage-key.ts`) before handing the record to the store, so the real path is
+   `<SENTINEL_HOME>/runs/acme__widget/<ts>/`. The suite asserts the storage-key form and names the
+   normalisation in a comment.
+2. **`metadata.json#repo`.** `plan.md`'s validation strategy expects `repo: "acme/widget"`. The record's
+   `repoName` is the *already normalised* storage key (`persist-run.ts:116`), and `serializeRunMetadata`
+   copies it verbatim, so the persisted value is `acme__widget`. Asserting the alias there would have
+   failed; asserting the storage key pins the real D7 contract, and it is also the assertion that a
+   mutation of `toRunStorageKey` would break.
+
+The `runs list` / `runs show` legs still use the **alias** `acme/widget` on argv and still see the alias
+echoed back in the output — `list-runs` normalises the query input and `format-runs.ts` deliberately
+prints the alias the caller typed rather than the stored key. Both halves of that contract are now
+covered end to end.
+
+### What the suite does
+
+One test, `registers a repository, reviews a branch and reads the run back`, five argv legs through
+`createCli(createCliDeps({ … })).run(argv)` with a fresh graph per leg (the way each real CLI process
+builds exactly one):
+
+1. `repo add https://example.test/acme/widget.git --local-path <tmp repo> --base-branch main
+   --harness quick` — offline by construction (`registerRepo` skips `git.clone` with `localPath` and
+   skips `git.defaultBranch` with an explicit base). Exit 0, one stdout record, empty stderr,
+   `<SENTINEL_HOME>/repos.yaml` written and containing the alias.
+2. `repo list` — the alias is printed back.
+3. `review acme/widget feature/tighten-widget --type quick` — exit 0, empty stderr.
+4. Persistence: exactly one run directory; `result.md` equals the scripted engine output **byte for
+   byte**, `prompt.md` is non-empty, `metadata.json` carries `repo`, `baseRef`, `targetRef`,
+   `state: "ok"`, `verdict: "approve"`; `validations/` absent.
+5. `runs list acme/widget` then `runs show acme/widget <id>` — the printed id equals the run
+   directory's basename, and the block reports `state ok` / `verdict approve`.
+
+Isolation (S6/AC-3): `SENTINEL_HOME` is injected as `env` on `createCliDeps` and `process.env` is never
+mutated; `homeDir` is pointed at `<fixture root>/dead-home`, a path that is never created, and the test
+asserts it still does not exist at the end — so a `SENTINEL_HOME` regression that fell back to the home
+directory would be caught rather than silently tolerated. Every asserted path is built with
+`join(sentinelHome, …)`. Teardown is an unconditional `afterEach` over a module-level list of temp roots
+(`rmSync(root, { recursive: true, force: true })`), outside any `try`, so a mid-flow assertion failure
+still cleans up both roots.
+
+The fixture (`e2e/support/hermetic-git.ts`) restates the proven recipe:
+`realpathSync(mkdtempSync(join(tmpdir(), "sentinel-e2e-")))`, `git init --bare -b main`, clone,
+per-invocation `-c user.email` / `-c user.name`, a seed commit on `main`, a feature branch with one
+committed modification, both pushed, and `HERMETIC_GIT_ENV` pinning `GIT_CONFIG_GLOBAL=/dev/null`,
+`GIT_CONFIG_SYSTEM=/dev/null`, `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`, `LANG=C`. Its header comment names
+`src/adapters/driven/git/__test__/git-cli.test.ts` as the origin of the recipe. It is deliberately not a
+`.test.ts` file, so the `e2e` project's include does not collect it as a suite.
+
+### Quick checks
+
+Planned (from `plan.md` ST-3): `npx vitest run --project e2e` green with more than zero tests, then
+`npm run check` clean, then a second `e2e` run for determinism. All three were run; nothing was skipped.
+
+```
+$ npx vitest run --project e2e
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  2.06s
+```
+
+`npm run check` failed once on formatting only — biome would have wrapped two long lines. Fixed with
+`npx biome check --write e2e` (formatting of the new files, no assertion touched), after which:
+
+```
+$ npm run check
+> biome check . && tsc --noEmit && depcruise src
+Checked 165 files in 215ms. No fixes applied.
+✔ no dependency violations found (107 modules, 254 dependencies cruised)
+```
+
+The file count moved from 163 to 165 — exactly the two new `e2e/` files — which is the first positive
+evidence that ST-2's gate widening actually reaches them (AC-8's spot check in ST-6 is still required
+and is not replaced by this).
+
+Determinism: the e2e project was run three further times after the formatting fix, each `1 passed (1)`
+in 1.2–1.5s. No flake, no ordering dependence, no leftover temp directory.
+
+`npm test` (the full 1037-test aggregate) was **not** run: it belongs to ST-6 and running it here would
+not change the stage's outcome.
+
+### Surprises worth recording
+
+- The whole flow ran green on the first attempt, which is the strongest single signal so far that the
+  composition root is wired correctly — this is the first time worktree → diff → prompt → engine →
+  parse → persist has executed end to end against real git and a real filesystem.
+- The two artifact-path corrections above are the only places where a persisted artifact disagreed with
+  the planning documents. Both were in the same direction: the documents used the *alias* where the code
+  uses the *storage key*. Worth flagging to QA as a documentation-accuracy item for `design.md` D-7,
+  which will otherwise mislead the next reader.
+- `git worktree add --detach` at a resolved sha means the review never contends with the clone's checked
+  out branch, so the fixture is free to leave the clone parked on `main`. No serialization hazard showed
+  up.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion. The stage stayed inside its two new
+files.
+
+### Open risks carried forward
+
+- AC-8 remains **configured and now partially exercised** (biome and `tsc` demonstrably see `e2e/`), but
+  the deliberate-type-error spot check of ST-6 is still the required evidence and must not be dropped.
+- `risk-e7h1-005` (test-only seam in production code) and `risk-e7h1-007` (AC-7 verified by reading, not
+  by a test) carry forward unchanged.
+- AC-11 is entirely unproven until ST-5: the suite is green, and a green suite is not yet evidence that
+  it would go red.
+
+### Git discipline
+
+No commit, no stage, no branch, no stash, no checkout. The two new files are left untracked in the
+working tree for the orchestrator.
+
+### QA handoff
+
+Recommended before ST-4, at the orchestrator's discretion. The stage adds real test code with real
+assertions and is the first stage whose output a reviewer can meaningfully disagree with — specifically
+the two corrected assertions above, which a reviewer should confirm rather than take on trust. If the
+orchestrator prefers one review covering the whole suite, deferring to after ST-4 is defensible: the
+negative test is small and shares the file.
+
+### Next action
+
+Return to the orchestrator for `stage_approval` on ST-4 (the `request-changes` negative case, exit code
+1, in the same file), or for a QA pass over ST-1..ST-3 first. ST-4 is not approved and was not started.

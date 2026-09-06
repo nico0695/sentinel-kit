@@ -122,7 +122,18 @@ stages:
       `src` still matches. Biome behaves the same, file count unchanged at 163. So the
       ST-2-before-ST-3 ordering needed no revisiting. `npm test` deliberately not run (no
       runtime path changed); ST-6 runs the full gate.
-      ST-3..ST-6 not started — each still needs its own stage_approval.
+      ST-3 COMPLETE and validated (`success`). Two NEW files, no existing source file
+      touched: `e2e/support/hermetic-git.ts` and `e2e/review-flow.test.ts` (one test, five
+      argv legs, fresh graph per leg, unconditional afterEach teardown). Validation:
+      `npx vitest run --project e2e` green with 1 test in 1 file — non-vacuous, satisfying
+      AC-1 — and deterministic across FOUR runs (2.06s then 1.46/1.24/1.42s, no flake, no
+      leftover temp dirs); `npm run check` clean. Biome's file count moved 163 -> 165, which
+      is the first POSITIVE evidence that ST-2's gate widening actually reaches `e2e/`
+      rather than being inert. One formatting-only `check` failure was fixed with
+      `biome check --write e2e`; no assertion was weakened. `npm test` deliberately deferred
+      to ST-6. Amendment 1's four binding constraints all honoured, with an in-file comment
+      recording why `metadata.json#engine` is not asserted.
+      ST-4..ST-6 not started — each still needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -372,6 +383,21 @@ open_risks:
       that matches nothing. Any `check` failure in ST-3/ST-4 is therefore attributable to
       the new test files.
     severity: low
+  - id: risk-e7h1-010
+    summary: >-
+      Two more artifact-vs-code corrections, found by ST-3 and independently re-verified by
+      the orchestrator against the source. Both make the assertions STRONGER and neither
+      changes scope: (1) runs do NOT land under `<SENTINEL_HOME>/runs/acme/widget/` as
+      design D-7 claims — `persistRun` maps the alias through `toRunStorageKey`
+      (`owner/repo` -> `owner__repo`) before handing the record to the store, because
+      `RunStore` needs a single path segment and its schemas reject `/`, so the real path is
+      `runs/acme__widget/<ts>/`; (2) `metadata.json#repo` therefore persists as
+      `acme__widget`, not the alias the plan expected — asserting the alias there would have
+      failed. The alias/key split is deliberate and both halves are now covered end to end:
+      the `runs list`/`runs show` legs still take the alias on argv and get the alias echoed
+      back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
+      the record to mislead the next reader.
+    severity: low
   - id: risk-e7h1-009
     summary: >-
       Raised by ST-2: AC-8 is now CONFIGURED but not DEMONSTRATED. The widened gate is inert
@@ -437,4 +463,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:38:00Z"
+updated_at: "2026-09-05T17:50:00Z"

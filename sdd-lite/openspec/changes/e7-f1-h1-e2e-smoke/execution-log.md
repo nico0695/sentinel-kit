@@ -17,7 +17,7 @@
 | ST-4 | Negative case (S5) | cp-005 (approved) | completed |
 | ST-5 | AC-11 mutation verification | cp-006 (approved) | completed — with finding (M2 blind spot) |
 | ST-5b | Close the M2 blind spot: two worktree-location assertions | cp-007 (approved) | completed |
-| ST-6 | Full gate + closeout evidence | pending | pending |
+| ST-6 | Full gate + closeout evidence | cp-008 (approved) | completed |
 
 ## ST-1 — Test-only `ReviewEngine` seam in the composition root
 
@@ -843,3 +843,195 @@ QA should confirm the two new assertions read as intentional and permanent.
 
 Return to the orchestrator. ST-6 (full gate: `npm test`, `npm run build`, AC-8 spot check, closeout
 evidence) is the remaining stage and requires its own approval.
+
+---
+
+## ST-6 — Full gate + closeout evidence
+
+- approval_reference: checkpoint `cp-008`, ST-6 only (the final execution stage). No further stage
+  is approved; closeout belongs to `sddl-qa-review`.
+- status: completed
+- planned_scope: no code change beyond whatever the gate itself demands. The gate demanded nothing —
+  every command below passed on the tree as committed at `02a1267` (`aeb62cb` on top adds only the
+  `cp-008` approval record).
+- actual_changed_files: none under `src/` or `e2e/`. This log entry is the only artifact written.
+  The AC-8 spot check's deliberate type error was introduced and reverted inside this stage; its
+  file ends the stage byte-identical to `HEAD`.
+
+### 1. `npm run check`
+
+```
+> biome check . && tsc --noEmit && depcruise src
+
+Checked 165 files in 279ms. No fixes applied.
+
+✔ no dependency violations found (107 modules, 254 dependencies cruised)
+```
+
+Clean. 165 files is the post-ST-2 count — `e2e/review-flow.test.ts` and `e2e/support/hermetic-git.ts`
+are inside the biome and `tsc` scopes, not merely adjacent to them.
+
+### 2. `npm test`
+
+```
+ RUN  v4.1.10 /home/user/sentinel-kit
+
+ Test Files  50 passed (50)
+      Tests  1039 passed (1039)
+   Start at  22:11:56
+   Duration  14.92s
+```
+
+**1039 = the pre-story 1037 plus exactly the 2 new e2e tests**, across 50 files (49 + 1). The
+expected number, hit exactly; no rationalisation needed.
+
+**No pre-existing suite was modified — verified, not assumed.** The story's own commit range is
+`e590a73~1..HEAD` (`e590a73` opens `[E7.F1.H1]`):
+
+```
+$ git diff --stat e590a73~1..HEAD -- src/ e2e/ tsconfig.json biome.json package.json
+ biome.json                  |   1 +
+ e2e/review-flow.test.ts     | 343 ++++++++++++++++++++++++++++++++++++++++++++
+ e2e/support/hermetic-git.ts | 118 +++++++++++++++
+ src/main/container.ts       |  26 +++-
+ tsconfig.json               |   2 +-
+ 5 files changed, 488 insertions(+), 2 deletions(-)
+
+$ git diff --name-only e590a73~1..HEAD -- 'src/**/__test__/**' | wc -l
+0
+```
+
+Zero files under `src/**/__test__/` touched by the story; `package.json` untouched by it as well
+(no new dependency, no new script — AC-8's gate widening rode entirely on `tsconfig.json` and
+`biome.json`, per N-2). Note for readers of a `main...HEAD` diff: that wider range also carries the
+already-merged `[E6.F2.H2]` TUI work, whose `src/adapters/driving/tui/__test__/**` changes belong to
+that story, not this one. The commit-range diff above is the correct scope.
+
+### 3. `npm run build`
+
+```
+> tsup
+
+CLI Building entry: {"cli":"src/main/cli.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI Target: node22
+ESM Build start
+ESM dist/cli.js 124.20 KB
+ESM ⚡️ Build success in 38ms
+```
+
+Succeeded. Widening `tsconfig.json#include` to `["src", "e2e"]` did **not** pull `e2e/` into the
+bundle: the entry is `src/main/cli.ts` and the output is a single 124.20 KB `dist/cli.js`, the same
+shape as before ST-2.
+
+### 4. `node dist/cli.js --version`
+
+```
+0.0.0
+```
+
+Prints the `package.json` version, as the CI `build` job's final step does.
+
+### AC-8 spot check (risk-e7h1-009) — the gate over `e2e/` is live, not merely configured
+
+ST-2 widened the gate; nothing had yet shown it *rejecting* anything under `e2e/`. Done here, once,
+and reverted.
+
+| Step | Action | Result |
+|---|---|---|
+| 1 | Append `const ac8SpotCheck: number = "not-a-number";` to `e2e/support/hermetic-git.ts` | 3 lines added at EOF |
+| 2 | `npx tsc --noEmit` | **FAILED**, exit code `2` |
+| 3 | `git checkout -- e2e/support/hermetic-git.ts` | reverted |
+| 4 | `git diff e2e/support/hermetic-git.ts` | **empty (0 bytes)** |
+| 5 | `npx tsc --noEmit` | exit code `0`, silent |
+
+Verbatim failure at step 2:
+
+```
+e2e/support/hermetic-git.ts(121,7): error TS2322: Type 'string' is not assignable to type 'number'.
+```
+
+The reported path is the `e2e/` file itself, so the diagnostic came from the widened `include` and
+not from some incidental import through `src/`. **AC-8 is met: a type error under `e2e/` fails
+`npm run check`.** No file was left mutated — step 4's empty diff is the proof, and the closing
+`git status --porcelain` below is the second.
+
+### AC-10 — `.github/workflows/ci.yml` needs no edit
+
+Confirmed by reading the file; not edited.
+
+- The `test` job runs `npm ci` then **`npm test`** — the bare script, `vitest run` with no
+  `--project` filter. `vitest.config.ts` declares three projects (`core`, `adapters`, `e2e`) and a
+  filterless `vitest run` executes all of them, which is exactly what the local run above did
+  (50 files / 1039 tests spans all three).
+- That job carries `strategy.matrix.node: [22, 24]`, so the e2e smoke runs on **both** Node 22 and
+  Node 24 with no per-project configuration.
+- The `build` job already ends with `node dist/cli.js --version`, mirroring step 4 above.
+- Hermeticity on a bare runner was checked too, since AC-10 is about CI and not only about this
+  machine: `e2e/support/hermetic-git.ts` passes the commit identity per invocation via
+  `-c user.email=… -c user.name=…` and pins `GIT_CONFIG_GLOBAL=/dev/null`,
+  `GIT_CONFIG_SYSTEM=/dev/null`, `GIT_TERMINAL_PROMPT=0`. A runner with no `~/.gitconfig` and no
+  configured identity still produces commits, and no ambient `commit.gpgsign` or `init.defaultBranch`
+  can reach the fixture.
+
+**No workflow change is required for AC-10, and none was made.**
+
+### risk-e7h1-011 — closed, not carried
+
+ST-5b's re-applied M2 turned the suite RED (`ENOENT … /worktrees` at `e2e/review-flow.test.ts:237`,
+and independently `expected [ 'repo' ] to deeply equal []` at `:244`), then green after the revert.
+The blind spot ST-5 found is closed by a demonstrated failure, not by an accepted note.
+
+**Documentation defect worth one line (not a code defect):** the ST-5b entry above labels that
+closure `risk-e7h1-008` in three places, while `plan.md` Amendment 1 and `state.yaml` register the
+M2 blind spot as **`risk-e7h1-011`** (`risk-e7h1-008` is the ST-2 quality-gate interaction risk,
+retired at ST-2). The evidence and the conclusion are correct; only the id is mistyped. Prior log
+entries are append-only history and were **not** rewritten — flagged here for `sddl-qa-review` to
+correct in `state.yaml`/`qa-report.md` if it wants the ids to reconcile.
+
+### Quick checks
+
+Planned for ST-6: `npm run check`, `npm test`, `npm run build`, `node dist/cli.js --version`, the
+AC-8 spot check, and the AC-10 reading. **All six were run**; nothing was skipped and nothing was
+deferred. Not run, deliberately: any new test, any change to a pre-existing suite, and any workflow
+edit — all outside this stage.
+
+### Blockers
+
+None. The gate demanded no change.
+
+### Open risks carried forward
+
+- `risk-e7h1-009` — **closed** by the AC-8 spot check above.
+- `risk-e7h1-011` — **closed** by ST-5b, confirmed here.
+- `risk-e7h1-005` (test-only `engineOverride` seam living in production code) and `risk-e7h1-007`
+  (AC-7 verified by reading the diff rather than by a test) carry forward unchanged and were
+  accepted at plan time.
+- New, cosmetic: the `risk-e7h1-008` / `risk-e7h1-011` id mismatch in the ST-5b entry, above.
+
+### Ending state
+
+```
+$ git status --porcelain
+(empty before this entry was written; only this file afterwards)
+```
+
+No net change under `src/` or `e2e/`. `state.yaml`, `plan.md`, `design.md`, `spec.md` and
+`proposal.md` were not touched by this stage.
+
+### Git discipline
+
+No commit, no push, no stage, no branch, no stash. The only git write was
+`git checkout -- e2e/support/hermetic-git.ts`, reverting the AC-8 type error this stage introduced
+itself — the one write the ST-6 handoff permits.
+
+### QA handoff
+
+**Recommended, in `final` mode.** Every planned stage is executed and the full gate is green, so the
+change is ready for closing QA. Suggested independent re-verification: re-run one ST-5 mutation
+(prefer **M2**, the one whose behaviour ST-5b changed) and confirm it goes red, then confirm
+`git status --porcelain` is clean afterwards. `sddl-executor` does not claim completion.
+
+### Next action
+
+Return to the orchestrator. No execution stage remains; route to `sddl-qa-review` (final mode).

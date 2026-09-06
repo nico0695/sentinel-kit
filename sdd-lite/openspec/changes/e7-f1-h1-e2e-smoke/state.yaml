@@ -30,7 +30,7 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: implementing
+lifecycle_status: reviewing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -96,7 +96,7 @@ stages:
       spot check. Amendment 1's corrections are written in as binding constraints on the
       assertions ST-3/ST-4 may write.
   sddl-executor:
-    status: in_progress
+    status: completed
     started_at: "2026-09-05T17:10:00Z"
     notes: >-
       ST-1 COMPLETE and validated (`success`). Only `src/main/container.ts` touched, 25
@@ -186,7 +186,25 @@ stages:
       (`expected [ 'repo' ] to deeply equal []`), so neither is dead weight shadowed by the
       other. The orchestrator RE-RAN the entire red/green cycle itself — apply M2, observe
       red, revert, confirm empty diff and green — rather than accepting the report.
-      ST-6 not started — it still needs its own stage_approval.
+      ST-6 COMPLETE (`success`) — the final execution stage. The gate demanded NO code
+      change; nothing was fixed, worked around or rationalised. `npm run check` clean (biome
+      165 files, tsc silent, depcruise 107 modules / 254 deps); `npm test` 1039/1039 across
+      50 files — exactly the pre-story 1037 plus the 2 new e2e tests — with ZERO files under
+      `src/**/__test__/` touched by the story's commit range; `npm run build` OK (124.20 KB,
+      and the widened tsconfig#include did NOT pull `e2e/` into the bundle);
+      `node dist/cli.js --version` prints 0.0.0. The orchestrator independently re-ran the
+      suite, the build, the version and the diff-scope check.
+      AC-8 spot check PASSED and closes risk-e7h1-009: a deliberate
+      `const ac8SpotCheck: number = "not-a-number";` in `e2e/support/hermetic-git.ts` made
+      `npx tsc --noEmit` FAIL with exit 2 and the error path inside `e2e/` —
+      `hermetic-git.ts(121,7): error TS2322: Type 'string' is not assignable to type
+      'number'` — then reverted to an empty diff and a silent re-run. The widened gate is
+      live, not inert.
+      AC-10 confirmed with no workflow edit: CI's `test` job runs bare `npm test` (no
+      `--project` filter) and `vitest.config.ts` declares all three projects, so a
+      filterless run executes the e2e smoke on both Node 22 and 24. The fixture also needs
+      no git identity on a bare runner.
+      All six execution stages are done.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -650,6 +668,17 @@ open_risks:
       back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
       the record to mislead the next reader.
     severity: low
+  - id: risk-e7h1-012
+    summary: >-
+      Documentation-only, non-blocking, self-reported by ST-6: the ST-5b entry in
+      `execution-log.md` labels the M2 blind-spot closure `risk-e7h1-008` in three places,
+      while `plan.md` Amendment 1 and this file register it as `risk-e7h1-011`
+      (`risk-e7h1-008` is the ST-2 gate-interaction risk, retired at ST-2). The evidence and
+      the conclusion are correct; only the id is mistyped. Execution-log entries are
+      append-only, so ST-6 flagged it in its own entry rather than rewriting history.
+      sddl-qa-review should reconcile the ids rather than leave two numbering schemes on the
+      record.
+    severity: low
   - id: risk-e7h1-009
     summary: >-
       Raised by ST-2: AC-8 is now CONFIGURED but not DEMONSTRATED. The widened gate is inert
@@ -715,4 +744,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T19:05:00Z"
+updated_at: "2026-09-05T19:20:00Z"

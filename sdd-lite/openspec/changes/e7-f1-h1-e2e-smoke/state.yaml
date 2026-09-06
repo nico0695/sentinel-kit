@@ -164,6 +164,44 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-006
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-5, the AC-11 mutation verification — the stage that converts "the suite
+      is green" into "the suite provably goes red when the flow breaks". Scope: NO net file
+      change. Design's mutation points are applied ONE AT A TIME, never stacked: M1
+      (`run-store-fs.ts`: `metadata.json` -> `meta.json`), M2 (`createWiringGraph`:
+      `worktreesDir: paths.clonesDir`), optionally M3 (`resolveReviewExitCode` returns 0 for
+      `request-changes`). Per mutation: `npx vitest run --project e2e` must go RED and the
+      exact failing assertion is recorded; `git checkout -- <file>`; re-run green. At least
+      two mutations on different layers are required. This stage temporarily edits
+      production files under `src/`, which is why it carries its own approval even though it
+      leaves no net change.
+      After the last revert the revert itself must be PROVEN, not assumed: `git status
+      --porcelain` shows only ST-1..ST-4's intended files, and per-file diffs on
+      `run-store-fs.ts`, `container.ts` and the exit-code module show no mutation residue. A
+      stray mutation left in the tree is a defect, not a nit.
+    question: Approve ST-5, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-5
+        description: >-
+          Temporary mutations in src/, applied one at a time and each reverted with the
+          revert proven; no net file change.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-4 are committed and pushed; AC-11 stays unproven.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before mutating anything.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T18:20:00Z"
+    created_at: "2026-09-05T18:20:00Z"
+    resolved_at: "2026-09-05T18:20:00Z"
   - id: cp-005
     type: stage_approval
     stage: orchestrator
@@ -330,6 +368,16 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-009
+    checkpoint_id: cp-006
+    selected_option_id: approve
+    rationale: >-
+      ST-5 approved. This is the only stage that deliberately edits production files under
+      `src/`, and the only evidence that will ever exist for AC-11: a test that cannot go red
+      is decoration, and until this runs the suite's green is unfalsified. The approval
+      explicitly covers temporary mutation AND requires the revert to be proven rather than
+      assumed. ST-6 remains unapproved. Author: user.
+    recorded_at: "2026-09-05T18:20:00Z"
   - id: d-008
     checkpoint_id: cp-005
     selected_option_id: approve
@@ -518,4 +566,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T18:12:00Z"
+updated_at: "2026-09-05T18:20:00Z"

@@ -198,6 +198,37 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-008
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-6, the final stage. It closes the change, so anything left unproven
+      there ships. Scope: no code change beyond whatever the gate itself demands. Proves the
+      full gate — `npm run check` clean, `npm test` = the previous 1037 plus the 2 new e2e
+      tests with no pre-existing suite modified, `npm run build`, `node dist/cli.js
+      --version` — and records that AC-10 needs no workflow edit, since CI's `test` job
+      already runs every vitest project across the Node 22/24 matrix. Also owes the AC-8
+      spot check (risk-e7h1-009): introduce a deliberate type error under `e2e/`, confirm
+      `tsc --noEmit` FAILS, revert, re-run clean. That spot check is the only evidence the
+      widened gate actually rejects a bad file there rather than sitting inert.
+    question: Approve ST-6, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-6
+        description: Final verification stage; closes the change.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-5b are committed and pushed; the gate stays unproven end to end.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before the closeout stage.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T19:05:00Z"
+    created_at: "2026-09-05T19:05:00Z"
+    resolved_at: "2026-09-05T19:05:00Z"
   - id: cp-007
     type: stage_approval
     stage: orchestrator
@@ -440,6 +471,15 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-011
+    checkpoint_id: cp-008
+    selected_option_id: approve
+    rationale: >-
+      ST-6 approved — the final execution stage. Author: user. Note for the record: approving
+      ST-6 is not the same as closing the change. Only `sddl-qa-review` in final mode may set
+      `completed`, and the deferred code review (d-006) still has to happen over the full
+      diff before this goes to a PR.
+    recorded_at: "2026-09-05T19:05:00Z"
   - id: d-010
     checkpoint_id: cp-007
     selected_option_id: close
@@ -675,4 +715,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T19:00:00Z"
+updated_at: "2026-09-05T19:05:00Z"

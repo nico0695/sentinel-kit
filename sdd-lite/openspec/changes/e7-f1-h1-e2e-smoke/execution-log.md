@@ -15,7 +15,7 @@
 | ST-2 | Bring `e2e/` into the quality gate (d-004, AC-8) | cp-003 (approved) | completed |
 | ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | cp-004 (approved) | completed |
 | ST-4 | Negative case (S5) | cp-005 (approved) | completed |
-| ST-5 | AC-11 mutation verification | pending | pending |
+| ST-5 | AC-11 mutation verification | cp-006 (approved) | completed — with finding (M2 blind spot) |
 | ST-6 | Full gate + closeout evidence | pending | pending |
 
 ## ST-1 — Test-only `ReviewEngine` seam in the composition root
@@ -566,3 +566,174 @@ mutation stage. ST-5 is the natural point where a review would otherwise arrive 
 
 Return to the orchestrator for a QA pass over ST-1..ST-4, or for `stage_approval` on ST-5 (AC-11
 mutation verification). ST-5 and ST-6 are not approved and were not started.
+
+## ST-5 — AC-11 mutation verification
+
+- approval_reference: checkpoint `cp-006` (committed at `bf37aef`), ST-5 only. ST-6 explicitly **not** approved and
+  not started: the AC-8 deliberate-type-error spot check, `npm test` and `npm run build` were not run.
+- status: completed — with one material finding (M2 did not go red; see below)
+- planned_scope: no net file change. Apply `design.md` D-8's mutations M1/M2/M3 one at a time, never
+  stacked; per mutation run `npx vitest run --project e2e`, record the exact failing assertion,
+  `git checkout -- <file>`, re-run green.
+- actual_changed_files: **none under `src/` or `e2e/`** — every mutation was reverted and each revert
+  was verified with an empty `git diff`. Only `execution-log.md` (this entry) was written.
+
+### Baseline
+
+```
+$ npx vitest run --project e2e
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+```
+
+### M1 — driven storage (`src/adapters/driven/storage/run-store-fs.ts`)
+
+Mutation: the staged metadata file is written as `meta.json` instead of `metadata.json`
+(line 219, the `writeFile(join(stagingDir, "metadata.json"), …)` call). The read site at line 70 was
+deliberately left alone, per D-8, so the mutation models a real write-side regression.
+
+Result: **RED — 2 tests failed of 2.** Exact failing assertions:
+
+```
+FAIL e2e/review-flow.test.ts > registers a repository, reviews a branch and reads the run back
+Error: ENOENT: no such file or directory, open
+  '/tmp/sentinel-home-2e0WRv/runs/acme__widget/20260906T161522464Z/metadata.json'
+ ❯ e2e/review-flow.test.ts:192:5
+    192|     readFileSync(join(runDir, "metadata.json"), "utf-8"),
+
+FAIL e2e/review-flow.test.ts > reports a request-changes verdict with the configurable gate exit code
+Error: ENOENT: no such file or directory, open
+  '/tmp/sentinel-home-qQAKZ9/runs/acme__widget/20260906T161522713Z/metadata.json'
+ ❯ e2e/review-flow.test.ts:311:5
+    311|     readFileSync(join(runDir, "metadata.json"), "utf-8"),
+```
+
+Revert: `git checkout -- src/adapters/driven/storage/run-store-fs.ts`;
+`git diff src/adapters/driven/storage/run-store-fs.ts` → empty; re-run → 2 passed (2).
+
+Secondary observation (not a stage blocker, recorded for QA): the failure arrives at the test's own
+`metadata.json` read, i.e. **before** any `runs show` assertion could fail. D-8 predicted S4
+(`runs show`) would also go red. The suite still detects the regression — AC-11 is satisfied by M1 —
+but the evidence does **not** demonstrate that `runs show` itself notices a missing `metadata.json`;
+`run-store-fs.ts:380` carries a comment about tolerating exactly the "finalDir exists but
+metadata.json is gone" case, so that tolerance may be by design. Untested either way here.
+
+### M2 — composition root (`src/main/container.ts`) — **DID NOT GO RED**
+
+Mutation: `createWiringGraph` hands `runReview` `worktreesDir: paths.clonesDir` instead of
+`paths.worktreesDir` (line 256).
+
+Result: **GREEN — 2 passed (2).** No assertion failed. Per the stage handoff this was not swapped for
+an easier mutation; it is recorded as the finding it is.
+
+Diagnosis (the blind spot, named precisely):
+
+- The mutation is *live*, not dead code: `worktreesDir` flows `container.ts:256` →
+  `run-review.ts:402` → `create-review-worktree.ts`, which builds
+  `<worktreesDir>/<repoBasename>/<sanitizedLabel>-<timestamp>`. Under the mutation the ephemeral
+  worktree is really created under `<SENTINEL_HOME>/clones/…` instead of `<SENTINEL_HOME>/worktrees/…`.
+- It is unobservable to the smoke for two compounding reasons: (a) the fixture registers the repo with
+  `--local-path`, so `clonesDir` is otherwise empty and nothing collides; (b) the suite asserts
+  **nothing** about where the worktree lived, and nothing about `clones/` staying untouched — the
+  worktree is created and cleaned up inside the review, so both directories are unobserved
+  intermediate state.
+- Why it would matter in production: `listOrphanWorktrees` scans `worktreesDir` and treats everything
+  under it as orphan-cleanup candidates. A worktree created outside that root is invisible to orphan
+  cleanup, and `<clonesDir>/<repoBasename>/…` sits in the same tree as managed clones at
+  `<clonesDir>/<owner>/<repo>`. So M2 is a real defect class that this smoke does not catch.
+- Scope note: adding an assertion for it (e.g. `<HOME>/worktrees` was used, `<HOME>/clones` stayed
+  empty) is a change to `e2e/review-flow.test.ts` and therefore **outside ST-5's approved scope**
+  (ST-5 is explicitly "no net file change"). Not done. Routed to the user/QA as a decision.
+
+Revert: `git checkout -- src/main/container.ts`; `git diff src/main/container.ts` → empty;
+re-run → 2 passed (2).
+
+### M3 — driving CLI (`src/adapters/driving/cli/exit-code.ts`)
+
+D-8 marked M3 optional "if M1 and M2 both behaved as expected". M2 did not, so M3 became **required**
+to satisfy the stage's "at least two mutations, on different layers, each proven red" bar. It is a
+mutation point already named in the approved D-8 list, so this is not scope expansion.
+
+Mutation: `resolveReviewExitCode` returns `0` unconditionally once past the fail-closed guard
+(`return verdict === "request-changes" ? changesExitCode : 0;` → `return 0;`).
+
+Result: **RED — 1 failed, 1 passed of 2**, exactly the asymmetry D-8 predicted: the negative case
+fails while the happy path stays green, which is the evidence that the second test earns its place.
+Exact failing assertion:
+
+```
+FAIL e2e/review-flow.test.ts > reports a request-changes verdict with the configurable gate exit code
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected  1
++ Received  0
+ ❯ e2e/review-flow.test.ts:295:25
+    295|   expect(reviewed.code).toBe(1);
+```
+
+Revert: `git checkout -- src/adapters/driving/cli/exit-code.ts`;
+`git diff src/adapters/driving/cli/exit-code.ts` → empty; re-run → 2 passed (2).
+
+### AC-11 verdict
+
+Satisfied, with a named gap. Two mutations on two different layers — **M1 (driven storage)** and
+**M3 (driving CLI exit-code policy)** — each turned the suite red with a recorded, specific failing
+assertion, and each reverted to green. The smoke is therefore demonstrably capable of failing when the
+flow breaks; it is not a suite that passes vacuously. The gap is M2: the composition-root
+worktree-location property is **not** covered.
+
+### Ending-state evidence (revert proven, not assumed)
+
+```
+$ git status --porcelain
+ M sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/state.yaml
+
+$ git diff src/adapters/driven/storage/run-store-fs.ts   # empty
+$ git diff src/main/container.ts                          # empty
+$ git diff src/adapters/driving/cli/exit-code.ts          # empty
+$ git diff --stat src/                                    # empty
+```
+
+`state.yaml` is orchestrator-owned and was already modified before this stage started; ST-5 did not
+touch it. No production file is left modified. `e2e/` is unmodified (ST-4 is committed at `2872a28`).
+
+### Quick checks
+
+Planned for ST-5 (`plan.md`): the e2e project run per mutation plus `git status --porcelain`. All run,
+as transcribed above — 6 e2e runs total (1 baseline + 3 mutated + reverts, each revert re-verified).
+`npm run check` was **not** run and is not needed: `git diff --stat src/` is empty, so the compiled and
+linted surface is byte-identical to the state ST-4 already proved clean at 165 files. `npm test` and
+`npm run build` were **not** run — they belong to ST-6 and ST-6 is not approved.
+
+### Blockers
+
+None blocking the stage itself; ST-5 completed. One open decision for the user/QA (M2 coverage gap).
+
+### Open risks carried forward
+
+- **NEW `risk-e7h1-008` — worktree-location blind spot.** The smoke does not observe that reviews use
+  `worktreesDir`; re-pointing it at `clonesDir` leaves the suite fully green. Impact: orphan-worktree
+  cleanup regressions and clones/worktrees tree collisions are invisible to E2E. Options: (a) accept
+  and document the gap for the MVP; (b) one-stage follow-up adding two assertions to
+  `e2e/review-flow.test.ts` (worktree root used, `clones/` untouched) and re-running M2 to prove red.
+  Recommendation: **(b)** — it is small, it closes the only demonstrated hole in the story's own
+  headline claim, and M2 already exists as a ready-made proof. Level **B** (it changes the approved
+  test scope), so the user decides.
+- AC-8's deliberate-type-error spot check (ST-6) is still owed.
+- `risk-e7h1-005` and `risk-e7h1-007` carry forward unchanged.
+
+### Git discipline
+
+No commit, no stage, no branch, no stash. The only git writes were the three
+`git checkout -- <file>` reverts, each on a file this stage had just mutated itself — the one write
+the ST-5 handoff permits. Nothing else was checked out.
+
+### QA handoff
+
+Recommended. The mutation evidence and, above all, the M2 finding should be reviewed before ST-6
+closes the change — ST-6 is the last stage, so a gap accepted silently here ships.
+
+### Next action
+
+Return to the orchestrator with the M2 blind spot as an open level-B decision (accept the gap, or
+approve a small follow-up stage that adds the worktree-location assertions and re-proves M2 red).
+ST-6 is not approved and was not started.

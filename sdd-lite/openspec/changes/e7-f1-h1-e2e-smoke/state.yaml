@@ -152,7 +152,24 @@ stages:
       divergent ways to build the same graph. It DOES reuse the module-scope constants,
       CapturedIo/createCapturedIo, the temporaryRoots teardown registry and
       createHermeticRepo.
-      ST-5 and ST-6 not started — each still needs its own stage_approval.
+      ST-5 COMPLETE, returned `partial` — the stage ran fully, but produced the finding the
+      handoff had flagged as the most important possible outcome, and that finding needs a
+      user decision before ST-6. Three mutations, one at a time, never stacked:
+      M1 (`run-store-fs.ts:219`, storage — metadata written as `meta.json`): WENT RED, 2 of 2
+      failed, `ENOENT ... /runs/acme__widget/<ts>/metadata.json` at review-flow.test.ts:192
+      and :311. M2 (`container.ts:256`, composition — `worktreesDir: paths.clonesDir`): DID
+      NOT GO RED, 2 of 2 still passed — see risk-e7h1-011. M3 (`exit-code.ts`, driving CLI —
+      `resolveReviewExitCode` returns 0 unconditionally): WENT RED with exactly D-8's
+      predicted asymmetry, 1 failed 1 passed, `expected +0 to be 1` at :295. M2's green made
+      M3 REQUIRED rather than optional, to reach two proven-red mutations on different
+      layers; M3 was already an approved D-8 point, so no scope expansion.
+      AC-11 is satisfied WITH A NAMED GAP: M1 (storage) and M3 (CLI) each turned the suite
+      red on different layers with specific recorded assertions, so the smoke is
+      demonstrably not vacuous. Ending state proven, not assumed, and re-verified
+      independently by the orchestrator: `git diff` empty on all three mutated files, `git
+      diff --stat src e2e` empty, suite green 2/2. The executor did NOT swap M2 for an
+      easier mutation.
+      ST-6 not started — it still needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -486,6 +503,25 @@ open_risks:
       that matches nothing. Any `check` failure in ST-3/ST-4 is therefore attributable to
       the new test files.
     severity: low
+  - id: risk-e7h1-011
+    summary: >-
+      DEMONSTRATED BLIND SPOT, found by ST-5's M2 and the single most important finding of
+      this story. Handing `runReview` `worktreesDir: paths.clonesDir` does NOT turn the smoke
+      red — 2 of 2 still pass. The mutation is live, not dead code
+      (`container.ts:256` -> `run-review.ts:402` -> `create-review-worktree.ts`, which builds
+      `<worktreesDir>/<repoBasename>/<label>-<ts>`), so the worktree really is created in the
+      wrong tree and the suite notices nothing. It is unobservable because the fixture
+      registers with `--local-path`, leaving `clonesDir` otherwise empty, and the suite
+      asserts nothing about where the worktree lived or that `clones/` stays untouched.
+      This matters in production, not just in the test: `listOrphanWorktrees` scans
+      `worktreesDir`, so a worktree created outside it is invisible to orphan cleanup, and
+      `<clonesDir>/<repoBasename>/...` shares a tree with managed clones.
+      Level B decision owed before ST-6, because ST-6 CLOSES the change and a gap accepted
+      silently there ships: (a) accept and document the gap for the MVP, or (b) add two
+      assertions to `e2e/review-flow.test.ts` — the worktree root actually used, and
+      `clones/` untouched — and re-run M2 to prove it red. Adding them was outside ST-5's
+      "no net file change" scope, so it was correctly not done there.
+    severity: medium
   - id: risk-e7h1-010
     summary: >-
       Two more artifact-vs-code corrections, found by ST-3 and independently re-verified by
@@ -566,4 +602,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T18:20:00Z"
+updated_at: "2026-09-05T18:35:00Z"

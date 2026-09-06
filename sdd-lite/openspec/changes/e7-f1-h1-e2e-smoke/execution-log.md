@@ -12,7 +12,7 @@
 | Stage Id | Goal | Approval | Status |
 |---|---|---|---|
 | ST-1 | Add the optional, test-only `ReviewEngine` seam (D-1/D-2/D-3) | cp-002 (approved) | completed |
-| ST-2 | Bring `e2e/` into the quality gate (d-004, AC-8) | pending | pending |
+| ST-2 | Bring `e2e/` into the quality gate (d-004, AC-8) | cp-003 (approved) | completed |
 | ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | pending | pending |
 | ST-4 | Negative case (S5) | pending | pending |
 | ST-5 | AC-11 mutation verification | pending | pending |
@@ -174,3 +174,134 @@ seam's semantics.
 Return to the orchestrator for QA review of ST-1, or for `stage_approval` on ST-2
 (`tsconfig.json#include` → `["src", "e2e"]`, `biome.json#files.includes` += `"e2e/**"`). ST-2 is not
 approved and was not started.
+
+---
+
+## ST-2 — Bring `e2e/` into the quality gate
+
+- approval_reference: checkpoint `cp-003` (decision `d-006`), ST-2 only. ST-3..ST-6 explicitly not
+  approved and not started; no file was created under `e2e/`.
+- status: completed
+- planned_scope: `tsconfig.json#include` → `["src", "e2e"]`; `biome.json#files.includes` gains
+  `"e2e/**"`. `.dependency-cruiser.cjs` and `package.json#scripts.check` deliberately UNCHANGED
+  (non-goal N-2 — `depcruise` stays scoped to `src` because the architecture guards are the
+  core-extraction guarantee and `e2e/` is neither shipped nor subject to the inward-dependency rule).
+- actual_changed_files: `tsconfig.json`, `biome.json`. Exactly two files, two edits. No file created,
+  no file deleted.
+
+### Pre-execution verification
+
+- Working tree before the stage held only the orchestrator-owned `state.yaml` modification; `HEAD` was
+  `3ce1557` (ST-1, committed). No unrelated local change could be confused with this stage's edits.
+- `e2e/` confirmed absent on disk (`ls e2e` → no such file or directory). This is the deliberate
+  ordering of `risk-e7h1-008`: running the config edit before any `e2e/` file exists makes any new
+  finding attributable to the config alone.
+
+### Applied edits (two, as planned)
+
+1. `tsconfig.json` — `"include": ["src"]` → `"include": ["src", "e2e"]`.
+2. `biome.json` — `"e2e/**"` added to `files.includes`, immediately after `"src/**"`.
+
+Nothing else in either file was reformatted or reordered.
+
+### The open question this stage existed to answer
+
+The handoff flagged an unknown: what `tsc` does when `include` names a directory that does not exist.
+
+**Answer, measured rather than assumed: nothing.** `tsc --noEmit` exited silently, with no error and
+no warning. TypeScript's "no inputs were found" diagnostic (TS18003) fires only when the *whole*
+`include`/`files` set resolves to zero input files; a single include entry that matches nothing is
+ignored as long as another entry (here `src`) matches. Biome behaves the same way — a glob matching no
+path is not an error, and its file count is unchanged at 163.
+
+Consequence for the plan: the ordering ST-2-before-ST-3 is sound and needs no revisiting. The config
+is inert today and becomes load-bearing the moment ST-3 writes the first file under `e2e/`.
+
+### Quick checks
+
+Planned: `npm run check` only. No `npm test`, because this stage changes no runtime code path — it
+changes which files two static tools look at, and `vitest.config.ts` (which already declares the `e2e`
+project) was not touched. Skipping `npm test` here is a recorded choice, not an omission; ST-6 runs the
+full gate.
+
+Run: `npm run check` — **clean**, exit 0. Verbatim:
+
+```
+> @nico0695/sentinel@0.0.0 check
+> biome check . && tsc --noEmit && depcruise src
+
+Checked 163 files in 282ms. No fixes applied.
+
+✔ no dependency violations found (107 modules, 254 dependencies cruised)
+```
+
+This matches the post-ST-1 baseline exactly (biome 163 files, `tsc` silent, depcruise 0 violations /
+107 modules / 254 dependencies). No pre-existing finding surfaced, and no `tsup`/vitest
+type-resolution interaction appeared — so the STOP condition the handoff described did not trigger.
+
+Not verified here, by design: that the widened config *actually rejects* a bad `e2e/` file. Proving the
+gate bites requires a file under `e2e/`, and `plan.md` assigns that spot check to ST-6 (deliberate type
+error → `tsc --noEmit` fails → revert → re-run clean). Until then AC-8 is configured but unproven.
+
+### `git diff`
+
+```diff
+diff --git a/biome.json b/biome.json
+index 6ba5318..303d762 100644
+--- a/biome.json
++++ b/biome.json
+@@ -3,6 +3,7 @@
+   "files": {
+     "includes": [
+       "src/**",
++      "e2e/**",
+       "package.json",
+       "tsconfig.json",
+       "biome.json",
+diff --git a/tsconfig.json b/tsconfig.json
+index b806095..2de6f02 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -12,5 +12,5 @@
+     "skipLibCheck": true,
+     "resolveJsonModule": true
+   },
+-  "include": ["src"]
++  "include": ["src", "e2e"]
+ }
+```
+
+`.dependency-cruiser.cjs` and `package.json` diffs are empty, as required by N-2.
+
+### Blockers
+
+None. The stage completed as planned with no contradiction, no scope drift, and no blast-radius
+expansion.
+
+### Open risks carried forward
+
+- `risk-e7h1-008` — retired for this stage. The isolation experiment it prescribed was run and produced
+  a clean result, so any `check` failure in ST-3/ST-4 is attributable to the new test files rather than
+  to the gate configuration.
+- AC-8 is **configured but not yet demonstrated**: the widened gate is inert while `e2e/` is empty. The
+  ST-6 spot check is the evidence, and it must not be dropped.
+- `risk-e7h1-005` and `risk-e7h1-007` carry forward unchanged from ST-1; this stage neither aggravates
+  nor mitigates them.
+
+### Git discipline
+
+No commit, no stage, no branch, no stash, no checkout. Both changed files left in the working tree for
+the orchestrator.
+
+### QA handoff
+
+Not recommended as a separate pass for ST-2 on its own. The stage is a two-line configuration change
+with a fully observable outcome (the `npm run check` transcript above), it touches no production or
+test code, and the deferral recorded in `d-006` — review once the seam and the suite that exercises it
+both exist — applies here too. The ST-1 review remains deferred, not skipped.
+
+### Next action
+
+Return to the orchestrator for `stage_approval` on ST-3 (hermetic git fixture
+`e2e/support/hermetic-git.ts` plus the happy-path smoke test `e2e/review-flow.test.ts`). ST-3 is not
+approved and was not started; no file exists under `e2e/`.

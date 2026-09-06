@@ -109,7 +109,20 @@ stages:
       forwards its whole options object, so no forwarding rewrite was made. `createEngine`
       gained no parameter, `sentinelPaths()` still called once, and with the field omitted
       the `??` fallback is the pre-edit expression character for character.
-      ST-2..ST-6 not started — each still needs its own stage_approval.
+      ST-2 COMPLETE and validated (`success`). Two files, two edits: `tsconfig.json`
+      include -> ["src", "e2e"], `biome.json` files.includes += "e2e/**". Diffs on
+      `.dependency-cruiser.cjs` and `package.json` are EMPTY, as N-2 requires — verified
+      independently by the orchestrator. `npm run check` clean and byte-identical to the
+      post-ST-1 baseline (163 files, 107 modules, 0 violations), so the isolation
+      experiment came back clean and risk-e7h1-008 is retired: any `check` failure in
+      ST-3/ST-4 is now attributable to the new test files, not to the gate config.
+      The stage measured rather than assumed the open question it was handed: `tsc` with an
+      `include` entry naming a directory that does not exist emits nothing and exits 0 —
+      TS18003 fires only when the ENTIRE include/files set resolves to zero inputs, and
+      `src` still matches. Biome behaves the same, file count unchanged at 163. So the
+      ST-2-before-ST-3 ordering needed no revisiting. `npm test` deliberately not run (no
+      runtime path changed); ST-6 runs the full gate.
+      ST-3..ST-6 not started — each still needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -121,6 +134,38 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-003
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-2, which brings `e2e/` into the quality gate per d-004 and AC-8.
+      Scope: `tsconfig.json#include` -> ["src", "e2e"] and `biome.json#files.includes` +=
+      "e2e/**". `.dependency-cruiser.cjs` and `package.json#scripts.check` stay UNCHANGED
+      (non-goal N-2). Validation: `npm run check` alone — no runtime change, so no `npm
+      test` needed. Deliberately run BEFORE any e2e/ file exists so any new finding is
+      attributable to the config edit and nothing else (risk-e7h1-008); a surfaced
+      pre-existing finding or a tsup/vitest type-resolution interaction is a STOP, not a
+      widened edit.
+    question: >-
+      Approve ST-2 so the executor may modify tsconfig.json and biome.json, pause, or revise
+      the plan first?
+    options:
+      - id: approve
+        label: Approve ST-2
+        description: Two config edits, validated with `npm run check`; any surprise is a STOP.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: No further code touched; ST-1 is already committed and pushed.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before executing ST-2.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:25:00Z"
+    created_at: "2026-09-05T17:25:00Z"
+    resolved_at: "2026-09-05T17:25:00Z"
   - id: cp-002
     type: stage_approval
     stage: orchestrator
@@ -189,6 +234,18 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-006
+    checkpoint_id: cp-003
+    selected_option_id: approve
+    rationale: >-
+      ST-2 approved. The user chose to proceed to ST-2 over running a review of the ST-1
+      diff now, which the orchestrator had recommended: the review budget is two fix rounds
+      per lineage, and spending one on a diff whose only behavioral change is a single `??`
+      would waste it — the review is far more informative once the seam AND the suite that
+      exercises it both exist. The executor's alternative recommendation (sddl-qa-review in
+      stage mode before ST-2) was presented and not taken. Review is therefore deferred, not
+      skipped. Author: user (recommendation by claude).
+    recorded_at: "2026-09-05T17:25:00Z"
   - id: d-005
     checkpoint_id: cp-002
     selected_option_id: approve
@@ -264,11 +321,19 @@ open_risks:
     severity: low
   - id: risk-e7h1-008
     summary: >-
-      Sequencing risk raised by the plan: ST-2 is the first time tsc, biome and tsup ever see
-      an `e2e/` directory, so a pre-existing finding or a type-resolution interaction can
-      surface there. The plan binds this as a STOP-and-report, never a widened edit — the
-      config stage must stay attributable.
+      RETIRED at ST-2. The isolation experiment ran with no `e2e/` file present and `npm run
+      check` came back byte-identical to the baseline: no pre-existing finding, no
+      tsup/vitest type-resolution interaction, and `tsc` is silent about an `include` entry
+      that matches nothing. Any `check` failure in ST-3/ST-4 is therefore attributable to
+      the new test files.
     severity: low
+  - id: risk-e7h1-009
+    summary: >-
+      Raised by ST-2: AC-8 is now CONFIGURED but not DEMONSTRATED. The widened gate is inert
+      while `e2e/` is empty — nothing yet proves it would reject a bad file there. ST-6's
+      spot check (deliberate type error in `e2e/` -> `tsc --noEmit` fails -> revert -> clean)
+      is the ONLY evidence for AC-8 and must not be dropped from ST-6 for being fiddly.
+    severity: medium
   - id: risk-e7h1-006
     summary: >-
       Three spec assertions were contradicted by code evidence found at design time, all
@@ -327,4 +392,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:20:00Z"
+updated_at: "2026-09-05T17:33:00Z"

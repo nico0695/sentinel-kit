@@ -181,6 +181,44 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-007
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Level-B decision on risk-e7h1-011 plus the stage approval it implies. The user chose to
+      CLOSE the M2 blind spot rather than accept and document it, inserting a new stage
+      ST-5b between ST-5 and ST-6. Scope: two assertions added to `e2e/review-flow.test.ts`
+      (the worktree root actually used, and that `clones/` stays untouched), then M2
+      re-applied to prove the suite NOW goes red, reverted, revert proven empty. No net
+      production change. Validation: e2e 2/2 green with the new assertions, M2 -> RED with
+      the exact failing assertion recorded, revert -> green, `git diff
+      src/main/container.ts` empty, `npm run check` clean.
+    question: >-
+      Close the M2 blind spot with two assertions and an M2 re-run, accept and document the
+      gap, or also investigate the underlying worktreesDir/clonesDir behavior?
+    options:
+      - id: close
+        label: Close it — 2 assertions + M2 re-run
+        description: >-
+          Small stage; M2 is a ready-made proof and it closes the only demonstrated hole in
+          the story's headline claim.
+        recommended: true
+      - id: accept
+        label: Accept and document the gap
+        description: >-
+          AC-11 is already satisfied by M1 and M3 on two layers; record the limitation and
+          open a follow-up issue.
+      - id: investigate
+        label: Close it and also investigate the underlying behavior
+        description: >-
+          Same as close, plus a broader worktreesDir/clonesDir investigation — new scope,
+          probably its own issue.
+    free_input_allowed: true
+    response:
+      selected_option_id: close
+      responded_at: "2026-09-05T18:45:00Z"
+    created_at: "2026-09-05T18:40:00Z"
+    resolved_at: "2026-09-05T18:45:00Z"
   - id: cp-006
     type: stage_approval
     stage: orchestrator
@@ -385,6 +423,22 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-010
+    checkpoint_id: cp-007
+    selected_option_id: close
+    rationale: >-
+      Close the M2 blind spot: insert ST-5b adding two assertions (worktree root actually
+      used; `clones/` untouched) and re-run M2 to prove the suite goes red. Chosen over
+      accepting the gap, which was defensible since AC-11 is already met by M1 and M3 on two
+      layers, and over additionally investigating the underlying worktreesDir/clonesDir
+      behavior, which is scope outside [E7.F1.H1] and would deserve its own issue. The
+      deciding argument: the story's headline claim is "fails if any piece of the flow
+      breaks", and shipping a demonstrated counter-example to that claim inside the very
+      story that makes it would be the worst of both worlds. M2 is already a ready-made
+      proof, so the cost is one small stage. Level B. Author: user (claude recommended this
+      option). This checkpoint doubles as the stage_approval for ST-5b; ST-6 remains
+      unapproved.
+    recorded_at: "2026-09-05T18:45:00Z"
   - id: d-009
     checkpoint_id: cp-006
     selected_option_id: approve
@@ -602,4 +656,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T18:35:00Z"
+updated_at: "2026-09-05T18:45:00Z"

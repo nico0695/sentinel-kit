@@ -145,6 +145,36 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-005
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-4, the negative case (S5; AC-6, AC-12). Scope: ONE new test appended to
+      the existing `e2e/review-flow.test.ts` — no new file, no existing source file touched.
+      The FakeEngine is scripted to `VERDICT: request-changes`, exit code 1 is asserted (the
+      configurable default from [E6.F1.H2]), and the same three persisted files are asserted
+      as in the happy path. Validation: `npx vitest run --project e2e` with 2 tests green,
+      then `npm run check` clean. The Amendment 1 constraints and the ST-3 storage-key
+      correction (`runs/acme__widget/<ts>/`, `metadata.json#repo` = `acme__widget`) bind
+      here too.
+    question: Approve ST-4, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-4
+        description: One added test in the existing e2e file; no source file modified.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-3 are committed and pushed; nothing is lost.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before writing the negative case.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T18:00:00Z"
+    created_at: "2026-09-05T18:00:00Z"
+    resolved_at: "2026-09-05T18:00:00Z"
   - id: cp-004
     type: stage_approval
     stage: orchestrator
@@ -281,6 +311,12 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-008
+    checkpoint_id: cp-005
+    selected_option_id: approve
+    rationale: >-
+      ST-4 approved. ST-5 and ST-6 remain unapproved. Author: user.
+    recorded_at: "2026-09-05T18:00:00Z"
   - id: d-007
     checkpoint_id: cp-004
     selected_option_id: approve
@@ -463,4 +499,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:50:00Z"
+updated_at: "2026-09-05T18:00:00Z"

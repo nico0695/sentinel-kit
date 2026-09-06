@@ -30,7 +30,7 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: planned
+lifecycle_status: implementing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -96,7 +96,9 @@ stages:
       spot check. Amendment 1's corrections are written in as binding constraints on the
       assertions ST-3/ST-4 may write.
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-09-05T17:10:00Z"
+    notes: "ST-1 approved via cp-002. ST-2..ST-6 not yet approved."
   sddl-qa-review:
     status: pending
 artifacts:
@@ -108,6 +110,40 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-002
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Mandatory gate immediately before the first code-touching stage. ST-1 adds the
+      optional, test-only ReviewEngine seam (D-1/D-2/D-3) and is the ONLY production change
+      in the whole story. Scope: `src/main/container.ts` only — `readonly engineOverride?:
+      ReviewEngine` on CliDepsOptions (@internal TSDoc) and on the private
+      WiringGraphOptions, one `??` at the engine site, one comment naming d-003 and AC-7.
+      Planned validation: `npm run check` clean, `npm test` still 1037/1037 across 49 files,
+      `git diff src/main/container.ts` limited to the three documented edits, and an EMPTY
+      `git diff src/core/repos/ports/config-schemas.ts` (AC-7).
+    question: >-
+      Approve ST-1 so the executor may modify src/main/container.ts, pause here, or revise
+      the plan first?
+    options:
+      - id: approve
+        label: Approve ST-1
+        description: >-
+          Executor applies the three edits and validates with the full gate; any deviation
+          from the declared scope is a STOP, not an improvisation.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: No code touched; the change stays `planned` with everything pushed.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan with feedback before executing.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:10:00Z"
+    created_at: "2026-09-05T17:08:00Z"
+    resolved_at: "2026-09-05T17:10:00Z"
   - id: cp-001
     type: phase_validation
     stage: sddl-proposal
@@ -142,6 +178,16 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-005
+    checkpoint_id: cp-002
+    selected_option_id: approve
+    rationale: >-
+      Plan approved and ST-1 approved for execution. This is the mandatory stage_approval
+      gate that precedes any code-touching stage; it is required in every execution mode and
+      is NOT covered by the earlier interactive-mode routing confirmations. Approval covers
+      ST-1 only — ST-2 through ST-6 each need their own gate. Author: user (options and
+      recommendation presented by claude).
+    recorded_at: "2026-09-05T17:10:00Z"
   - id: d-002
     checkpoint_id: bootstrap-preflight
     free_text: surgical-refresh
@@ -260,7 +306,7 @@ open_risks:
       depcruise stays scoped to `src` deliberately.
     severity: low
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-executor
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
@@ -270,4 +316,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:02:00Z"
+updated_at: "2026-09-05T17:10:00Z"

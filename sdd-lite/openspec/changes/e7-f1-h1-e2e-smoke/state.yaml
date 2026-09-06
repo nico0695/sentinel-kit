@@ -134,6 +134,42 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 checkpoints:
+  - id: cp-004
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-3, the first stage that actually exercises the ST-1 seam. Scope: two NEW
+      files, no existing file modified — `e2e/support/hermetic-git.ts` (D-5:
+      `createHermeticRepo()` + `HERMETIC_GIT_ENV`, self-contained, origin comment pointing at
+      `src/adapters/driven/git/__test__/git-cli.test.ts`, deliberately not a `.test.ts` file)
+      and `e2e/review-flow.test.ts` with the happy-path test: `repo add` -> `repo list` ->
+      `review` -> `runs list` -> `runs show`, each an argv array through
+      `createCli(createCliDeps({ env: { SENTINEL_HOME: <tmp> }, homeDir: <dead tmp>,
+      engineOverride: fake })).run(argv)`, with an unconditional afterEach removing both temp
+      roots (D-6). Covers S1-S4 and AC-1..AC-6, AC-12. Validation: `npx vitest run --project
+      e2e` green with >0 tests (AC-1), then `npm run check` clean, then a re-run to confirm
+      determinism. Amendment 1 binds the assertions: `validations/` asserted ABSENT,
+      `repos.yaml` only (never `config.yaml`), run identity by directory basename vs the id
+      `runs list` prints, and never `metadata.json#engine`.
+    question: >-
+      Approve ST-3 so the executor may create the two e2e files, pause, or revise the plan?
+    options:
+      - id: approve
+        label: Approve ST-3
+        description: Two new files under e2e/; no existing source file is modified.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1 and ST-2 are already committed and pushed; nothing is lost.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before writing the suite.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:38:00Z"
+    created_at: "2026-09-05T17:38:00Z"
+    resolved_at: "2026-09-05T17:38:00Z"
   - id: cp-003
     type: stage_approval
     stage: orchestrator
@@ -234,6 +270,15 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-007
+    checkpoint_id: cp-004
+    selected_option_id: approve
+    rationale: >-
+      ST-3 approved. This is the stage where the ST-1 seam is first exercised at runtime,
+      which also makes it the first real evidence about whether the seam's design holds
+      (risk-e7h1-007 noted the seam was review-verified only). ST-4..ST-6 remain unapproved.
+      Author: user.
+    recorded_at: "2026-09-05T17:38:00Z"
   - id: d-006
     checkpoint_id: cp-003
     selected_option_id: approve
@@ -392,4 +437,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T17:33:00Z"
+updated_at: "2026-09-05T17:38:00Z"

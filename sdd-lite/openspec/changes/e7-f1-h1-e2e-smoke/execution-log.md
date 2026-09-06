@@ -14,7 +14,7 @@
 | ST-1 | Add the optional, test-only `ReviewEngine` seam (D-1/D-2/D-3) | cp-002 (approved) | completed |
 | ST-2 | Bring `e2e/` into the quality gate (d-004, AC-8) | cp-003 (approved) | completed |
 | ST-3 | Hermetic fixture + happy-path smoke (S1-S4) | cp-004 (approved) | completed |
-| ST-4 | Negative case (S5) | pending | pending |
+| ST-4 | Negative case (S5) | cp-005 (approved) | completed |
 | ST-5 | AC-11 mutation verification | pending | pending |
 | ST-6 | Full gate + closeout evidence | pending | pending |
 
@@ -466,3 +466,103 @@ negative test is small and shares the file.
 
 Return to the orchestrator for `stage_approval` on ST-4 (the `request-changes` negative case, exit code
 1, in the same file), or for a QA pass over ST-1..ST-3 first. ST-4 is not approved and was not started.
+
+## ST-4 — Negative case: `request-changes` resolves the gate exit code
+
+- approval_reference: checkpoint `cp-005`, ST-4 only. ST-5 and ST-6 explicitly not approved and not
+  started — no mutation was applied and the AC-8 deliberate-type-error spot check was not run.
+- status: completed
+- planned_scope: one additional `it` appended to the existing `e2e/review-flow.test.ts` (S5; AC-6,
+  AC-12). No new file, no `src/**` change.
+- actual_changed_files: `e2e/review-flow.test.ts` (only). No file created, no file deleted.
+
+### What was written
+
+A second test scripting the FakeEngine to `VERDICT: request-changes`, driving `repo add` → `review`
+through the same `createCli(createCliDeps({...})).run(argv)` path, and asserting:
+
+- `run(argv)` returns **exit code 1** — the `--changes-exit-code` default from `[E6.F1.H2]`, returned
+  in process as a value. `stderr` stays empty, which matters: a `1` accompanied by a diagnostic would
+  mean a failure, not a verdict.
+- the same three persisted files as the happy path, under `<SENTINEL_HOME>/runs/acme__widget/<ts>/`:
+  `result.md` equal to the scripted output byte for byte, a non-empty `prompt.md`, and a
+  `metadata.json` carrying `repo: "acme__widget"`, `baseRef`, `targetRef`, `state: "ok"` and
+  `verdict: "request-changes"`.
+- `validations/` **absent** — the `quick` harness declares `skills: []` (Amendment 1 A-1, N-4).
+
+`state` is asserted `ok` on purpose: a blocking verdict is a *completed* run, and the exit code is the
+only thing that differs from the happy path. That is the distinction the negative case exists to prove.
+
+### Assertions deliberately not written
+
+- `metadata.json#engine` — it records the resolved name `claude-code` while the FakeEngine ran
+  (Amendment 1). Asserting it would pin a falsehood.
+- `<SENTINEL_HOME>/config.yaml` — only `repos.yaml` is written (Amendment 1 A-2).
+- `runs list` / `runs show` legs — the happy path already covers the history surface and run-identity
+  by directory basename (there is no `id` key in `metadata.json`). Repeating them here would turn the
+  smoke into a matrix, which AC-12 forbids. The verdict's persistence is already asserted directly in
+  `metadata.json`.
+
+### A-level decision — wiring inlined rather than shared
+
+The new test repeats the fixture/home setup and the `run(argv)` closure instead of extracting a shared
+factory. Two reasons, recorded because the duplication is visible and a reviewer will ask: (a) factoring
+it out would require rewriting ST-3's test, which is outside this stage's approved scope; (b) a factory
+used by only one of two tests would be worse than the duplication — it would leave two divergent ways to
+build the same graph in one file. What *was* reused is everything already at module scope:
+`REPO_URL`, `REPO_ALIAS`, `REPO_STORAGE_KEY`, `CapturedIo`/`createCapturedIo`, the `temporaryRoots`
+teardown registry, and `createHermeticRepo`. Author: `claude` (A — reversible, local to one test file).
+If QA prefers a shared helper, it is a one-stage follow-up that touches both tests at once.
+
+### Quick checks
+
+```
+$ npx vitest run --project e2e
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Duration  1.91s
+
+$ npm run check
+> biome check . && tsc --noEmit && depcruise src
+Checked 165 files in 253ms. No fixes applied.
+✔ no dependency violations found (107 modules, 254 dependencies cruised)
+
+$ npx vitest run --project e2e   # determinism re-run
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Duration  1.26s
+```
+
+The file count stays at 165 — no new file, as planned. `npm test` was **not** run: it belongs to ST-6.
+
+No assertion was weakened to reach green. The exit code was `1` on the first run, so the
+`[E6.F1.H2]` contract holds through the real composition root and not only in the unit test of
+`resolveReviewExitCode`.
+
+### Blockers
+
+None. No contradiction, no scope drift, no blast-radius expansion.
+
+### Open risks carried forward
+
+- AC-11 remains entirely unproven until ST-5: two green tests are still not evidence that they would go
+  red. This is now the single largest gap in the change.
+- AC-8's deliberate-type-error spot check (ST-6) is still owed.
+- `risk-e7h1-005` and `risk-e7h1-007` carry forward unchanged.
+
+### Git discipline
+
+No commit, no stage, no branch, no stash, no checkout. `git status --porcelain` shows only
+`M e2e/review-flow.test.ts` (this stage) and `M sdd-lite/.../state.yaml` (orchestrator-owned, already
+modified before this stage started and not touched here).
+
+### QA handoff
+
+Recommended now. ST-3 deferred its review with the argument that the negative case is small and shares
+the file — that condition is now met, so one QA pass can cover the whole suite (ST-1..ST-4) before the
+mutation stage. ST-5 is the natural point where a review would otherwise arrive too late to be cheap.
+
+### Next action
+
+Return to the orchestrator for a QA pass over ST-1..ST-4, or for `stage_approval` on ST-5 (AC-11
+mutation verification). ST-5 and ST-6 are not approved and were not started.

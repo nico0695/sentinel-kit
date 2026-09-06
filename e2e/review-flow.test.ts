@@ -54,6 +54,15 @@ const ENGINE_OUTPUT = [
   "VERDICT: approve",
 ].join("\n");
 
+/** The blocking counterpart: same shape, the one verdict that gates a run. */
+const CHANGES_ENGINE_OUTPUT = [
+  "## Review",
+  "",
+  "[SEV: high] `widget.ts` — the exported helper drops its error path.",
+  "",
+  "VERDICT: request-changes",
+].join("\n");
+
 /** Captures the two line channels the CLI writes through. */
 interface CapturedIo extends CliIo {
   readonly out: string[];
@@ -214,4 +223,100 @@ it("registers a repository, reviews a branch and reads the run back", async () =
 
   /* --- isolation (S6) --- */
   expect(existsSync(deadHomeDir)).toBe(false);
+});
+
+it("reports a request-changes verdict with the configurable gate exit code", async () => {
+  const fixture: HermeticRepo = await createHermeticRepo();
+  temporaryRoots.push(fixture.root);
+
+  const sentinelHome = realpathSync(
+    mkdtempSync(join(tmpdir(), "sentinel-home-")),
+  );
+  temporaryRoots.push(sentinelHome);
+
+  const deadHomeDir = join(fixture.root, "dead-home");
+
+  const engine: ReviewEngine = createFakeEngine({
+    ok: true,
+    result: { output: CHANGES_ENGINE_OUTPUT },
+  });
+
+  // Deliberately inlined rather than shared with the happy path: each e2e
+  // scenario reads as one complete script, and factoring the wiring out would
+  // mean rewriting a test that is not in this stage's scope.
+  const run = async (
+    ...args: string[]
+  ): Promise<{ code: number; io: CapturedIo }> => {
+    const io = createCapturedIo();
+    const cli = createCli(
+      createCliDeps({
+        version: "0.0.0-e2e",
+        env: { SENTINEL_HOME: sentinelHome },
+        homeDir: deadHomeDir,
+        io,
+        engineOverride: engine,
+      }),
+    );
+    const code = await cli.run([
+      "/usr/bin/node",
+      "/tmp/sentinel/cli.js",
+      ...args,
+    ]);
+    return { code, io };
+  };
+
+  const added = await run(
+    "repo",
+    "add",
+    REPO_URL,
+    "--local-path",
+    fixture.repoPath,
+    "--base-branch",
+    fixture.baseBranch,
+    "--harness",
+    "quick",
+  );
+  expect(added.io.err).toEqual([]);
+  expect(added.code).toBe(0);
+
+  /* --- review (S5) --- */
+  const reviewed = await run(
+    "review",
+    REPO_ALIAS,
+    fixture.featureBranch,
+    "--type",
+    "quick",
+  );
+
+  // The gate signal, and the whole point of this scenario: a completed review
+  // that blocks. `1` is the `--changes-exit-code` default from `[E6.F1.H2]`,
+  // returned by `run(argv)` as a value — nothing here touches `process`.
+  expect(reviewed.io.err).toEqual([]);
+  expect(reviewed.code).toBe(1);
+
+  /* --- persistence: the same three files as the happy path --- */
+  const repoRunsDir = join(sentinelHome, "runs", REPO_STORAGE_KEY);
+  const runIds = readdirSync(repoRunsDir);
+  expect(runIds).toHaveLength(1);
+  const runDir = join(repoRunsDir, runIds[0] as string);
+
+  expect(readFileSync(join(runDir, "result.md"), "utf-8")).toBe(
+    CHANGES_ENGINE_OUTPUT,
+  );
+  expect(
+    readFileSync(join(runDir, "prompt.md"), "utf-8").length,
+  ).toBeGreaterThan(0);
+
+  const metadata: Record<string, unknown> = JSON.parse(
+    readFileSync(join(runDir, "metadata.json"), "utf-8"),
+  );
+  expect(metadata.repo).toBe(REPO_STORAGE_KEY);
+  expect(metadata.baseRef).toBe(fixture.baseBranch);
+  expect(metadata.targetRef).toBe(fixture.featureBranch);
+  // A blocking verdict is still a completed run: the state stays `ok` and only
+  // the verdict — and therefore the exit code — differs from the happy path.
+  expect(metadata.state).toBe("ok");
+  expect(metadata.verdict).toBe("request-changes");
+
+  expect(existsSync(join(runDir, "validations"))).toBe(false);
 });

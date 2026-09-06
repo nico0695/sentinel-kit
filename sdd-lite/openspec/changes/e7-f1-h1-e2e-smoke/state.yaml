@@ -133,7 +133,26 @@ stages:
       `biome check --write e2e`; no assertion was weakened. `npm test` deliberately deferred
       to ST-6. Amendment 1's four binding constraints all honoured, with an in-file comment
       recording why `metadata.json#engine` is not asserted.
-      ST-4..ST-6 not started — each still needs its own stage_approval.
+      ST-4 COMPLETE and validated (`success`). One test appended to the existing
+      `e2e/review-flow.test.ts` (+105 lines: the new `it` plus a CHANGES_ENGINE_OUTPUT
+      constant); no new file, nothing under `src/` touched — the orchestrator confirmed
+      `git diff --stat src` is empty. The FakeEngine is scripted to
+      `VERDICT: request-changes` and `run(argv)` returns exit code 1 (the
+      `--changes-exit-code` default from [E6.F1.H2]) with empty stderr, on the FIRST run, no
+      assertion weakened. Asserts the same three files under
+      `<SENTINEL_HOME>/runs/acme__widget/<ts>/` — `result.md` byte-equal to the scripted
+      output, non-empty `prompt.md`, `metadata.json` with repo `acme__widget`, baseRef,
+      targetRef, state `ok`, verdict `request-changes` — plus `validations/` absent. All
+      Amendment 1 constraints honoured. Validation: e2e project 2/2 green (1.91s), `npm run
+      check` clean at 165 files, determinism re-run 2/2 (1.26s); the orchestrator re-ran the
+      project independently and also got 2/2.
+      A-level call worth a reviewer's eye: the new test inlines its fixture/home setup rather
+      than sharing a factory with ST-3's, because extracting one would mean rewriting a test
+      outside this stage's scope and a factory used by one of two tests would leave two
+      divergent ways to build the same graph. It DOES reuse the module-scope constants,
+      CapturedIo/createCapturedIo, the temporaryRoots teardown registry and
+      createHermeticRepo.
+      ST-5 and ST-6 not started — each still needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -499,4 +518,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T18:00:00Z"
+updated_at: "2026-09-05T18:12:00Z"

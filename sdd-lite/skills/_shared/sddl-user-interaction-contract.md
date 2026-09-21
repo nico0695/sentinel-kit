@@ -23,6 +23,8 @@ This contract defines how `sdd-lite` asks the user for decisions without turning
 | `review_gate` | offering a post-execution code review, approving a review fix round, or adjudicating a judge contradiction | conditional — mandatory before any fix round and for every judge contradiction |
 | `escalation_review` | the request no longer fits safe lite execution | conditional |
 | `final_review` | final QA found warnings, blockers, or a closeout decision is still needed | conditional |
+| `archive_review` | confirming which changes get archived and with which disposition | mandatory before any archive move |
+| `delivery_gate` | confirming the delivery target, its change correlation, and the output language before drafting | mandatory before `sddl-delivery` drafts anything |
 
 ## Standard checkpoint shape
 
@@ -127,6 +129,65 @@ Recommended options:
 - accept and close
 - return for fixes
 - hold for review
+
+## `archive_review` minimum content
+
+Each `archive_review` checkpoint should include:
+
+- the candidate changes with `change-name`, lifecycle status, age, QA verdict, and proposed disposition
+- the rubric class behind each proposal, so the user can see why it was proposed
+- any detected related-change cluster, labelled as informational only
+- for `batch` mode: the action set (`all`, `none`, indices, ranges, `inspect N`, `skip N`, `done`)
+
+Recommended options for `single` mode:
+
+- archive with the proposed disposition
+- change the disposition
+- keep the change active
+
+Rules:
+
+- Nothing moves before the user resolves this checkpoint.
+- Only `ready` candidates may be preselected. `stale-candidate` and `blocked-candidate` rows require an individual confirmation.
+- A change proposed as `abandoned` needs a one-line reason from the user before it executes.
+- `inspect N` answers from persisted digests and returns to the same checkpoint without changing the selection.
+- Unrecognized input restates the action set instead of being interpreted.
+
+## `delivery_gate` minimum content
+
+Each `delivery_gate` checkpoint should include:
+
+- the modes that will run (`commit`, `pr`, `ticket`) and the frozen target
+- the correlated `change-name` with its rubric class, or an explicit statement that no change is associated
+- the output language question, unless `delivery.output_language` is set in `config.yaml`
+- for `ticket` mode: a request for the current ticket description, when the user wants it corrected
+- for a commit range: the action set (`all`, `none`, indices, ranges, `inspect N`, `done`)
+
+Output language options:
+
+| Option | Effect |
+|---|---|
+| `en` | all three outputs in English |
+| `chat` | all three follow `conventions.chat_language` |
+| `es` | all three in Spanish |
+| `mixed` | commit message in English, pull request and ticket in Spanish |
+
+Recommended options for a named change:
+
+- draft with the proposed modes
+- change the modes
+- stop
+
+Rules:
+
+- Nothing is drafted before the user resolves this checkpoint.
+- Only commits whose correlation class is `exact` may be preselected. Every other class requires an explicit decision.
+- An ambiguous correlation is presented with both candidates and the signals that fired for each. It is never resolved by the system.
+- The output language is recorded once per change and reused on later runs without asking again.
+- `inspect N` answers from read-only git output and returns to the same checkpoint without changing the selection.
+- Unrecognized input restates the action set instead of being interpreted.
+- This gate confirms drafting only. Nothing it resolves applies a commit, opens a pull request, or writes to a tracker.
+- Declining the offer resolves the gate and is recorded as a decision. A declined delivery is a resolved delivery: the offer is not repeated, and downstream routing may proceed.
 
 ## Decision recording
 

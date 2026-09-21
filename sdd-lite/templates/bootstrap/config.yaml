@@ -3,7 +3,7 @@ project:
   name: example-project
   slug: example-project
   root: /absolute/path/to/project
-  package_root: sdd/sdd-lite
+  package_root: harness/stable/sdd-lite
   runtime_root: ./sdd-lite
   stack:
     languages:
@@ -21,6 +21,15 @@ paths:
   config_path: ./sdd-lite/openspec/config.yaml
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
+  archive_root: ./sdd-lite/openspec/archive
+  delivery_root: ./sdd-lite/openspec/delivery
+
+archive:
+  suggest_threshold: 15
+  stale_days: 30
+
+delivery:
+  pr_suggest_min_commits: 3
 
 quality_commands:
   install:
@@ -72,7 +81,7 @@ conventions:
 
 ai_setups:
   detected: []
-  # Possible values: claude_code, codex
+  # Possible values: claude_code, agents
   configured: []
   # Skills installed per AI target
   skills_installed: []
@@ -91,11 +100,46 @@ ai_setups:
   #     - sddl-judgment-day
   #     - sddl-deep-explorer
   #     - sddl-qa-review
+  #     - sddl-delivery
+  #     - sddl-archive
   wrappers_injected: []
   # Example entry:
   # - ai: claude_code
   #   target_file: CLAUDE.md
   #   injected_at: "2026-04-15T00:00:00Z"
+  agents_installed: []
+  # Example entry:
+  # - target: .claude/agents
+  #   method: copy
+  #   installed_at: "2026-04-15T00:00:00Z"
+  #   profiles:
+  #     - sddl-light
+  #     - sddl-framer
+  #     - sddl-explorer
+  #     - sddl-architect
+  #     - sddl-sequencer
+  #     - sddl-executor
+  #     - sddl-reviewer
+  #     - sddl-qa
+
+# Optional. Omit to keep template defaults from templates/agents/profiles.yaml.
+# Init regenerates adapter files when these values change.
+# Profile ids: sddl-light, sddl-framer, sddl-explorer, sddl-architect,
+# sddl-sequencer, sddl-executor, sddl-reviewer, sddl-qa.
+# execution_profiles:
+#   sddl-framer:
+#     claude:
+#       model: opus          # raise proposal to the high tier for ambiguous projects
+#       effort: high
+#     codex:
+#       model: gpt-5.6-sol
+#       effort: high
+#   sddl-executor:
+#     claude:
+#       model: inherit       # let the session model write code instead of sonnet
+#     codex:
+#       model: inherit       # omit the generated TOML model key
+#       effort: high         # effort remains independently configurable
 
 metadata:
   bootstrap_version: stage-1

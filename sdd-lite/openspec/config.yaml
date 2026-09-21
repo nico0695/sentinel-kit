@@ -2,7 +2,7 @@ version: "0.1"
 project:
   name: sentinel
   slug: sentinel
-  root: /home/user/sentinel-kit
+  root: /Users/nicolasschmidt/Documents/develop/test-cr-cli
   package_root: sdd-lite
   runtime_root: ./sdd-lite
   stack:
@@ -20,15 +20,22 @@ paths:
   config_path: ./sdd-lite/openspec/config.yaml
   changes_root: ./sdd-lite/openspec/changes
   reviews_root: ./sdd-lite/openspec/reviews
+  archive_root: ./sdd-lite/openspec/archive
+  delivery_root: ./sdd-lite/openspec/delivery
 
-# NOTE: E0 through E6.F2.H1 have landed on `main` @ 59b806e (PR #75 merged). All four
-# scripts are runnable and verified exit 0 as of that merge: `npm run check` (biome +
-# tsc + depcruise, 0 violations — 156 files, 103 modules cruised), `npm test` (vitest,
-# 754/754 across 45 files), `npm run build` (tsup) and `npm run dev` (`tsup --silent &&
-# node dist/cli.js`). `[E6.F1.H1]` added the CLI adapter (`src/adapters/driving/cli/`),
-# the `commander` runtime dep, and the `src/main/` composition root (cli.ts,
-# container.ts, paths.ts); `[E6.F2.H1]` filled `src/adapters/driving/tui/` and added
-# the `@clack/prompts` runtime dep.
+archive:
+  suggest_threshold: 15
+  stale_days: 30
+
+delivery:
+  pr_suggest_min_commits: 3
+
+# NOTE: E0 through E6 have landed on `main` (last merge: PR #78 @ cbc878b; product code
+# last changed by the PR #77 owner-review fix round). The validated gates are `npm run check`
+# (biome 163 files; tsc clean; depcruise 0 violations across 107 modules / 254 dependencies)
+# and `npm test` (1038/1038 across 50 files, including the in-progress E7 smoke), both exit 0.
+# E7 is the only open epic, with five required stories. `[E7.F1.H1]` is implemented in the
+# working tree (uncommitted) and awaits code review + final QA.
 quality_commands:
   install:
     - npm ci
@@ -42,27 +49,23 @@ quality_commands:
     - npm run check
   format:
     - npm run check
+  dev:
+    - npm run dev
 
 bootstrap:
   status: refreshed
   strategy: shallow-high-signal
   generated_at: "2026-08-01T14:39:32Z"
   generated_by: sddl-init
-  last_validated_at: "2026-08-29T15:00:00Z"
-  # Surgical refresh 2026-08-29 by the orchestrator (not a full sddl-init run),
-  # post-E6.F2.H1 on `main` @ 59b806e, at the start of `[E6.F2.H2]`. What changed
-  # since the previous surgical entry: `[E6.F2.H1]` (PR #75) landed the TUI
-  # navigation flow — `src/adapters/driving/tui/` is no longer a placeholder
-  # (`tui-flow.ts`, `tui-deps.ts`, `render.ts`, `clack-prompter.ts` + 6 suites),
-  # `src/main/cli.ts` dispatches bare argv to the TUI, and `createWiringGraph` /
-  # `createTuiDeps` were extracted in `container.ts`. First TUI runtime dep
-  # ratified and installed: `@clack/prompts` 1.7.0 (exact-pinned, confined to
-  # `tui/clack-prompter.ts`); `npm test` grew from 707/39 to 754/45.
-  # `[E6.F2.H2]` (result rendering) is the last required E6 story and rewrites the
-  # deliberately minimal `tui/render.ts` surface that `[E6.F2.H1]` left behind.
-  # `picocolors` / `marked-terminal` stay declared-only recommendations
-  # (docs/setup-tecnico-sentinel.md §4) until this story's design ratifies them.
-  # Next refresh trigger: E6 closed (E7 entry), or a new runtime dep lands.
+  last_validated_at: "2026-09-21T01:34:01Z"
+  # Refreshed by sddl-init after adopting the sdd-lite 0.4 package (wrapper contract 0.4,
+  # execution-profiles version 2). Changes vs the previous bootstrap: CLAUDE.md wrapper 0.1 -> 0.4,
+  # eight execution-profile adapters installed (.claude/agents, .codex/agents), sddl-delivery and
+  # sddl-archive skills installed, AGENTS.md agents configured (.agents/skills, AGENTS.md wrapper),
+  # archive/delivery paths and settings added, and the non-schema `fixture_roots` key dropped from
+  # observed_paths. Project facts: 1038 tests / 50 files (was 995 / 49); the `e2e/` project now
+  # holds the `[E7.F1.H1]` smoke. Next refresh trigger: E7 materially changes release tooling,
+  # the package enters its first published release, or the sdd-lite package is updated again.
   refresh_recommended: false
   refresh_reason_codes: []
   observed_files:
@@ -72,6 +75,8 @@ bootstrap:
       - package-lock.json
     docs:
       - CLAUDE.md
+      - README.md
+      - CONTRIBUTING.md
       - docs/prd-sentinel.md
       - docs/setup-tecnico-sentinel.md
       - docs/backlog-mvp-sentinel.md
@@ -102,9 +107,9 @@ bootstrap:
       - src/adapters/driven/git/__test__
       - src/adapters/driven/storage/__test__
       - src/adapters/driving/cli/__test__
+      - src/adapters/driving/tui/__test__
       - src/main/__test__
-    fixture_roots:
-      - fixtures
+      - e2e
     config_roots:
       - .
 
@@ -119,12 +124,14 @@ conventions:
 ai_setups:
   detected:
     - claude_code
+    - agents
   configured:
     - claude_code
+    - agents
   skills_installed:
     - target: .claude/skills
       method: copy
-      installed_at: "2026-08-01T13:14:29Z"
+      installed_at: "2026-09-21T01:32:13Z"
       skills:
         - sddl-init
         - sddl-proposal
@@ -136,10 +143,56 @@ ai_setups:
         - sddl-judgment-day
         - sddl-deep-explorer
         - sddl-qa-review
+        - sddl-delivery
+        - sddl-archive
+    - target: .agents/skills
+      method: copy
+      installed_at: "2026-09-21T01:32:13Z"
+      skills:
+        - sddl-init
+        - sddl-proposal
+        - sddl-spec
+        - sddl-design
+        - sddl-plan
+        - sddl-executor
+        - sddl-code-review
+        - sddl-judgment-day
+        - sddl-deep-explorer
+        - sddl-qa-review
+        - sddl-delivery
+        - sddl-archive
+  agents_installed:
+    - target: .claude/agents
+      method: copy
+      installed_at: "2026-09-21T01:32:13Z"
+      profiles:
+        - sddl-light
+        - sddl-framer
+        - sddl-explorer
+        - sddl-architect
+        - sddl-sequencer
+        - sddl-executor
+        - sddl-reviewer
+        - sddl-qa
+    - target: .codex/agents
+      method: copy
+      installed_at: "2026-09-21T01:32:13Z"
+      profiles:
+        - sddl-light
+        - sddl-framer
+        - sddl-explorer
+        - sddl-architect
+        - sddl-sequencer
+        - sddl-executor
+        - sddl-reviewer
+        - sddl-qa
   wrappers_injected:
     - ai: claude_code
       target_file: CLAUDE.md
-      injected_at: "2026-08-01T13:14:29Z"
+      injected_at: "2026-09-21T01:32:13Z"
+    - ai: agents
+      target_file: AGENTS.md
+      injected_at: "2026-09-21T01:32:13Z"
 
 metadata:
   bootstrap_version: stage-1

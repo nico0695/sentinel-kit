@@ -80,6 +80,7 @@ Write or refresh:
 Do not write outside `./sdd-lite/` except for the approved repository changes required by the current stage.
 Do not write `qa-report.md`.
 Do not perform commits, stashes, rebases, or other git history actions.
+Do not stage files either. `git add` belongs to the orchestrator and only on explicit user request.
 
 ## Execution Model
 

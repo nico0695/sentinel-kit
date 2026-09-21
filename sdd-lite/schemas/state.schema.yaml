@@ -71,6 +71,7 @@ properties:
       - reviewing
       - completed
       - blocked
+      - archived
   current_stage:
     type: string
     enum:
@@ -84,6 +85,8 @@ properties:
       - sddl-code-review
       - sddl-judgment-day
       - sddl-qa-review
+      - sddl-delivery
+      - sddl-archive
   stages:
     type: object
     additionalProperties: false
@@ -113,6 +116,10 @@ properties:
       sddl-judgment-day:
         $ref: "#/$defs/stageState"
       sddl-qa-review:
+        $ref: "#/$defs/stageState"
+      sddl-delivery:
+        $ref: "#/$defs/stageState"
+      sddl-archive:
         $ref: "#/$defs/stageState"
   artifacts:
     type: object
@@ -151,6 +158,12 @@ properties:
         type: string
         minLength: 1
       review_ledger:
+        type: string
+        minLength: 1
+      archive_report:
+        type: string
+        minLength: 1
+      delivery_report:
         type: string
         minLength: 1
   checkpoints:
@@ -247,6 +260,47 @@ properties:
       ledger_path:
         type: string
         minLength: 1
+  delivery_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - modes_run
+      - output_language
+      - reported_at
+    properties:
+      modes_run:
+        type: array
+        items:
+          type: string
+          enum:
+            - commit
+            - pr
+            - ticket
+      output_language:
+        type: string
+        enum:
+          - en
+          - chat
+          - es
+          - mixed
+      ticket_status:
+        type: string
+        enum:
+          - complete
+          - concerns
+          - not_applicable
+      new_configuration:
+        type: boolean
+      report_path:
+        type: string
+        minLength: 1
+      reported_at:
+        type: string
+        minLength: 1
+      commits:
+        type: array
+        items:
+          $ref: "#/$defs/recordedCommit"
   next_action:
     type: object
     additionalProperties: false
@@ -263,6 +317,7 @@ properties:
           - review_output
           - create_macro_plan
           - escalate_to_sdd_v2
+          - archive
           - complete
           - halt
       target:
@@ -327,6 +382,8 @@ $defs:
           - review_gate
           - escalation_review
           - final_review
+          - archive_review
+          - delivery_gate
       stage:
         type: string
         enum:
@@ -340,6 +397,8 @@ $defs:
           - sddl-code-review
           - sddl-judgment-day
           - sddl-qa-review
+          - sddl-delivery
+          - sddl-archive
       summary:
         type: string
         minLength: 1
@@ -411,6 +470,25 @@ $defs:
         minLength: 1
       recommended:
         type: boolean
+  recordedCommit:
+    type: object
+    additionalProperties: false
+    required:
+      - sha
+      - subject
+      - recorded_at
+    properties:
+      sha:
+        type: string
+        pattern: "^[0-9a-f]{7,40}$"
+      subject:
+        type: string
+        minLength: 1
+      stage_id:
+        type: string
+      recorded_at:
+        type: string
+        minLength: 1
   risk:
     type: object
     additionalProperties: false

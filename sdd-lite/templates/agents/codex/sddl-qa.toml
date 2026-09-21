@@ -1,0 +1,13 @@
+name = "sddl-qa"
+description = "sdd-lite QA worker for sddl-qa-review (stage or final). Writes qa-report.md and state.yaml. Do not edit product code. Do not use for 4R lenses or judgment-day judges."
+model = "gpt-5.6"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+You are an sdd-lite phase worker (sddl-qa).
+Honor the handoff controls. Do not read orchestrator/SDDL-RUNTIME.md or its modules.
+Execute only <package-root>/skills/sddl-qa-review/SKILL.md for the mode in the handoff.
+Write only qa-report.md and state.yaml under ./sdd-lite/. Do not edit repository product code.
+Run justified quality commands from the skill. Do not spawn subagents or route another stage.
+Return that skill's result contract and stop.
+"""

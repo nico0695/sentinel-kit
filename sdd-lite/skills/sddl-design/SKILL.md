@@ -16,6 +16,8 @@ Turn `spec.md` into a technical design that defines how the change should be imp
 
 This stage produces the architecture and technical decisions. It does not produce the execution plan — that belongs to `sddl-plan`.
 
+Throughout this skill, a difference is **material** when it would change the technical direction, the affected areas, or the selected route. Anything that would not change one of those three is not material, and is not worth a question or a stop.
+
 ## Runtime operating rules
 
 - Execute this phase yourself. Do not become a nested orchestrator.
@@ -41,15 +43,35 @@ This stage should not:
 - absorb executor or QA logic
 - hide unresolved technical decisions
 
+## Inbound spec contract
+
+`spec.md` is not just prose to reuse. Its `Open Questions And Decisions` table is addressed in part to this stage, and every row has to land somewhere — a question that reaches this stage and disappears is a decision made silently.
+
+Sort the rows by their `Needed Before` value:
+
+- **`design`** — this stage owns it. Resolve it with current evidence and record the resolution in `Alternatives And Trade-Offs` or `Interfaces, Data, And State`. If it cannot be resolved here, do not design around it: return `partial` with `decision_required`, or `blocked` when no safe technical direction exists without it.
+- **`execution`** — this stage does not own it, and must not drop it. Carry it into `Open Technical Questions` in `design.md`, keeping its `Needed Before: execution` value so `sddl-plan` can surface it for the stage it affects.
+- **already `resolved`** — nothing to carry.
+
+A row never disappears without either a recorded resolution or an explicit carry-forward.
+
 ## Proportional design
 
-For changes where the technical approach is obvious from the spec (e.g., adding a field to an existing form, fixing a validation bug), produce a minimal design proportional to the complexity. The design must still identify affected areas, but other sections can be condensed or omitted when they add no value.
+Produce a minimal design — technical approach and affected areas only, other sections condensed or omitted — when all three hold:
+
+- no row in the spec's `Open Questions And Decisions` is unresolved with `Needed Before: design`
+- the spec's in-scope boundary touches a single surface (one module, one endpoint, one form)
+- no active risk in `state.yaml` `open_risks` is at `medium` severity or above
+
+Anything else gets the full artifact. A single surface can still carry high technical impact, which is why the risk condition is separate from the scope one.
+
+When the conditions disagree with your instinct that the change is trivial, follow the conditions — the whole point is that two runs over the same spec reach the same shape.
 
 ## Reads
 
 Read:
 
-- `./sdd-lite/openspec/changes/{change-name}/spec.md` as the primary input
+- `./sdd-lite/openspec/changes/{change-name}/spec.md` as the primary input, including its `Open Questions And Decisions`
 - `./sdd-lite/openspec/changes/{change-name}/proposal.md` as reference
 - `./sdd-lite/openspec/config.yaml`
 - `./sdd-lite/project-context.md`
@@ -102,24 +124,16 @@ Persisted artifacts stay in English even if chat is Spanish.
 
 ## Phase validation
 
-Before returning, apply smart phase validation:
+Before returning, apply the `phase_validation` checkpoint as defined in `skills/_shared/sddl-user-interaction-contract.md`. It is conditional: skip it when the user already indicated advancement, and always present it when the technical approach is ambiguous, when viable alternatives carry different risk profiles, or when open technical questions would affect the execution plan.
 
-- If the user already indicated advancement (e.g., "continue with plan", "go ahead"), skip the checkpoint and record it as implicitly approved.
-- If there is ambiguity in technical approach or multiple viable alternatives with different risk profiles, present the checkpoint.
-- If the artifact contains open technical questions that affect the execution plan, present the checkpoint.
-
-When presenting the checkpoint, include:
-
-- a concise summary of the technical approach and affected areas
-- the next phase (`sddl-plan`)
-- recommended options: approve and continue, revise this phase, stop
+Record the checkpoint in `state.yaml` with `type: phase_validation`, the artifact written, and the decision.
 
 ## Workflow
 
 1. Read `spec.md`
    Reuse its scope boundary, acceptance criteria, and expected behavior instead of redefining them.
 2. Check minimum design readiness
-   Stop if the spec is missing, contradicted, or not specific enough for safe design.
+   Apply `Inbound spec contract` to sort every open question. Also stop if the spec is missing, contradicted, or not specific enough for safe design.
 3. Define the technical approach
    Explain how the change should be implemented at a practical level.
 4. Map affected areas
@@ -139,6 +153,9 @@ When syncing `state.yaml` from this stage:
 
 - set `current_stage: sddl-design` while active
 - update `stages.sddl-design`
+- update `artifacts.design` with the artifact path
+- refresh `open_risks` with the risks still active after this stage
+- refresh `updated_at`
 - keep approved checkpoints and decisions intact
 - keep the lifecycle at `planning`
 - set `next_action` toward `sddl-plan`, a user checkpoint, or a blocked stop
@@ -160,20 +177,28 @@ Before finishing, verify:
 - affected areas are visible
 - alternatives are recorded when they exist
 - open technical questions are visible
+- every row of the spec's `Open Questions And Decisions` was either resolved here or carried into `Open Technical Questions` with its `Needed Before: execution` intact
 - the result is enough for `sddl-plan` to proceed without guessing
 - all persisted content is English
 
 ## Expected Output
 
-On success, provide:
+Return the common result structure from `skills/_shared/sddl-flow-contract.md`.
 
-- `status: success`
-- `design.md` in `artifacts`
-- a short summary of the technical approach
-- the next safe step, usually `sddl-plan`
+Required fields:
+
+- `status`: `success`, `partial`, or `blocked`
+- `executive_summary`: the technical approach and affected areas in a few lines
+- `artifacts`: `design.md` and `state.yaml`
+- `next_action`: the next safe step, usually `sddl-plan`
+- `open_risks`: risks still active after this stage, with `low`, `medium`, or `high` severity. Return an empty list when there are none — never omit the field. The orchestrator surfaces `medium` and above to the user before routing.
+
+Optional fields to include when they apply:
+
+- `decision_required` and `decision_options` when a technical decision needs the user
 - `context_resolution`
 - `standards_source`
-- `artifact_digests_used` when applicable
+- `artifact_digests_used`
 - `recommended_next_stage`
 
 Use `partial` when the design is usable but a material decision still gates safe planning.

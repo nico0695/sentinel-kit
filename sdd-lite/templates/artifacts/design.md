@@ -14,7 +14,6 @@
 - change_name:
 - objective:
 - route:
-- design_status:
 
 ## Design Overview
 

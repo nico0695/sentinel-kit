@@ -17,6 +17,10 @@ Turn `proposal.md` into a formal specification that makes scope boundaries, expe
 
 This stage does not redefine the problem — it formalizes the proposal into a contract that design, execution, and QA stages can validate against.
 
+Throughout this skill, a difference is **material** when it would change the scope boundary, an acceptance criterion, or the selected route. Anything that would not change one of those three is not material, and is not worth a question or a stop.
+
+Severity, wherever this skill refers to it, uses `low`, `medium`, or `high` — the same scale `open_risks` carries in `state.yaml`.
+
 ## Runtime operating rules
 
 - Execute this phase yourself. Do not become a nested orchestrator.
@@ -42,15 +46,37 @@ This stage should not:
 - become an execution plan
 - hide unresolved decisions behind vague wording
 
+## Inbound proposal contract
+
+`proposal.md` is not just prose to reuse. Three of its fields are preconditions for this stage.
+
+**`proposal_status`.** Formalize only when it is `ready`. `needs-input` means a readiness gate is still waiting on the user; `blocked` means the framing needs a decision beyond `sddl-proposal`. In either case there is no stable contract to formalize — return `blocked`, naming the status and what it is waiting on. Do not resolve the gate yourself.
+
+**`Readiness Check`.** A gate left at `raised` with `high` severity is a blocking precondition: return `blocked` rather than formalize on a framing the proposal itself marked unresolved. A gate at `resolved` is fine — it was raised and settled.
+
+**`Open Questions For Spec`.** This table is addressed to this stage. Every row must land somewhere:
+
+- migrate each row into `Open Questions And Decisions` in `spec.md`
+- resolve the ones current evidence can settle, and mark them `resolved`
+- for the rest, fill the `Needed Before` column with `design` or `execution`
+- a migrated row never disappears without either `resolved` or an explicit `Needed Before`
+
+Rows the user explicitly skipped during the proposal's clarification block arrive here. They are open questions, not settled decisions — never treat a skipped question as an implicit answer.
+
 ## Proportional spec
 
-For changes where the scope is obvious from the proposal (e.g., "add a field to a form", "fix a typo in validation"), produce a minimal spec proportional to the complexity instead of forcing all boilerplate sections. The spec must still cover scope boundary and acceptance criteria, but other sections can be condensed or omitted when they add no value.
+Produce a minimal spec — scope boundary and acceptance criteria only, other sections condensed or omitted — when both hold:
+
+- all three gates in the proposal's `Readiness Check` are `clear`
+- the scope sketch touches a single surface (one module, one endpoint, one form)
+
+Anything else gets the full artifact. When the two conditions disagree with your instinct that the change is trivial, follow the conditions — the whole point is that two runs over the same proposal reach the same shape.
 
 ## Reads
 
 Read:
 
-- `./sdd-lite/openspec/changes/{change-name}/proposal.md` as the primary input
+- `./sdd-lite/openspec/changes/{change-name}/proposal.md` as the primary input, including its `proposal_status`, `Readiness Check`, and `Open Questions For Spec`
 - `./sdd-lite/openspec/config.yaml`
 - `./sdd-lite/project-context.md`
 - `./sdd-lite/skill-catalog.md` as the runtime standards registry
@@ -106,38 +132,32 @@ Persisted artifacts stay in English even if chat is Spanish.
 
 ## Phase validation
 
-Before returning, apply smart phase validation:
+Before returning, apply the `phase_validation` checkpoint as defined in `skills/_shared/sddl-user-interaction-contract.md`. It is conditional: skip it when the user already indicated advancement, and always present it when scope, risk, or interpretation is ambiguous, or when the artifact carries open questions or risks at `medium` or `high` severity.
 
-- If the user already indicated advancement (e.g., "continue with design", "go ahead"), skip the checkpoint and record it as implicitly approved.
-- If there is ambiguity in scope, risk, or multiple plausible interpretations, present the checkpoint.
-- If the artifact contains open questions or risks above medium severity, present the checkpoint.
-
-When presenting the checkpoint, include:
-
-- a concise summary of the scope and key acceptance criteria
-- the next phase (`sddl-design`)
-- recommended options: approve and continue, revise this phase, stop
+Record the checkpoint in `state.yaml` with `type: phase_validation`, the artifact written, and the decision.
 
 ## Workflow
 
 1. Read `proposal.md`
    Reuse its problem framing, feasibility signal, and scope sketch instead of redefining them.
-2. Check minimum spec readiness
-   Stop if the proposal is missing, contradicted, or not specific enough for safe specification.
-3. Define the firm scope boundary
+2. Check the inbound proposal contract
+   Apply `Inbound proposal contract`. Also stop if the proposal is missing, contradicted, or not specific enough for safe specification.
+3. Migrate `Open Questions For Spec`
+   Per `Inbound proposal contract`.
+4. Define the firm scope boundary
    Make in-scope work, out-of-scope work, and non-goals definitive.
-4. Define expected behavior scenarios
+5. Define expected behavior scenarios
    Keep them concrete enough for QA to validate later.
-5. Define acceptance criteria
+6. Define acceptance criteria
    Each criterion should have a validation hint and priority.
-6. Record risks and open questions
+7. Record risks and open questions
    Keep unresolved questions visible instead of burying them in prose.
-7. Write `spec.md`
+8. Write `spec.md`
    Keep it compact, auditable, and directly usable by `sddl-design`.
-8. Phase validation checkpoint
+9. Phase validation checkpoint
    Apply smart validation: skip if user already approved advancement, present if ambiguity exists.
-9. Sync `state.yaml`
-   Record stage status, lifecycle status, checkpoints, decisions, open risks, and the next safe action.
+10. Sync `state.yaml`
+    Record stage status, lifecycle status, checkpoints, decisions, open risks, and the next safe action.
 
 ## State Sync Rules
 
@@ -145,6 +165,9 @@ When syncing `state.yaml` from this stage:
 
 - set `current_stage: sddl-spec` while active
 - update `stages.sddl-spec`
+- update `artifacts.spec` with the artifact path
+- refresh `open_risks` with the risks still active after this stage
+- refresh `updated_at`
 - keep approved checkpoints and decisions intact
 - keep the lifecycle at `planning`
 - set the next recommended action toward `sddl-design`, a user checkpoint, or a blocked stop
@@ -155,7 +178,7 @@ Do not pretend the change is execution-ready from this stage alone.
 
 - `spec.md` must retain scope boundaries, acceptance criteria, risks, and open questions.
 - The artifact must be short enough for lite, but specific enough to detect drift later.
-- Target roughly 300 to 500 words plus tables when possible.
+- Respect the word budget stated in `templates/artifacts/spec.md`.
 - Start with a short digest that downstream stages can reuse cheaply.
 - If there is no real alternative or open question, say so explicitly instead of padding the artifact.
 
@@ -167,21 +190,29 @@ Before finishing, verify:
 - acceptance criteria are concrete and validatable
 - expected behavior scenarios are explicit
 - risks and open questions remain visible
+- every row of the proposal's `Open Questions For Spec` appears in `Open Questions And Decisions`, either `resolved` or with a `Needed Before`
 - the result is enough for `sddl-design` to proceed without guessing
 - all persisted content is English
 
 ## Expected Output
 
-On success, provide:
+Return the common result structure from `skills/_shared/sddl-flow-contract.md`.
 
-- `status: success`
-- `spec.md` in `artifacts`
-- a short summary of the formal scope and key acceptance criteria
-- the next safe step, usually `sddl-design`
+Required fields:
+
+- `status`: `success`, `partial`, or `blocked`
+- `executive_summary`: the formal scope and key acceptance criteria in a few lines
+- `artifacts`: `spec.md` and `state.yaml`
+- `next_action`: the next safe step, usually `sddl-design`
+- `open_risks`: risks still active after this stage, with `low`, `medium`, or `high` severity. Return an empty list when there are none — never omit the field. The orchestrator surfaces `medium` and above to the user before routing.
+
+Optional fields to include when they apply:
+
+- `decision_required` and `decision_options` when a blocking precondition needs the user
 - `context_resolution`
 - `standards_source`
-- `artifact_digests_used` when applicable
+- `artifact_digests_used`
 - `recommended_next_stage`
 
 Use `partial` when the artifact is usable but a material checkpoint still gates safe design.
-Use `blocked` when the spec cannot be formalized safely without a material user decision.
+Use `blocked` when the spec cannot be formalized safely without a material user decision, or when the inbound proposal is not `ready`.

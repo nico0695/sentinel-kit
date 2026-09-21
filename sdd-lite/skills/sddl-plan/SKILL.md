@@ -42,6 +42,14 @@ This stage should not:
 - absorb executor or QA logic
 - hide unresolved planning decisions
 
+## Inbound design contract
+
+`design.md` carries an `Open Technical Questions` table. Rows marked `Needed Before: execution` reached this stage because nothing earlier could settle them, and the user should see them before approving the stage they affect.
+
+Record each such row in `Approval Notes`, naming the stage whose work depends on the answer, so it sits in the plan's own approval context instead of staying buried in the design. This stage surfaces these questions; it does not resolve them and does not block on them.
+
+Rows marked `Needed Before: design` should already be resolved. If one arrives still open, the design is incomplete: return `blocked` naming the row, rather than planning around a decision that was never made.
+
 ## Proportional plan
 
 For changes with an obvious execution path (e.g., single-stage changes, straightforward file modifications), produce a minimal plan proportional to the complexity. The plan must still have a stage table, but other sections can be condensed when they add no value.
@@ -50,7 +58,7 @@ For changes with an obvious execution path (e.g., single-stage changes, straight
 
 Read:
 
-- `./sdd-lite/openspec/changes/{change-name}/design.md` as the primary input
+- `./sdd-lite/openspec/changes/{change-name}/design.md` as the primary input, including its `Open Technical Questions`
 - `./sdd-lite/openspec/changes/{change-name}/spec.md` as reference
 - `./sdd-lite/openspec/changes/{change-name}/proposal.md` as reference
 - `./sdd-lite/openspec/config.yaml`
@@ -82,14 +90,12 @@ Use `templates/artifacts/plan.md` as the baseline shape for `plan.md`.
 The plan must keep these sections explicit:
 
 - execution digest
-- summary (including `planner_terminal` and `execution_ready` flags)
+- summary
 - stage plan table
 - validation strategy
 - dependencies and sequencing
 - planner stop note
 - approval notes
-
-The stage plan table is the embedded status table pattern for lite planning.
 
 ## Stage Plan Rules
 
@@ -119,17 +125,11 @@ Persisted planning artifacts stay in English even if chat is Spanish.
 
 ## Phase validation
 
-Before returning, apply smart phase validation:
+Before returning, apply the `phase_validation` checkpoint as defined in `skills/_shared/sddl-user-interaction-contract.md`. It is conditional: skip it when the user already indicated advancement, and always present it when the plan has multiple stages with complex dependencies.
 
-- If the user already indicated advancement (e.g., "start execution", "go ahead"), skip the checkpoint and record it as implicitly approved.
-- If the plan has multiple stages with complex dependencies, present the checkpoint.
-- If `objective` is `planner`, always present the checkpoint with the stop option prominent.
+When `objective` is `planner`, always present the checkpoint with the stop option prominent — that is this stage's terminal decision, not a routine advance.
 
-When presenting the checkpoint, include:
-
-- a concise summary of the stage plan
-- the next action (executor approval, planner stop, or macro-plan review)
-- recommended options: approve and start execution, stop as planned, revise the plan
+Present the next action as executor approval, planner stop, or macro-plan review. Record the checkpoint in `state.yaml` with `type: phase_validation`, the artifact written, and the decision.
 
 ## Fix Stage Requests
 
@@ -162,14 +162,14 @@ For approved `macro-plan-first` routes:
 1. Read `design.md`
    Reuse its technical approach and affected areas instead of redefining them.
 2. Check minimum planning readiness
-   Stop if the design is missing, contradicted, or not specific enough for safe planning.
+   Apply `Inbound design contract`. Also stop if the design is missing, contradicted, or not specific enough for safe planning.
 3. Build the stage plan
-   Create a compact ordered plan with explicit dependencies, validation notes, approval boundaries, and a status column.
+   Create a compact ordered plan with explicit dependencies, validation notes, and approval boundaries.
 4. Define the validation strategy
    State how each stage or batch should be validated after execution.
 5. Apply terminal planning rules
    If `objective` is `planner`, stop after this artifact and leave the change in `planned`.
-   If the route is approved `macro-plan-first`, write `macro-plan.md` as the approved chunking output and do not mark direct execution ready.
+   If the route is approved `macro-plan-first`, write `macro-plan.md` as the approved chunking output. It is planning-only and does not authorize implementation, as its `Deferred Execution Note` states.
 6. Write `plan.md`
    Keep it concise, executable, and aligned with the design.
 7. Phase validation checkpoint
@@ -183,6 +183,9 @@ When syncing `state.yaml` from this stage:
 
 - set `current_stage: sddl-plan` while active
 - update `stages.sddl-plan`
+- update `artifacts.plan` with the artifact path, and `artifacts.macro_plan` when the route required one
+- refresh `open_risks` with the risks still active after this stage
+- refresh `updated_at`
 - keep approved checkpoints and decisions intact
 - set `next_action` toward planner stop, macro-plan review, executor approval, or a blocked checkpoint
 - leave execution and QA stages pending unless state already reflects a justified blocked outcome
@@ -204,20 +207,28 @@ Before finishing, verify:
 - validation expectations are stated per stage or batch
 - dependency order is explicit
 - approval boundaries are visible before code-touching work
+- every `Needed Before: execution` row from the design appears in `Approval Notes` with the stage it affects
 - planner terminal behavior is explicit when `objective: planner`
 - all persisted content is English
 
 ## Expected Output
 
-On success, provide:
+Return the common result structure from `skills/_shared/sddl-flow-contract.md`.
 
-- `status: success`
-- `plan.md` in `artifacts`
-- `macro-plan.md` only when the approved route requires it
-- the next safe step, usually planner stop, user approval, or `sddl-executor`
+Required fields:
+
+- `status`: `success`, `partial`, or `blocked`
+- `executive_summary`: the stage plan and its approval boundaries in a few lines
+- `artifacts`: `plan.md` and `state.yaml`, plus `macro-plan.md` only when the approved route requires it
+- `next_action`: the next safe step, usually planner stop, user approval, or `sddl-executor`
+- `open_risks`: risks still active after this stage, with `low`, `medium`, or `high` severity. Return an empty list when there are none — never omit the field. The orchestrator surfaces `medium` and above to the user before routing.
+
+Optional fields to include when they apply:
+
+- `decision_required` and `decision_options` when a planning decision needs the user
 - `context_resolution`
 - `standards_source`
-- `artifact_digests_used` when applicable
+- `artifact_digests_used`
 - `recommended_next_stage`
 
 Use `partial` when the plan is usable but a material decision still gates safe execution.

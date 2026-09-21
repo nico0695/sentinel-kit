@@ -24,7 +24,7 @@ It does not replace `sddl-qa-review`, which judges the change against its spec a
 
 Unlike linear stages, this skill is a protocol the orchestrator executes:
 
-- the orchestrator freezes the target, triages it, and launches each lens as a fresh read-only worker using the Review Worker Envelope (see `SDDL-ORCHESTRATOR.md`, Review Operations)
+- the orchestrator loads `orchestrator/modules/review-runtime.md`, freezes the target, triages it, and launches each lens as a fresh read-only `sddl-reviewer` worker using its Review Worker Envelope
 - lens and refuter prompts are injected from `references/lens-prompts.md`
 - workers return `findings` rows and stop; they never write artifacts
 - only the orchestrator merges findings and writes `review-ledger.md`

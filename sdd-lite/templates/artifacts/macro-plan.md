@@ -5,8 +5,6 @@
 - change_name:
 - objective:
 - route: macro-plan-first
-- approved_checkpoint_id:
-- execution_ready: false
 
 ## Why Direct Execution Is Not Safe Yet
 
@@ -14,8 +12,8 @@
 
 ## Chunk Plan
 
-| Chunk Id | Goal | In Scope | Out Of Scope | Dependencies | Validation Focus | Approval Needed | Status |
-|---|---|---|---|---|---|---|---|
+| Chunk Id | Goal | In Scope | Out Of Scope | Dependencies | Validation Focus | Approval Needed |
+|---|---|---|---|---|---|---|
 
 ## Chunk Notes
 

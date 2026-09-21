@@ -39,6 +39,17 @@
 
 ## Conventions
 
+Project conventions observed during bootstrap. Use `not established` when the evidence budget did not settle a row.
+
+| Area | Convention | Evidence |
+|---|---|---|
+| naming and file placement |  |  |
+| layering / architectural pattern |  |  |
+| testing style |  |  |
+| error handling |  |  |
+
+sdd-lite conventions (fixed, not project-specific):
+
 - Persisted bootstrap and change artifacts stay in English.
 - Chat language may differ from artifact language.
 

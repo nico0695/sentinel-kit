@@ -215,6 +215,7 @@ artifacts:
   plan: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/plan.md
   execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 checkpoints:
   - id: cp-008
     type: stage_approval
@@ -733,9 +734,35 @@ open_risks:
       RESOLVED by decision d-004: `e2e` joins tsconfig#include and biome.json#files.includes;
       depcruise stays scoped to `src` deliberately.
     severity: low
+review_summary:
+  mode: 4r
+  verdict: fail
+  round: 0
+  counts:
+    confirmed: 1
+    suspect: 0
+    escalated: 0
+    info: 11
+  summary: >-
+    full-4r over the frozen target f5cd81f (490 changed lines put it over the 400-line
+    threshold). Four lenses, blind to each other, one exhaustive sweep each. ONE open
+    CRITICAL: R3-001 — the diff and prompt stages are unobserved, so an empty or
+    wrongly-ranged diff passes both tests green; four concrete surviving mutations named,
+    one of which destroys the merge-base PR semantics the PRD mandates. Deterministic, so
+    the refuter had no eligible candidate and the pass was correctly not run; the
+    orchestrator re-verified the claim directly instead (grep confirms `metadata.diff` is
+    never read, `prompt.md` appears only in two `.length` assertions, and run-layout.ts
+    already persists the diff metadata the test could assert). 11 info rows after merging
+    three claims that more than one lens found independently. The verdict is a hole in the
+    safety net, NOT a product defect — which is precisely the failure mode this story
+    exists to prevent. Notable clean: the d-003 containment holds (the seam is unreachable
+    from argv, config or env, and the package is bin-only), no escape path in the recursive
+    deletion, no argument injection, and the ST-5b assertions confirmed non-vacuous.
+  reported_at: "2026-09-24T12:00:00Z"
+  ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: run_stage
-  target: sddl-executor
+  kind: ask_user
+  target: review_gate
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
     ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
@@ -744,4 +771,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-05T19:20:00Z"
+updated_at: "2026-09-24T12:00:00Z"

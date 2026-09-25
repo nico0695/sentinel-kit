@@ -217,6 +217,45 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 checkpoints:
+  - id: cp-009
+    type: review_gate
+    stage: orchestrator
+    summary: >-
+      The full-4r review returned `fail` on one open CRITICAL (R3-001: the diff and prompt
+      stages are unobserved, so an empty or wrongly-ranged diff passes both tests green).
+      Confirmed severe findings never trigger direct edits, so the fix route is the user's
+      call. R3-001 sits inside approved scope, so the suggested route is: rerun `sddl-plan`
+      to insert a fix stage seeded from the confirmed ledger id, then `stage_approval`, then
+      `sddl-executor`.
+    question: >-
+      Open the fix stage with R3-001 plus the cheap info rows, only the CRITICAL, or defer?
+    options:
+      - id: critical_plus_cheap
+        label: R3-001 plus the cheap info rows
+        description: >-
+          Fix the blocking finding and fold in the low-cost info rows while the stage is
+          open — the worktree leaf assertion, io.out assertions, the e2e testTimeout, the
+          fixture try/catch, per-root teardown isolation, the git env hardening and the two
+          readability rows.
+        recommended: true
+      - id: critical_only
+        label: Only the CRITICAL
+        description: Narrowest possible fix; info rows become follow-up issues.
+      - id: defer
+        label: Defer the fix
+        description: >-
+          Not recommended — it would ship the safety net with a demonstrated hole in the
+          exact claim the story makes.
+    free_input_allowed: true
+    response:
+      selected_option_id: critical_plus_cheap
+      free_text: >-
+        User answered "si" to the recommended option, which was named first in the question.
+        The orchestrator adopted that reading and said so explicitly, noting the scope can
+        still be narrowed at the ST-7 stage_approval before any code is touched.
+      responded_at: "2026-09-25T10:00:00Z"
+    created_at: "2026-09-25T10:00:00Z"
+    resolved_at: "2026-09-25T10:00:00Z"
   - id: cp-008
     type: stage_approval
     stage: orchestrator
@@ -490,6 +529,21 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-012
+    checkpoint_id: cp-009
+    selected_option_id: critical_plus_cheap
+    rationale: >-
+      Fix round 1 covers R3-001 (blocking) plus the cheap info rows. Deferring was rejected
+      because it would ship the net with a demonstrated counter-example to the story's own
+      headline claim; critical-only was available but the info rows are a handful of lines
+      each and re-opening the file later costs more than folding them in now. One caveat the
+      plan must handle rather than silently absorb: R3-005 (an exit-code-2 test) would add a
+      THIRD test, which exceeds the spec's scoping of one happy path plus at most one
+      negative case — so it needs either a spec amendment or a follow-up issue, not a quiet
+      inclusion. Author: user (recommendation by claude; the answer was a bare "si" to the
+      first-listed recommended option, and the orchestrator stated its reading explicitly
+      rather than assuming silently).
+    recorded_at: "2026-09-25T10:00:00Z"
   - id: d-011
     checkpoint_id: cp-008
     selected_option_id: approve
@@ -761,8 +815,8 @@ review_summary:
   reported_at: "2026-09-24T12:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: ask_user
-  target: review_gate
+  kind: run_stage
+  target: sddl-plan
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
     ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
@@ -771,4 +825,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-24T12:00:00Z"
+updated_at: "2026-09-25T10:00:00Z"

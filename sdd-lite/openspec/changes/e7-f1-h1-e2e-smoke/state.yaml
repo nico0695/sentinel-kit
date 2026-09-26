@@ -217,6 +217,33 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 checkpoints:
+  - id: cp-010
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      Level-B left open by plan Amendment 2: whether R3-006 joins ST-7. It is not a flag
+      removal — the fixture clones an empty bare origin and pushes afterwards, so
+      `refs/remotes/origin/HEAD` is never set, `git symbolic-ref` exits 128 and `git-cli`
+      maps it to GitNoDefaultBranchError; dropping `--base-branch` today makes `repo add`
+      FAIL. Including it therefore also means adding `git remote set-head origin main` to the
+      fixture.
+    question: Does R3-006 join ST-7, or become a follow-up?
+    options:
+      - id: include
+        label: Include in ST-7
+        description: >-
+          Drop `--base-branch` from the happy path only (the negative keeps it, so both arms
+          stay exercised), plus the `set-head` prerequisite, under a STOP rule.
+        recommended: true
+      - id: followup
+        label: Leave as follow-up
+        description: ST-7 stays at the CRITICAL plus the eight confirmed info rows.
+    free_input_allowed: true
+    response:
+      selected_option_id: include
+      responded_at: "2026-09-26T09:00:00Z"
+    created_at: "2026-09-26T09:00:00Z"
+    resolved_at: "2026-09-26T09:00:00Z"
   - id: cp-009
     type: review_gate
     stage: orchestrator
@@ -529,6 +556,20 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-013
+    checkpoint_id: cp-010
+    selected_option_id: include
+    rationale: >-
+      R3-006 joins ST-7. The deciding argument: it is the SAME SPECIES as R3-001 — an
+      assertion that hands back the test's own input and therefore proves nothing — and
+      fixing the species while leaving a known instance in the same file is the weaker
+      outcome. Marginal cost is one git call plus two argv elements, since the fixture is
+      already being edited for the divergent commit (A-1). It also gains a real mutation
+      proof (M8) that the current shape cannot have. Bounded by a STOP rule: if default-branch
+      detection misbehaves, restore the flag and route R3-006 out rather than debugging git
+      plumbing inside a fix round — an info row must never put the CRITICAL's fix at risk.
+      Level B. Author: user (claude recommended inclusion).
+    recorded_at: "2026-09-26T09:00:00Z"
   - id: d-012
     checkpoint_id: cp-009
     selected_option_id: critical_plus_cheap
@@ -723,6 +764,19 @@ open_risks:
       back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
       the record to mislead the next reader.
     severity: low
+  - id: risk-e7h1-013
+    summary: >-
+      MATERIAL, raised at plan time by Amendment 2 and independently re-verified by the
+      orchestrator against `e2e/support/hermetic-git.ts:81-115`: the fixture commits once on
+      `main`, pushes, cuts the feature branch from that tip and NEVER advances `main`. So
+      `merge-base(main, feature)` IS the tip of `main`, and mutating
+      `compute-review-diff.ts` from `from: mergeBase` to `from: request.baseRef` yields a
+      byte-identical diff. Any natural assertion on `metadata.diff` or `prompt.md` would stay
+      green under it — meaning ST-7 could produce a fix that looks done and provably is not.
+      ST-7 must add a commit to `main` after the feature branch is cut (A-1), and M4 carries a
+      stop rule: if M4 stays green, the fixture divergence did not land. This is the single
+      thing the scoped re-review must confirm.
+    severity: medium
   - id: risk-e7h1-012
     summary: >-
       Documentation-only, non-blocking, self-reported by ST-6: the ST-5b entry in
@@ -815,8 +869,8 @@ review_summary:
   reported_at: "2026-09-24T12:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: run_stage
-  target: sddl-plan
+  kind: wait_for_approval
+  target: sddl-executor
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
     ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
@@ -825,4 +879,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-25T10:00:00Z"
+updated_at: "2026-09-26T09:00:00Z"

@@ -228,7 +228,11 @@ stages:
       test run; the orchestrator read the final diff in full and confirmed the sequence is
       intact and no stray token remains.
   sddl-qa-review:
-    status: pending
+    status: completed
+    completed_at: "2026-09-30T16:00:00Z"
+    notes: >-
+      Final mode returned pass_with_warnings. Completion withheld pending a final_review
+      checkpoint (cp-013) for the user's explicit acceptance of the warnings.
 artifacts:
   state: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/state.yaml
   proposal: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/proposal.md
@@ -239,6 +243,40 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 checkpoints:
+  - id: cp-013
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA returned pass_with_warnings. Per the QA contract a warning verdict cannot
+      close the change on its own: `completed` requires the user's explicit acceptance of the
+      warnings. Nothing is blocking and no fix stage is needed. The warnings are:
+      (W1) N-1 — the smoke drives `createCli(createCliDeps(...)).run(argv)` in-process and
+      does NOT exercise src/main/cli.ts argv dispatch, process.exitCode or the built
+      dist/cli.js, so "fails if any piece breaks" is bounded at the composition-root
+      boundary, with CI's `node dist/cli.js --version` a partial offset — a boundary the user
+      chose at d-003; (W2) the exit-code-2 arm is unexercised end to end, tracked as #79;
+      (W3) the Node 22/24 CI matrix legs are not observable locally, so AC-10 is inferred and
+      upgrades to a clean PASS once a CI run on the PR shows both legs green; (W4) two
+      info-level SUGGESTION rows remain, RR1-001 and RR1-002.
+    question: >-
+      Accept these warnings and mark the change completed, or hold it in `reviewing`?
+    options:
+      - id: accept
+        label: Accept the warnings and complete
+        description: >-
+          Marks the change `completed` at pass_with_warnings. The change is then ready for
+          the audit-history entry and a PR.
+        recommended: true
+      - id: fix_suggestions
+        label: Spend fix round 2 on RR1-001 and RR1-002 first
+        description: >-
+          Two small SUGGESTION rows; round 2 of 2 is unspent. RR1-001 (an unguarded rmSync in
+          the fixture's catch block) is a genuine but tiny inconsistency. Costs another
+          stage_approval and scoped re-review for info-level rows.
+      - id: hold
+        label: Hold in reviewing
+        description: Do not complete yet.
+    free_input_allowed: true
   - id: cp-012
     type: phase_validation
     stage: sddl-qa-review
@@ -811,6 +849,7 @@ open_risks:
       production code or trades away coverage of the real built binary. This must be settled
       as an explicit decision at spec/design, not improvised at execution.
     severity: medium
+    status: closed — resolved by decision d-003 (route (a)); residual is N-1, tracked as a known limitation
   - id: risk-e7h1-002
     summary: >-
       The e2e test must run in CI (an explicit acceptance criterion) on ubuntu-latest across
@@ -820,6 +859,7 @@ open_risks:
       existing git adapter suites already face this; whether they solved it reusably is
       unverified and is proposal/design evidence, not an assumption to carry forward.
     severity: low
+    status: closed — the hermetic-git recipe was restated in e2e/ and is CI-deterministic
   - id: risk-e7h1-008
     summary: >-
       RETIRED at ST-2. The isolation experiment ran with no `e2e/` file present and `npm run
@@ -828,6 +868,7 @@ open_risks:
       that matches nothing. Any `check` failure in ST-3/ST-4 is therefore attributable to
       the new test files.
     severity: low
+    status: retired — the ST-2 gate-interaction risk, retired at ST-2 (the ST-5b log entry's use of this id is a typo for -011)
   - id: risk-e7h1-011
     summary: >-
       CLOSED at ST-5b, closure independently re-verified by the orchestrator: with the two
@@ -849,6 +890,7 @@ open_risks:
       `clones/` untouched — and re-run M2 to prove it red. Adding them was outside ST-5's
       "no net file change" scope, so it was correctly not done there.
     severity: medium
+    status: closed — the M2 worktree-location blind spot, found by ST-5 and closed by ST-5b
   - id: risk-e7h1-010
     summary: >-
       Two more artifact-vs-code corrections, found by ST-3 and independently re-verified by
@@ -864,6 +906,7 @@ open_risks:
       back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
       the record to mislead the next reader.
     severity: low
+    status: closed — design Amendment 1 corrected D-7's run path
   - id: risk-e7h1-014
     summary: >-
       R3-005 is a KNOWN, ACCEPTED coverage gap with a tracked owner: the exit-code-2 arm (the
@@ -874,6 +917,7 @@ open_risks:
       level, so only the composition wiring is uncovered. Tracked as GitHub issue #79
       (https://github.com/nico0695/sentinel-kit/issues/79), created under d-015.
     severity: low
+    status: open — R3-005, tracked as GitHub issue #79; accepted as a known gap for this story
   - id: risk-e7h1-013
     summary: >-
       MATERIAL, raised at plan time by Amendment 2 and independently re-verified by the
@@ -890,6 +934,7 @@ open_risks:
       empirically by the orchestrator AND independently by the scoped re-reviewer's
       code-level trace of the fixture.
     severity: medium
+    status: closed — verified empirically by the orchestrator and by the scoped re-reviewer's fixture trace
   - id: risk-e7h1-012
     summary: >-
       Documentation-only, non-blocking, self-reported by ST-6: the ST-5b entry in
@@ -901,6 +946,7 @@ open_risks:
       sddl-qa-review should reconcile the ids rather than leave two numbering schemes on the
       record.
     severity: low
+    status: closed — the id mismatch is reconciled authoritatively in qa-report.md; the append-only execution log is left as written
   - id: risk-e7h1-009
     summary: >-
       Raised by ST-2: AC-8 is now CONFIGURED but not DEMONSTRATED. The widened gate is inert
@@ -908,6 +954,7 @@ open_risks:
       spot check (deliberate type error in `e2e/` -> `tsc --noEmit` fails -> revert -> clean)
       is the ONLY evidence for AC-8 and must not be dropped from ST-6 for being fiddly.
     severity: medium
+    status: closed — AC-8 demonstrated by the ST-6 deliberate-type-error spot check
   - id: risk-e7h1-006
     summary: >-
       Three spec assertions were contradicted by code evidence found at design time, all
@@ -920,6 +967,7 @@ open_risks:
       what `runs list` prints. Routed back to sddl-spec as Amendment 1 so spec and design do
       not contradict each other on the record.
     severity: low
+    status: closed — absorbed by spec Amendment 1
   - id: risk-e7h1-007
     summary: >-
       Two informational findings from design that the plan and QA must not lose: AC-7's
@@ -930,6 +978,7 @@ open_risks:
       resolution), so the smoke must never assert an engine name. Both folded into
       Amendment 1.
     severity: low
+    status: accepted — AC-7 is verified by reading the diff because no container wiring test exists
   - id: risk-e7h1-004
     summary: >-
       Raised by the spec stage (Q8, A-level, design-owned — no user input needed):
@@ -938,6 +987,7 @@ open_risks:
       interface (`src/main/container.ts:78-87`) that forwards into the graph. Design decides
       whether to extend `CliDepsOptions` or restructure the forwarding.
     severity: low
+    status: closed — settled by design D-1/D-2 (extend, do not restructure)
   - id: risk-e7h1-005
     summary: >-
       Accepted consequence of d-003: a test-only seam now exists in production code
@@ -945,6 +995,7 @@ open_risks:
       `EngineNameSchema` diff to be empty and the existing wiring tests to be unmodified,
       so the seam cannot silently widen the user-facing surface.
     severity: low
+    status: accepted — a test-only seam in production code, contained by AC-7 and verified by the final QA
   - id: risk-e7h1-003
     summary: >-
       New, found by the proposal stage: a top-level `e2e/` directory is invisible to all three
@@ -955,6 +1006,24 @@ open_risks:
       RESOLVED by decision d-004: `e2e` joins tsconfig#include and biome.json#files.includes;
       depcruise stays scoped to `src` deliberately.
     severity: low
+    status: closed — resolved by decision d-004 (e2e joins tsconfig and biome); demonstrated by the ST-6 AC-8 spot check
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    Independent final QA. All 12 acceptance criteria re-verified against the amended spec:
+    ten PASS and two PASS-WITH-CAVEAT (AC-10, because no CI run is observable from here so
+    the Node 22/24 legs are inferred; AC-11, because of the recorded non-goal N-1). Real
+    command output: check clean (165 files, 107 modules), 1039/1039 across 50 files, build
+    OK, version 0.0.0, e2e 2/2. The QA re-ran mutation M2 itself — RED with
+    `ENOENT scandir '<tmp>/worktrees'` at review-flow.test.ts:266 — then reverted it with an
+    empty diff. Scope over e590a73~1..HEAD is exactly the six expected code files. Not a
+    clean pass because of four warnings: N-1 (the smoke does not exercise argv dispatch or
+    the built bundle — a user-accepted boundary, d-003, not a defect), the exit-code-2 arm
+    (#79), the unobserved CI matrix legs, and stale open_risks (now marked). Completion is
+    NOT set: a final_review checkpoint requires the user's explicit acceptance.
+  reported_at: "2026-09-30T16:00:00Z"
+  report_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
 review_summary:
   mode: 4r
   verdict: pass_with_warnings
@@ -989,16 +1058,14 @@ review_summary:
   reported_at: "2026-09-30T14:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: run_stage
-  target: sddl-qa-review
+  kind: ask_user
+  target: cp-013
   summary: >-
-    Implementation and review are complete: ST-1..ST-7 done, the 4R review verdict is
-    pass_with_warnings with zero open severe findings (R3-001 verified by a scoped
-    re-review). Remaining before this can go to a PR: (1) sddl-qa-review in FINAL mode — the
-    only stage permitted to set `completed`, which must re-verify the 12 acceptance criteria
-    against the amended spec and reconcile the risk-id mismatch (risk-e7h1-012); (2) the
-    mandatory audit-history entry, required before closing a story; (3) the R3-005 follow-up
-    issue the orchestrator owes. Awaiting the user's go-ahead for the final QA stage
-    (interactive mode).
+    Final QA is done and returned pass_with_warnings. The change stays `reviewing` and is
+    NOT marked completed: cp-013 (final_review) is open and needs the user's explicit
+    acceptance of four non-blocking warnings (N-1, #79, unobserved CI legs, two SUGGESTION
+    rows). After acceptance: mark completed, write the mandatory audit-history entry
+    (history-log), and open the PR titled `[E7.F1.H1] E2E smoke test of the full flow` with
+    `Closes #41`. The PR itself needs a separate explicit request.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T15:10:00Z"
+updated_at: "2026-09-30T16:00:00Z"

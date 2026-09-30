@@ -30,7 +30,7 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: implementing
+lifecycle_status: reviewing
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -841,9 +841,9 @@ open_risks:
       ST-7 must add a commit to `main` after the feature branch is cut (A-1), and M4 carries a
       stop rule: if M4 stays green, the fixture divergence did not land. This is the single
       thing the scoped re-review must confirm.
-      MITIGATED at ST-7 and re-verified by the orchestrator: the divergent commit landed and
-      M4 now goes RED (review-flow.test.ts:205). Stays open only until the scoped re-review
-      confirms it independently.
+      CLOSED: the divergent commit landed and M4 goes RED (review-flow.test.ts:205), verified
+      empirically by the orchestrator AND independently by the scoped re-reviewer's
+      code-level trace of the fixture.
     severity: medium
   - id: risk-e7h1-012
     summary: >-
@@ -912,13 +912,13 @@ open_risks:
     severity: low
 review_summary:
   mode: 4r
-  verdict: fail
+  verdict: pass_with_warnings
   round: 1
   counts:
     confirmed: 1
     suspect: 0
     escalated: 0
-    info: 11
+    info: 13
   summary: >-
     full-4r over the frozen target f5cd81f (490 changed lines put it over the 400-line
     threshold). Four lenses, blind to each other, one exhaustive sweep each. ONE open
@@ -931,20 +931,29 @@ review_summary:
     already persists the diff metadata the test could assert). 11 info rows after merging
     three claims that more than one lens found independently. The verdict is a hole in the
     safety net, NOT a product defect — which is precisely the failure mode this story
-    exists to prevent. Notable clean: the d-003 containment holds (the seam is unreachable
+    exists to prevent. UPDATE after fix round 1 (ST-7) and the scoped re-review: R3-001 is
+    VERIFIED closed — the re-reviewer independently traced the fixture (merge-base resolves
+    to the seed commit while main sits one commit ahead, so the mergeBase -> baseRef
+    mutation yields a two-file diff and both the fileCount and paired unrelated.ts
+    assertions go red), agreeing with the orchestrator's own empirical M4 run. All ten fix
+    ids closed, R3-005 correctly not added. Two new SUGGESTION rows (RR1-001, RR1-002), both
+    info. Zero open severe findings, so the verdict moves fail -> pass_with_warnings; round
+    2 is unspent. Original notes: notable clean: the d-003 containment holds (the seam is unreachable
     from argv, config or env, and the package is bin-only), no escape path in the recursive
     deletion, no argument injection, and the ST-5b assertions confirmed non-vacuous.
-  reported_at: "2026-09-30T12:00:00Z"
+  reported_at: "2026-09-30T14:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: run_stage
-  target: sddl-code-review
+  kind: wait_for_approval
+  target: sddl-qa-review
   summary: >-
-    Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
-    ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
-    the e2e suite and hermetic-git fixture, the two quality-gate config edits, and the AC-11
-    mutation verification using design's three named mutation points. HELD: awaiting the
-    user's confirmation to route (interactive mode). No code-touching stage may start before
-    plan approval plus a stage_approval checkpoint.
+    Implementation and review are complete: ST-1..ST-7 done, the 4R review verdict is
+    pass_with_warnings with zero open severe findings (R3-001 verified by a scoped
+    re-review). Remaining before this can go to a PR: (1) sddl-qa-review in FINAL mode — the
+    only stage permitted to set `completed`, which must re-verify the 12 acceptance criteria
+    against the amended spec and reconcile the risk-id mismatch (risk-e7h1-012); (2) the
+    mandatory audit-history entry, required before closing a story; (3) the R3-005 follow-up
+    issue the orchestrator owes. Awaiting the user's go-ahead for the final QA stage
+    (interactive mode).
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T12:00:00Z"
+updated_at: "2026-09-30T14:00:00Z"

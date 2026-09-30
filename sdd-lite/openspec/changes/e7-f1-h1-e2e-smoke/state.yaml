@@ -30,7 +30,7 @@ complexity_assessment:
     boundary, low-medium risk.
   confidence: medium
   recorded_at: "2026-09-05T16:10:00Z"
-lifecycle_status: reviewing
+lifecycle_status: completed
 current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
@@ -277,6 +277,11 @@ checkpoints:
         label: Hold in reviewing
         description: Do not complete yet.
     free_input_allowed: true
+    response:
+      selected_option_id: accept
+      responded_at: "2026-09-30T16:30:00Z"
+    created_at: "2026-09-30T16:00:00Z"
+    resolved_at: "2026-09-30T16:30:00Z"
   - id: cp-012
     type: phase_validation
     stage: sddl-qa-review
@@ -676,6 +681,17 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-016
+    checkpoint_id: cp-013
+    selected_option_id: accept
+    rationale: >-
+      The user accepted the four non-blocking warnings of the final QA (N-1, #79, the
+      unobserved CI matrix legs, and the RR1-001/RR1-002 SUGGESTION rows) and chose to
+      complete the change at pass_with_warnings, over spending fix round 2 on two info-level
+      rows and over holding in `reviewing`. Fix round 2 of 2 stays unspent. AC-10 remains
+      inferred until a CI run on the PR shows both Node 22 and 24 legs green. Level B.
+      Author: user (claude recommended acceptance).
+    recorded_at: "2026-09-30T16:30:00Z"
   - id: d-015
     checkpoint_id: cp-012
     selected_option_id: both
@@ -1058,14 +1074,14 @@ review_summary:
   reported_at: "2026-09-30T14:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: ask_user
-  target: cp-013
+  kind: complete
+  target: pull-request
   summary: >-
-    Final QA is done and returned pass_with_warnings. The change stays `reviewing` and is
-    NOT marked completed: cp-013 (final_review) is open and needs the user's explicit
-    acceptance of four non-blocking warnings (N-1, #79, unobserved CI legs, two SUGGESTION
-    rows). After acceptance: mark completed, write the mandatory audit-history entry
-    (history-log), and open the PR titled `[E7.F1.H1] E2E smoke test of the full flow` with
-    `Closes #41`. The PR itself needs a separate explicit request.
+    The change is completed at pass_with_warnings and its audit-history entry is written
+    (history/entries/2026-09-05-S30-e7-f1-h1-e2e-smoke.md, indexed as S30). Nothing remains
+    inside the sdd-lite change. Outside it: a PR titled `[E7.F1.H1] E2E smoke test of the
+    full flow` with `Closes #41` — opened ONLY on the user's explicit request; a CI run on it
+    upgrades AC-10 from inferred to demonstrated. The R3-005 follow-up is tracked as issue
+    #79.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T16:00:00Z"
+updated_at: "2026-09-30T17:00:00Z"

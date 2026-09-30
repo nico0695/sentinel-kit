@@ -239,6 +239,32 @@ artifacts:
   qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
   review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 checkpoints:
+  - id: cp-012
+    type: phase_validation
+    stage: sddl-qa-review
+    summary: >-
+      Go-ahead for the final QA stage and for creating the R3-005 follow-up issue, asked
+      together after the scoped re-review closed the review at pass_with_warnings with zero
+      open severe findings. sddl-qa-review in FINAL mode re-verifies the 12 acceptance
+      criteria against the amended spec and is the only stage permitted to set `completed` —
+      and only on a clean `pass`; `pass_with_warnings` keeps the change in `reviewing` and
+      requires a final_review checkpoint. The issue is an outward-facing GitHub write.
+    question: Launch the final QA and create the R3-005 follow-up issue?
+    options:
+      - id: both
+        label: Launch final QA and create the issue
+        description: Both, as offered.
+        recommended: true
+      - id: qa_only
+        label: Final QA only
+        description: Leave the issue for later.
+    free_input_allowed: true
+    response:
+      selected_option_id: both
+      free_text: 'User: "si" — a bare yes to the two-part question "lanzo el QA final, y creo el issue de R3-005?".'
+      responded_at: "2026-09-30T15:00:00Z"
+    created_at: "2026-09-30T15:00:00Z"
+    resolved_at: "2026-09-30T15:00:00Z"
   - id: cp-011
     type: stage_approval
     stage: orchestrator
@@ -612,6 +638,15 @@ decisions:
       `interactive` over `auto` on the recommendation that this change carries a real
       design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
     recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-015
+    checkpoint_id: cp-012
+    selected_option_id: both
+    rationale: >-
+      The user answered a bare "si" to a two-part question, and the orchestrator read it as
+      YES to both (final QA and the R3-005 issue) — the natural reading, since it was a
+      single compound question with no option singled out. Stated explicitly here rather than
+      assumed silently. Author: user.
+    recorded_at: "2026-09-30T15:00:00Z"
   - id: d-014
     checkpoint_id: cp-011
     selected_option_id: approve
@@ -829,6 +864,16 @@ open_risks:
       back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
       the record to mislead the next reader.
     severity: low
+  - id: risk-e7h1-014
+    summary: >-
+      R3-005 is a KNOWN, ACCEPTED coverage gap with a tracked owner: the exit-code-2 arm (the
+      whole non-`ok` half of the review exit-code contract) is unexercised end to end, so
+      `resolveReviewExitCode` could return 0 for a failed or ambiguous run without either e2e
+      test noticing. Kept out of the story on purpose — a third scenario breaches AC-12 /
+      N-3. Mitigated in part: `exit-code.test.ts` pins every non-`ok` state to 2 at unit
+      level, so only the composition wiring is uncovered. Tracked as GitHub issue #79
+      (https://github.com/nico0695/sentinel-kit/issues/79), created under d-015.
+    severity: low
   - id: risk-e7h1-013
     summary: >-
       MATERIAL, raised at plan time by Amendment 2 and independently re-verified by the
@@ -944,7 +989,7 @@ review_summary:
   reported_at: "2026-09-30T14:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
-  kind: wait_for_approval
+  kind: run_stage
   target: sddl-qa-review
   summary: >-
     Implementation and review are complete: ST-1..ST-7 done, the 4R review verdict is
@@ -956,4 +1001,4 @@ next_action:
     issue the orchestrator owes. Awaiting the user's go-ahead for the final QA stage
     (interactive mode).
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T14:00:00Z"
+updated_at: "2026-09-30T15:10:00Z"

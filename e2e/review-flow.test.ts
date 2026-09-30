@@ -31,6 +31,7 @@ import { type CliIo, createCli } from "../src/adapters/driving/cli/index.js";
 import type { ReviewEngine } from "../src/core/run/index.js";
 import { createCliDeps } from "../src/main/container.js";
 import {
+  BASE_ONLY_FILE,
   createHermeticRepo,
   type HermeticRepo,
 } from "./support/hermetic-git.js";
@@ -89,9 +90,17 @@ const temporaryRoots: string[] = [];
 afterEach(() => {
   // Unconditional and outside any `try`: a failed assertion mid-flow must not
   // leak a temp home, a clone or a worktree onto the runner.
-  for (const root of temporaryRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true });
+  // Each removal is isolated and the registry is cleared only afterwards: one
+  // EACCES/EBUSY (`force` only suppresses ENOENT) must not abort the loop and
+  // destroy the record of the remaining roots.
+  for (const root of [...temporaryRoots]) {
+    try {
+      rmSync(root, { recursive: true, force: true });
+    } catch {
+      // Best effort: keep going so the other roots are still removed.
+    }
   }
+  temporaryRoots.length = 0;
 });
 
 it("registers a repository, reviews a branch and reads the run back", async () => {
@@ -139,14 +148,15 @@ it("registers a repository, reviews a branch and reads the run back", async () =
   };
 
   /* --- register (S1) --- */
+  // No `--base-branch`: the default branch is detected from the clone's
+  // `origin/HEAD` (set by the fixture), so `metadata.baseRef` below is a
+  // value the code derived rather than one this test supplied.
   const added = await run(
     "repo",
     "add",
     REPO_URL,
     "--local-path",
     fixture.repoPath,
-    "--base-branch",
-    fixture.baseBranch,
     "--harness",
     "quick",
   );
@@ -184,9 +194,15 @@ it("registers a repository, reviews a branch and reads the run back", async () =
   const runDir = join(repoRunsDir, runId);
 
   expect(readFileSync(join(runDir, "result.md"), "utf-8")).toBe(ENGINE_OUTPUT);
-  expect(
-    readFileSync(join(runDir, "prompt.md"), "utf-8").length,
-  ).toBeGreaterThan(0);
+
+  // The prompt must carry the diff by content — `length > 0` cannot tell a
+  // full diff from none. The negative is paired with positives and relies on
+  // the fixture's divergent commit on `main`: a diff ranged from the base ref
+  // instead of the merge-base would list `unrelated.ts`.
+  const prompt = readFileSync(join(runDir, "prompt.md"), "utf-8");
+  expect(prompt).toContain('<file path="widget.ts"');
+  expect(prompt).toContain("export const tightened = true;");
+  expect(prompt).not.toContain(BASE_ONLY_FILE);
 
   const metadata: Record<string, unknown> = JSON.parse(
     readFileSync(join(runDir, "metadata.json"), "utf-8"),
@@ -196,6 +212,19 @@ it("registers a repository, reviews a branch and reads the run back", async () =
   expect(metadata.targetRef).toBe(fixture.featureBranch);
   expect(metadata.state).toBe("ok");
   expect(metadata.verdict).toBe("approve");
+
+  // Exactly one changed file: `merge-base(main, feature)..feature` is
+  // `widget.ts` alone, whereas `main..feature` would also count `unrelated.ts`.
+  const diff = metadata.diff as Record<string, unknown>;
+  expect(diff.fileCount).toBe(1);
+  expect(diff.totalLines).toBeGreaterThan(0);
+  expect(diff.truncated).toBe(false);
+
+  // The command's own stdout: the reported run directory must be the one read
+  // above, plus the outcome lines (`REVIEW_OUTCOME_FIELDS`).
+  expect(reviewed.io.out).toContain(`runDir\t${runDir}`);
+  expect(reviewed.io.out).toContain("state\tok");
+  expect(reviewed.io.out).toContain("verdict\tapprove");
   // Not asserted on purpose: `metadata.json#engine` records the *resolved*
   // engine name (`claude-code`), because the override interposes after name
   // resolution — the FakeEngine ran under that name. Asserting it would pin a
@@ -238,6 +267,12 @@ it("registers a repository, reviews a branch and reads the run back", async () =
     basename(fixture.repoPath),
   ]);
 
+  // The leaf: the parent above proves the root used, this proves the worktree
+  // itself was removed rather than leaked.
+  expect(
+    readdirSync(join(sentinelHome, "worktrees", basename(fixture.repoPath))),
+  ).toEqual([]);
+
   // The other half of the same property, from the opposite side: a
   // `--local-path` registration clones nothing, so `clones/` must stay empty
   // whether or not it was created. A worktree misdirected into it shows up
@@ -265,6 +300,9 @@ it("reports a request-changes verdict with the configurable gate exit code", asy
   // Deliberately inlined rather than shared with the happy path: each e2e
   // scenario reads as one complete script, and factoring the wiring out would
   // mean rewriting a test that is not in this stage's scope.
+  // One graph per leg, the way each real CLI process builds exactly one; a
+  // shared graph would hide per-invocation construction bugs
+  // (`container.ts` property 1). `SENTINEL_HOME` arrives as injected `env`.
   const run = async (
     ...args: string[]
   ): Promise<{ code: number; io: CapturedIo }> => {

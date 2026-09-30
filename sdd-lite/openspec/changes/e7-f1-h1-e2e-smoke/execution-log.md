@@ -1035,3 +1035,38 @@ change is ready for closing QA. Suggested independent re-verification: re-run on
 ### Next action
 
 Return to the orchestrator. No execution stage remains; route to `sddl-qa-review` (final mode).
+
+## ST-7 — Fix round 1 (round 1 of 2), approved at cp-011
+
+Scope: R3-001 (CRITICAL) + R3-002, R3-003, R3-004, R4-001, R4-002, R1-001, R2-001, R2-002, R3-006 (d-013).
+Files changed: `e2e/review-flow.test.ts`, `e2e/support/hermetic-git.ts`, `vitest.config.ts`. Net `src/**` change: none.
+
+### What changed
+- Fixture: a commit adding `unrelated.ts` on `main` AFTER the feature branch is cut (exported `BASE_ONLY_FILE`), so `merge-base(main, feature)` is the seed commit; `git remote set-head origin main` after the push (R3-006); provisioning wrapped so a failure removes its temp root and rethrows (R4-001); five ambient git env names set to `undefined` (R1-001); `HERMETIC_GIT_ENV` no longer exported (R2-001).
+- `vitest.config.ts`: `testTimeout` and `hookTimeout` 30000 on the `e2e` project only (R3-004).
+- Happy-path test: `prompt.md` content assertions (positive `<file path="widget.ts"` and `export const tightened = true;`, paired negative `unrelated.ts`), `metadata.diff` (`fileCount` 1, `totalLines` > 0, `truncated` false), `reviewed.io.out` (`runDir\t<runDir>`, `state\tok`, `verdict\tapprove`), empty worktree leaf (R3-002), `--base-branch` dropped (R3-006). Teardown isolates each `rmSync` and clears the registry afterwards (R4-002). R2-002 rationale comment restored on the second test's `run`; that test keeps `--base-branch`.
+- R3-006 landed: `set-head` worked and detection yielded `main` (happy-path `metadata.baseRef === "main"` passes with no flag). STOP rule did not fire. R3-005 not done (out of scope).
+
+### Green baseline
+`npx vitest run --project e2e`: 2/2.
+
+### Mutation evidence (each applied alone, reverted with `git checkout -- <file>`, `git diff <file>` empty, re-run 2/2)
+| Id | Mutation | Result | Failing assertion |
+|---|---|---|---|
+| M4 | `compute-review-diff.ts:226` `from: mergeBase` -> `from: request.baseRef` | RED | `e2e/review-flow.test.ts:205` `expected '<instructions>...' not to contain 'unrelated.ts'` (the `fileCount === 1` assertion at :219 is downstream and not reached because the first failure aborts the test) |
+| M5 | `assemble-prompt.ts:25` drop `renderDiff(input.diff)` | RED | `e2e/review-flow.test.ts:203` `expected '<instructions>...' to contain '<file path="widget.ts"'` |
+| M8 | `register-repo.ts:104` detected branch hardcoded to `"master"` | RED | `e2e/review-flow.test.ts:187` `expected 2 to be +0` (the review exits 2 because `master` does not resolve, so the failure is earlier than the `metadata.baseRef` assertion; still detected) |
+| M6 (optional) | `persist-run.ts:74` `fileCount: 0` | RED | `e2e/review-flow.test.ts:219` `expected +0 to be 1` |
+M7 and M9 not run (optional).
+
+### Full gate
+`npm run check` clean (biome 165 files, depcruise 107 modules / 254 deps); `npm test` 1039/1039 across 50 files; `npm run build` OK; `node dist/cli.js --version` prints `0.0.0`; e2e re-run 2/2.
+
+### Ending state
+`git status --porcelain`: the three files above plus this log. `git diff --stat src` empty; `git diff` empty on `compute-review-diff.ts`, `assemble-prompt.ts`, `register-repo.ts`, `persist-run.ts`.
+
+### Git discipline
+No commit, push, stage, branch or stash. Only `git checkout -- <file>` on the four files mutated by this stage.
+
+### Next action
+Return to the orchestrator: scoped re-review of the ST-7 delta against `review-ledger.md`, then `sddl-qa-review` final mode.

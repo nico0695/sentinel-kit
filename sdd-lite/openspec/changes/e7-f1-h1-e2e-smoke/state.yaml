@@ -205,6 +205,28 @@ stages:
       filterless run executes the e2e smoke on both Node 22 and 24. The fixture also needs
       no git identity on a bare runner.
       All six execution stages are done.
+      ST-7 COMPLETE (`success`) — fix round 1 of a maximum 2, all ten ids landed (R3-001,
+      R3-002, R3-003, R3-004, R4-001, R4-002, R1-001, R2-001, R2-002, R3-006); no STOP rule
+      fired and nothing was deferred. The fixture gained the divergent `unrelated.ts` commit
+      on `main` AFTER the feature branch is cut, which is what made M4 detectable. Mutations,
+      each applied alone and reverted with an empty diff: M4 (`compute-review-diff.ts:226`)
+      RED at review-flow.test.ts:205 `expected ... not to contain 'unrelated.ts'`; M5
+      (`assemble-prompt.ts:25`) RED at :203 `expected ... to contain '<file path="widget.ts"'`;
+      M8 (`register-repo.ts:104`) RED at :187 `expected 2 to be +0`; M6 (`persist-run.ts:74`)
+      RED at :219 `expected +0 to be 1`. M7 and M9 not run. The orchestrator independently
+      re-ran the baseline, M4 and M5 cycles itself (same failing assertions, reverts empty,
+      tree clean) and the full gate: check clean (165 files, 107 modules), 1039/1039 across
+      50 files, build OK, e2e 2/2 deterministic, `git diff --stat src` empty.
+      Two honest qualifications from the executor, both accepted: (1) under M4 the
+      `fileCount === 1` assertion at :219 is SHADOWED by the earlier prompt assertion (the
+      first failure aborts the test), so it is isolated only by M6, not by M4; (2) M8 failed
+      EARLIER than the plan predicted — the review leg exits 2 because `master` does not
+      resolve, so the run aborts before reaching the `metadata.baseRef === "main"` assertion.
+      The mutation is still detected, just by a coarser assertion. The executor also
+      self-reported a process slip — an over-broad string replace briefly corrupted
+      `hermetic-git.ts` (a stray token removed the `checkout -b` line), repaired before any
+      test run; the orchestrator read the final diff in full and confirmed the sequence is
+      intact and no stray token remains.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -819,6 +841,9 @@ open_risks:
       ST-7 must add a commit to `main` after the feature branch is cut (A-1), and M4 carries a
       stop rule: if M4 stays green, the fixture divergence did not land. This is the single
       thing the scoped re-review must confirm.
+      MITIGATED at ST-7 and re-verified by the orchestrator: the divergent commit landed and
+      M4 now goes RED (review-flow.test.ts:205). Stays open only until the scoped re-review
+      confirms it independently.
     severity: medium
   - id: risk-e7h1-012
     summary: >-
@@ -888,7 +913,7 @@ open_risks:
 review_summary:
   mode: 4r
   verdict: fail
-  round: 0
+  round: 1
   counts:
     confirmed: 1
     suspect: 0
@@ -909,11 +934,11 @@ review_summary:
     exists to prevent. Notable clean: the d-003 containment holds (the seam is unreachable
     from argv, config or env, and the package is bin-only), no escape path in the recursive
     deletion, no argument injection, and the ST-5b assertions confirmed non-vacuous.
-  reported_at: "2026-09-24T12:00:00Z"
+  reported_at: "2026-09-30T12:00:00Z"
   ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
 next_action:
   kind: run_stage
-  target: sddl-executor
+  target: sddl-code-review
   summary: >-
     Amendment 1 has landed and spec/design are consistent. Next: sddl-plan produces the
     ordered stage plan and validation strategy from design.md — the engine seam (D-1/D-2),
@@ -922,4 +947,4 @@ next_action:
     user's confirmation to route (interactive mode). No code-touching stage may start before
     plan approval plus a stage_approval checkpoint.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T09:00:00Z"
+updated_at: "2026-09-30T12:00:00Z"

@@ -7,9 +7,9 @@
 - judgment_target_kind: code
 - tier: full-4r
 - scope: change:e7-f1-h1-e2e-smoke
-- round: 0
+- round: 1
 - counts: confirmed=1 suspect=0 escalated=0 info=11
-- open_severe_findings: 1
+- open_severe_findings: 0 (R3-001 fixed by ST-7, awaiting scoped re-review verification)
 - verdict: fail
 - next_action_digest: >-
     One CRITICAL, deterministic, introduced and blocking: R3-001 — the diff and prompt
@@ -24,7 +24,7 @@
 
 | Review Seq | Target Identity | Mode | Tier | Rounds Used | Verdict | Reported At |
 |---|---|---|---|---|---|---|
-| 1 | `f5cd81f` / diff sha256 `0e9569b4…` | 4r | full-4r | 0 of 2 | fail | 2026-09-24 |
+| 1 | `f5cd81f` / diff sha256 `0e9569b4…` | 4r | full-4r | 1 of 2 (fix applied, pending scoped re-review) | fail | 2026-09-24 |
 
 ## Target
 
@@ -39,7 +39,7 @@
 
 | Id | Lens/Judge | Location | Severity | Status | Evidence Class | Causal Disposition | Blocking | Claim | Proof Refs |
 |---|---|---|---|---|---|---|---|---|---|
-| R3-001 | reliability | `e2e/review-flow.test.ts:205` | CRITICAL | open | deterministic | introduced | yes | The diff and prompt stages — the literal middle of the flow the suite claims to cover — are completely unobserved: `prompt.md` is only asserted to be non-empty and `metadata.diff` is never read, so an empty, wrongly-ranged or diff-less prompt passes both tests green. | `e2e/review-flow.test.ts:188,328` (the only prompt assertion is `.length > 0`); orchestrator re-verified: `grep` for `metadata.diff`/`fileCount`/`totalLines` in the test file returns NOTHING, while `run-layout.ts:127-138` persists `diff.{fileCount,totalLines,estimatedTokens,truncated}`; `assemble-prompt.ts:23-28` — a zero-file diff still renders several KB, so `length > 0` cannot distinguish full diff from no diff; `fake-engine.ts:51` discards the request, so nothing else observes the prompt; four named surviving mutations incl. `computeReviewDiff` using `from: request.baseRef` instead of `mergeBase`, which destroys PR semantics (CLAUDE.md §Architecture) |
+| R3-001 | reliability | `e2e/review-flow.test.ts:205` | CRITICAL | fixed | deterministic | introduced | yes | The diff and prompt stages — the literal middle of the flow the suite claims to cover — are completely unobserved: `prompt.md` is only asserted to be non-empty and `metadata.diff` is never read, so an empty, wrongly-ranged or diff-less prompt passes both tests green. | `e2e/review-flow.test.ts:188,328` (the only prompt assertion is `.length > 0`); orchestrator re-verified: `grep` for `metadata.diff`/`fileCount`/`totalLines` in the test file returns NOTHING, while `run-layout.ts:127-138` persists `diff.{fileCount,totalLines,estimatedTokens,truncated}`; `assemble-prompt.ts:23-28` — a zero-file diff still renders several KB, so `length > 0` cannot distinguish full diff from no diff; `fake-engine.ts:51` discards the request, so nothing else observes the prompt; four named surviving mutations incl. `computeReviewDiff` using `from: request.baseRef` instead of `mergeBase`, which destroys PR semantics (CLAUDE.md §Architecture) |
 | R3-002 | reliability | `e2e/review-flow.test.ts:236` | WARNING | info | deterministic | introduced | no | Worktree cleanup is asserted only via the parent directory that `git worktree add` creates, so a review that leaks its worktree — the ephemeral-worktree guarantee of PRD §5.1 — still passes. | `e2e/review-flow.test.ts:236-238` inspects `<home>/worktrees`, one level above the leaf; `src/core/workspace/helpers.ts:44-52` — the worktree is `<worktreesDir>/<repoBasename>/<label>-<ts>`; surviving mutations: `cleanupPolicy` defaulting to `keep`, `cleanupWorktree` returning `policy-keep`, or `worktree remove` losing `--force` |
 | R3-003 | reliability | `e2e/review-flow.test.ts:190` | WARNING | info | deterministic | introduced | no | Nothing in either test asserts a single line of the `review` command's stdout, so the primary user-visible output of the flow's terminal command can render garbage — or omit the verdict entirely — with the suite green. | Orchestrator re-verified: the review leg asserts only `reviewed.io.err` and `reviewed.code` (`:176-177`, `:315-316`); `io.out` never inspected; `format-review.ts:58-69,91-110` emits ten `key\tvalue` lines; the `state`/`verdict` assertions at `:228-230` are on `formatRunRecordBlock`, a different renderer |
 | R3-004 / R4-003 / R1-003 | reliability + resilience + risk | `vitest.config.ts:31` | WARNING | info | inferential | introduced | no | The new e2e tests spawn roughly twenty git subprocesses each under vitest's default 5000 ms per-test timeout while 49 other test files run in parallel workers, so the suite is liable to flake red on a 2-vCPU ubuntu-latest runner. | Converged independently by three lenses. `vitest.config.ts:27-34` sets no `testTimeout` at project or root level (vitest default 5000 ms); ~10 git spawns in the fixture plus ~11 in the review leg; `GitPort.contract.ts:103-105` — the repo's other git-spawning suite provisions in `beforeEach` under the 10 s hook budget, so this suite moved the same work under a tighter one; `ci.yml` runs the aggregate on Node 22 and 24, so the e2e worker competes for CPU (the 2/2 determinism observation was of the e2e project in isolation) |
@@ -86,4 +86,24 @@ Recorded because they were the specific risks the change was designed around, an
 
 `fail` — one open CRITICAL. Note what this verdict is and is not: it is not a defect in the product, which the suite exercises correctly end to end. It is a hole in the safety net itself. The story's headline acceptance criterion is "fails if any piece of the flow breaks", and R3-001 names four concrete mutations in the middle of that flow — including one that destroys the PR diff semantics the PRD mandates — that leave both tests green. Shipping the net with that hole would deliver false confidence, which is the specific failure mode this story exists to prevent.
 
-Zero of two fix rounds used.
+Zero of two fix rounds used at the time of the original verdict; see Fix Round 1 below.
+
+## Fix Round 1
+
+Applied as stage ST-7 under decisions d-012, d-013 and d-014. **Round 1 of a maximum 2 is consumed.** The fix delta is the ST-7 commit; the scoped re-review sees only this ledger plus that delta, never the original diff again.
+
+| Ledger id | Status after ST-7 | What changed | Evidence |
+|---|---|---|---|
+| R3-001 | fixed (awaiting verification) | `metadata.diff` is now read (`fileCount` 1, `totalLines` > 0, `truncated` false); `prompt.md` is asserted by content — positive `<file path="widget.ts"` and `export const tightened = true;`, paired with the negative `unrelated.ts`. The fixture gained a commit on `main` made AFTER the feature branch is cut, without which `merge-base(main, feature) == main` and the `mergeBase` -> `baseRef` mutation was undetectable | M4 RED at `review-flow.test.ts:205`; M5 RED at `:203`; M6 RED at `:219` — each reverted with an empty diff. Orchestrator independently re-ran baseline, M4 and M5 |
+| R3-002 | closed (info) | worktree LEAF asserted empty, complementing ST-5b's parent assertion | folded into ST-7 |
+| R3-003 | closed (info) | `reviewed.io.out` asserted: `runDir\t<runDir>`, `state\tok`, `verdict\tapprove` | folded into ST-7 |
+| R3-004 / R4-003 / R1-003 | closed (info) | `testTimeout` and `hookTimeout` 30000 on the `e2e` project only | `vitest.config.ts` diff |
+| R4-001 / R1-002 | closed (info) | provisioning wrapped; a failure removes its own temp root and rethrows the original error | `hermetic-git.ts` diff |
+| R4-002 | closed (info) | teardown isolates each `rmSync` and clears the registry after the loop | folded into ST-7 |
+| R1-001 | closed (info) | `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_CONFIG_COUNT` set to `undefined` | `hermetic-git.ts` diff |
+| R2-001 | closed (info) | `HERMETIC_GIT_ENV` no longer exported | `hermetic-git.ts` diff |
+| R2-002 | closed (info) | rationale comment restored on the second test's `run` helper | folded into ST-7 |
+| R3-006 | closed (info) | `--base-branch` dropped from the happy path only; fixture runs `git remote set-head origin main` so default-branch detection is real | M8 RED at `:187` |
+| R3-005 | deferred | third scenario would exceed AC-12 / N-3 | follow-up issue, owed by the orchestrator |
+
+Qualifications recorded honestly rather than smoothed over: under M4 the `fileCount === 1` assertion is shadowed by the earlier prompt assertion and is isolated only by M6; and M8 fails earlier than planned (the review leg exits 2 because `master` does not resolve) rather than at the `baseRef` assertion — detected, but by a coarser assertion.

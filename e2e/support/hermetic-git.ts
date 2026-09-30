@@ -13,7 +13,7 @@
  * does not collect it as a suite.
  */
 
-import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execa } from "execa";
@@ -36,9 +36,20 @@ const GIT_IDENTITY = [
  * `core.hooksPath`, `init.templateDir` or `init.defaultBranch` can reach the
  * fixture. `GIT_TERMINAL_PROMPT=0` keeps a credential prompt from hanging a
  * spawn. `LC_ALL=C` / `LANG=C` pin git's wording.
+ *
+ * The ambient repository-selecting and config-injecting names are set to
+ * `undefined` explicitly (execa drops `undefined` entries): a suite launched
+ * from a git hook, `git bisect run` or `git rebase --exec` inherits `GIT_DIR`
+ * and friends, and `GIT_CONFIG_COUNT/KEY/VALUE` can set exactly the
+ * `core.hooksPath` this comment claims is unreachable.
  */
-export const HERMETIC_GIT_ENV = {
+const HERMETIC_GIT_ENV = {
   ...process.env,
+  GIT_DIR: undefined,
+  GIT_WORK_TREE: undefined,
+  GIT_INDEX_FILE: undefined,
+  GIT_OBJECT_DIRECTORY: undefined,
+  GIT_CONFIG_COUNT: undefined,
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_SYSTEM: "/dev/null",
   GIT_TERMINAL_PROMPT: "0",
@@ -50,6 +61,9 @@ export const HERMETIC_GIT_ENV = {
 async function git(args: readonly string[]): Promise<void> {
   await execa("git", [...args], { env: HERMETIC_GIT_ENV });
 }
+
+/** File committed on `main` only, after the feature branch was cut. */
+export const BASE_ONLY_FILE = "unrelated.ts";
 
 /** What the smoke needs to register a repository and review a branch. */
 export interface HermeticRepo {
@@ -74,6 +88,17 @@ export interface HermeticRepo {
  */
 export async function createHermeticRepo(): Promise<HermeticRepo> {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "sentinel-e2e-")));
+  try {
+    return await provision(root);
+  } catch (error) {
+    // The root only reaches the caller through the return value, so a
+    // provisioning failure would otherwise leak it with its path unrecoverable.
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function provision(root: string): Promise<HermeticRepo> {
   const barePath = join(root, "origin.git");
   const repoPath = join(root, "repo");
   const featureBranch = "feature/tighten-widget";
@@ -92,6 +117,11 @@ export async function createHermeticRepo(): Promise<HermeticRepo> {
     "seed: add widget",
   ]);
   await git(["-C", repoPath, "push", "-u", "origin", "main"]);
+  // The clone was made from an empty origin, so `refs/remotes/origin/HEAD` was
+  // never set and default-branch detection (`symbolic-ref` on it) would fail
+  // with `GitNoDefaultBranchError`. Set it locally — no network — so a test can
+  // register without `--base-branch` and let detection prove it yields `main`.
+  await git(["-C", repoPath, "remote", "set-head", "origin", "main"]);
 
   await git(["-C", repoPath, "checkout", "-q", "-b", featureBranch]);
   writeFileSync(
@@ -108,6 +138,29 @@ export async function createHermeticRepo(): Promise<HermeticRepo> {
     "feat: tighten widget",
   ]);
   await git(["-C", repoPath, "push", "-u", "origin", featureBranch]);
+
+  // Advance `main` AFTER the feature branch was cut. Without this the branch
+  // is cut from the tip of `main`, so `merge-base(main, feature) == main` and a
+  // diff computed from the base ref instead of the merge-base (mutation M4 of
+  // the fix round) is byte-identical to the correct one — undetectable. With
+  // it, the merge-base is the seed commit, the correct diff is `widget.ts`
+  // alone, and a wrongly-ranged diff also carries `unrelated.ts`. Do not
+  // delete this commit as unused: the e2e diff assertions depend on it.
+  await git(["-C", repoPath, "checkout", "-q", "main"]);
+  writeFileSync(
+    join(repoPath, BASE_ONLY_FILE),
+    "export const unrelated = 1;\n",
+  );
+  await git(["-C", repoPath, "add", BASE_ONLY_FILE]);
+  await git([
+    "-C",
+    repoPath,
+    ...GIT_IDENTITY,
+    "commit",
+    "-m",
+    "chore: advance main past the feature branch point",
+  ]);
+  await git(["-C", repoPath, "push", "origin", "main"]);
 
   // Leave the clone on the base branch: the review's worktree is created
   // detached at a resolved sha, but a clone parked on the branch under review

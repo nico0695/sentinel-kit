@@ -32,6 +32,10 @@ export default defineConfig({
           name: "e2e",
           environment: "node",
           include: ["e2e/**/*.test.ts"],
+          // Each test spawns ~20 git processes while the other projects'
+          // workers compete for CPU; the 5000 ms default is too tight there.
+          testTimeout: 30000,
+          hookTimeout: 30000,
         },
       },
     ],

@@ -24,7 +24,7 @@ For routine diff review, `sddl-code-review` is the default; judgment-day replace
 
 Like `sddl-code-review`, this skill is a protocol the orchestrator executes:
 
-- the orchestrator freezes the target, then launches Judge A and Judge B as fresh read-only workers with identical scope and criteria, using the Review Worker Envelope
+- the orchestrator freezes the target, then launches Judge A and Judge B as fresh read-only `sddl-reviewer` workers with identical scope and criteria, using the Review Worker Envelope
 - judge prompts come from `references/judge-prompt.md`; findings follow `skills/_shared/sddl-review-ledger-contract.md`
 - judges are blind: neither sees the other's reasoning or results; wait for BOTH before merging — never accept a partial judgment
 - only the orchestrator merges findings into `review-ledger.md` and updates state

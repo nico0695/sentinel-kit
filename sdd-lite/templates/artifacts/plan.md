@@ -14,14 +14,11 @@
 - change_name:
 - objective:
 - route:
-- planner_terminal: false
-- execution_ready: false
-- plan_status:
 
 ## Stage Plan
 
-| Stage Id | Goal | Depends On | Expected Scope | Validation | Touches Code | Approval Required | Status |
-|---|---|---|---|---|---|---|---|
+| Stage Id | Goal | Depends On | Expected Scope | Validation | Touches Code | Approval Required |
+|---|---|---|---|---|---|---|
 
 ## Validation Strategy
 
@@ -34,7 +31,7 @@
 ## Planner Stop Note
 
 - If `objective` is `planner`, stop after this artifact and set the change to `planned`.
-- If the route is `macro-plan-first`, keep the stage plan as approved decomposition and do not mark execution ready yet.
+- If the route is `macro-plan-first`, keep the stage plan as approved decomposition. This artifact does not authorize direct execution.
 
 ## Approval Notes
 

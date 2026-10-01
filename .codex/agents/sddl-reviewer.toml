@@ -1,0 +1,12 @@
+name = "sddl-reviewer"
+description = "sdd-lite read-only reviewer for 4R lenses, refuter, and judgment-day judges. Never write review-ledger.md, qa-report.md, or edit code. Do not use for sddl-qa-review (that is sddl-qa)."
+model = "gpt-5.6"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+You are an sdd-lite review worker (sddl-reviewer).
+Honor the handoff controls. Do not read orchestrator/SDDL-RUNTIME.md or its modules.
+Execute only the named stage skill or the injected lens/judge prompt. Stay read-only.
+Do not write review-ledger.md, edit code, spawn subagents, or route the next stage.
+Return the result contract (findings for lenses/judges/refuter) and stop.
+"""

@@ -98,6 +98,44 @@ properties:
       reviews_root:
         type: string
         const: "./sdd-lite/openspec/reviews"
+      archive_root:
+        type: string
+        const: "./sdd-lite/openspec/archive"
+      delivery_root:
+        type: string
+        const: "./sdd-lite/openspec/delivery"
+  archive:
+    type: object
+    additionalProperties: false
+    properties:
+      suggest_threshold:
+        description: "Archivable changes that trigger a cleanup suggestion at session start."
+        type: integer
+        minimum: 1
+      stale_days:
+        description: "Age after which a draft or planning change becomes a stale candidate."
+        type: integer
+        minimum: 1
+  delivery:
+    type: object
+    additionalProperties: false
+    properties:
+      base_branch:
+        description: "Base ref for resolving a commit range. Falls back to the remote HEAD symref."
+        type: string
+        minLength: 1
+      pr_suggest_min_commits:
+        description: "Commits ahead of the base before drafting a pull request is worth proposing."
+        type: integer
+        minimum: 1
+      output_language:
+        description: "Fixes the drafted output language and suppresses the question at the delivery gate."
+        type: string
+        enum:
+          - en
+          - chat
+          - es
+          - mixed
   quality_commands:
     type: object
     additionalProperties: false
@@ -235,14 +273,14 @@ properties:
           type: string
           enum:
             - claude_code
-            - codex
+            - agents
       configured:
         type: array
         items:
           type: string
           enum:
             - claude_code
-            - codex
+            - agents
       skills_installed:
         type: array
         items:
@@ -284,13 +322,59 @@ properties:
               type: string
               enum:
                 - claude_code
-                - codex
+                - agents
             target_file:
               type: string
               minLength: 1
             injected_at:
               type: string
               minLength: 1
+      agents_installed:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - target
+            - method
+            - installed_at
+            - profiles
+          properties:
+            target:
+              type: string
+              minLength: 1
+            method:
+              type: string
+              enum:
+                - copy
+            installed_at:
+              type: string
+              minLength: 1
+            profiles:
+              type: array
+              items:
+                $ref: "#/$defs/executionProfileId"
+  execution_profiles:
+    description: "Optional per-profile model/effort overrides. Absence uses templates/agents defaults. Init regenerates adapter files from this section."
+    type: object
+    additionalProperties: false
+    properties:
+      sddl-light:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-framer:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-explorer:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-architect:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-sequencer:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-executor:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-reviewer:
+        $ref: "#/$defs/executionProfileOverride"
+      sddl-qa:
+        $ref: "#/$defs/executionProfileOverride"
   metadata:
     type: object
     additionalProperties: false
@@ -313,6 +397,37 @@ properties:
         type: string
         const: sddl-qa-review
 $defs:
+  executionProfileId:
+    type: string
+    enum:
+      - sddl-light
+      - sddl-framer
+      - sddl-explorer
+      - sddl-architect
+      - sddl-sequencer
+      - sddl-executor
+      - sddl-reviewer
+      - sddl-qa
+  hostModelOverride:
+    type: object
+    additionalProperties: false
+    properties:
+      model:
+        description: "Host model override. For Codex, 'inherit' tells sddl-init to omit the generated TOML model key so Codex uses its normal model precedence."
+        type: string
+        minLength: 1
+      effort:
+        description: "Host reasoning-effort override, resolved independently from model."
+        type: string
+        minLength: 1
+  executionProfileOverride:
+    type: object
+    additionalProperties: false
+    properties:
+      claude:
+        $ref: "#/$defs/hostModelOverride"
+      codex:
+        $ref: "#/$defs/hostModelOverride"
   commandList:
     type: array
     items:

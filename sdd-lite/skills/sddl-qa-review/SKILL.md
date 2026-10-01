@@ -41,7 +41,8 @@ This stage should not:
 - edit code, tests, configs, or planning artifacts
 - replace `sddl-executor`
 - pretend that `stage` mode closes the whole change
-- introduce archive behavior
+- move, archive, or delete any change folder; archiving belongs to `sddl-archive`
+- draft commit messages, pull request descriptions, or ticket content; that belongs to `sddl-delivery`
 
 ## Reads
 
@@ -106,6 +107,7 @@ Rules:
 - use `config.yaml` quality commands as the canonical starting point for final checks
 - only `final` mode may move the change to `lifecycle_status: completed`
 - `pass_with_warnings` or `fail` must not silently mark the change completed
+- when the change reaches `completed`, set `recommended_next_stage: sddl-delivery` so the orchestrator can raise its closeout offer, which covers both drafting the delivery and archiving; do neither of those here
 
 ## Preconditions
 
@@ -248,7 +250,7 @@ Before finishing, verify:
 - `stage` mode does not claim final completion
 - `final` mode defines whether completion is allowed, deferred, or blocked
 - the report includes findings, evidence, verdict, and next action
-- the final report remains sufficient without an archive phase
+- the final report stands on its own as the quality record, independently of whether the change is archived later
 
 ## Expected Output
 

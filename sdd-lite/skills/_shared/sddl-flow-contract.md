@@ -9,6 +9,7 @@ Use this contract to keep all lite skills aligned on:
 - canonical objective ids
 - route ids
 - stage ids
+- execution profile ids
 - lifecycle rules
 - thin-orchestrator rules
 - context loading order
@@ -48,6 +49,45 @@ These ids are the canonical change-stage names used in state and contracts.
 | `sddl-code-review` | on-demand 4R code review of a frozen diff, producing `review-ledger.md` |
 | `sddl-judgment-day` | opt-in adversarial dual review (two blind judges) of a code target or planning artifact |
 | `sddl-qa-review` | stage review or final closeout |
+| `sddl-delivery` | draft the commit message, pull request description, and ticket content for work already done |
+| `sddl-archive` | move finished, planned, or abandoned changes into the archive tree |
+
+Profile ids are not stage ids. Never write an execution profile into `state.yaml` `current_stage` or `stages`.
+
+### Execution profile ids
+
+Host CLI adapters. The named skill remains the phase algorithm. Source of truth for defaults: `templates/agents/profiles.yaml`.
+
+| Profile | Skills it may execute | Capability | Tier |
+|---|---|---|---|
+| `sddl-light` | `sddl-archive`, `sddl-delivery` | workspace-write; prompt-scoped to `./sdd-lite/` | cheap |
+| `sddl-framer` | `sddl-proposal` | workspace-write; prompt-scoped to `./sdd-lite/` | mid, high effort |
+| `sddl-explorer` | `sddl-deep-explorer` | read-only | mid |
+| `sddl-architect` | `sddl-spec`, `sddl-design` | workspace-write; prompt-scoped to `./sdd-lite/` | high |
+| `sddl-sequencer` | `sddl-plan` | workspace-write; prompt-scoped to `./sdd-lite/` | mid |
+| `sddl-executor` | `sddl-executor` | workspace-write; prompt-scoped to the approved stage | mid, high effort |
+| `sddl-reviewer` | `sddl-code-review`, `sddl-judgment-day` | read-only | mid, high effort |
+| `sddl-qa` | `sddl-qa-review` | workspace-write; prompt-scoped to its owned runtime artifacts | mid, high effort |
+
+Tiering rule: decision stages (spec, design) run on the high tier, framing and execution over decided work run on the mid tier, mechanical stages run cheap, and verification (reviewer, QA) never runs below the code writer. Host models per tier live in `templates/agents/profiles.yaml`.
+
+`workspace-write` grants access to the workspace; the narrower paths above are behavioral contract boundaries, not host-enforced subdirectory sandboxes.
+
+| Stage | Profile |
+|---|---|
+| `sddl-proposal` | `sddl-framer` |
+| `sddl-spec` | `sddl-architect` |
+| `sddl-archive` | `sddl-light` |
+| `sddl-delivery` | `sddl-light` |
+| `sddl-deep-explorer` | `sddl-explorer` |
+| `sddl-design` | `sddl-architect` |
+| `sddl-plan` | `sddl-sequencer` |
+| `sddl-executor` | `sddl-executor` |
+| `sddl-code-review` | `sddl-reviewer` |
+| `sddl-judgment-day` | `sddl-reviewer` |
+| `sddl-qa-review` | `sddl-qa` |
+
+`sddl-init` has no profile. It runs in the main session.
 
 ### Stage status ids
 
@@ -68,6 +108,7 @@ These ids are the canonical change-stage names used in state and contracts.
 | `reviewing` | QA review is in progress or required |
 | `completed` | final QA closeout succeeded |
 | `blocked` | safe progress cannot continue |
+| `archived` | the change was moved out of the active tree by `sddl-archive` |
 
 ## Context ladder
 
@@ -100,6 +141,21 @@ The orchestrator is an event loop, not a worker.
 - Do not perform installs, builds, or broad test runs inline in the orchestrator.
 - Prefer artifact paths and short digests over copied artifact bodies.
 - Treat `./sdd-lite/skill-catalog.md` as the source for `Project Standards (auto-resolved)`.
+- Delegate to the mapped execution profile, which executes the named skill. Do not invent a profile per file.
+
+## Worker handoff controls
+
+Every delegated worker handoff must carry these controls before any stage-specific content:
+
+```yaml
+sddl_role: phase-worker # review-worker for lenses, judges, and refuters
+stage: sddl-*
+execution_profile: sddl-framer # or sddl-light | sddl-explorer | sddl-architect | sddl-sequencer | sddl-executor | sddl-reviewer | sddl-qa
+orchestration_allowed: false
+runtime_loading_allowed: false
+```
+
+Host wrappers evaluate these fields before sdd-lite activation. A matching worker executes only the named skill, does not read `orchestrator/SDDL-RUNTIME.md` or its modules, does not ask for session mode, does not route later stages, and does not launch descendants. The wrapper launches the CLI agent named in `execution_profile`. Missing controls are a malformed delegated handoff; the main orchestrator must correct it before retrying.
 
 ## Common result structure
 
@@ -141,6 +197,14 @@ Every lite stage result must be representable with:
 - `sddl-deep-explorer` is read-only and on-demand.
 - `sddl-qa-review` in `stage` mode never marks the change `completed`.
 - `sddl-qa-review` in `final` mode is the only lite path that may set `lifecycle_status: completed`.
+- `sddl-delivery` drafts delivery text and never changes `lifecycle_status`, never closes a change, and never archives one.
+- `sddl-delivery` never executes a git write command and never calls an issue tracker: it produces text the user applies manually.
+- `sddl-delivery` may read its source from `changes/{change-name}/` or from an archived copy, so archiving a change never blocks drafting its delivery text.
+- `delivery-report.md` is not a resume anchor. Its absence never blocks resume, because delivery runs after closeout.
+- `sddl-archive` is the only lite path that may set `lifecycle_status: archived`, and it writes that status only inside the archived copy.
+- `sddl-archive` is opt-in and confirmed per change: it never runs automatically and never archives a change without a recorded decision.
+- `sddl-archive` never deletes, never merges changes, and never archives a `fail` QA verdict.
+- `planner` changes are archivable once they reach `planned`; `sddl-archive` records that as `disposition: planned`.
 - `sddl-code-review` and `sddl-judgment-day` are review protocols executed by the orchestrator: their lens/judge workers are read-only, only the orchestrator writes `review-ledger.md`, and neither protocol may close a change or apply fixes directly.
 - `sddl-code-review` and `sddl-judgment-day` are mutually exclusive per target; judgment-day replaces the 4R review for its target.
 - `sddl-judgment-day` is opt-in only and never auto-routed.

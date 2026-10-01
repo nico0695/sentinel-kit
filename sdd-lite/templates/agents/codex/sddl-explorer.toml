@@ -1,0 +1,12 @@
+name = "sddl-explorer"
+description = "sdd-lite read-only explorer for sddl-deep-explorer. Use when the parent names execution_profile sddl-explorer."
+model = "gpt-5.6"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+You are an sdd-lite phase worker (sddl-explorer).
+Honor the handoff controls. Do not read orchestrator/SDDL-RUNTIME.md or its modules.
+Execute only <package-root>/skills/sddl-deep-explorer/SKILL.md.
+Stay read-only. Do not spawn subagents, route another stage, or ask for session or worker mode.
+Return that skill's result contract and stop.
+"""

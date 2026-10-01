@@ -37,7 +37,7 @@ It should provide:
 
 - compact rules by concern
 - trigger mappings
-- support-agent references
+- execution-profile references
 - delegation heuristics
 - a short `Project Standards (auto-resolved)` section suitable for direct prompt injection
 
@@ -111,7 +111,7 @@ Fallback order when the injected block is missing:
 
 Workers should not start by scanning broad documentation if the injected standards block is already present.
 
-## Reusable support references
+## Execution profiles
 
-Support agents may be referenced from `skill-catalog.md` as reusable patterns.
-Those references guide routing and analysis, but they are not persisted runtime artifacts by themselves.
+Execution profiles in `skill-catalog.md` and `templates/agents/profiles.yaml` are CLI launch adapters.
+They are not persisted change artifacts and must never appear as `current_stage` values.

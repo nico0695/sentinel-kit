@@ -14,7 +14,7 @@ Persisted artifacts stay in English. Chat interaction may be Spanish or English.
 4. [Setup and basic configuration (`sddl-init`)](#4-setup-and-basic-configuration-sddl-init)
 5. [The `config.yaml` file (settings)](#5-the-configyaml-file-settings)
 6. [Runtime file layout](#6-runtime-file-layout)
-7. [The 10 available skills](#7-the-10-available-skills)
+7. [The 12 available skills](#7-the-12-available-skills)
 8. [Standard flow and alternative flows](#8-standard-flow-and-alternative-flows)
 9. [How changes to the code are controlled](#9-how-changes-to-the-code-are-controlled)
 10. [Usage examples](#10-usage-examples)
@@ -72,12 +72,14 @@ In those cases, **escalate to `sdd-v2`**.
 |---|---|
 | **Bootstrap** | Initial preparation of the repo: creates `./sdd-lite/` with project context, skill catalog, and `config.yaml`. Mandatory before any change routing. |
 | **Orchestrator** | Thin coordinator that reads minimum state, chooses the route, and delegates. It does not implement, run builds/tests, or rewrite other stages' artifacts. |
-| **Worker / Skill** | Fresh executor that performs one concrete stage (proposal, design, execution, QA, exploration). |
+| **Worker / Skill** | Fresh executor that performs one concrete stage (proposal, design, execution, QA, exploration). The skill is the algorithm; the execution profile is the CLI agent that launches it. |
 | **Objective (`objective`)** | `new-feature`, `bug-fix`, `planner`, or `refactor-rework`. |
 | **Route (`route`)** | `continue-lite`, `macro-plan-first`, or `escalate-to-sdd-v2`. |
 | **`state.yaml`** | Resume anchor. Records lifecycle, current stage, checkpoints, and next action. |
 | **Checkpoint / approval** | Explicit confirmation point before each later stage starts (mandatory for code-touching stages). |
 | **Digest** | Short summary at the top of each artifact, reusable by downstream stages without rereading the full body. |
+
+The main SDD session keeps `orchestrator/SDDL-RUNTIME.md` loaded. Review, combined closeout, and exceptional recovery rules are separate modules loaded only when their event occurs. Delegated workers carry explicit controls that prevent them from loading the runtime or becoming nested orchestrators.
 
 ---
 
@@ -85,32 +87,40 @@ In those cases, **escalate to `sdd-v2`**.
 
 `sddl-init` is the bootstrap skill. Run it the first time, or when the bootstrap becomes stale.
 
+When upgrading a project from a wrapper older than contract `0.4`, rerun `sddl-init` and approve complete replacement of the marked `CLAUDE.md` and/or `AGENTS.md` block before resuming SDD work.
+
 ### What it does
 
 1. **Preflight.** Determines whether bootstrap is missing, stale, incomplete, or already usable.
 2. **Shallow scan.** Inspects manifests, lockfiles, docs, build/test/lint configs, source and test roots.
-3. **AI setup detection.** Scans the project root for:
+3. **Convention scan.** Bounded pass (max 6 extra files) over contributor docs, executable style config, and 2-3 representative source/test files, to record how the project already writes code: naming and file placement, layering, testing style, error handling. Anything not settled within the budget is recorded as `not established`. The result lands in the `Conventions` table of `project-context.md` and, distilled to at most 6 bullets, in `### project_conventions` of `skill-catalog.md` — which is what gets injected into delegated stage prompts.
+4. **AI setup detection.** Scans the project root for:
 
-   | Signal found | AI detected |
+   | Signal found | AI id detected |
    |---|---|
-   | `CLAUDE.md` exists | Claude Code |
-   | `.claude/` directory exists | Claude Code |
-   | `AGENTS.md` exists | Codex |
-   | `.codex/` directory exists | Codex |
+   | `CLAUDE.md` exists | `claude_code` |
+   | `.claude/` directory exists | `claude_code` |
+   | `AGENTS.md` exists | `agents` |
+   | `.agents/` directory exists | `agents` |
+   | `.codex/` directory exists | `agents` |
 
-4. **Selection checkpoint.** Asks the user which AI(s) to configure: Claude Code, Codex, both, or skip.
-5. **Skill installation.** The user chooses between two methods:
+   `agents` is the vendor-neutral id for any agent driven by the `AGENTS.md` / `.agents/` convention. Codex is first-class under this id (named roles install to `.codex/agents/`). Grok and OpenCode reuse the same wrapper and `.agents/skills/`; they do not load `.codex/agents`.
+
+5. **Selection checkpoint.** Asks the user which AI(s) to configure: `claude_code`, `agents`, both, or skip.
+6. **Skill installation.** The user chooses between two methods:
 
    | Method | Description | Use when |
    |---|---|---|
    | **Symlink** | Creates a directory symlink from `.claude/skills/<skill>` (or `.agents/skills/<skill>`) to the package skill directory, so `SKILL.md` and `references/` resolve together. | The package stays in this repo. Recommended. |
    | **Copy** | Copies each skill directory (`SKILL.md` plus `references/` when present) to the target and rewrites package-relative paths. | The package may move, or symlinks are unsupported. |
 
-   All 10 canonical skills are installed: `sddl-init`, `sddl-proposal`, `sddl-spec`, `sddl-design`, `sddl-plan`, `sddl-executor`, `sddl-code-review`, `sddl-judgment-day`, `sddl-deep-explorer`, `sddl-qa-review`.
+   All 12 canonical skills are installed: `sddl-init`, `sddl-proposal`, `sddl-spec`, `sddl-design`, `sddl-plan`, `sddl-executor`, `sddl-code-review`, `sddl-judgment-day`, `sddl-deep-explorer`, `sddl-qa-review`, `sddl-delivery`, `sddl-archive`.
 
-6. **Wrapper injection.** Inserts a demarcated block between `<!-- sdd-lite:start -->` and `<!-- sdd-lite:end -->` in `CLAUDE.md` and/or `AGENTS.md`. If the block already exists, it is replaced; if the file is missing, it is created with only the wrapper. Confirmation is always required before inserting.
+   Eight execution-profile adapters are also copied (generated, replaced on rerun; stale ids such as `sddl-planner` are removed): `sddl-light`, `sddl-framer`, `sddl-explorer`, `sddl-architect`, `sddl-sequencer`, `sddl-executor`, `sddl-reviewer`, `sddl-qa`. Claude files go to `.claude/agents/`; Codex files go to `.codex/agents/`. They do not replace skills. Codex TOML adapters are optional for inline operation but required for optimized `native-workers` routing. Override models in `execution_profiles` inside `config.yaml`, then rerun init; for Codex, `model: inherit` omits the generated TOML `model` key while preserving the configured effort.
 
-7. **Generates the bootstrap artifacts**:
+7. **Wrapper injection.** Inserts a demarcated block between `<!-- sdd-lite:start -->` and `<!-- sdd-lite:end -->` in `CLAUDE.md` and/or `AGENTS.md`. If the block already exists, it is replaced; if the file is missing, it is created with only the wrapper. Confirmation is always required before inserting.
+
+8. **Generates the bootstrap artifacts**:
    - `./sdd-lite/project-context.md`
    - `./sdd-lite/skill-catalog.md`
    - `./sdd-lite/openspec/config.yaml`
@@ -136,11 +146,13 @@ Main sections (validated by `schemas/config.schema.yaml`):
 |---|---|
 | `version` | Schema version. |
 | `project` | Identity: `name`, `slug`, `root`, `package_root`, `runtime_root` (`./sdd-lite`), `stack` (languages, frameworks, runtime, package manager). |
-| `paths` | Fixed canonical paths: `runtime_root`, `project_context_path`, `skill_catalog_path`, `artifact_root`, `config_path`, `changes_root`, and optional `reviews_root`. |
+| `paths` | Fixed canonical paths: `runtime_root`, `project_context_path`, `skill_catalog_path`, `artifact_root`, `config_path`, `changes_root`, and optional `reviews_root`, `archive_root`, `delivery_root`. |
 | `quality_commands` | Commands for `install`, `test`, `build`, `lint`, `typecheck`, and optional `format`, `dev`. |
 | `bootstrap` | Metadata: `status` (`created`/`refreshed`/`already_usable`), `strategy`, timestamps, refresh flags, observed files and paths. |
 | `conventions` | `persisted_language: en`, `chat_language` (`es`/`en`), `asks_only_when_material`, etc. |
-| `ai_setups` | Result of `sddl-init` steps 3–6: `detected`, `configured`, `skills_installed` (target + method + timestamp), `wrappers_injected`. |
+| `archive` | Optional. `suggest_threshold` (default 15) and `stale_days` (default 30) for the cleanup suggestion. |
+| `delivery` | Optional. `base_branch`, `pr_suggest_min_commits` (default 3), and `output_language` for `sddl-delivery`. |
+| `ai_setups` | Result of `sddl-init` steps 4–7: `detected`, `configured`, `skills_installed`, `agents_installed`, `wrappers_injected`. Optional top-level `execution_profiles` overrides adapter model/effort. |
 | `metadata` | `bootstrap_version`, `package_mode: lite`, `planner_terminal_skill: sddl-plan`, `final_closure_skill: sddl-qa-review`. |
 
 All internal paths live under `./sdd-lite/`. A root-level `openspec/` is never used.
@@ -168,10 +180,21 @@ All runtime files live under `./sdd-lite/`:
         qa-report.md         # findings and closeout
         macro-plan.md        # only on approved macro-plan-first route
         review-ledger.md     # only when a 4R or judgment-day review ran
+        delivery-report.md   # only when sddl-delivery ran for this change
     reviews/
       {target-slug}/
         review-ledger.md     # standalone reviews without an active change
+    delivery/
+      {target-slug}/
+        delivery-report.md   # standalone delivery runs without an active change
+    archive/
+      {YYYY-MM-DD}-{change-name}/
+        archive-report.md    # plus every artifact the change had
+      _discarded/
+        {YYYY-MM-DD}-{change-name}/   # abandoned, pending manual deletion
 ```
+
+`archive/` is a sibling of `changes/`, not a child, so `changes/*/` always lists active changes only.
 
 | Artifact | Owner | Purpose |
 |---|---|---|
@@ -186,6 +209,8 @@ All runtime files live under `./sdd-lite/`:
 | `execution-log.md` | `sddl-executor` | Stage-by-stage execution ledger. |
 | `qa-report.md` | `sddl-qa-review` | Review findings and closeout evidence. |
 | `review-ledger.md` | orchestrator (via `sddl-code-review` / `sddl-judgment-day`) | 4R or judgment-day findings, corroboration, and fix rounds. |
+| `delivery-report.md` | `sddl-delivery` | Frozen delivery target, commit correlation evidence, recorded SHAs. |
+| `archive-report.md` | `sddl-archive` | Disposition, final verdict, and explicit reopen steps. |
 
 ### Artifact budget (guidance)
 
@@ -202,7 +227,7 @@ All runtime files live under `./sdd-lite/`:
 
 ---
 
-## 7. The 10 available skills
+## 7. The 12 available skills
 
 | Skill | Role | Writes |
 |---|---|---|
@@ -216,6 +241,23 @@ All runtime files live under `./sdd-lite/`:
 | `sddl-judgment-day` | Opt-in adversarial dual review: two blind judges over one immutable target; convergence confirms, contradiction escalates. Works on code or planning artifacts. | `review-ledger.md` and `state.yaml` (written by the orchestrator). |
 | `sddl-deep-explorer` | Bounded, **read-only** analysis when a material unknown blocks routing. | Nothing persistent by default. |
 | `sddl-qa-review` | Unified review in `stage` or `final` mode. | `qa-report.md`, `state.yaml`. |
+| `sddl-delivery` | Drafts the commit message, PR description, and ticket content for work already done. `commit`, `pr`, or `ticket` mode. | `delivery-report.md`, `state.yaml`. |
+| `sddl-archive` | Moves finished, planned, or abandoned changes into the archive tree. `single` or `batch` mode. | `archive/{YYYY-MM-DD}-{change-name}/archive-report.md`. |
+
+Execution profiles (CLI adapters, not extra stages):
+
+| Profile | Launches | Claude default | Codex default |
+|---|---|---|---|
+| `sddl-light` | archive, delivery | haiku / low | gpt-5.6-luna / low |
+| `sddl-framer` | proposal | sonnet / high | gpt-5.6 / high |
+| `sddl-explorer` | deep-explorer (read-only) | sonnet / medium | gpt-5.6 / medium |
+| `sddl-architect` | spec, design | opus / medium | gpt-5.6-sol / medium |
+| `sddl-sequencer` | plan | sonnet / medium | gpt-5.6 / medium |
+| `sddl-executor` | executor | sonnet / high | gpt-5.6 / high |
+| `sddl-reviewer` | 4R lenses/judges (read-only) | sonnet / high | gpt-5.6 / high |
+| `sddl-qa` | qa-review (writes `qa-report.md` + `state.yaml`) | sonnet / high | gpt-5.6 / high |
+
+Tiering: decision stages (spec, design) run on the high tier, framing and execution over decided work run on the mid tier with high effort, mechanical stages run cheap, and verification never runs below the code writer. Override any cell in `execution_profiles` inside `config.yaml` and rerun `sddl-init`.
 
 Key rules:
 
@@ -224,6 +266,8 @@ Key rules:
 - `sddl-qa-review` in `stage` mode never marks the change `completed`. Only `final` mode with a `pass` verdict may close it.
 - `sddl-code-review` and `sddl-judgment-day` are orchestrator-executed protocols: their lens/judge workers are read-only and only the orchestrator writes `review-ledger.md`. They never close a change and never apply fixes directly — fixes always flow through `plan.md` and `stage_approval`.
 - `sddl-judgment-day` is opt-in only and replaces the 4R review for its target (never run both on the same target).
+- `sddl-delivery` drafts text only: it never runs a git write command, never calls an issue tracker, and never changes `lifecycle_status`.
+- `sddl-archive` never deletes, never merges changes, and never moves anything without a recorded decision per change.
 
 ### The two review loops in short
 
@@ -260,6 +304,8 @@ preflight
   -> sddl-qa-review (stage) when useful
   -> sddl-executor / sddl-code-review / sddl-qa-review (stage) as needed
   -> sddl-qa-review (final, consumes review-ledger.md as evidence when it exists)
+  -> closeout offer once the change is completed:
+       sddl-delivery / sddl-archive / both (delivery first) / neither
 ```
 
 ### Standalone review flows
@@ -311,6 +357,67 @@ When work exceeds lite safety:
 -> recommend sdd-v2
 ```
 
+### Delivery flow
+
+`sddl-delivery` drafts the texts you need to hand work off. It never runs git, never calls a tracker, and never changes `lifecycle_status`.
+
+| Mode | Produces | Notes |
+|---|---|---|
+| `commit` | one commit message | on request only; records the SHA if you confirm you applied it |
+| `pr` | the pull request description | grouped by concern, no exhaustive file table |
+| `ticket` | corrected description, evidence, how to test, status | four pasteable blocks; any tracker, any item type |
+
+Use it when:
+
+- **a change just closed** — the closeout offer proposes it, and the artifacts answer almost everything
+- **the change is already archived** — archiving never blocks drafting
+- **there is no SDD flow at all** — pick from a numbered list of prior commits (`all | none | 1,3 | 1-4 | inspect 3 | done`). Only commits with a recorded SHA are preselected; every other match is a recommendation you confirm, and ambiguous ones are shown side by side rather than resolved for you
+
+Output language is chosen at the gate, or fixed once with `delivery.output_language` in `config.yaml`.
+To customize a format, ask for the template: it is copied once into `./sdd-lite/templates/delivery/` and nothing overwrites it after that, including a rerun of `sddl-init`.
+
+### Archive flow
+
+`sddl-archive` moves changes out of `changes/` once they no longer belong there. It is bookkeeping, not a second quality gate: it trusts the QA verdict and never compensates for a missing or failed review.
+
+Each archived change keeps every artifact it had, plus a short `archive-report.md` recording its disposition, verdict, and exact reopen steps.
+
+| `disposition` | Meaning | Destination |
+|---|---|---|
+| `closed` | finished change, QA final passed | `archive/` |
+| `planned` | `planner` objective that ended at `planned` | `archive/` |
+| `abandoned` | work stopped and will not continue | `archive/_discarded/` |
+| `superseded` | replaced by another change | `archive/` |
+
+Two modes:
+
+- **`single`** — one change. Reached through the closeout offer after `sddl-qa-review` in `final` mode, or on direct request.
+- **`batch`** — interactive triage of every candidate:
+
+```text
+#  change-name              status        age    verdict      proposal
+1  add-user-auth            completed     12d    pass         archive (closed)
+2  fix-login-redirect       completed     31d    pass_warn    archive (closed)
+3  refactor-api-client      draft         45d    -            discard (abandoned)  <- confirm
+4  add-payment-flow         implementing   3d    -            keep active
+
+Related: [1, 2] shared prefix + 60% file overlap
+
+Actions: all | none | 1,3 | 1-4 | inspect 3 | skip 4 | done
+```
+
+Nothing moves until `done`. `inspect N` shows a change digest without changing the selection. Only `ready` candidates are ever preselected; stale and blocked ones need individual confirmation, and `abandoned` needs a one-line reason.
+
+Three hard rules:
+
+- **Never deletes.** `abandoned` changes go to `_discarded/`, and the skill prints the literal path plus the deletion command for you to run manually. It warns you when `sdd-lite/` is gitignored, because then deletion is permanent.
+- **Never merges.** Related changes are cross-referenced in `related_changes`; combining their content is a new change, not an archive action.
+- **Never automatic.** Every move needs a recorded decision.
+
+Reopening is a plain move back into `changes/{change-name}/` plus the state edit spelled out in the report.
+
+**Accumulation suggestion.** `sdd-lite` has no end-of-session event, so the orchestrator checks once at session start: when archivable changes reach `archive.suggest_threshold` in `config.yaml` (default 15), it offers cleanup in one line and continues either way. It counts archivable changes, not total ones — many legitimately active changes are not a problem.
+
 ---
 
 ## 9. How changes to the code are controlled
@@ -337,7 +444,9 @@ In every case: it stops, records the reason in `execution-log.md`, and routes to
 
 ### No hidden git side effects
 
-`sddl-executor` does not commit, stash, rebase, or otherwise modify git history. `sdd-lite` does not define git/PR/issue workflows by itself.
+`sddl-executor` does not commit, stash, rebase, or otherwise modify git history. Nothing in `sdd-lite` executes a git, PR, or issue-tracker mutation. `sddl-delivery` drafts commit, PR, and ticket **text** for you to apply manually; it never applies anything.
+
+There is exactly one exception: **`git add`**. The orchestrator may stage files, but only when you ask for it in that turn, only with the paths named explicitly, and it tells you what it staged. Never `git add -A`, `git add .`, or `git add -u` — those would sweep in files you did not name. No stage worker stages anything, ever.
 
 If dirty local changes exist:
 
@@ -382,8 +491,9 @@ The orchestrator runs `sddl-init`:
 2. Detects `CLAUDE.md` → proposes configuring Claude Code.
 3. Asks: symlink or copy → user picks `symlink`.
 4. Asks: inject the wrapper into `CLAUDE.md`? → user accepts.
-5. Writes `./sdd-lite/project-context.md`, `./sdd-lite/skill-catalog.md`, `./sdd-lite/openspec/config.yaml`.
-6. Returns a summary covering bootstrap status and AI setup results.
+5. Copies the eight execution-profile adapters into `.claude/agents/`.
+6. Writes `./sdd-lite/project-context.md`, `./sdd-lite/skill-catalog.md`, `./sdd-lite/openspec/config.yaml`.
+7. Returns a summary covering bootstrap status, skills, adapters, and wrapper results.
 
 ### Example 2 — Add a bounded feature
 
@@ -399,6 +509,7 @@ Expected flow:
 6. **S1 approval** → `sddl-executor` implements S1 only, records in `execution-log.md`.
 7. **S2 approval** → `sddl-executor` runs the planned tests.
 8. **`sddl-qa-review` in `final` mode** → on a `pass` verdict, marks the change `completed`.
+9. **Closeout offer** → one prompt with four options: draft the delivery, archive it, both (delivery first), or neither. Picking `both` gives you the commit / PR / ticket text plus a `delivery-report.md`, and then moves the change to `./sdd-lite/openspec/archive/{date}-{change-name}/` with that report inside it. Picking `neither` leaves the change in `changes/` and does not ask again.
 
 ### Example 3 — Bug with unclear root cause
 
@@ -454,6 +565,8 @@ The orchestrator:
 | More phases and artifacts. | Fewer phases and artifacts. |
 | Heavier orchestration. | Thin coordinator plus delegated workers. |
 | Separate stage QA and final verify. | One `sddl-qa-review` skill with `stage` and `final` modes. |
+| Branch, PR, and issue support flows are reserved placeholders that were never implemented. | `sddl-delivery` drafts commit, PR, and ticket content in one skill, without ever executing git or calling a tracker. |
+| Archive is a strict gate after verify, and `planner` never archives. | `sddl-archive` records an explicit `disposition`, so finished, planned, and abandoned changes are all archivable without lying about the outcome. |
 | Heavier governance. | Faster flow with explicit escalation when safety drops. |
 
 Recommendation: use `sdd-lite` first for bounded work. Escalate to `sdd-v2` when the lite route is no longer safe (broad migrations, redesigns, repo-wide coordination).

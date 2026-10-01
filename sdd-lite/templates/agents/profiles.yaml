@@ -1,0 +1,169 @@
+# Canonical execution-profile matrix for sdd-lite.
+# Skills stay the phase source of truth. These profiles are CLI launch adapters.
+# sddl-init copies host files from templates/agents/{claude,codex}/ and applies
+# execution_profiles overrides from config.yaml when present.
+# Profile ids are never stage ids: do not write them to state.yaml current_stage.
+#
+# Tiering rule: decision stages run high, execution over decided work runs mid,
+# mechanical stages run cheap, and verification never runs below the code writer.
+#
+# Host tier map (keep both columns aligned when changing a profile):
+#   cheap  -> Claude haiku  / Codex gpt-5.6-luna
+#   mid    -> Claude sonnet / Codex gpt-5.6
+#   high   -> Claude opus   / Codex gpt-5.6-sol
+
+version: "2"
+sddl_init_profile: none
+
+profiles:
+  sddl-light:
+    skills:
+      - sddl-archive
+      - sddl-delivery
+    capability: workspace-write
+    write_scope: runtime-only
+    claude:
+      file: templates/agents/claude/sddl-light.md
+      install_name: sddl-light.md
+      model: haiku
+      effort: low
+    codex:
+      file: templates/agents/codex/sddl-light.toml
+      install_name: sddl-light.toml
+      model: gpt-5.6-luna
+      effort: low
+      sandbox_mode: workspace-write
+
+  sddl-framer:
+    skills:
+      - sddl-proposal
+    capability: workspace-write
+    write_scope: runtime-only
+    claude:
+      file: templates/agents/claude/sddl-framer.md
+      install_name: sddl-framer.md
+      model: sonnet
+      effort: high
+    codex:
+      file: templates/agents/codex/sddl-framer.toml
+      install_name: sddl-framer.toml
+      model: gpt-5.6
+      effort: high
+      sandbox_mode: workspace-write
+
+  sddl-explorer:
+    skills:
+      - sddl-deep-explorer
+    capability: read-only
+    write_scope: none
+    claude:
+      file: templates/agents/claude/sddl-explorer.md
+      install_name: sddl-explorer.md
+      model: sonnet
+      effort: medium
+    codex:
+      file: templates/agents/codex/sddl-explorer.toml
+      install_name: sddl-explorer.toml
+      model: gpt-5.6
+      effort: medium
+      sandbox_mode: read-only
+
+  sddl-architect:
+    skills:
+      - sddl-spec
+      - sddl-design
+    capability: workspace-write
+    write_scope: runtime-only
+    claude:
+      file: templates/agents/claude/sddl-architect.md
+      install_name: sddl-architect.md
+      model: opus
+      effort: medium
+    codex:
+      file: templates/agents/codex/sddl-architect.toml
+      install_name: sddl-architect.toml
+      model: gpt-5.6-sol
+      effort: medium
+      sandbox_mode: workspace-write
+
+  sddl-sequencer:
+    skills:
+      - sddl-plan
+    capability: workspace-write
+    write_scope: runtime-only
+    claude:
+      file: templates/agents/claude/sddl-sequencer.md
+      install_name: sddl-sequencer.md
+      model: sonnet
+      effort: medium
+    codex:
+      file: templates/agents/codex/sddl-sequencer.toml
+      install_name: sddl-sequencer.toml
+      model: gpt-5.6
+      effort: medium
+      sandbox_mode: workspace-write
+
+  sddl-executor:
+    skills:
+      - sddl-executor
+    capability: workspace-write
+    write_scope: approved-stage
+    claude:
+      file: templates/agents/claude/sddl-executor.md
+      install_name: sddl-executor.md
+      model: sonnet
+      effort: high
+    codex:
+      file: templates/agents/codex/sddl-executor.toml
+      install_name: sddl-executor.toml
+      model: gpt-5.6
+      effort: high
+      sandbox_mode: workspace-write
+
+  sddl-reviewer:
+    skills:
+      - sddl-code-review
+      - sddl-judgment-day
+    capability: read-only
+    write_scope: none
+    claude:
+      file: templates/agents/claude/sddl-reviewer.md
+      install_name: sddl-reviewer.md
+      model: sonnet
+      effort: high
+    codex:
+      file: templates/agents/codex/sddl-reviewer.toml
+      install_name: sddl-reviewer.toml
+      model: gpt-5.6
+      effort: high
+      sandbox_mode: read-only
+
+  sddl-qa:
+    skills:
+      - sddl-qa-review
+    capability: workspace-write
+    write_scope: runtime-only
+    claude:
+      file: templates/agents/claude/sddl-qa.md
+      install_name: sddl-qa.md
+      model: sonnet
+      effort: high
+    codex:
+      file: templates/agents/codex/sddl-qa.toml
+      install_name: sddl-qa.toml
+      model: gpt-5.6
+      effort: high
+      sandbox_mode: workspace-write
+
+stage_map:
+  sddl-proposal: sddl-framer
+  sddl-spec: sddl-architect
+  sddl-archive: sddl-light
+  sddl-delivery: sddl-light
+  sddl-deep-explorer: sddl-explorer
+  sddl-design: sddl-architect
+  sddl-plan: sddl-sequencer
+  sddl-executor: sddl-executor
+  sddl-code-review: sddl-reviewer
+  sddl-judgment-day: sddl-reviewer
+  sddl-qa-review: sddl-qa

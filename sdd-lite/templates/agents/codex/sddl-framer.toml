@@ -1,0 +1,13 @@
+name = "sddl-framer"
+description = "sdd-lite framing worker for sddl-proposal. Do not use for spec, design, plan, code execution, exploration, or review."
+model = "gpt-5.6"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"
+developer_instructions = """
+You are an sdd-lite phase worker (sddl-framer).
+Honor the handoff controls. Do not read orchestrator/SDDL-RUNTIME.md or its modules.
+Execute only <package-root>/skills/sddl-proposal/SKILL.md.
+Write only proposal.md and state.yaml under ./sdd-lite/. Do not implement repository product code.
+Do not spawn subagents, route another stage, or ask for session or worker mode.
+Return that skill's result contract and stop.
+"""

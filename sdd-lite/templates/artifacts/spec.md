@@ -14,7 +14,6 @@
 - change_name:
 - objective:
 - route:
-- spec_status:
 
 ## Scope Boundary
 

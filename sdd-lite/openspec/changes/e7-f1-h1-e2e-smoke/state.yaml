@@ -923,6 +923,22 @@ open_risks:
       the record to mislead the next reader.
     severity: low
     status: closed — design Amendment 1 corrected D-7's run path
+  - id: risk-e7h1-015
+    summary: >-
+      DISCOVERED AT PR TIME, NOT COVERED. The user's acceptance of `[E6.F2.H2]` (2026-08-30)
+      directed that `risk-e6f2h2-014` and review row `R4-002` be carried into this story, and
+      the owner's skill-catalog on `main` repeats it ("must carry `risk-e6f2h2-014` plus
+      review row R4-002"). The risk: the TUI now WAITS after a finished review, and on stdin
+      EOF the post-run `confirm` never settles, so the process exits 13 with a raw Node
+      warning over the digest and loses the intended exit code — with no process-level test
+      anywhere. This change never saw that directive: it lives in the prior change's artifacts
+      and was not read at proposal time (a process gap, not a decision). Its smoke is
+      IN-PROCESS by design (non-goal N-1) — it never touches the TUI, a real TTY, real stdin,
+      `src/main/cli.ts` or `dist/cli.js` — so it CANNOT catch this defect. Disclosed at the
+      top of PR #80. Decision owed by the user: cover it in this PR (a process-level test, a
+      different shape from the in-process smoke) or file a follow-up issue.
+    severity: medium
+    status: open — unresolved, awaiting the user's decision
   - id: risk-e7h1-014
     summary: >-
       R3-005 is a KNOWN, ACCEPTED coverage gap with a tracked owner: the exit-code-2 arm (the
@@ -1084,4 +1100,4 @@ next_action:
     upgrades AC-10 from inferred to demonstrated. The R3-005 follow-up is tracked as issue
     #79.
 created_at: "2026-09-05T16:10:00Z"
-updated_at: "2026-09-30T17:00:00Z"
+updated_at: "2026-10-01T10:00:00Z"

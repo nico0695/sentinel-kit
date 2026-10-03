@@ -108,6 +108,23 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-011
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S4: write docs/privacy.md (5 sections, one 5-node Mermaid without styles, d-014
+      wording), insert the README "Using sentinel" section before "Quick start (development)",
+      and apply d-015 (one-line fix in docs/quick-start.md section 6).
+    options:
+      - id: approve
+        label: Approve S4
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T18:00:00Z"
+    created_at: "2026-10-03T17:55:00Z"
+    resolved_at: "2026-10-03T18:00:00Z"
   - id: cp-010
     type: stage_approval
     stage: sddl-executor

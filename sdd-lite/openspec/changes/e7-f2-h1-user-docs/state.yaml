@@ -92,6 +92,23 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-009
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S2: write docs/quick-start.md per the design outline (7 sections, D6 sentence
+      in section 4, Next steps, no Mermaid), then re-run V1-V10 and V14 with commands extracted
+      from the doc and check every flag against the saved --help. No other file touched.
+    options:
+      - id: approve
+        label: Approve S2
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T16:40:00Z"
+    created_at: "2026-10-03T16:35:00Z"
+    resolved_at: "2026-10-03T16:40:00Z"
   - id: cp-008
     type: stage_approval
     stage: sddl-executor

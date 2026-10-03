@@ -1,0 +1,1103 @@
+version: "0.1"
+change_name: e7-f1-h1-e2e-smoke
+# The orchestrator's handoff objective is `implementer`; `state.schema.yaml` has no such
+# enum member, so the schema-valid equivalent for a backlog test-infrastructure story is
+# recorded here (the same mapping E6's stories used). Intent is unchanged: this change
+# runs through execution, it does not stop at plan.
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E7.F1.H1] (issue #41), first story of E7 (wrap-up) and the required predecessor of
+    the release pipeline [E7.F2.H3]: an end-to-end smoke test over the full flow — register a
+    repo, review a branch, read the run back out of history — driven against a temporary git
+    repository and the existing FakeEngine, asserting the persisted artifacts. Bounded scope
+    span: the repo's `e2e` vitest project has existed since E0 (`vitest.config.ts`, include
+    `e2e/**/*.test.ts`) but matches no files today, so the story creates the first `e2e/` root
+    rather than reshaping an existing suite. Blast radius is normally test-only, with ONE
+    material exception that is the load-bearing ambiguity of this change: the FakeEngine the
+    story names is not reachable through the CLI today. `EngineNameSchema` is
+    `z.enum(["claude-code", "opencode"])` (`src/core/repos/ports/config-schemas.ts:14`),
+    `createEngine` is a closed name-to-constructor lookup over those two
+    (`src/main/container.ts:118`), and `createWiringGraph` accepts only `env` and `homeDir` —
+    there is no seam to inject a `ReviewEngine`. Reaching the FakeEngine therefore requires a
+    production-code decision (a test-only injection seam in the composition root, a gated
+    `fake` engine name in the schema, or running in-process against `createCliDeps` and giving
+    up coverage of the built `dist/cli.js`), each with a different cost to the public surface.
+    Isolation itself is already solved and is not a risk: `SENTINEL_HOME` fully redirects
+    sentinel state (`src/main/paths.ts:68`). Medium ambiguity concentrated at the spec/design
+    boundary, low-medium risk.
+  confidence: medium
+  recorded_at: "2026-09-05T16:10:00Z"
+lifecycle_status: completed
+current_stage: sddl-executor
+stages:
+  sddl-deep-explorer:
+    status: pending
+  sddl-proposal:
+    status: completed
+    started_at: "2026-09-05T16:10:00Z"
+    completed_at: "2026-09-05T16:18:00Z"
+    notes: >-
+      Returned `partial`: proposal.md is complete and usable by sddl-spec, but two B-level
+      questions (Q1 engine reachability, Q2 e2e/ in the quality gate) gate a safe spec freeze.
+      Investigated both orchestrator risks with code evidence and surfaced a third
+      (risk-e7h1-003). Wrote proposal.md only; state.yaml left to the orchestrator as
+      instructed.
+  sddl-spec:
+    status: completed
+    started_at: "2026-09-05T16:25:00Z"
+    completed_at: "2026-09-05T16:32:00Z"
+    notes: >-
+      Returned `success`. 12 acceptance criteria (AC-1..AC-12) and 6 behavior scenarios
+      (S1-S6). Both story checkboxes are bound: AC-10 = runs in CI on the existing `test`
+      job across Node 22/24 with no workflow change, AC-11 = "fails if any piece breaks",
+      demonstrated by at least two mutations on different layers, reverted, with QA
+      re-running one. d-003 and d-004 formalized as non-goals N-1 and N-2. Verified that
+      Q5 (exit-code assertions) IS reachable under route (a): `createCli(deps).run(argv)`
+      returns `Promise<number>` and never touches `process`, so exit codes are asserted
+      in-process. Raised Q8 (A-level, design-owned).
+  sddl-design:
+    status: completed
+    started_at: "2026-09-05T16:32:00Z"
+    completed_at: "2026-09-05T16:42:00Z"
+    notes: >-
+      Returned `success`. Settled Q8 as D-1/D-2: extend, do not restructure — declare
+      `engineOverride?: ReviewEngine` on both `CliDepsOptions` (public, `@internal`,
+      test-only TSDoc) and the private `WiringGraphOptions`, since `createCliDeps` already
+      forwards its whole options object into `createWiringGraph`; consume it as
+      `engine: options.engineOverride ?? createEngine(request.engineName, env)` inside the
+      existing `runReview` thunk. Omitted, the expression is today's call verbatim, so the
+      `UnknownEngineError` throw and the `SENTINEL_OPENCODE_MODEL` failure path stay
+      byte-identical; present, `??` short-circuits so the fake never demands an opencode
+      model. `sentinelPaths()` is still called once — property 1 intact. Also specified
+      `e2e/review-flow.test.ts` (2 tests) + `e2e/support/hermetic-git.ts`, per-test
+      SENTINEL_HOME via env injection, and three named AC-11 mutation points on different
+      layers (M1 rename metadata.json in run-store-fs, M2 hand runReview the wrong
+      worktrees dir, M3 make resolveReviewExitCode return 0 for request-changes).
+      Surfaced three code-evidence corrections to spec assertions (A-1/A-2/A-3), routed
+      back to sddl-spec as Amendment 1 rather than left as a silent contradiction.
+      Amendment 1 has since landed (see the sddl-spec notes), so spec and design are
+      consistent on the record.
+  sddl-plan:
+    status: completed
+    started_at: "2026-09-05T16:55:00Z"
+    completed_at: "2026-09-05T17:02:00Z"
+    notes: >-
+      Returned `success`. Six strictly sequential code-touching stages, each gated by
+      stage_approval. ST-1 isolates the ONLY production change (the engineOverride seam) so
+      it is reviewable and revertible on its own. ST-2 lands the d-004 gate edits BEFORE any
+      e2e/ file exists, so a tsc/biome/tsup interaction is attributable to the config alone.
+      ST-3 adds the hermetic-git fixture + happy path (S1-S4), ST-4 the negative case (S5).
+      ST-5 is an explicit AC-11 mutation stage: M1/M2 (+optional M3) one at a time, red
+      assertion recorded, reverted, revert PROVEN by `git status --porcelain` plus per-file
+      diffs showing no residue. ST-6 proves the full gate plus the AC-8 deliberate-type-error
+      spot check. Amendment 1's corrections are written in as binding constraints on the
+      assertions ST-3/ST-4 may write.
+  sddl-executor:
+    status: completed
+    started_at: "2026-09-05T17:10:00Z"
+    notes: >-
+      ST-1 COMPLETE and validated (`success`). Only `src/main/container.ts` touched, 25
+      insertions across 3 hunks. Validation, real outputs: `npm run check` clean (163 files,
+      107 modules / 254 deps, 0 violations); `npm test` 1037/1037 across 49 files — exact
+      baseline match; `git diff src/main/container.ts` limited to the three approved edits;
+      `git diff src/core/repos/ports/config-schemas.ts` EMPTY (AC-7). Orchestrator
+      independently re-verified both diff checks rather than taking the worker's word.
+      The design assumption was confirmed in code before editing: `createCliDeps` already
+      forwards its whole options object, so no forwarding rewrite was made. `createEngine`
+      gained no parameter, `sentinelPaths()` still called once, and with the field omitted
+      the `??` fallback is the pre-edit expression character for character.
+      ST-2 COMPLETE and validated (`success`). Two files, two edits: `tsconfig.json`
+      include -> ["src", "e2e"], `biome.json` files.includes += "e2e/**". Diffs on
+      `.dependency-cruiser.cjs` and `package.json` are EMPTY, as N-2 requires — verified
+      independently by the orchestrator. `npm run check` clean and byte-identical to the
+      post-ST-1 baseline (163 files, 107 modules, 0 violations), so the isolation
+      experiment came back clean and risk-e7h1-008 is retired: any `check` failure in
+      ST-3/ST-4 is now attributable to the new test files, not to the gate config.
+      The stage measured rather than assumed the open question it was handed: `tsc` with an
+      `include` entry naming a directory that does not exist emits nothing and exits 0 —
+      TS18003 fires only when the ENTIRE include/files set resolves to zero inputs, and
+      `src` still matches. Biome behaves the same, file count unchanged at 163. So the
+      ST-2-before-ST-3 ordering needed no revisiting. `npm test` deliberately not run (no
+      runtime path changed); ST-6 runs the full gate.
+      ST-3 COMPLETE and validated (`success`). Two NEW files, no existing source file
+      touched: `e2e/support/hermetic-git.ts` and `e2e/review-flow.test.ts` (one test, five
+      argv legs, fresh graph per leg, unconditional afterEach teardown). Validation:
+      `npx vitest run --project e2e` green with 1 test in 1 file — non-vacuous, satisfying
+      AC-1 — and deterministic across FOUR runs (2.06s then 1.46/1.24/1.42s, no flake, no
+      leftover temp dirs); `npm run check` clean. Biome's file count moved 163 -> 165, which
+      is the first POSITIVE evidence that ST-2's gate widening actually reaches `e2e/`
+      rather than being inert. One formatting-only `check` failure was fixed with
+      `biome check --write e2e`; no assertion was weakened. `npm test` deliberately deferred
+      to ST-6. Amendment 1's four binding constraints all honoured, with an in-file comment
+      recording why `metadata.json#engine` is not asserted.
+      ST-4 COMPLETE and validated (`success`). One test appended to the existing
+      `e2e/review-flow.test.ts` (+105 lines: the new `it` plus a CHANGES_ENGINE_OUTPUT
+      constant); no new file, nothing under `src/` touched — the orchestrator confirmed
+      `git diff --stat src` is empty. The FakeEngine is scripted to
+      `VERDICT: request-changes` and `run(argv)` returns exit code 1 (the
+      `--changes-exit-code` default from [E6.F1.H2]) with empty stderr, on the FIRST run, no
+      assertion weakened. Asserts the same three files under
+      `<SENTINEL_HOME>/runs/acme__widget/<ts>/` — `result.md` byte-equal to the scripted
+      output, non-empty `prompt.md`, `metadata.json` with repo `acme__widget`, baseRef,
+      targetRef, state `ok`, verdict `request-changes` — plus `validations/` absent. All
+      Amendment 1 constraints honoured. Validation: e2e project 2/2 green (1.91s), `npm run
+      check` clean at 165 files, determinism re-run 2/2 (1.26s); the orchestrator re-ran the
+      project independently and also got 2/2.
+      A-level call worth a reviewer's eye: the new test inlines its fixture/home setup rather
+      than sharing a factory with ST-3's, because extracting one would mean rewriting a test
+      outside this stage's scope and a factory used by one of two tests would leave two
+      divergent ways to build the same graph. It DOES reuse the module-scope constants,
+      CapturedIo/createCapturedIo, the temporaryRoots teardown registry and
+      createHermeticRepo.
+      ST-5 COMPLETE, returned `partial` — the stage ran fully, but produced the finding the
+      handoff had flagged as the most important possible outcome, and that finding needs a
+      user decision before ST-6. Three mutations, one at a time, never stacked:
+      M1 (`run-store-fs.ts:219`, storage — metadata written as `meta.json`): WENT RED, 2 of 2
+      failed, `ENOENT ... /runs/acme__widget/<ts>/metadata.json` at review-flow.test.ts:192
+      and :311. M2 (`container.ts:256`, composition — `worktreesDir: paths.clonesDir`): DID
+      NOT GO RED, 2 of 2 still passed — see risk-e7h1-011. M3 (`exit-code.ts`, driving CLI —
+      `resolveReviewExitCode` returns 0 unconditionally): WENT RED with exactly D-8's
+      predicted asymmetry, 1 failed 1 passed, `expected +0 to be 1` at :295. M2's green made
+      M3 REQUIRED rather than optional, to reach two proven-red mutations on different
+      layers; M3 was already an approved D-8 point, so no scope expansion.
+      AC-11 is satisfied WITH A NAMED GAP: M1 (storage) and M3 (CLI) each turned the suite
+      red on different layers with specific recorded assertions, so the smoke is
+      demonstrably not vacuous. Ending state proven, not assumed, and re-verified
+      independently by the orchestrator: `git diff` empty on all three mutated files, `git
+      diff --stat src e2e` empty, suite green 2/2. The executor did NOT swap M2 for an
+      easier mutation.
+      ST-5b COMPLETE (`success`) — the M2 blind spot is CLOSED and the closure is proven.
+      Two assertions added to the existing happy-path test (no third test, no new fixture),
+      plus `basename` on the existing `node:path` import. The insight that made it
+      observable: `runReview`'s cleanup removes the worktree on the success path, so the
+      worktree itself is gone by assertion time — but its PARENT survives, because
+      `git worktree add` creates `<worktreesDir>/<repoBasename>/` and the adapter's
+      `worktree remove --force` deletes only the leaf. Assertion 1 uses `readdirSync` rather
+      than `existsSync` on purpose: a directory that was never created THROWS instead of
+      passing vacuously. Assertion 2 tolerates `clones/` not existing at all.
+      Red/green proof: baseline 2/2 green; M2 applied -> 1 failed 1 passed with
+      `ENOENT ... scandir '/tmp/sentinel-home-*/worktrees'` at review-flow.test.ts:237;
+      revert -> 2/2 green; `git diff src/main/container.ts` empty; `npm run check` clean.
+      The executor also checked, unprompted, that the two assertions are independent: with
+      assertion 1 transiently neutralised, assertion 2 bites on its own
+      (`expected [ 'repo' ] to deeply equal []`), so neither is dead weight shadowed by the
+      other. The orchestrator RE-RAN the entire red/green cycle itself — apply M2, observe
+      red, revert, confirm empty diff and green — rather than accepting the report.
+      ST-6 COMPLETE (`success`) — the final execution stage. The gate demanded NO code
+      change; nothing was fixed, worked around or rationalised. `npm run check` clean (biome
+      165 files, tsc silent, depcruise 107 modules / 254 deps); `npm test` 1039/1039 across
+      50 files — exactly the pre-story 1037 plus the 2 new e2e tests — with ZERO files under
+      `src/**/__test__/` touched by the story's commit range; `npm run build` OK (124.20 KB,
+      and the widened tsconfig#include did NOT pull `e2e/` into the bundle);
+      `node dist/cli.js --version` prints 0.0.0. The orchestrator independently re-ran the
+      suite, the build, the version and the diff-scope check.
+      AC-8 spot check PASSED and closes risk-e7h1-009: a deliberate
+      `const ac8SpotCheck: number = "not-a-number";` in `e2e/support/hermetic-git.ts` made
+      `npx tsc --noEmit` FAIL with exit 2 and the error path inside `e2e/` —
+      `hermetic-git.ts(121,7): error TS2322: Type 'string' is not assignable to type
+      'number'` — then reverted to an empty diff and a silent re-run. The widened gate is
+      live, not inert.
+      AC-10 confirmed with no workflow edit: CI's `test` job runs bare `npm test` (no
+      `--project` filter) and `vitest.config.ts` declares all three projects, so a
+      filterless run executes the e2e smoke on both Node 22 and 24. The fixture also needs
+      no git identity on a bare runner.
+      All six execution stages are done.
+      ST-7 COMPLETE (`success`) — fix round 1 of a maximum 2, all ten ids landed (R3-001,
+      R3-002, R3-003, R3-004, R4-001, R4-002, R1-001, R2-001, R2-002, R3-006); no STOP rule
+      fired and nothing was deferred. The fixture gained the divergent `unrelated.ts` commit
+      on `main` AFTER the feature branch is cut, which is what made M4 detectable. Mutations,
+      each applied alone and reverted with an empty diff: M4 (`compute-review-diff.ts:226`)
+      RED at review-flow.test.ts:205 `expected ... not to contain 'unrelated.ts'`; M5
+      (`assemble-prompt.ts:25`) RED at :203 `expected ... to contain '<file path="widget.ts"'`;
+      M8 (`register-repo.ts:104`) RED at :187 `expected 2 to be +0`; M6 (`persist-run.ts:74`)
+      RED at :219 `expected +0 to be 1`. M7 and M9 not run. The orchestrator independently
+      re-ran the baseline, M4 and M5 cycles itself (same failing assertions, reverts empty,
+      tree clean) and the full gate: check clean (165 files, 107 modules), 1039/1039 across
+      50 files, build OK, e2e 2/2 deterministic, `git diff --stat src` empty.
+      Two honest qualifications from the executor, both accepted: (1) under M4 the
+      `fileCount === 1` assertion at :219 is SHADOWED by the earlier prompt assertion (the
+      first failure aborts the test), so it is isolated only by M6, not by M4; (2) M8 failed
+      EARLIER than the plan predicted — the review leg exits 2 because `master` does not
+      resolve, so the run aborts before reaching the `metadata.baseRef === "main"` assertion.
+      The mutation is still detected, just by a coarser assertion. The executor also
+      self-reported a process slip — an over-broad string replace briefly corrupted
+      `hermetic-git.ts` (a stray token removed the `checkout -b` line), repaired before any
+      test run; the orchestrator read the final diff in full and confirmed the sequence is
+      intact and no stray token remains.
+  sddl-qa-review:
+    status: completed
+    completed_at: "2026-09-30T16:00:00Z"
+    notes: >-
+      Final mode returned pass_with_warnings. Completion withheld pending a final_review
+      checkpoint (cp-013) for the user's explicit acceptance of the warnings.
+artifacts:
+  state: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/state.yaml
+  proposal: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/proposal.md
+  spec: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/spec.md
+  design: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/design.md
+  plan: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/plan.md
+  execution_log: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
+  review_ledger: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
+checkpoints:
+  - id: cp-013
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA returned pass_with_warnings. Per the QA contract a warning verdict cannot
+      close the change on its own: `completed` requires the user's explicit acceptance of the
+      warnings. Nothing is blocking and no fix stage is needed. The warnings are:
+      (W1) N-1 — the smoke drives `createCli(createCliDeps(...)).run(argv)` in-process and
+      does NOT exercise src/main/cli.ts argv dispatch, process.exitCode or the built
+      dist/cli.js, so "fails if any piece breaks" is bounded at the composition-root
+      boundary, with CI's `node dist/cli.js --version` a partial offset — a boundary the user
+      chose at d-003; (W2) the exit-code-2 arm is unexercised end to end, tracked as #79;
+      (W3) the Node 22/24 CI matrix legs are not observable locally, so AC-10 is inferred and
+      upgrades to a clean PASS once a CI run on the PR shows both legs green; (W4) two
+      info-level SUGGESTION rows remain, RR1-001 and RR1-002.
+    question: >-
+      Accept these warnings and mark the change completed, or hold it in `reviewing`?
+    options:
+      - id: accept
+        label: Accept the warnings and complete
+        description: >-
+          Marks the change `completed` at pass_with_warnings. The change is then ready for
+          the audit-history entry and a PR.
+        recommended: true
+      - id: fix_suggestions
+        label: Spend fix round 2 on RR1-001 and RR1-002 first
+        description: >-
+          Two small SUGGESTION rows; round 2 of 2 is unspent. RR1-001 (an unguarded rmSync in
+          the fixture's catch block) is a genuine but tiny inconsistency. Costs another
+          stage_approval and scoped re-review for info-level rows.
+      - id: hold
+        label: Hold in reviewing
+        description: Do not complete yet.
+    free_input_allowed: true
+    response:
+      selected_option_id: accept
+      responded_at: "2026-09-30T16:30:00Z"
+    created_at: "2026-09-30T16:00:00Z"
+    resolved_at: "2026-09-30T16:30:00Z"
+  - id: cp-012
+    type: phase_validation
+    stage: sddl-qa-review
+    summary: >-
+      Go-ahead for the final QA stage and for creating the R3-005 follow-up issue, asked
+      together after the scoped re-review closed the review at pass_with_warnings with zero
+      open severe findings. sddl-qa-review in FINAL mode re-verifies the 12 acceptance
+      criteria against the amended spec and is the only stage permitted to set `completed` —
+      and only on a clean `pass`; `pass_with_warnings` keeps the change in `reviewing` and
+      requires a final_review checkpoint. The issue is an outward-facing GitHub write.
+    question: Launch the final QA and create the R3-005 follow-up issue?
+    options:
+      - id: both
+        label: Launch final QA and create the issue
+        description: Both, as offered.
+        recommended: true
+      - id: qa_only
+        label: Final QA only
+        description: Leave the issue for later.
+    free_input_allowed: true
+    response:
+      selected_option_id: both
+      free_text: 'User: "si" — a bare yes to the two-part question "lanzo el QA final, y creo el issue de R3-005?".'
+      responded_at: "2026-09-30T15:00:00Z"
+    created_at: "2026-09-30T15:00:00Z"
+    resolved_at: "2026-09-30T15:00:00Z"
+  - id: cp-011
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-7, fix round 1 (round 1 of a maximum 2). Scope: ten ledger ids —
+      R3-001 (CRITICAL, blocking) plus R3-002, R3-003, R3-004, R4-001, R4-002, R1-001,
+      R2-001, R2-002 and R3-006 (per d-013). Files: `e2e/review-flow.test.ts`,
+      `e2e/support/hermetic-git.ts`, `vitest.config.ts` and nothing else; zero net `src/**`,
+      no third test, no new dependency. Validation is by mutation, not by a green run: M4
+      (`mergeBase` -> `baseRef`) and M5 (drop `renderDiff`) are mandatory and M8 is mandatory
+      because R3-006 was taken, each applied alone, driven RED with the exact failing
+      assertion recorded, reverted, revert proven with an empty `git diff`. M4 carries a stop
+      rule: if it stays green the fixture divergence did not land.
+    question: Approve ST-7, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-7
+        description: >-
+          Three test/config files; the only `src/**` touches are mutations applied and
+          reverted inside the stage.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-6 and the review ledger are committed and pushed.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before touching the fixture.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      free_text: 'User: "si continua" — an explicit reply to the ST-7 stage_approval question.'
+      responded_at: "2026-09-30T09:00:00Z"
+    created_at: "2026-09-30T09:00:00Z"
+    resolved_at: "2026-09-30T09:00:00Z"
+  - id: cp-010
+    type: scope_change
+    stage: orchestrator
+    summary: >-
+      Level-B left open by plan Amendment 2: whether R3-006 joins ST-7. It is not a flag
+      removal — the fixture clones an empty bare origin and pushes afterwards, so
+      `refs/remotes/origin/HEAD` is never set, `git symbolic-ref` exits 128 and `git-cli`
+      maps it to GitNoDefaultBranchError; dropping `--base-branch` today makes `repo add`
+      FAIL. Including it therefore also means adding `git remote set-head origin main` to the
+      fixture.
+    question: Does R3-006 join ST-7, or become a follow-up?
+    options:
+      - id: include
+        label: Include in ST-7
+        description: >-
+          Drop `--base-branch` from the happy path only (the negative keeps it, so both arms
+          stay exercised), plus the `set-head` prerequisite, under a STOP rule.
+        recommended: true
+      - id: followup
+        label: Leave as follow-up
+        description: ST-7 stays at the CRITICAL plus the eight confirmed info rows.
+    free_input_allowed: true
+    response:
+      selected_option_id: include
+      responded_at: "2026-09-26T09:00:00Z"
+    created_at: "2026-09-26T09:00:00Z"
+    resolved_at: "2026-09-26T09:00:00Z"
+  - id: cp-009
+    type: review_gate
+    stage: orchestrator
+    summary: >-
+      The full-4r review returned `fail` on one open CRITICAL (R3-001: the diff and prompt
+      stages are unobserved, so an empty or wrongly-ranged diff passes both tests green).
+      Confirmed severe findings never trigger direct edits, so the fix route is the user's
+      call. R3-001 sits inside approved scope, so the suggested route is: rerun `sddl-plan`
+      to insert a fix stage seeded from the confirmed ledger id, then `stage_approval`, then
+      `sddl-executor`.
+    question: >-
+      Open the fix stage with R3-001 plus the cheap info rows, only the CRITICAL, or defer?
+    options:
+      - id: critical_plus_cheap
+        label: R3-001 plus the cheap info rows
+        description: >-
+          Fix the blocking finding and fold in the low-cost info rows while the stage is
+          open — the worktree leaf assertion, io.out assertions, the e2e testTimeout, the
+          fixture try/catch, per-root teardown isolation, the git env hardening and the two
+          readability rows.
+        recommended: true
+      - id: critical_only
+        label: Only the CRITICAL
+        description: Narrowest possible fix; info rows become follow-up issues.
+      - id: defer
+        label: Defer the fix
+        description: >-
+          Not recommended — it would ship the safety net with a demonstrated hole in the
+          exact claim the story makes.
+    free_input_allowed: true
+    response:
+      selected_option_id: critical_plus_cheap
+      free_text: >-
+        User answered "si" to the recommended option, which was named first in the question.
+        The orchestrator adopted that reading and said so explicitly, noting the scope can
+        still be narrowed at the ST-7 stage_approval before any code is touched.
+      responded_at: "2026-09-25T10:00:00Z"
+    created_at: "2026-09-25T10:00:00Z"
+    resolved_at: "2026-09-25T10:00:00Z"
+  - id: cp-008
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-6, the final stage. It closes the change, so anything left unproven
+      there ships. Scope: no code change beyond whatever the gate itself demands. Proves the
+      full gate — `npm run check` clean, `npm test` = the previous 1037 plus the 2 new e2e
+      tests with no pre-existing suite modified, `npm run build`, `node dist/cli.js
+      --version` — and records that AC-10 needs no workflow edit, since CI's `test` job
+      already runs every vitest project across the Node 22/24 matrix. Also owes the AC-8
+      spot check (risk-e7h1-009): introduce a deliberate type error under `e2e/`, confirm
+      `tsc --noEmit` FAILS, revert, re-run clean. That spot check is the only evidence the
+      widened gate actually rejects a bad file there rather than sitting inert.
+    question: Approve ST-6, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-6
+        description: Final verification stage; closes the change.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-5b are committed and pushed; the gate stays unproven end to end.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before the closeout stage.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T19:05:00Z"
+    created_at: "2026-09-05T19:05:00Z"
+    resolved_at: "2026-09-05T19:05:00Z"
+  - id: cp-007
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Level-B decision on risk-e7h1-011 plus the stage approval it implies. The user chose to
+      CLOSE the M2 blind spot rather than accept and document it, inserting a new stage
+      ST-5b between ST-5 and ST-6. Scope: two assertions added to `e2e/review-flow.test.ts`
+      (the worktree root actually used, and that `clones/` stays untouched), then M2
+      re-applied to prove the suite NOW goes red, reverted, revert proven empty. No net
+      production change. Validation: e2e 2/2 green with the new assertions, M2 -> RED with
+      the exact failing assertion recorded, revert -> green, `git diff
+      src/main/container.ts` empty, `npm run check` clean.
+    question: >-
+      Close the M2 blind spot with two assertions and an M2 re-run, accept and document the
+      gap, or also investigate the underlying worktreesDir/clonesDir behavior?
+    options:
+      - id: close
+        label: Close it — 2 assertions + M2 re-run
+        description: >-
+          Small stage; M2 is a ready-made proof and it closes the only demonstrated hole in
+          the story's headline claim.
+        recommended: true
+      - id: accept
+        label: Accept and document the gap
+        description: >-
+          AC-11 is already satisfied by M1 and M3 on two layers; record the limitation and
+          open a follow-up issue.
+      - id: investigate
+        label: Close it and also investigate the underlying behavior
+        description: >-
+          Same as close, plus a broader worktreesDir/clonesDir investigation — new scope,
+          probably its own issue.
+    free_input_allowed: true
+    response:
+      selected_option_id: close
+      responded_at: "2026-09-05T18:45:00Z"
+    created_at: "2026-09-05T18:40:00Z"
+    resolved_at: "2026-09-05T18:45:00Z"
+  - id: cp-006
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-5, the AC-11 mutation verification — the stage that converts "the suite
+      is green" into "the suite provably goes red when the flow breaks". Scope: NO net file
+      change. Design's mutation points are applied ONE AT A TIME, never stacked: M1
+      (`run-store-fs.ts`: `metadata.json` -> `meta.json`), M2 (`createWiringGraph`:
+      `worktreesDir: paths.clonesDir`), optionally M3 (`resolveReviewExitCode` returns 0 for
+      `request-changes`). Per mutation: `npx vitest run --project e2e` must go RED and the
+      exact failing assertion is recorded; `git checkout -- <file>`; re-run green. At least
+      two mutations on different layers are required. This stage temporarily edits
+      production files under `src/`, which is why it carries its own approval even though it
+      leaves no net change.
+      After the last revert the revert itself must be PROVEN, not assumed: `git status
+      --porcelain` shows only ST-1..ST-4's intended files, and per-file diffs on
+      `run-store-fs.ts`, `container.ts` and the exit-code module show no mutation residue. A
+      stray mutation left in the tree is a defect, not a nit.
+    question: Approve ST-5, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-5
+        description: >-
+          Temporary mutations in src/, applied one at a time and each reverted with the
+          revert proven; no net file change.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-4 are committed and pushed; AC-11 stays unproven.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before mutating anything.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T18:20:00Z"
+    created_at: "2026-09-05T18:20:00Z"
+    resolved_at: "2026-09-05T18:20:00Z"
+  - id: cp-005
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-4, the negative case (S5; AC-6, AC-12). Scope: ONE new test appended to
+      the existing `e2e/review-flow.test.ts` — no new file, no existing source file touched.
+      The FakeEngine is scripted to `VERDICT: request-changes`, exit code 1 is asserted (the
+      configurable default from [E6.F1.H2]), and the same three persisted files are asserted
+      as in the happy path. Validation: `npx vitest run --project e2e` with 2 tests green,
+      then `npm run check` clean. The Amendment 1 constraints and the ST-3 storage-key
+      correction (`runs/acme__widget/<ts>/`, `metadata.json#repo` = `acme__widget`) bind
+      here too.
+    question: Approve ST-4, pause, or revise the plan first?
+    options:
+      - id: approve
+        label: Approve ST-4
+        description: One added test in the existing e2e file; no source file modified.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1..ST-3 are committed and pushed; nothing is lost.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before writing the negative case.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T18:00:00Z"
+    created_at: "2026-09-05T18:00:00Z"
+    resolved_at: "2026-09-05T18:00:00Z"
+  - id: cp-004
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-3, the first stage that actually exercises the ST-1 seam. Scope: two NEW
+      files, no existing file modified — `e2e/support/hermetic-git.ts` (D-5:
+      `createHermeticRepo()` + `HERMETIC_GIT_ENV`, self-contained, origin comment pointing at
+      `src/adapters/driven/git/__test__/git-cli.test.ts`, deliberately not a `.test.ts` file)
+      and `e2e/review-flow.test.ts` with the happy-path test: `repo add` -> `repo list` ->
+      `review` -> `runs list` -> `runs show`, each an argv array through
+      `createCli(createCliDeps({ env: { SENTINEL_HOME: <tmp> }, homeDir: <dead tmp>,
+      engineOverride: fake })).run(argv)`, with an unconditional afterEach removing both temp
+      roots (D-6). Covers S1-S4 and AC-1..AC-6, AC-12. Validation: `npx vitest run --project
+      e2e` green with >0 tests (AC-1), then `npm run check` clean, then a re-run to confirm
+      determinism. Amendment 1 binds the assertions: `validations/` asserted ABSENT,
+      `repos.yaml` only (never `config.yaml`), run identity by directory basename vs the id
+      `runs list` prints, and never `metadata.json#engine`.
+    question: >-
+      Approve ST-3 so the executor may create the two e2e files, pause, or revise the plan?
+    options:
+      - id: approve
+        label: Approve ST-3
+        description: Two new files under e2e/; no existing source file is modified.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: ST-1 and ST-2 are already committed and pushed; nothing is lost.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before writing the suite.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:38:00Z"
+    created_at: "2026-09-05T17:38:00Z"
+    resolved_at: "2026-09-05T17:38:00Z"
+  - id: cp-003
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Gate before ST-2, which brings `e2e/` into the quality gate per d-004 and AC-8.
+      Scope: `tsconfig.json#include` -> ["src", "e2e"] and `biome.json#files.includes` +=
+      "e2e/**". `.dependency-cruiser.cjs` and `package.json#scripts.check` stay UNCHANGED
+      (non-goal N-2). Validation: `npm run check` alone — no runtime change, so no `npm
+      test` needed. Deliberately run BEFORE any e2e/ file exists so any new finding is
+      attributable to the config edit and nothing else (risk-e7h1-008); a surfaced
+      pre-existing finding or a tsup/vitest type-resolution interaction is a STOP, not a
+      widened edit.
+    question: >-
+      Approve ST-2 so the executor may modify tsconfig.json and biome.json, pause, or revise
+      the plan first?
+    options:
+      - id: approve
+        label: Approve ST-2
+        description: Two config edits, validated with `npm run check`; any surprise is a STOP.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: No further code touched; ST-1 is already committed and pushed.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan before executing ST-2.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:25:00Z"
+    created_at: "2026-09-05T17:25:00Z"
+    resolved_at: "2026-09-05T17:25:00Z"
+  - id: cp-002
+    type: stage_approval
+    stage: orchestrator
+    summary: >-
+      Mandatory gate immediately before the first code-touching stage. ST-1 adds the
+      optional, test-only ReviewEngine seam (D-1/D-2/D-3) and is the ONLY production change
+      in the whole story. Scope: `src/main/container.ts` only — `readonly engineOverride?:
+      ReviewEngine` on CliDepsOptions (@internal TSDoc) and on the private
+      WiringGraphOptions, one `??` at the engine site, one comment naming d-003 and AC-7.
+      Planned validation: `npm run check` clean, `npm test` still 1037/1037 across 49 files,
+      `git diff src/main/container.ts` limited to the three documented edits, and an EMPTY
+      `git diff src/core/repos/ports/config-schemas.ts` (AC-7).
+    question: >-
+      Approve ST-1 so the executor may modify src/main/container.ts, pause here, or revise
+      the plan first?
+    options:
+      - id: approve
+        label: Approve ST-1
+        description: >-
+          Executor applies the three edits and validates with the full gate; any deviation
+          from the declared scope is a STOP, not an improvisation.
+        recommended: true
+      - id: pause
+        label: Pause here
+        description: No code touched; the change stays `planned` with everything pushed.
+      - id: revise
+        label: Revise the plan first
+        description: Return to sddl-plan with feedback before executing.
+    free_input_allowed: true
+    response:
+      selected_option_id: approve
+      responded_at: "2026-09-05T17:10:00Z"
+    created_at: "2026-09-05T17:08:00Z"
+    resolved_at: "2026-09-05T17:10:00Z"
+  - id: cp-001
+    type: phase_validation
+    stage: sddl-proposal
+    summary: >-
+      The proposal returned two B-level questions that shape the spec's acceptance criteria.
+      Q1 decides how the smoke run reaches the FakeEngine, and with it how much of the real
+      binary the "fails if any piece of the flow breaks" criterion actually covers. Q2 decides
+      whether the new top-level `e2e/` directory joins the quality gate, which today is blind
+      to it (tsconfig `include` is `["src"]`, biome uses an explicit allowlist, and `check`
+      runs `depcruise src`).
+    question: >-
+      Q1: which route reaches the FakeEngine — (a) an optional ReviewEngine override in
+      WiringGraphOptions used only by the e2e harness, (b) a `fake` member in EngineNameSchema
+      gated by an env var, or (c) in-process against createCliDeps? Q2: does `e2e/` join
+      tsconfig/biome (and does depcruise stay scoped to `src`)?
+    free_input_allowed: true
+    response:
+      free_text: >-
+        Q1 = (a) optional ReviewEngine override in WiringGraphOptions, test-only.
+        Q2 = add e2e to tsconfig#include and biome.json#files.includes; depcruise stays
+        scoped to `src`.
+      responded_at: "2026-09-05T16:25:00Z"
+    created_at: "2026-09-05T16:18:00Z"
+    resolved_at: "2026-09-05T16:25:00Z"
+decisions:
+  - id: d-001
+    checkpoint_id: session-init
+    free_text: interactive
+    rationale: >-
+      Session execution mode, asked once per the orchestrator contract's Session
+      Initialization rule and cached for the session. Author: user. The user chose
+      `interactive` over `auto` on the recommendation that this change carries a real
+      design decision (the engine seam, risk-e7h1-001) worth seeing before it is designed.
+    recorded_at: "2026-09-05T16:05:00Z"
+  - id: d-016
+    checkpoint_id: cp-013
+    selected_option_id: accept
+    rationale: >-
+      The user accepted the four non-blocking warnings of the final QA (N-1, #79, the
+      unobserved CI matrix legs, and the RR1-001/RR1-002 SUGGESTION rows) and chose to
+      complete the change at pass_with_warnings, over spending fix round 2 on two info-level
+      rows and over holding in `reviewing`. Fix round 2 of 2 stays unspent. AC-10 remains
+      inferred until a CI run on the PR shows both Node 22 and 24 legs green. Level B.
+      Author: user (claude recommended acceptance).
+    recorded_at: "2026-09-30T16:30:00Z"
+  - id: d-015
+    checkpoint_id: cp-012
+    selected_option_id: both
+    rationale: >-
+      The user answered a bare "si" to a two-part question, and the orchestrator read it as
+      YES to both (final QA and the R3-005 issue) — the natural reading, since it was a
+      single compound question with no option singled out. Stated explicitly here rather than
+      assumed silently. Author: user.
+    recorded_at: "2026-09-30T15:00:00Z"
+  - id: d-014
+    checkpoint_id: cp-011
+    selected_option_id: approve
+    rationale: >-
+      ST-7 approved as its own stage_approval, distinct from the earlier review-gate answer
+      (d-012 chose the fix ROUTE; this approves the STAGE). Approval covers ST-7 only and
+      includes the M8 mutation because R3-006 was taken under d-013. After it: a scoped
+      re-review over the fix delta only, then sddl-qa-review in final mode. Author: user.
+    recorded_at: "2026-09-30T09:00:00Z"
+  - id: d-013
+    checkpoint_id: cp-010
+    selected_option_id: include
+    rationale: >-
+      R3-006 joins ST-7. The deciding argument: it is the SAME SPECIES as R3-001 — an
+      assertion that hands back the test's own input and therefore proves nothing — and
+      fixing the species while leaving a known instance in the same file is the weaker
+      outcome. Marginal cost is one git call plus two argv elements, since the fixture is
+      already being edited for the divergent commit (A-1). It also gains a real mutation
+      proof (M8) that the current shape cannot have. Bounded by a STOP rule: if default-branch
+      detection misbehaves, restore the flag and route R3-006 out rather than debugging git
+      plumbing inside a fix round — an info row must never put the CRITICAL's fix at risk.
+      Level B. Author: user (claude recommended inclusion).
+    recorded_at: "2026-09-26T09:00:00Z"
+  - id: d-012
+    checkpoint_id: cp-009
+    selected_option_id: critical_plus_cheap
+    rationale: >-
+      Fix round 1 covers R3-001 (blocking) plus the cheap info rows. Deferring was rejected
+      because it would ship the net with a demonstrated counter-example to the story's own
+      headline claim; critical-only was available but the info rows are a handful of lines
+      each and re-opening the file later costs more than folding them in now. One caveat the
+      plan must handle rather than silently absorb: R3-005 (an exit-code-2 test) would add a
+      THIRD test, which exceeds the spec's scoping of one happy path plus at most one
+      negative case — so it needs either a spec amendment or a follow-up issue, not a quiet
+      inclusion. Author: user (recommendation by claude; the answer was a bare "si" to the
+      first-listed recommended option, and the orchestrator stated its reading explicitly
+      rather than assuming silently).
+    recorded_at: "2026-09-25T10:00:00Z"
+  - id: d-011
+    checkpoint_id: cp-008
+    selected_option_id: approve
+    rationale: >-
+      ST-6 approved — the final execution stage. Author: user. Note for the record: approving
+      ST-6 is not the same as closing the change. Only `sddl-qa-review` in final mode may set
+      `completed`, and the deferred code review (d-006) still has to happen over the full
+      diff before this goes to a PR.
+    recorded_at: "2026-09-05T19:05:00Z"
+  - id: d-010
+    checkpoint_id: cp-007
+    selected_option_id: close
+    rationale: >-
+      Close the M2 blind spot: insert ST-5b adding two assertions (worktree root actually
+      used; `clones/` untouched) and re-run M2 to prove the suite goes red. Chosen over
+      accepting the gap, which was defensible since AC-11 is already met by M1 and M3 on two
+      layers, and over additionally investigating the underlying worktreesDir/clonesDir
+      behavior, which is scope outside [E7.F1.H1] and would deserve its own issue. The
+      deciding argument: the story's headline claim is "fails if any piece of the flow
+      breaks", and shipping a demonstrated counter-example to that claim inside the very
+      story that makes it would be the worst of both worlds. M2 is already a ready-made
+      proof, so the cost is one small stage. Level B. Author: user (claude recommended this
+      option). This checkpoint doubles as the stage_approval for ST-5b; ST-6 remains
+      unapproved.
+    recorded_at: "2026-09-05T18:45:00Z"
+  - id: d-009
+    checkpoint_id: cp-006
+    selected_option_id: approve
+    rationale: >-
+      ST-5 approved. This is the only stage that deliberately edits production files under
+      `src/`, and the only evidence that will ever exist for AC-11: a test that cannot go red
+      is decoration, and until this runs the suite's green is unfalsified. The approval
+      explicitly covers temporary mutation AND requires the revert to be proven rather than
+      assumed. ST-6 remains unapproved. Author: user.
+    recorded_at: "2026-09-05T18:20:00Z"
+  - id: d-008
+    checkpoint_id: cp-005
+    selected_option_id: approve
+    rationale: >-
+      ST-4 approved. ST-5 and ST-6 remain unapproved. Author: user.
+    recorded_at: "2026-09-05T18:00:00Z"
+  - id: d-007
+    checkpoint_id: cp-004
+    selected_option_id: approve
+    rationale: >-
+      ST-3 approved. This is the stage where the ST-1 seam is first exercised at runtime,
+      which also makes it the first real evidence about whether the seam's design holds
+      (risk-e7h1-007 noted the seam was review-verified only). ST-4..ST-6 remain unapproved.
+      Author: user.
+    recorded_at: "2026-09-05T17:38:00Z"
+  - id: d-006
+    checkpoint_id: cp-003
+    selected_option_id: approve
+    rationale: >-
+      ST-2 approved. The user chose to proceed to ST-2 over running a review of the ST-1
+      diff now, which the orchestrator had recommended: the review budget is two fix rounds
+      per lineage, and spending one on a diff whose only behavioral change is a single `??`
+      would waste it — the review is far more informative once the seam AND the suite that
+      exercises it both exist. The executor's alternative recommendation (sddl-qa-review in
+      stage mode before ST-2) was presented and not taken. Review is therefore deferred, not
+      skipped. Author: user (recommendation by claude).
+    recorded_at: "2026-09-05T17:25:00Z"
+  - id: d-005
+    checkpoint_id: cp-002
+    selected_option_id: approve
+    rationale: >-
+      Plan approved and ST-1 approved for execution. This is the mandatory stage_approval
+      gate that precedes any code-touching stage; it is required in every execution mode and
+      is NOT covered by the earlier interactive-mode routing confirmations. Approval covers
+      ST-1 only — ST-2 through ST-6 each need their own gate. Author: user (options and
+      recommendation presented by claude).
+    recorded_at: "2026-09-05T17:10:00Z"
+  - id: d-002
+    checkpoint_id: bootstrap-preflight
+    free_text: surgical-refresh
+    rationale: >-
+      Bootstrap preflight read `stale`: `config.yaml`'s own recorded refresh trigger was
+      "E6 closed (E7 entry)", which is exactly this routing point. Refreshed surgically
+      by the orchestrator (not a full `sddl-init` run) against verified repo reality at
+      `main` @ cbc878b — check/test/build re-run from a clean `npm ci` (1037/49 tests,
+      0 guard violations), `picocolors` recorded as ratified, `marked-terminal` dropped
+      as a pending recommendation, and the missing `src/adapters/driving/tui/__test__`
+      root added to observed paths. Preflight is now `ready`, so code-touching execution
+      is not gated on stale bootstrap. Level A (technical, reversible, aligned with the
+      setup doc). Author: claude.
+    recorded_at: "2026-09-05T16:00:00Z"
+  - id: d-003
+    checkpoint_id: cp-001
+    free_text: "Q1 = route (a)"
+    rationale: >-
+      The smoke run reaches the FakeEngine through an OPTIONAL `ReviewEngine` override in
+      `WiringGraphOptions`, typed as optional and documented as test-only. Chosen over route
+      (b) (a `fake` member in `EngineNameSchema`, gated by an env var) and route (c)
+      (in-process against `createCliDeps`). Rationale: (b) is the only route that covers
+      `dist/cli.js` as a real subprocess, but it puts a test engine into the user-facing
+      schema — `sentinel review --engine` validation and help, `config.yaml`'s
+      `defaultEngine`, and persisted run metadata all consume `EngineNameSchema`, so an env
+      gate narrows the exposure without removing it. Surface purity won. The cost is
+      explicit and must be written into the spec, not implied: `src/main/cli.ts` (argv
+      dispatch) and the built bundle stay outside the smoke's coverage, partially offset by
+      the existing CI `build` job running `node dist/cli.js --version`. Level B. Author:
+      user (options and recommendation presented by claude; claude recommended (a)).
+    recorded_at: "2026-09-05T16:25:00Z"
+  - id: d-004
+    checkpoint_id: cp-001
+    free_text: "Q2 = tsconfig + biome yes, depcruise scoped to src"
+    rationale: >-
+      `e2e` joins `tsconfig.json#include` and `biome.json#files.includes` so the smoke suite
+      is typechecked and linted like the rest of the repo, closing risk-e7h1-003. `depcruise`
+      stays scoped to `src`: the architecture guards are the core-extraction guarantee, and
+      `e2e/` is neither shipped (`package.json#files` is dist/harnesses/skills) nor subject
+      to the inward-dependency rule — it legitimately reaches into both `src/main` and
+      `src/adapters` at once. The exclusion is recorded as a deliberate decision rather than
+      left as an accident of scoping. Level B (repo structure + quality gate). Author: user
+      (claude recommended this option).
+    recorded_at: "2026-09-05T16:25:00Z"
+open_risks:
+  - id: risk-e7h1-001
+    summary: >-
+      The FakeEngine that story [E7.F1.H1] names as the e2e driver is unreachable through the
+      CLI: `EngineNameSchema` admits only `claude-code` and `opencode`, `createEngine` is a
+      closed lookup over those two, and the composition root exposes no `ReviewEngine`
+      injection seam. Every route to the story's acceptance criteria therefore touches
+      production code or trades away coverage of the real built binary. This must be settled
+      as an explicit decision at spec/design, not improvised at execution.
+    severity: medium
+    status: closed — resolved by decision d-003 (route (a)); residual is N-1, tracked as a known limitation
+  - id: risk-e7h1-002
+    summary: >-
+      The e2e test must run in CI (an explicit acceptance criterion) on ubuntu-latest across
+      the Node 22/24 matrix, which means it must create a temporary git repository with a
+      deterministic identity and no dependency on the developer's global git config
+      (`user.name`/`user.email`, `init.defaultBranch`, commit signing, `core.autocrlf`). The
+      existing git adapter suites already face this; whether they solved it reusably is
+      unverified and is proposal/design evidence, not an assumption to carry forward.
+    severity: low
+    status: closed — the hermetic-git recipe was restated in e2e/ and is CI-deterministic
+  - id: risk-e7h1-008
+    summary: >-
+      RETIRED at ST-2. The isolation experiment ran with no `e2e/` file present and `npm run
+      check` came back byte-identical to the baseline: no pre-existing finding, no
+      tsup/vitest type-resolution interaction, and `tsc` is silent about an `include` entry
+      that matches nothing. Any `check` failure in ST-3/ST-4 is therefore attributable to
+      the new test files.
+    severity: low
+    status: retired — the ST-2 gate-interaction risk, retired at ST-2 (the ST-5b log entry's use of this id is a typo for -011)
+  - id: risk-e7h1-011
+    summary: >-
+      CLOSED at ST-5b, closure independently re-verified by the orchestrator: with the two
+      new assertions in place, M2 turns the suite red (`ENOENT ... scandir
+      '<tmp>/worktrees'`). Originally a DEMONSTRATED BLIND SPOT found by ST-5's M2, and the
+      single most important finding of this story. Handing `runReview` `worktreesDir: paths.clonesDir` does NOT turn the smoke
+      red — 2 of 2 still pass. The mutation is live, not dead code
+      (`container.ts:256` -> `run-review.ts:402` -> `create-review-worktree.ts`, which builds
+      `<worktreesDir>/<repoBasename>/<label>-<ts>`), so the worktree really is created in the
+      wrong tree and the suite notices nothing. It is unobservable because the fixture
+      registers with `--local-path`, leaving `clonesDir` otherwise empty, and the suite
+      asserts nothing about where the worktree lived or that `clones/` stays untouched.
+      This matters in production, not just in the test: `listOrphanWorktrees` scans
+      `worktreesDir`, so a worktree created outside it is invisible to orphan cleanup, and
+      `<clonesDir>/<repoBasename>/...` shares a tree with managed clones.
+      Level B decision owed before ST-6, because ST-6 CLOSES the change and a gap accepted
+      silently there ships: (a) accept and document the gap for the MVP, or (b) add two
+      assertions to `e2e/review-flow.test.ts` — the worktree root actually used, and
+      `clones/` untouched — and re-run M2 to prove it red. Adding them was outside ST-5's
+      "no net file change" scope, so it was correctly not done there.
+    severity: medium
+    status: closed — the M2 worktree-location blind spot, found by ST-5 and closed by ST-5b
+  - id: risk-e7h1-010
+    summary: >-
+      Two more artifact-vs-code corrections, found by ST-3 and independently re-verified by
+      the orchestrator against the source. Both make the assertions STRONGER and neither
+      changes scope: (1) runs do NOT land under `<SENTINEL_HOME>/runs/acme/widget/` as
+      design D-7 claims — `persistRun` maps the alias through `toRunStorageKey`
+      (`owner/repo` -> `owner__repo`) before handing the record to the store, because
+      `RunStore` needs a single path segment and its schemas reject `/`, so the real path is
+      `runs/acme__widget/<ts>/`; (2) `metadata.json#repo` therefore persists as
+      `acme__widget`, not the alias the plan expected — asserting the alias there would have
+      failed. The alias/key split is deliberate and both halves are now covered end to end:
+      the `runs list`/`runs show` legs still take the alias on argv and get the alias echoed
+      back. Routed to sddl-design as its own Amendment 1; D-7's wrong path must not stay on
+      the record to mislead the next reader.
+    severity: low
+    status: closed — design Amendment 1 corrected D-7's run path
+  - id: risk-e7h1-015
+    summary: >-
+      DISCOVERED AT PR TIME, NOT COVERED. The user's acceptance of `[E6.F2.H2]` (2026-08-30)
+      directed that `risk-e6f2h2-014` and review row `R4-002` be carried into this story, and
+      the owner's skill-catalog on `main` repeats it ("must carry `risk-e6f2h2-014` plus
+      review row R4-002"). The risk: the TUI now WAITS after a finished review, and on stdin
+      EOF the post-run `confirm` never settles, so the process exits 13 with a raw Node
+      warning over the digest and loses the intended exit code — with no process-level test
+      anywhere. This change never saw that directive: it lives in the prior change's artifacts
+      and was not read at proposal time (a process gap, not a decision). Its smoke is
+      IN-PROCESS by design (non-goal N-1) — it never touches the TUI, a real TTY, real stdin,
+      `src/main/cli.ts` or `dist/cli.js` — so it CANNOT catch this defect. Disclosed at the
+      top of PR #80. Decision owed by the user: cover it in this PR (a process-level test, a
+      different shape from the in-process smoke) or file a follow-up issue.
+    severity: medium
+    status: open — DECIDED to merge PR #80 as is and track the risk as follow-up issue #82 (https://github.com/nico0695/sentinel-kit/issues/82); stays open until that issue lands
+  - id: risk-e7h1-014
+    summary: >-
+      R3-005 is a KNOWN, ACCEPTED coverage gap with a tracked owner: the exit-code-2 arm (the
+      whole non-`ok` half of the review exit-code contract) is unexercised end to end, so
+      `resolveReviewExitCode` could return 0 for a failed or ambiguous run without either e2e
+      test noticing. Kept out of the story on purpose — a third scenario breaches AC-12 /
+      N-3. Mitigated in part: `exit-code.test.ts` pins every non-`ok` state to 2 at unit
+      level, so only the composition wiring is uncovered. Tracked as GitHub issue #79
+      (https://github.com/nico0695/sentinel-kit/issues/79), created under d-015.
+    severity: low
+    status: open — R3-005, tracked as GitHub issue #79; accepted as a known gap for this story
+  - id: risk-e7h1-013
+    summary: >-
+      MATERIAL, raised at plan time by Amendment 2 and independently re-verified by the
+      orchestrator against `e2e/support/hermetic-git.ts:81-115`: the fixture commits once on
+      `main`, pushes, cuts the feature branch from that tip and NEVER advances `main`. So
+      `merge-base(main, feature)` IS the tip of `main`, and mutating
+      `compute-review-diff.ts` from `from: mergeBase` to `from: request.baseRef` yields a
+      byte-identical diff. Any natural assertion on `metadata.diff` or `prompt.md` would stay
+      green under it — meaning ST-7 could produce a fix that looks done and provably is not.
+      ST-7 must add a commit to `main` after the feature branch is cut (A-1), and M4 carries a
+      stop rule: if M4 stays green, the fixture divergence did not land. This is the single
+      thing the scoped re-review must confirm.
+      CLOSED: the divergent commit landed and M4 goes RED (review-flow.test.ts:205), verified
+      empirically by the orchestrator AND independently by the scoped re-reviewer's
+      code-level trace of the fixture.
+    severity: medium
+    status: closed — verified empirically by the orchestrator and by the scoped re-reviewer's fixture trace
+  - id: risk-e7h1-012
+    summary: >-
+      Documentation-only, non-blocking, self-reported by ST-6: the ST-5b entry in
+      `execution-log.md` labels the M2 blind-spot closure `risk-e7h1-008` in three places,
+      while `plan.md` Amendment 1 and this file register it as `risk-e7h1-011`
+      (`risk-e7h1-008` is the ST-2 gate-interaction risk, retired at ST-2). The evidence and
+      the conclusion are correct; only the id is mistyped. Execution-log entries are
+      append-only, so ST-6 flagged it in its own entry rather than rewriting history.
+      sddl-qa-review should reconcile the ids rather than leave two numbering schemes on the
+      record.
+    severity: low
+    status: closed — the id mismatch is reconciled authoritatively in qa-report.md; the append-only execution log is left as written
+  - id: risk-e7h1-009
+    summary: >-
+      Raised by ST-2: AC-8 is now CONFIGURED but not DEMONSTRATED. The widened gate is inert
+      while `e2e/` is empty — nothing yet proves it would reject a bad file there. ST-6's
+      spot check (deliberate type error in `e2e/` -> `tsc --noEmit` fails -> revert -> clean)
+      is the ONLY evidence for AC-8 and must not be dropped from ST-6 for being fiddly.
+    severity: medium
+    status: closed — AC-8 demonstrated by the ST-6 deliberate-type-error spot check
+  - id: risk-e7h1-006
+    summary: >-
+      Three spec assertions were contradicted by code evidence found at design time, all
+      A-level and none a scope change: (A-1) `validations/` is written only when
+      `validationOutput` is non-empty (`run-store-fs.ts:237-240`) and `repo add` has no
+      `--validations` flag, so under the `quick` harness it never exists and the smoke must
+      assert it ABSENT; (A-2) `<SENTINEL_HOME>/config.yaml` is never written by any CLI path,
+      so only `repos.yaml` may be asserted; (A-3) `serializeRunMetadata` emits no `id` field —
+      the run id IS the directory name, so AC-5 is met by matching the directory name against
+      what `runs list` prints. Routed back to sddl-spec as Amendment 1 so spec and design do
+      not contradict each other on the record.
+    severity: low
+    status: closed — absorbed by spec Amendment 1
+  - id: risk-e7h1-007
+    summary: >-
+      Two informational findings from design that the plan and QA must not lose: AC-7's
+      "existing wiring tests unmodified" clause is VACUOUS as written, because
+      `src/main/__test__/` holds only `paths.test.ts` — there is no container wiring test, so
+      the seam has to be verified by reading the diff; and `metadata.json#engine` will read
+      `claude-code` while the FakeEngine actually ran (the override interposes after name
+      resolution), so the smoke must never assert an engine name. Both folded into
+      Amendment 1.
+    severity: low
+    status: accepted — AC-7 is verified by reading the diff because no container wiring test exists; the PR #80 review independently raised the same gap, tracked as follow-up issue #81 (https://github.com/nico0695/sentinel-kit/issues/81)
+  - id: risk-e7h1-004
+    summary: >-
+      Raised by the spec stage (Q8, A-level, design-owned — no user input needed):
+      `WiringGraphOptions` alone is insufficient to carry the route-(a) engine override,
+      because the smoke calls `createCliDeps`, whose `CliDepsOptions` is a separate
+      interface (`src/main/container.ts:78-87`) that forwards into the graph. Design decides
+      whether to extend `CliDepsOptions` or restructure the forwarding.
+    severity: low
+    status: closed — settled by design D-1/D-2 (extend, do not restructure)
+  - id: risk-e7h1-005
+    summary: >-
+      Accepted consequence of d-003: a test-only seam now exists in production code
+      (`src/main/container.ts`). Mitigated by spec AC-7, which requires the
+      `EngineNameSchema` diff to be empty and the existing wiring tests to be unmodified,
+      so the seam cannot silently widen the user-facing surface.
+    severity: low
+    status: accepted — a test-only seam in production code, contained by AC-7 and verified by the final QA
+  - id: risk-e7h1-003
+    summary: >-
+      New, found by the proposal stage: a top-level `e2e/` directory is invisible to all three
+      quality-gate tools. `tsconfig.json` sets `"include": ["src"]`, `biome.json#files.includes`
+      is an explicit allowlist, and `npm run check` runs `depcruise src`. Only `vitest.config.ts`
+      already matches `e2e/**/*.test.ts`. Left unaddressed, the smoke suite would run unlinted
+      and untypechecked — the one directory in the repo outside the gate. Raised as Q2 and
+      RESOLVED by decision d-004: `e2e` joins tsconfig#include and biome.json#files.includes;
+      depcruise stays scoped to `src` deliberately.
+    severity: low
+    status: closed — resolved by decision d-004 (e2e joins tsconfig and biome); demonstrated by the ST-6 AC-8 spot check
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    Independent final QA. All 12 acceptance criteria re-verified against the amended spec:
+    ten PASS and two PASS-WITH-CAVEAT (AC-10, because no CI run is observable from here so
+    the Node 22/24 legs are inferred; AC-11, because of the recorded non-goal N-1). Real
+    command output: check clean (165 files, 107 modules), 1039/1039 across 50 files, build
+    OK, version 0.0.0, e2e 2/2. The QA re-ran mutation M2 itself — RED with
+    `ENOENT scandir '<tmp>/worktrees'` at review-flow.test.ts:266 — then reverted it with an
+    empty diff. Scope over e590a73~1..HEAD is exactly the six expected code files. Not a
+    clean pass because of four warnings: N-1 (the smoke does not exercise argv dispatch or
+    the built bundle — a user-accepted boundary, d-003, not a defect), the exit-code-2 arm
+    (#79), the unobserved CI matrix legs, and stale open_risks (now marked). Completion is
+    NOT set: a final_review checkpoint requires the user's explicit acceptance.
+  reported_at: "2026-09-30T16:00:00Z"
+  report_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/qa-report.md
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 1
+  counts:
+    confirmed: 1
+    suspect: 0
+    escalated: 0
+    info: 13
+  summary: >-
+    full-4r over the frozen target f5cd81f (490 changed lines put it over the 400-line
+    threshold). Four lenses, blind to each other, one exhaustive sweep each. ONE open
+    CRITICAL: R3-001 — the diff and prompt stages are unobserved, so an empty or
+    wrongly-ranged diff passes both tests green; four concrete surviving mutations named,
+    one of which destroys the merge-base PR semantics the PRD mandates. Deterministic, so
+    the refuter had no eligible candidate and the pass was correctly not run; the
+    orchestrator re-verified the claim directly instead (grep confirms `metadata.diff` is
+    never read, `prompt.md` appears only in two `.length` assertions, and run-layout.ts
+    already persists the diff metadata the test could assert). 11 info rows after merging
+    three claims that more than one lens found independently. The verdict is a hole in the
+    safety net, NOT a product defect — which is precisely the failure mode this story
+    exists to prevent. UPDATE after fix round 1 (ST-7) and the scoped re-review: R3-001 is
+    VERIFIED closed — the re-reviewer independently traced the fixture (merge-base resolves
+    to the seed commit while main sits one commit ahead, so the mergeBase -> baseRef
+    mutation yields a two-file diff and both the fileCount and paired unrelated.ts
+    assertions go red), agreeing with the orchestrator's own empirical M4 run. All ten fix
+    ids closed, R3-005 correctly not added. Two new SUGGESTION rows (RR1-001, RR1-002), both
+    info. Zero open severe findings, so the verdict moves fail -> pass_with_warnings; round
+    2 is unspent. Original notes: notable clean: the d-003 containment holds (the seam is unreachable
+    from argv, config or env, and the package is bin-only), no escape path in the recursive
+    deletion, no argument injection, and the ST-5b assertions confirmed non-vacuous.
+  reported_at: "2026-09-30T14:00:00Z"
+  ledger_path: sdd-lite/openspec/changes/e7-f1-h1-e2e-smoke/review-ledger.md
+next_action:
+  kind: complete
+  target: pull-request
+  summary: >-
+    The change is completed at pass_with_warnings and its audit-history entry is written
+    (history/entries/2026-09-05-S30-e7-f1-h1-e2e-smoke.md, indexed as S30). Nothing remains
+    inside the sdd-lite change. Outside it: a PR titled `[E7.F1.H1] E2E smoke test of the
+    full flow` with `Closes #41` — opened ONLY on the user's explicit request; a CI run on it
+    upgrades AC-10 from inferred to demonstrated. The R3-005 follow-up is tracked as issue
+    #79.
+created_at: "2026-09-05T16:10:00Z"
+updated_at: "2026-10-02T12:00:00Z"

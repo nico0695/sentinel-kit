@@ -84,6 +84,26 @@ export interface CliDepsOptions {
   readonly homeDir?: string;
   /** Output sink; defaults to the real streams. */
   readonly io?: CliIo;
+  /**
+   * Test-only seam: the engine the `review` path runs with, bypassing
+   * `createEngine`'s name → constructor lookup.
+   *
+   * Injected by the `e2e/` smoke suite and by nothing else. It is deliberately
+   * unreachable from argv, config or the environment: `EngineNameSchema`
+   * (`src/core/repos/ports/config-schemas.ts`) is NOT extended with a fake
+   * name (d-003), so no user-facing surface can select a stub engine and the
+   * production engine catalogue stays exactly the two shipped adapters.
+   *
+   * Omitting the field must reproduce today's behavior byte for byte —
+   * per-invocation construction (property 2 above), the `default:` throw and
+   * the `SENTINEL_OPENCODE_MODEL` failure path all intact. That is the
+   * seam's acceptance condition (AC-7), and the reason it is applied with a
+   * `??` at the construction site rather than by teaching `createEngine`
+   * about overrides.
+   *
+   * @internal
+   */
+  readonly engineOverride?: ReviewEngine;
 }
 
 /**
@@ -144,6 +164,8 @@ function createEngine(
 interface WiringGraphOptions {
   readonly env?: PathEnv;
   readonly homeDir?: string;
+  /** Test-only; the contract lives on `CliDepsOptions.engineOverride`. */
+  readonly engineOverride?: ReviewEngine;
 }
 
 /**
@@ -227,7 +249,9 @@ function createWiringGraph(options: WiringGraphOptions) {
     runReview: (request) =>
       runReview(request, {
         git,
-        engine: createEngine(request.engineName, env),
+        // `??`, so an omitted override leaves today's call verbatim (AC-7);
+        // the fake engine is injected here and never named (d-003).
+        engine: options.engineOverride ?? createEngine(request.engineName, env),
         harnesses,
         worktreesDir: paths.worktreesDir,
         processRunner,

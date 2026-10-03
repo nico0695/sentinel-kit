@@ -67,8 +67,9 @@ stages:
       own stage_approval. Design Needed-Before-execution rows (F1-F7, V8 exit code) recorded in
       Approval Notes. F1-F7 filing, 4R, QA, history, PR are downstream orchestrator gates.
   sddl-executor:
-    status: in_progress
+    status: completed
     started_at: "2026-10-03T16:20:00Z"
+    completed_at: "2026-10-03T19:10:00Z"
     notes: >-
       S1 completed (stage_approval cp-008). verify-quickstart.sh (V1-V15) and verify-verdict.mts
       written in the change dir; execution-log.md started. Dry baseline against branch HEAD 5b5786e
@@ -106,6 +107,22 @@ stages:
       recorded in execution-log.md; no claim removed, none unsupported. No CF row contradicted;
       nothing outside the S4 scope touched; no git side effects. QA deferred (non-code stage). S5
       pending, needs its own stage_approval.
+      S5 completed (stage_approval cp-012), verification only; docs and scripts unchanged. Doc bash
+      blocks extracted by script (quick-start 15, guide 3, privacy 0, one command each) and mapped
+      to V-steps; every doc command is covered by verify-quickstart.sh or the literal replay (only the
+      install block and the interactive harness list/Ctrl+C step are not run literally: install by V2
+      with the local clone per plan, TUI structural). Full verify-quickstart.sh in sb-s5 (HEAD
+      9998593, VQ_HARNESS_DIR = four files extracted from the written guide): 79/79 PASS, engine
+      absence 10/10; literal replay with SENTINEL_HOME unset (default ~/.sentinel under a sandbox
+      HOME): 38/38 PASS, guard 12/12, includes quick-start section 6 after d-015 (opencode needs a
+      model id also via defaultEngine; defaultEngine honored). verify-verdict.mts ALL PASS (15).
+      Cross-doc: format rules, AC-3, AC-4, links all clean; AC-5 PASS-WITH-CAVEAT (run-folder file
+      list in quick-start 5 and privacy 3, prompt composition in guide 1 and privacy 1). Final
+      AC-1..AC-19 table in execution-log.md: no FAIL; AC-19 open until the PR step; not-verified-live
+      caveat row recorded. npm run check exit 0, npm test exit 0 (50 files, 1039 tests; npm ci run
+      in the repo to create git-ignored node_modules). git diff --stat origin/main...HEAD: 3 docs,
+      README, sdd-lite only. No contradiction, no blocker, no git side effects. Next: 4R review
+      triage, then final QA.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -530,6 +547,19 @@ decisions:
       Author: user.
     recorded_at: "2026-10-03T13:10:00Z"
 open_risks:
+  - id: risk-e7f2h1-010
+    summary: >-
+      S5 observation: npm install -g . from a directory installs a symlink to the cloned folder, so
+      deleting sentinel-kit breaks the sentinel command; quick start section 2 does not say to keep
+      it. No doc claim is false. Optional one-line note for triage; moot once the release (#45)
+      replaces the source install.
+    severity: low
+  - id: risk-e7f2h1-011
+    summary: >-
+      S5 observation (AC-5): two small overlaps between docs (run-folder file list in quick-start 5
+      and privacy 3; prompt composition in guide 1 and privacy 1), both from the approved outlines.
+      Triage in 4R whether to link instead of repeat.
+    severity: low
   - id: risk-e7f2h1-006
     summary: >-
       F5: factory output.md asks for the verdict on the first line but the parser reads only the
@@ -581,12 +611,12 @@ open_risks:
       --base-branch). To be filed as GitHub issues, not fixed in this PR.
     severity: low
 next_action:
-  kind: stage_approval
+  kind: review_output
   summary: >-
-    S4 complete (docs/privacy.md written with d-014 applied, README "Using sentinel" section
-    inserted, d-015 one-line fix applied; greps and link check clean, no contradictions). Next:
-    user approval of stage S5 (full verification against the three written docs, claim-to-CF table
-    and AC-1..AC-18 evidence, npm run check and npm test, git diff --stat blast radius), then
-    sddl-executor for S5 only.
+    S5 complete (verification and gate green: full verify 79/79, literal replay 38/38, verdict
+    15/15, npm run check and npm test exit 0, diff = 3 docs + README + sdd-lite only; AC-1..AC-18
+    PASS with AC-5 caveat, AC-19 open at PR step). Next: orchestrator runs 4R review of the frozen
+    diff and triages findings (including risk-e7f2h1-010 and -011), then final sddl-qa-review
+    (must disclose the not-verified-live gap, d-006), then history entry, F1-F7 filing and the PR.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T18:30:00Z"
+updated_at: "2026-10-03T19:10:00Z"

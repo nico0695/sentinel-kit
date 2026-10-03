@@ -8,7 +8,7 @@
 | S2 | `docs/quick-start.md` | completed (pending next approval) | cp-009 (user, 2026-10-03T16:40:00Z) | doc written; V1-V15 green 79/79; doc commands replayed literally; no contradictions |
 | S3 | `docs/build-your-own-harness.md` | completed (pending next approval) | cp-010 (user, 2026-10-03T17:20:00Z) | doc written; V4/V11/V12/V13/V15 green 50/50 from the guide's literal files; verdict check ALL PASS; no contradictions |
 | S4 | `docs/privacy.md` + README section | completed (pending next approval) | cp-011 (user, 2026-10-03T18:00:00Z) | privacy.md written (d-014 applied), README section inserted, d-015 one-line fix applied; all S4 greps clean; no contradictions |
-| S5 | Full verification + gate | pending | requires its own stage_approval | |
+| S5 | Full verification + gate | completed (pending 4R review / final QA) | cp-012 (user, stage_approval) | full verify 79/79 + literal replay 38/38 + verdict 15/15; `npm run check` and `npm test` exit 0 (1039 tests); diff = 3 docs + README + sdd-lite only; AC-1..AC-18 PASS (AC-5 with caveat), AC-19 open at PR step; not-verified-live caveat (d-006) |
 
 ## S1 - Verification scripts and dry baseline
 
@@ -339,6 +339,135 @@ None. No CF row contradicted; no protected path touched.
 ### Next action
 
 Request `stage_approval` for S5 (full verification against the written docs and gate). S5 should also re-check that quick-start section 6 still runs through `verify-quickstart.sh` unchanged by the d-015 wording and that `git diff --stat main` shows only the 3 docs, README and sdd-lite/history.
+
+## S5 - Full verification and gate
+
+- Approval: `stage_approval` cp-012, selected `approve`. Branch `claude/nifty-heisenberg-w3gn8z`, HEAD 9998593 (S4 at 3c330e6); `origin/main` fetched, = 8c63ed3 (`git ls-remote` of the documented GitHub URL also returns 8c63ed3, so the clone URL in the quick start resolves). Working tree clean at start and at end except for the two sdd-lite files this stage edits. No git side effects by the executor (no add/commit/stash/push).
+- Planned scope: compare doc commands with what the scripts execute; full `verify-quickstart.sh` in a fresh sandbox with `VQ_HARNESS_DIR` = files extracted from the written guide; `verify-verdict.mts`; cross-doc read (AC-5, d-001 format); final AC-1..AC-19 table; `npm run check`, `npm test`; blast-radius diff.
+- Edited by this stage: `execution-log.md`, `state.yaml` only. Scripts and docs were NOT changed (no script defect, no doc defect found). One environment action: `npm ci` in the repo to create the git-ignored `node_modules/` (absent in this session) so the gates can run; `git status --short --ignored` shows `!! node_modules/` only, no tracked change.
+
+### Evidence artifacts (scratchpad `.../scratchpad/`)
+
+| Artifact | What it is |
+|---|---|
+| `s5-extract/` | the four `my-review` files extracted by script from the written guide ("Save this as `path`" + next fenced block); sha256 identical to the S3 extraction and to design.md's Harness Example (harness.md d6857f11..., skills.yaml 80084579..., house-rules.md a1e53961..., output.md 19777fbf...) |
+| `sb-s5/` | fresh sandbox of HEAD 9998593 (clone HEAD asserted equal to source HEAD); transcript `sb-s5/log/transcript.txt`; run output `s5-run.txt` |
+| `s5/replay.py`, `s5-replay.txt` | literal replay of the doc blocks (below), scratch only, not committed |
+| `s5-verdict.txt`, `s5-check.txt`, `s5-test.txt` | verdict check, `npm run check`, `npm test` output |
+
+### 1. Doc commands vs what the scripts execute
+
+Extraction (script, not by eye): `quick-start.md` has 15 `bash` blocks, `build-your-own-harness.md` 3, `privacy.md` 0 (its only fence is the Mermaid block; the doc has no command). Every `bash` block holds exactly one line (checked with an awk pass); no leading `$`. Mapping applied: `~/.sentinel` to `$SENTINEL_HOME` (script) or to the default home under a sandbox `HOME` (replay), GitHub URL to a local clone of the branch (script, per plan), `<url>` to the local `file://` origin, `<owner/repo>` = `acme/widget`, `<branch>` = `feature/greeting`.
+
+| # | Doc | Doc command | verify-quickstart.sh step | Literal replay (SENTINEL_HOME unset, `~/.sentinel` real default) |
+|---|---|---|---|---|
+| 1 | QS 1 | `node --version` | V2 (`run V2-node-version node --version`, v22.22.0) | executed, exit 0, major >= 22 |
+| 2 | QS 2 | `git clone https://github.com/nico0695/sentinel-kit.git` | V2 (`git clone --no-hardlinks --branch <branch> <local repo>`; URL differs by design) | not replayed; URL resolves (`git ls-remote` returns 8c63ed3) |
+| 3 | QS 2 | `cd sentinel-kit` | V2 (`cd "$CLONE"`) | not replayed |
+| 4 | QS 2 | `npm ci` | V2 (identical command, exit 0) | not replayed |
+| 5 | QS 2 | `npm run build` | V2 (identical, exit 0) | not replayed |
+| 6 | QS 2 | `npm install -g .` | V2 (identical, exit 0; `sentinel` and `snt` in prefix bin) | not replayed |
+| 7 | QS 2 | `sentinel --help` | V2, V3 | executed, exit 0; `snt --help` and `sentinel --version` also exit 0 |
+| 8 | QS 3 | `sentinel repo add <url>` | V4 (twice) | executed twice: `acme/widget registered`, then `already-registered`, `repos.yaml` unchanged; copy at `~/.sentinel/clones/acme/widget` |
+| 9 | QS 3 | `sentinel repo list` | V5 | executed: 4 fields (name, address, base branch `main`, default harness `-`) |
+| 10 | QS 4 | `sentinel review <owner/repo> <branch> --type quick` | V7 (+ V6 for the no-`--type` claim) | executed: exit 2, `state engine-error`, `failureStage engine`, `verdict -`, `runDir` under `~/.sentinel/runs/`, folder holds `metadata.json` + `prompt.md`, no `result.md`; without `--type`: exit 1, one stderr line naming `--type` |
+| 11 | QS 5 | `sentinel runs list <owner/repo>` | V10 | executed: one line, field 1 = repo name, field 2 = id |
+| 12 | QS 5 | `sentinel runs show <owner/repo> <id>` | V10 | executed with the listed id: `key<TAB>value` block, `state engine-error`, `failureStage`, `failureMessage` |
+| 13 | QS 6 | `export SENTINEL_OPENCODE_MODEL=<provider/model>` | V8, V9 (set with `env ...`; the script does not run a literal `export`) | executed literally in one shell with block 14 |
+| 14 | QS 6 | `sentinel review <owner/repo> <branch> --type quick --engine opencode` | V8 (no model: exit 1 + message; with model: exit 2, `engine opencode`, `engine-error`) | executed both ways, same results; the refused review left no run folder, the started one added exactly one |
+| 15 | QS 6 | YAML block `defaultEngine: opencode` (in `~/.sentinel/config.yaml`) | V9 | block asserted equal to `defaultEngine: opencode`, written to the default home: review without `--engine` gives `engine opencode`; without the model variable it exits 1 naming `SENTINEL_OPENCODE_MODEL` (backs d-015 "OpenCode needs a model id"); `--engine claude-code` overrides it for one review |
+| 16 | QS 7 | `sentinel` | V14 (`</dev/null`) | executed with stdin not a terminal: guidance on stderr naming `sentinel review`, exit 1, stdout empty |
+| 17 | HG 2 | `mkdir -p ~/.sentinel/harnesses/my-review` | V11 (`write_example_harness` runs `mkdir -p "$dest" "$skills"`, a variable form, not the literal text) | executed literally under the default home, exit 0 |
+| 18 | HG 2 | `mkdir -p ~/.sentinel/skills` | V11 (same function) | executed literally, exit 0 |
+| 19 | HG 3-5 | four "Save this as" files (harness.md, house-rules.md, skills.yaml, output.md) | V11 via `VQ_HARNESS_DIR` (cmp-identical to the extracted files) | written to the documented paths from the doc blocks |
+| 20 | HG 6 | `sentinel review <owner/repo> <branch> --type my-review` | V11 | executed: `harness my-review`, `failureStage engine` (not `harness`); `prompt.md` has the harness text, `<skill name="house-rules">`, the skill text, `<output-contract>`, the last-line rule; prompt order harness.md, skills, output.md, diff (guide section 1 claim) |
+| 21 | HG 6 | prose `repo add <url> --harness my-review` | V12 (`acme/gizmo`) | covered by V12 only (same sandbox run) |
+| 22 | HG 6 | YAML snippet `defaultHarness: my-review` under the repo entry | V12 | snippet keys (alias, `url`, `baseBranch`) equal the real `repos.yaml` entry keys; line inserted; review without `--type` uses `my-review`; `repo list` shows it as the default harness |
+| 23 | HG 7 | broken folder, misspelled `--type` | V13 | exit 2 each; `validation-failed`, `failureStage harness`, `Missing required harness.md in harness "broken"` (verbatim as quoted in the guide); `Harness not found: my-reveiw` |
+| 24 | HG 7 | interactive harness list and Ctrl+C message | not executable without a terminal | structural only: `"Review cancelled — nothing was run."` is at `src/adapters/driving/tui/tui-flow.ts:78`; `listHarnessTypes` uses the same loader V11 exercises (risk-e7f2h1-009) |
+| 25 | PV | (no commands) | n/a | privacy.md contains no command, flag, or env var |
+
+Not exercised literally (flagged, none is a defect): rows 2-6 (the install block), because the plan substitutes the local clone for the GitHub URL and V2 runs the same `npm` commands; row 13 (`export`) in the script itself, covered by the replay; rows 17-18 in the script, covered by the replay; row 21 only by V12; row 24 not at all (structural). No doc command is missing from the table. Engine absence: asserted 10 of 10 before reviews in `verify-quickstart.sh` and 12 of 12 (every `sentinel review` and bare `sentinel`) in the replay; no `ABORT`; no model invoked (d-006).
+
+### 2. Full `verify-quickstart.sh` (fresh sandbox `sb-s5`, `VQ_HARNESS_DIR` = `s5-extract`)
+
+`bash verify-quickstart.sh <scratchpad>/sb-s5`: exit 0, 79 checks, 0 failed (79 PASS lines, 0 FAIL). V1-V15 all PASS; clone HEAD = source HEAD = 9998593; `[engine-absence] ok` 10 times; V15 isolation: real `~/.sentinel` (absent), `~/.gitconfig`, `/opt/node22` listing and source repo status identical before and after. The sandbox `my-review` files are `cmp`-identical to the files extracted from the guide. V8 observed exit without `SENTINEL_OPENCODE_MODEL`: 1 (message only is documented). V9 (`defaultEngine: opencode` honored) PASS, which is the quick-start section 6 path after d-015.
+
+`node --experimental-strip-types verify-verdict.mts <sb-s5>/sentinel-kit/src/core/run/builtin-verdict-extraction.ts <scratchpad>/s5-extract/output.md`: ALL PASS (15 checks), exit 0. 40-line / 4145-char answer with the verdict last parses to `request-changes`; verdict-first control parses to `null` (F5); approve and comment variants parse; conflicting or absent markers give `null`.
+
+Literal replay (`s5/replay.py`): 38 checks, 0 failed (table above, third column).
+
+### 3. Cross-doc read and format rules
+
+| Check | Method | Result |
+|---|---|---|
+| AC-2 shape | `grep -n '^#'` per doc; line 3 | each doc: H1, one-line purpose sentence, numbered `## 1.`.. sections (QS 7, HG 7, PV 5), final `## Next steps` with exactly 2 links; no TOC (`grep` for contents / anchor lists: none). Headings inside the guide's fenced file blocks (`## Role`, `# House rules`, `## Answer format`) are file content, not doc headings. The guide's file table is a table of files, not a TOC |
+| AC-3 | `grep -c '```mermaid'` | QS 0, HG 0, PV 1; PV diagram nodes A-E = 5 (< 8); `grep -nE 'style \|classDef\|%%\{init'` none. Not rendered (no mermaid tooling in the sandbox); syntax is plain `flowchart LR` with `-->`, `-.->`, `<-->` |
+| AC-4 | `grep -inwE 'ports?\|adapters?\|hexagonal\|use case\|composition root\|core\|terminal state\|worktrees?\|pipeline'` and a substring variant | no hits in any of the three docs |
+| AC-6 | awk over `bash` blocks | every `bash` block is one command; no `$` prompts; `<url>`, `<owner/repo>`, `<branch>`, `<id>`, `<provider/model>` each get a "Replace ..." sentence in QS (the guide links to QS for them) |
+| AC-13 grep | `grep -inE 'extraskills\|contextmode'` | none in any doc |
+| Out of scope | `grep` for `--timeout`, `--local-path`, `--base-branch`, `--changes-exit-code`, `validationTimeoutMs`, `diffLimits`, `reviewTimeoutMs`, `defaultBaseBranch` | none |
+| Language policy | non-ASCII grep | two lines: the em dash inside the exact `output.md` example (design.md text) and the on-screen string `Review cancelled — nothing was run.` (verbatim from `tui-flow.ts:78`). Both English; the em dash is required for exactness |
+| Links | every relative `.md` link in README and the three docs | all resolve, none broken |
+| AC-5 (each concept once) | read | PASS-WITH-CAVEAT. Install: only QS 2. Placeholders and the sentinel folder / `SENTINEL_HOME`: only QS (guide and privacy link back). Data flow: only privacy; QS 5 and the guide link to it. Exit codes: pointer only. Two small overlaps, both present in the approved design outlines and each serving a different reader goal, listed for triage: (a) the run-folder file list (`metadata.json`, `prompt.md`, `result.md`) appears in QS 5 (reading a result) and in privacy 3 (what stays on disk, with `validations/` added); (b) what the prompt contains appears as one sentence in the guide section 1 (order of parts) and as a list in privacy 1. Neither contradicts the other (checked) |
+
+### 4. Final AC-1..AC-19 evidence table
+
+Legend: PASS, PASS-WITH-CAVEAT, FAIL. No FAIL.
+
+| AC | Verdict | Evidence |
+|---|---|---|
+| AC-1 | PASS | `git diff --name-status origin/main...HEAD`: `A docs/quick-start.md`, `A docs/build-your-own-harness.md`, `A docs/privacy.md`, `M README.md`, plus `sdd-lite/**` only. No index file; docs dir gains exactly three files |
+| AC-2 | PASS | section 3 table; H1 + one-line purpose + numbered sections + `## Next steps` (2 links each) + no TOC for all three docs |
+| AC-3 | PASS | section 3: Mermaid 0 / 0 / 1, 5 nodes, no `style` / `classDef` / `%%{init` |
+| AC-4 | PASS | section 3: jargon grep empty in all three docs |
+| AC-5 | PASS-WITH-CAVEAT | section 3: two small overlaps (run-folder file list QS 5 / PV 3; prompt composition guide 1 / PV 1), both in the approved outlines |
+| AC-6 | PASS | one command per `bash` block (awk check), no `$`, placeholders explained once in QS |
+| AC-7 | PASS | doc-command table in section 1; flags used: `--help`, `--type`, `--engine`, `--harness` (all in saved Appendix A help; `--version` was run in the replay but is not in any doc); subcommands `repo add`, `repo list`, `review`, `runs list`, `runs show` (Appendix A); env vars `SENTINEL_HOME`, `SENTINEL_OPENCODE_MODEL` (root help); config keys `defaultEngine` (V9), `defaultHarness` (V12, replay); factory harnesses `quick`, `pr-review`, `security` and skills `code-quality`, `security` exist in the installed package; no out-of-scope field documented |
+| AC-8 | PASS | QS 2 is the single install section: `git clone`, `npm ci`, `npm run build`, `npm install -g .`; "Node 22 or newer" is stated in QS 1 (prerequisites, directly before it) as the design outline places it; `package.json` `engines.node` is `>=22` |
+| AC-9 | PASS | `sb-s5` run: V1-V15, 79/79; clone of branch HEAD, isolated `SENTINEL_HOME`, isolated npm prefix, local bare origin with a feature branch; `repo add`, `repo list`, `review` with and without `--type`, `runs list`, `runs show` give the documented shapes; replay 38/38 |
+| AC-10 | PASS | 10 of 10 (script) and 12 of 12 (replay) `[engine-absence] ok` before every review / bare `sentinel`; reviews end `engine-error` at `failureStage engine` (V7, V8, V9, V11, V12); no ABORT; V15 isolation unchanged |
+| AC-11 | PASS | V11 and replay: `--type my-review` reaches stage `engine`, not `harness`; `prompt.md` holds the instructions, `<skill name="house-rules">` and its text, `<output-contract>` and the last-line rule, then the diff |
+| AC-12 | PASS | `verify-verdict.mts` ALL PASS (15): output.md asks for the exact last line `VERDICT: approve\|request-changes\|comment`; a 40-line / 4145-char answer shaped by it parses to `request-changes` with the built-in parser from the sandbox clone; verdict-first control gives `null` |
+| AC-13 | PASS | guide section 1 (folder name = `--type`, `harness.md` required, same name overrides the shipped one) and section 7 (one broken folder stops every review, `Harness not found`); V13 and replay confirm; `extraSkills` not mentioned (grep) |
+| AC-14 | PASS | claim-to-CF map recorded in the S4 entry above ("Claim-to-CF / code map (AC-14)"), 17 rows, every claim traced; re-checked in S5: Mermaid shape, d-014 (`grep -nE 'claude -p\|--model' docs/privacy.md` empty), run-folder claims against V6/V7/V13 and the replay (engine-error run holds `metadata.json` + `prompt.md`, no `result.md`; refused run keeps nothing; run dir under `~/.sentinel/runs/`; managed copy under `~/.sentinel/clones/`); no claim removed or softened in S5 |
+| AC-15 | PASS | QS 7: interactive-only, needs a terminal, scripts and CI use `sentinel review`, exit codes by pointer to `sentinel review --help`; V14 and replay: no terminal gives guidance, exit 1 |
+| AC-16 | PASS | QS 4: one sentence, "`sentinel review` works on the copy downloaded at `repo add`; it does not pick up changes pushed later." (d-012); no command to run |
+| AC-17 | PASS | `git diff origin/main...HEAD -- README.md`: exactly six added lines (the "Using sentinel" heading, blank, three links, blank) before `## Quick start (development)`; text identical to the design block; nothing removed |
+| AC-18 | PASS | no path under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, `package-lock.json`, `CONTRIBUTING.md`, or contributor docs in the diff (grep: none; allow-list check: none outside docs/3 files, README, sdd-lite); `npm run check` exit 0 (biome 165 files, tsc, depcruise 107 modules / 254 dependencies, no violations); `npm test` exit 0 (50 files, 1039 tests passed) |
+| AC-19 | OPEN (post-execution) | not an executor deliverable: F1-F7 are filed at PR time by the orchestrator and listed in the PR body with the d-006 gap. S5 check done: no doc promises a fix for F1-F7 (D6 sentence states a limitation; guide states the broken-folder behavior; QS 7 points to `--help` for exit codes) |
+| Not verified live (d-006, risk-e7f2h1-002) | CAVEAT, must be disclosed in QA and PR | no real engine was ever invoked and `claude` / `opencode` were unreachable by construction. The following rest on code reading, fixtures and the pre-flight failure path, not on a real review: a review reaching `state ok`; a `verdict` other than `-`; `result.md` appearing; the shape and content of an engine answer; `runs show` of an `ok` run; the exit codes 0 and 1; Claude Code and OpenCode behavior inside the temporary copy (permissions, file reads, deny config); a real model provider receiving the prompt. Also not driven (no terminal): the interactive flow in QS 7 and the harness list / Ctrl+C step in guide 7 (structural check only, risk-e7f2h1-009) |
+
+### 5. Gate (repository, not the sandbox)
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run check` (biome check, tsc --noEmit, depcruise src) | 0 | `Checked 165 files ... No fixes applied`; `no dependency violations found (107 modules, 254 dependencies cruised)` |
+| `npm test` (vitest run) | 0 | Test Files 50 passed (50); Tests 1039 passed (1039) |
+
+Biome and tsc do not cover `.md` (AC-18 note); doc correctness rests on sections 1-4. `git status --short` after both gates: clean (no tracked changes, no stray `runs/` or `worktrees/`).
+
+### 6. Blast radius (`git diff --stat origin/main...HEAD`, 12 files, 2604 insertions, 0 deletions)
+
+`README.md` (+6), `docs/quick-start.md` (+166), `docs/build-your-own-harness.md` (+130), `docs/privacy.md` (+61), and `sdd-lite/openspec/changes/e7-f2-h1-user-docs/` (design, execution-log, plan, proposal, spec, state, `verify-quickstart.sh`, `verify-verdict.mts`). Working tree equals HEAD before this stage's two edits. `history/**` not yet present (post-execution step).
+
+### Observations for 4R / QA triage (not defects, no doc edit made)
+
+1. `npm install -g .` from a directory installs a symlink to the cloned folder (`prefix/lib/node_modules/@nico0695/sentinel -> ../../../../sentinel-kit`). The quick start does not say to keep the `sentinel-kit` folder; deleting it breaks the `sentinel` command. No claim in the doc is false; an optional one-line note in QS 2 would prevent a surprise. Moot once #45 replaces the install step (risk-e7f2h1-001).
+2. The AC-5 overlaps above (run-folder file list, prompt composition), if the reviewer wants strict single-explanation: privacy 3 could link to QS 5 for the file list, keeping only the privacy-relevant points (prompt.md contains the diff, kept until deleted).
+3. The Mermaid in privacy.md was not rendered (no tooling); syntax reviewed by eye only.
+
+### Blockers
+
+None. No CF row contradicted; no doc claim found false; no protected path touched; engine never resolvable; real `~/.sentinel`, gitconfig and npm prefix unchanged.
+
+### QA handoff
+
+Recommended: 4R review of the frozen diff, then final `sddl-qa-review` (per plan post-execution steps); the QA report must disclose the not-verified-live gap (d-006, risk-e7f2h1-002).
+
+### Next action
+
+Orchestrator: 4R review triage, then final QA, then history entry, F1-F7 filing and PR (`Closes #43`).
 
 ## Appendix A - Saved `--help` texts (AC-7 reference, from the built CLI at 5b5786e)
 

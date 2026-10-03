@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | S1 | Verification scripts + dry baseline | completed (pending QA/next approval) | cp-008 (user, 2026-10-03T16:10:00Z) | 2 scripts written; baseline green, 79/79 checks; no contradictions |
 | S2 | `docs/quick-start.md` | completed (pending next approval) | cp-009 (user, 2026-10-03T16:40:00Z) | doc written; V1-V15 green 79/79; doc commands replayed literally; no contradictions |
-| S3 | `docs/build-your-own-harness.md` | pending | requires its own stage_approval | |
+| S3 | `docs/build-your-own-harness.md` | completed (pending next approval) | cp-010 (user, 2026-10-03T17:20:00Z) | doc written; V4/V11/V12/V13/V15 green 50/50 from the guide's literal files; verdict check ALL PASS; no contradictions |
 | S4 | `docs/privacy.md` + README section | pending | requires its own stage_approval | carries d-014 |
 | S5 | Full verification + gate | pending | requires its own stage_approval | |
 
@@ -181,6 +181,85 @@ None. No CF row contradicted; no protected path touched; engine never resolvable
 ### Next action
 
 Request `stage_approval` for S3 (`docs/build-your-own-harness.md`).
+
+## S3 - `docs/build-your-own-harness.md`
+
+- Approval: `stage_approval` cp-010, selected `approve`. Branch `claude/nifty-heisenberg-w3gn8z`, HEAD 0c29671. No git side effects by the executor. d-015 (quick-start section 6 fix) belongs to S4 and was not touched: `docs/quick-start.md` unchanged.
+- Planned scope: create `docs/build-your-own-harness.md` per the design outline (H1, one-line purpose, sections 1-7, Next steps; exact `my-review` example; no Mermaid; no `extraSkills` or `contextMode`); run V11, V12, V13 and `verify-verdict.mts` from files extracted from the written guide.
+
+### Changed files
+
+| File | Change |
+|---|---|
+| `docs/build-your-own-harness.md` | new (H1 `Build your own harness`, `## 1.`-`## 7.`, `## Next steps` with two links; 3 `bash` blocks and 1 `yaml` snippet, plus 4 file-content blocks; no TOC, no Mermaid) |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md` | this entry |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml` | S3 notes, next_action, updated_at |
+
+Scripts were not changed (no script defect: the first S3 run used `VQ_STEPS="V11 V12 V13 V15"` and failed only because V12 and V11 need the repository registered by V4; the rerun with V4 included passed. This is a usage note, not a script bug). Nothing under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, README, `docs/quick-start.md` or contributor docs was touched; `git status --short` shows only `docs/build-your-own-harness.md` as untracked before this log and state.yaml edits.
+
+### Wording decisions applied
+
+- File creation: each of the four files is a fenced block preceded by "Save this as `<path>`" (harness.md, house-rules.md, skills.yaml, output.md), and two `mkdir -p` blocks (one command each). The `my-review` example is copied exactly from design.md "Harness Example"; the VERDICT line is last (d-011).
+- Section 1 states: folder name = `--type`; location `~/.sentinel/harnesses/<name>/` with a link to the quick start for the sentinel folder; table of the three files (`output.md` absent means no verdict is asked and the review usually ends `ambiguous`, CF-10); skills in `~/.sentinel/skills/<name>.md` plus the two shipped skills `code-quality` and `security` (`skills/` directory); same name as a shipped harness or skill means yours is used (confirmed in `load-harnesses.ts`: user set wins for both harness types and skill names); prompt order harness.md, skills, output.md, diff (CF-8).
+- Section 4: `skills:` must be a list when `skills.yaml` exists; a name that matches no skill file breaks the harness (CF-6), pointer to section 7.
+- Section 6: `--type my-review`; default through `repo add --harness` on the first add (quick start covers "adding again changes nothing", so it is linked, not repeated); `defaultHarness` snippet follows the S1 note (flat map keyed by alias, two-space indented entries; the snippet parses with the `yaml` package to `{"acme/widget": {url, baseBranch, defaultHarness}}`). Placeholders point to the quick start.
+- Section 7: interactive harness list plus Ctrl+C. The exact string "Review cancelled — nothing was run." exists in `src/adapters/driving/tui/tui-flow.ts:78` (function `cancelled`), used for a cancel at the repository, branch and harness selections (exit 0). The broken-folder behavior quotes the observed `failureMessage Missing required harness.md in harness "broken"` with `state validation-failed` and `failureStage harness`; the misspelled `--type` gives `Harness not found: <name>` (V13 observed; both exit 2 and persist a run, not documented as codes). The doc does not claim what the list shows when a folder is broken (not observed); it only says to check the folder name and that it holds `harness.md`.
+- Out-of-scope items not mentioned: `extraSkills`, `contextMode`, `agent`, `validations`, `--timeout`, `--changes-exit-code`, exit codes.
+
+### Verification
+
+1. Extraction: the four files were extracted by script from the written guide (the block following each "Save this as `...`" line) into `<scratchpad>/s3-extract/`. Byte-compare against the design.md "Harness Example" blocks:
+
+| File | Identical to design.md | sha256 |
+|---|---|---|
+| `harness.md` | yes | d6857f11d4c7002d3338ebab8c9aecbbda16511ef9c5689dd54e937df1069c02 |
+| `skills.yaml` | yes | 80084579333162da70154204585291e87bb5668bad7c065f65cb2ae6846b4368 |
+| `house-rules.md` | yes | a1e53961ba706ea8e1bef62fe9b9c1629f639e1c9cb6e8c12161e31e194a2a3d |
+| `output.md` | yes | 19777fbf86138a6c546ed4535ed8a93e4ad039c81df283646c78d3c7ff3bc12d |
+
+The files the sandbox installed under `home/harnesses/my-review/` and `home/skills/` are `cmp`-identical to the extracted ones (V11 used `VQ_HARNESS_DIR`).
+
+2. `VQ_HARNESS_DIR=<scratchpad>/s3-extract VQ_STEPS="V4 V11 V12 V13 V15" verify-quickstart.sh <scratchpad>/sb-s3` (fresh clone of HEAD 0c29671, same isolation as S1/S2; V1-V3 always run): exit 0, 50 checks, 0 failed. Engine absence asserted 5 of 5 before reviews (`[engine-absence] ok`); no model invoked (d-006). The two `ABORT` grep hits in the transcript are the PASS lines that say "no ABORT". V15 isolation identical before and after (real `~/.sentinel`, `~/.gitconfig`, npm prefix, source repo status).
+
+| Step | Observed |
+|---|---|
+| V11 | `--type my-review` on `acme/widget feature/greeting`: exit 2, `state engine-error`, `harness my-review`, `failureStage engine` (not `harness`); `prompt.md` has the harness text, `<skill name="house-rules">`, the skill text, `<output-contract>`, the last-line rule and the diff |
+| V12 | `defaultHarness: my-review` inserted under `acme/widget` in `repos.yaml`: review without `--type` gives `harness my-review`, `failureStage engine`. Second origin `acme/gizmo` added with `repo add --harness my-review`: same result |
+| V13 | empty `harnesses/broken` with `--type quick`: exit 2, `validation-failed`, `failureStage harness`, `failureMessage Missing required harness.md in harness "broken"`; folder removed, then `--type my-reveiw`: `validation-failed`, `failureMessage Harness not found: my-reveiw` |
+
+3. `node --experimental-strip-types verify-verdict.mts <sb-s3>/sentinel-kit/src/core/run/builtin-verdict-extraction.ts <scratchpad>/s3-extract/output.md`: ALL PASS (15 checks): output.md says the verdict is the last line and offers the three values; the 40-line / 4145-char synthetic answer ending in `VERDICT: request-changes` parses to `request-changes`; the verdict-first control parses to `null` (F5); approve and comment variants parse; conflicting or absent markers give `null`.
+
+4. Greps on the written guide: `grep -ic extraskills` = 0; `grep -ic contextmode` = 0; `grep -c '```mermaid'` = 0; `grep -inwE 'ports?|adapters?|hexagonal|use case|composition root|core|terminal state|worktrees?|pipeline'` returns nothing (AC-4); heading shape H1, `## 1.`-`## 7.`, `## Next steps`, no TOC (AC-2).
+
+Doc-command to V-step map (AC-7):
+
+| Doc section | Doc command or claim | V-step that executes it | Result |
+|---|---|---|---|
+| 2 | `mkdir -p ~/.sentinel/harnesses/my-review` | V11 (`write_example_harness` creates the same folder under `$SENTINEL_HOME`; `~` maps to `$SENTINEL_HOME`) | folder and files present, cmp-identical |
+| 2 | `mkdir -p ~/.sentinel/skills` | V11 (same, `skills/house-rules.md`) | present |
+| 3-5 | the four "Save this as" files | V11 (loaded and accepted), `verify-verdict.mts` (output.md) | accepted, parses as designed |
+| 6 | `sentinel review <owner/repo> <branch> --type my-review` | V11 (`acme/widget feature/greeting --type my-review`) | `failureStage engine` |
+| 6 | `sentinel repo add <url> --harness my-review` (first add) | V12 (`acme/gizmo`) | review without `--type` gives `harness my-review` |
+| 6 | `defaultHarness: my-review` under the repository entry in `repos.yaml` | V12 (`acme/widget`) | same; snippet shape also parsed with `yaml` |
+| 7 | interactive list and Ctrl+C message | not executable without a terminal; structural: `tui-flow.ts:78` string, `listHarnessTypes` = `loadHarnesses(...).keys()` (`container.ts:316`), the loader V11 exercises | string confirmed verbatim |
+| 7 | broken folder behavior | V13 | observed message quoted |
+| 7 | misspelled `--type` | V13 | `Harness not found: my-reveiw` |
+
+AC-7 check: commands used are `mkdir -p`, `sentinel review ... --type`, `sentinel repo add <url> --harness`, `sentinel` (bare); all present in the saved help (Appendix A) or CF rows. Paths: `~/.sentinel/harnesses/<name>/`, `~/.sentinel/skills/<name>.md`, `~/.sentinel/repos.yaml` (CF-1); files `harness.md`, `output.md`, `skills.yaml` (CF-6); keys `defaultHarness` (CF-4), `skills:` (CF-6); shipped skills `code-quality`, `security` (`skills/`). Nothing from Out Of Scope is documented.
+
+Claim-to-CF: folder name = `--type` and layout (CF-6), override by name (CF-6), prompt order (CF-8), no `output.md` leads to `ambiguous` (CF-10), verdict rule and tail position (CF-9, `verify-verdict.mts`), default harness rule (CF-4), one broken harness stops all reviews (CF-7, V13), interactive list and Ctrl+C (CF-16 plus `tui-flow.ts`).
+
+### Blockers
+
+None. No CF row contradicted; no protected path touched; engine never resolvable; real `~/.sentinel`, gitconfig and npm prefix unchanged.
+
+### QA handoff
+
+`sddl-qa-review` deferred: non-code stage, self-contained, low risk; the first QA/4R pass happens after S5 per plan.
+
+### Next action
+
+Request `stage_approval` for S4 (`docs/privacy.md`, README "Using sentinel" section, and the d-015 one-line fix in `docs/quick-start.md` section 6).
 
 ## Appendix A - Saved `--help` texts (AC-7 reference, from the built CLI at 5b5786e)
 

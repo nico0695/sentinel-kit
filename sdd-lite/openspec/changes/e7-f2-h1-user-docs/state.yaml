@@ -88,6 +88,15 @@ stages:
       V-step map and AC-7 check recorded in execution-log.md. Run folder wording qualified after
       observing that harness-stage failures persist only metadata.json. No CF row contradicted;
       scripts unchanged. S3-S5 pending, each needs its own stage_approval.
+      S3 completed (stage_approval cp-010): docs/build-your-own-harness.md written (sections 1-7,
+      Next steps, no Mermaid, AC-4 grep clean, no extraSkills or contextMode). The four my-review
+      files extracted literally from the guide are byte-identical to design.md's Harness Example.
+      Sandbox sb-s3 (HEAD 0c29671) with VQ_HARNESS_DIR pointing at the extracted files: V4, V11,
+      V12, V13, V15 green, 50 of 50 checks; engine absence asserted 5 of 5, no model invoked.
+      verify-verdict.mts against the extracted output.md: ALL PASS (long answer with the verdict
+      last gives request-changes; verdict-first control gives null). "Review cancelled - nothing
+      was run." confirmed in tui-flow.ts. No CF row contradicted; scripts unchanged. S4 (privacy,
+      README, d-015 one-line quick-start fix) and S5 pending, each needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -529,8 +538,9 @@ open_risks:
 next_action:
   kind: stage_approval
   summary: >-
-    S2 complete (docs/quick-start.md written and verified, no contradictions). Next: user
-    approval of stage S3 (write docs/build-your-own-harness.md with the my-review example), then
-    sddl-executor for S3 only.
+    S3 complete (docs/build-your-own-harness.md written and verified, no contradictions). Next:
+    user approval of stage S4 (write docs/privacy.md applying d-014, insert the README "Using
+    sentinel" section, and make the d-015 one-line fix in docs/quick-start.md section 6), then
+    sddl-executor for S4 only.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T17:05:00Z"
+updated_at: "2026-10-03T17:50:00Z"

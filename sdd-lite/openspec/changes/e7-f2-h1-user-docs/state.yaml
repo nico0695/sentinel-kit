@@ -1,0 +1,260 @@
+version: "0.1"
+change_name: e7-f2-h1-user-docs
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E7.F2.H1] (issue #43, milestone E7, required): user documentation for people who
+    install and use sentinel, not contributors. Docs-only, no production code. The user
+    mandated the format (at most 3 flat docs, one per issue criterion, linked from README,
+    minimal repeated structure, at most one small Mermaid per doc). Bounded span but four
+    B-level decisions: the install path (package unpublished, #45 pending), file names, where
+    config.yaml/repos.yaml are documented under the 3-doc cap, and live-engine verification.
+    Low blast radius, medium ambiguity concentrated in the install path and verification.
+  confidence: medium
+  recorded_at: "2026-10-03T13:10:00Z"
+lifecycle_status: draft
+current_stage: sddl-proposal
+stages:
+  sddl-deep-explorer:
+    status: pending
+  sddl-proposal:
+    status: completed
+    started_at: "2026-10-03T13:10:00Z"
+    completed_at: "2026-10-03T13:30:00Z"
+    notes: >-
+      proposal.md written; returned partial (needs-input), then D1-D4 resolved by the user
+      (d-003..d-006; proposal.md's decision table still reads "pending" - state.yaml is the
+      authority for the resolution). Four B-level decisions D1-D4 each
+      carry a recommendation and are recorded as unresolved checkpoints cp-001..cp-004.
+      Lightweight exploration plus a sandbox install trial confirmed that npm pack + global
+      install and npm install -g . both produce a working sentinel/snt with factory harnesses.
+  sddl-spec:
+    status: pending
+  sddl-design:
+    status: pending
+  sddl-plan:
+    status: pending
+  sddl-executor:
+    status: pending
+  sddl-qa-review:
+    status: pending
+artifacts:
+  state: sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml
+  proposal: sdd-lite/openspec/changes/e7-f2-h1-user-docs/proposal.md
+  spec: sdd-lite/openspec/changes/e7-f2-h1-user-docs/spec.md
+  design: sdd-lite/openspec/changes/e7-f2-h1-user-docs/design.md
+  plan: sdd-lite/openspec/changes/e7-f2-h1-user-docs/plan.md
+  execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
+checkpoints:
+  - id: cp-004
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D4 (B): verification of the quick start against a real engine. The sandbox has `claude`
+      2.1.288 logged in through the host session's OAuth token and no `opencode`. A real review
+      sends the diff to Anthropic and spends that account's quota.
+    question: >-
+      How is the quick start verified against a real engine?
+    options:
+      - id: one_real_review
+        label: One real review of a tiny throwaway repo
+        description: >-
+          At the executor stage, with explicit approval, run one claude-code review of a
+          disposable repo (a few lines of diff). opencode is documented from code and
+          docs/engines and marked unverified live.
+        recommended: true
+      - id: structural_only
+        label: Structural verification only
+        description: >-
+          Verify install, repo add/list, runs list, error paths and the engine pre-flight
+          without invoking a model. The QA report states the gap honestly.
+      - id: user_runs_it
+        label: The user runs the live step
+        description: >-
+          Executor stops at the commands that need the engine; the user runs them on their
+          own machine and reports the result.
+    free_input_allowed: true
+    response:
+      selected_option_id: structural_only
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-003
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D3 (B): where config.yaml and repos.yaml are documented. The backlog lists
+      "configuration docs" separately; the user's cap is 3 docs, one per issue criterion.
+      There is no config command, so users edit the YAML by hand to change the default engine
+      or a repository's default harness.
+    question: Fold configuration into the three docs, or add a 4th?
+    options:
+      - id: fold
+        label: Fold into the three docs
+        description: >-
+          Engine choice (--engine, defaultEngine in config.yaml) in the quick start; repos.yaml
+          defaultHarness and extraSkills in the harness guide. Only fields verified end to end
+          are documented.
+        recommended: true
+      - id: fourth_doc
+        label: Add docs/configuration.md
+        description: >-
+          A fourth flat doc as the config reference. Breaks the one-per-criterion cap, so it
+          needs the user's explicit approval.
+      - id: readme_section
+        label: Put a short settings section in README
+        description: Keeps three docs but widens the README edit beyond links.
+    free_input_allowed: true
+    response:
+      selected_option_id: fold
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-002
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D2 (B): names and location of the three docs. Flat only, since nested folders and index
+      files are ruled out. Contributor docs already occupy docs/.
+    question: Which file names and location?
+    options:
+      - id: docs_flat
+        label: docs/quick-start.md, docs/build-your-own-harness.md, docs/privacy.md
+        description: >-
+          Flat, next to the contributor docs; README groups links under "Using sentinel" and
+          "Contributing".
+        recommended: true
+      - id: root_files
+        label: Root-level files
+        description: QUICKSTART.md and similar next to README; clutters the repository root.
+    free_input_allowed: true
+    response:
+      selected_option_id: docs_flat
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-001
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D1 (B): install path for the quick start. The package @nico0695/sentinel@0.0.0 is not
+      published (#45). Sandbox trial: npm ci, npm run build, then npm pack plus global install,
+      and npm install -g ., each yield working sentinel and snt commands with factory harnesses
+      resolved. There is no prepare script and dist/ is gitignored, so installing straight from
+      the git URL very likely fails (inferred, untested). Classified B, not C: no PRD text
+      requires a published install and the backlog dependency is E6.F1.H1.
+    question: What install does the quick start document?
+    options:
+      - id: from_source
+        label: Source install now, isolated in one step
+        description: >-
+          git clone, npm ci, npm run build, npm install -g . (Node 22+). Reproducible today;
+          #45 later swaps this single step for npm i -g.
+        recommended: true
+      - id: future_command
+        label: Document only the future npm i -g command
+        description: Not reproducible today and the command does not work yet; rejected.
+      - id: wait_for_release
+        label: Hold the story until #45 publishes
+        description: Reproducible but blocks a required story on an unrelated one.
+    free_input_allowed: true
+    response:
+      selected_option_id: from_source
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+decisions:
+  - id: d-006
+    checkpoint_id: cp-004
+    selected_option_id: structural_only
+    rationale: >-
+      D4 resolved by the user against the recommendation (one_real_review): no live model call.
+      Verify install, repo add/list, runs list, error paths and the engine pre-flight without
+      invoking a model; the review/result steps of the quick start are documented from code and
+      QA must state the unverified-live gap explicitly. Author: user (claude recommended
+      one_real_review).
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-005
+    checkpoint_id: cp-003
+    selected_option_id: fold
+    rationale: >-
+      D3 resolved by the user as recommended: configuration folds into the three docs (engine
+      choice in the quick start, repos.yaml defaultHarness/extraSkills in the harness guide),
+      documenting only fields verified end to end. No 4th doc. Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-004
+    checkpoint_id: cp-002
+    selected_option_id: docs_flat
+    rationale: >-
+      D2 resolved by the user as recommended: docs/quick-start.md,
+      docs/build-your-own-harness.md, docs/privacy.md, flat, linked from README.
+      Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-003
+    checkpoint_id: cp-001
+    selected_option_id: from_source
+    rationale: >-
+      D1 resolved by the user as recommended: the quick start documents the source install
+      (git clone, npm ci, npm run build, npm install -g ., Node 22+) isolated in one step so the
+      release (#45) swaps a single step. Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-002
+    checkpoint_id: handoff
+    free_text: continue-lite
+    rationale: >-
+      Route confirmed by the proposal stage: docs-only, bounded, no PRD conflict, no new
+      architecture. Level A. Author: claude (orchestrator proposed continue-lite, evidence
+      agrees).
+    recorded_at: "2026-10-03T13:10:00Z"
+  - id: d-001
+    checkpoint_id: handoff
+    free_text: user-mandated documentation format
+    rationale: >-
+      Binding format from the user's handoff: users not contributors; at most 3 flat docs, one
+      per issue criterion, linked from README; fixed minimal structure (title, one-line
+      purpose, numbered steps, Next steps); short and scannable; at most one simple Mermaid per
+      doc (fewer than 8 nodes, no custom styles); user language; contributor docs untouched;
+      every command verified against real code; no production code; license out of scope.
+      Author: user.
+    recorded_at: "2026-10-03T13:10:00Z"
+open_risks:
+  - id: risk-e7f2h1-001
+    summary: >-
+      The source-install step goes stale when the release pipeline (#45) publishes the
+      package. Mitigation: isolate install in one step of the quick start.
+    severity: medium
+  - id: risk-e7f2h1-002
+    summary: >-
+      Per d-006 (structural_only) no live model call is made: the quick start's review and
+      result steps are verified against code and the engine pre-flight only, never against a
+      real engine run; opencode is absent from the sandbox. QA must disclose the gap and the PR
+      must say so.
+    severity: medium
+  - id: risk-e7f2h1-003
+    summary: >-
+      The TUI post-run prompt with stdin at EOF exits 13 (#82). The docs must present the TUI as
+      interactive-only and point scripts at sentinel review.
+    severity: low
+  - id: risk-e7f2h1-004
+    summary: >-
+      Exit code 2 is not covered end to end (#79). Document the real mapping with a caveat
+      only if the spec decides to document exit codes.
+    severity: low
+  - id: risk-e7f2h1-005
+    summary: >-
+      Friction found while verifying (TUI empty-state hint says repo add <alias> <url> but real
+      usage is repo add <url>; repo add --local-path without an origin remote needs
+      --base-branch). To be filed as GitHub issues, not fixed in this PR.
+    severity: low
+next_action:
+  kind: approve_stage
+  summary: >-
+    D1-D4 resolved (from_source, docs_flat, fold, structural_only). Next: sddl-spec, pending the
+    user's go-ahead. Spec must verify in code what a harness without output.md does, which
+    config fields are wired end to end, and decide the README "Quick start (development)"
+    heading question.
+created_at: "2026-10-03T13:10:00Z"
+updated_at: "2026-10-03T13:30:00Z"

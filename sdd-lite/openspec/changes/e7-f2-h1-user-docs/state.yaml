@@ -14,8 +14,8 @@ complexity_assessment:
     Low blast radius, medium ambiguity concentrated in the install path and verification.
   confidence: medium
   recorded_at: "2026-10-03T13:10:00Z"
-lifecycle_status: draft
-current_stage: sddl-proposal
+lifecycle_status: planning
+current_stage: sddl-design
 stages:
   sddl-deep-explorer:
     status: pending
@@ -31,7 +31,18 @@ stages:
       Lightweight exploration plus a sandbox install trial confirmed that npm pack + global
       install and npm install -g . both produce a working sentinel/snt with factory harnesses.
   sddl-spec:
-    status: pending
+    status: completed
+    started_at: "2026-10-03T13:40:00Z"
+    completed_at: "2026-10-03T14:20:00Z"
+    notes: >-
+      spec.md written with a verified Code Facts table (CF-1..CF-17), AC-1..AC-19 written for
+      structural-only verification (d-006), follow-ups F1-F7. Proposal questions closed: harness
+      without output.md is accepted but asks for no verdict (CF-10); config fields narrowed to
+      defaultEngine/defaultHarness (A-1, extraSkills not wired); exit codes by pointer to
+      review --help (A-2); TUI interactive-only (A-3); README links-only (A-4). New facts raised
+      two B decisions (resolved by the user as d-011/d-012 and the spec validated at cp-007): D5 verdict position in the harness example (parser reads only the tail
+      window, factory output.md asks for the first line) and D6 stale managed clone (review
+      never fetches). Partial until D5/D6 are answered.
   sddl-design:
     status: pending
   sddl-plan:
@@ -49,6 +60,73 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-007
+    type: phase_validation
+    stage: sddl-spec
+    artifact: sdd-lite/openspec/changes/e7-f2-h1-user-docs/spec.md
+    summary: >-
+      Spec presented for validation: medium risks active and two B decisions (D5, D6) open.
+    decision: approved
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
+  - id: cp-006
+    type: missing_context
+    stage: sddl-spec
+    summary: >-
+      D6 (B): sentinel review never fetches (only the TUI branch step does) and a bare base
+      name resolves to the local branch, which stays as of clone time. Later reviews of a
+      repository added by URL can miss new pushes or include unrelated base commits.
+    question: How does the quick start handle the stale managed copy?
+    options:
+      - id: refresh_command
+        label: Document one refresh command
+        description: >-
+          Short section "Review new changes later" with
+          git -C ~/.sentinel/clones/<owner>/<repo> pull --ff-only (repos added by URL);
+          verified in the AC-9 sandbox; F3 filed.
+        recommended: true
+      - id: note_only
+        label: One-sentence limitation, no command
+        description: States that sentinel reviews the copy downloaded at repo add; F3 filed.
+      - id: omit
+        label: Say nothing, file F3
+        description: Quick start covers the first review only; later wrong diffs stay silent.
+    free_input_allowed: true
+    response:
+      selected_option_id: note_only
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
+  - id: cp-005
+    type: missing_context
+    stage: sddl-spec
+    summary: >-
+      D5 (B): the built-in parser finds VERDICT only in the tail window (longer of the last 30
+      lines or 2000 chars). Factory output.md files ask for the verdict as the first line, so a
+      long review comes back ambiguous (F5). The guide's example must pick a position.
+    question: Where does the harness example ask for the verdict line?
+    options:
+      - id: last_line
+        label: Last line
+        description: >-
+          Robust with the parser for any length; differs from the factory harnesses' first-line
+          convention (not mentioned in the guide); F5 filed for the factory/parser mismatch.
+        recommended: true
+      - id: first_line
+        label: First line, like the factory harnesses
+        description: Consistent with factory files but inherits F5; AC-12 would fail for long output.
+      - id: first_and_last
+        label: Both first and last line
+        description: Identical repeated markers collapse; robust but more to explain.
+    free_input_allowed: true
+    response:
+      selected_option_id: last_line
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
   - id: cp-004
     type: missing_context
     stage: sddl-proposal
@@ -167,6 +245,59 @@ checkpoints:
     created_at: "2026-10-03T13:10:00Z"
     resolved_at: "2026-10-03T13:30:00Z"
 decisions:
+  - id: d-012
+    checkpoint_id: cp-006
+    selected_option_id: note_only
+    rationale: >-
+      D6 resolved by the user against the recommendation (refresh_command): the quick start
+      states the limitation in one sentence (sentinel reviews the copy downloaded at repo add
+      and does not pick up later pushes) with no refresh command. F3 is still filed.
+      Author: user (claude recommended refresh_command).
+    recorded_at: "2026-10-03T14:40:00Z"
+  - id: d-011
+    checkpoint_id: cp-005
+    selected_option_id: last_line
+    rationale: >-
+      D5 resolved by the user as recommended: the harness example's output.md asks for the
+      VERDICT line as the last line of the response, robust with the parser's tail window at
+      any length; the factory first-line mismatch is not mentioned in the guide and is filed as
+      F5. Author: claude->user.
+    recorded_at: "2026-10-03T14:40:00Z"
+  - id: d-010
+    checkpoint_id: spec
+    free_text: README links-only
+    rationale: >-
+      A-4: README gets only a "Using sentinel" list with the three links before
+      "Quick start (development)"; the heading already says "development", so no rename.
+      Matches the approved docs_flat option text. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-009
+    checkpoint_id: spec
+    free_text: TUI interactive-only framing
+    rationale: >-
+      A-3: bare sentinel needs stdin and stdout TTYs, else guidance and exit 1 (tui-flow.ts:73-87);
+      #82 makes the post-run prompt unsafe without a terminal. Docs present it as interactive-only
+      and send scripts to sentinel review. No issue number in user docs. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-008
+    checkpoint_id: spec
+    free_text: exit codes by pointer
+    rationale: >-
+      A-2: the mapping already lives in sentinel review --help (exit-code.ts, review-command.ts
+      EXIT_CODE_HELP); d-001 says link instead of repeat, so the quick start points there and
+      does not restate a table. #79 is a test gap, not user-relevant. The help text's omission
+      that pre-run errors also exit 1 is filed as F6. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-007
+    checkpoint_id: spec
+    free_text: documented config fields
+    rationale: >-
+      A-1: applying d-005's own "verified end to end" rule. Documented: config.yaml defaultEngine,
+      repos.yaml defaultHarness (and repo add --harness), SENTINEL_HOME, SENTINEL_OPENCODE_MODEL.
+      Dropped: extraSkills (parsed, never passed to loadHarnesses; F4). Wired but outside the
+      d-005 fold and not documented: validations, validationTimeoutMs, diffLimits,
+      reviewTimeoutMs, defaultBaseBranch, per-repo defaultEngine. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
   - id: d-006
     checkpoint_id: cp-004
     selected_option_id: structural_only
@@ -221,6 +352,22 @@ decisions:
       Author: user.
     recorded_at: "2026-10-03T13:10:00Z"
 open_risks:
+  - id: risk-e7f2h1-006
+    summary: >-
+      F5: factory output.md asks for the verdict on the first line but the parser reads only the
+      tail window, so long factory-harness reviews may end ambiguous. Guide example avoids it
+      under D5 last_line; product fix out of scope (candidate for #42).
+    severity: medium
+  - id: risk-e7f2h1-007
+    summary: >-
+      F3: sentinel review never fetches and the base resolves to the stale local branch, so later
+      reviews of a URL-added repo can show wrong diffs. Handling depends on D6.
+    severity: medium
+  - id: risk-e7f2h1-008
+    summary: >-
+      In the sandbox claude sits in /opt/node22/bin next to node; structural verification needs a
+      PATH shim so no model can be invoked (AC-10).
+    severity: low
   - id: risk-e7f2h1-001
     summary: >-
       The source-install step goes stale when the release pipeline (#45) publishes the
@@ -250,11 +397,9 @@ open_risks:
       --base-branch). To be filed as GitHub issues, not fixed in this PR.
     severity: low
 next_action:
-  kind: approve_stage
+  kind: run_stage
   summary: >-
-    D1-D4 resolved (from_source, docs_flat, fold, structural_only). Next: sddl-spec, pending the
-    user's go-ahead. Spec must verify in code what a harness without output.md does, which
-    config fields are wired end to end, and decide the README "Quick start (development)"
-    heading question.
+    Spec validated (cp-007) with D5 last_line (d-011) and D6 note_only (d-012). Next:
+    sddl-design, approved by the user.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T13:30:00Z"
+updated_at: "2026-10-03T14:40:00Z"

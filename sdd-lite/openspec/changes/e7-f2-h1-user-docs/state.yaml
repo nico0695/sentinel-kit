@@ -44,7 +44,19 @@ stages:
       window, factory output.md asks for the first line) and D6 stale managed clone (review
       never fetches). Partial until D5/D6 are answered.
   sddl-design:
-    status: pending
+    status: completed
+    started_at: "2026-10-03T14:45:00Z"
+    completed_at: "2026-10-03T15:20:00Z"
+    notes: >-
+      design.md written: per-doc outlines mapped to CF rows (one Mermaid in total, privacy data
+      flow, 5 nodes), exact harness example my-review (harness.md, skills.yaml, output.md with
+      the VERDICT line last, user skill house-rules) checked against the loader, schema and
+      builtin-verdict-extraction.ts, README insert before "Quick start (development)", sandbox
+      verification V1-V15 plus verdict check as scripts kept in the change dir (sandbox state in
+      the scratchpad; PATH shim drops /opt/node22/bin), F1-F7 drafts, AC mapping. A-level
+      resolutions: guide check = interactive harness list; D6 sentence scoped to sentinel review
+      (interactive mode fetches); CF-13 corrected (runs/<owner>__<repo>/<id>, result.md only when
+      the engine answered); skills.yaml requires skills when present. No B/C item.
   sddl-plan:
     status: pending
   sddl-executor:
@@ -245,6 +257,18 @@ checkpoints:
     created_at: "2026-10-03T13:10:00Z"
     resolved_at: "2026-10-03T13:30:00Z"
 decisions:
+  - id: d-013
+    checkpoint_id: design
+    free_text: design-stage A decisions
+    rationale: >-
+      A-5 the guide confirms pickup via the interactive harness list (no model call; same loader
+      as review), with prompt.md as a one-line hint. A-6 verification scripts live in the change
+      dir (not linted, not in tsconfig, not product tests); sandbox state stays in the scratchpad;
+      reads the spec's "scratchpad only / not committed" hints as no product test code. A-7 D6
+      sentence scoped to sentinel review because interactive mode fetches (CF-12). A-8 docs refer
+      to the printed runDir, never spell runs/<owner>__<repo>/<id> (CF-13 corrected). A-9 the
+      only Mermaid is in privacy. Author: claude.
+    recorded_at: "2026-10-03T15:20:00Z"
   - id: d-012
     checkpoint_id: cp-006
     selected_option_id: note_only
@@ -361,8 +385,14 @@ open_risks:
   - id: risk-e7f2h1-007
     summary: >-
       F3: sentinel review never fetches and the base resolves to the stale local branch, so later
-      reviews of a URL-added repo can show wrong diffs. Handling depends on D6.
+      reviews of a URL-added repo can show wrong diffs. Docs state it in one sentence (d-012);
+      users get no refresh command; F3 filed.
     severity: medium
+  - id: risk-e7f2h1-009
+    summary: >-
+      The interactive harness list (guide check step) cannot be driven without a terminal in the
+      sandbox; verified structurally (listHarnessTypes uses the same loader as review, V11).
+    severity: low
   - id: risk-e7f2h1-008
     summary: >-
       In the sandbox claude sits in /opt/node22/bin next to node; structural verification needs a
@@ -399,7 +429,7 @@ open_risks:
 next_action:
   kind: run_stage
   summary: >-
-    Spec validated (cp-007) with D5 last_line (d-011) and D6 note_only (d-012). Next:
-    sddl-design, approved by the user.
+    Design complete (no B/C items). Next: sddl-plan to stage the executor work (docs, README,
+    verification scripts, issue filing).
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T14:40:00Z"
+updated_at: "2026-10-03T15:20:00Z"

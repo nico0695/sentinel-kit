@@ -117,6 +117,25 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-012
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S5: full verification. Doc-extracted commands vs script commands, a full
+      verify-quickstart.sh run in a fresh sandbox (including section 6 after d-015) and
+      verify-verdict.mts with no engine, cross-doc single-explanation read, npm run check and
+      npm test, and git diff --stat main proving no protected path changed. Writes only
+      execution-log.md and state.yaml.
+    options:
+      - id: approve
+        label: Approve S5
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T18:40:00Z"
+    created_at: "2026-10-03T18:35:00Z"
+    resolved_at: "2026-10-03T18:40:00Z"
   - id: cp-011
     type: stage_approval
     stage: sddl-executor

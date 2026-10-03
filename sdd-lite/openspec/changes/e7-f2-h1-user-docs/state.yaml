@@ -642,6 +642,24 @@ open_risks:
       usage is repo add <url>; repo add --local-path without an origin remote needs
       --base-branch). To be filed as GitHub issues, not fixed in this PR.
     severity: low
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 12
+  summary: >-
+    Forced full-4r (d-016) over frozen target 8fb52de (docs diff sha256 148975f2...), four
+    docs-adapted lenses, one sweep each, no refuter needed. Zero severe findings; twelve info
+    rows in review-ledger.md. Notable info rows: R3-001 (quick start says failureStage/
+    failureMessage explain any non-ok state; false for ambiguous), R1-001 (reviews persist in
+    Claude Code session history), R1-002/R1-003 (engine restrictions overstated), R1-004
+    (interrupted reviews leave the branch copy under worktrees/), R1-005 (token in URL is
+    stored), R4-002 (private repos need stored git credentials). Fixing them is a user choice.
+  ledger: sdd-lite/openspec/changes/e7-f2-h1-user-docs/review-ledger.md
 next_action:
   kind: review_output
   summary: >-

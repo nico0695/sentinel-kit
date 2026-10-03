@@ -126,7 +126,7 @@ If sentinel cannot start a review at all, for example when `--type` is missing, 
 
 ## 6. Choose the engine
 
-Claude Code is the default. To use OpenCode for one review, name a model first:
+Claude Code is the default. OpenCode needs a model id. Set it first:
 
 ```bash
 export SENTINEL_OPENCODE_MODEL=<provider/model>

@@ -97,6 +97,15 @@ stages:
       last gives request-changes; verdict-first control gives null). "Review cancelled - nothing
       was run." confirmed in tui-flow.ts. No CF row contradicted; scripts unchanged. S4 (privacy,
       README, d-015 one-line quick-start fix) and S5 pending, each needs its own stage_approval.
+      S4 completed (stage_approval cp-011): docs/privacy.md written (sections 1-5, Next steps, one
+      5-node Mermaid without styles, d-014 applied: no engine flags, OpenCode deny sentence kept and
+      verified against permission-config.ts); README "Using sentinel" block inserted before
+      "Quick start (development)" (git diff shows only the added block); d-015 applied (single-line
+      change in docs/quick-start.md section 6). Greps clean (Mermaid 1/0/0, no style/classDef/init,
+      no claude -p or --model, AC-4 empty), all relative links resolve. Claim-to-CF/code map for AC-14
+      recorded in execution-log.md; no claim removed, none unsupported. No CF row contradicted;
+      nothing outside the S4 scope touched; no git side effects. QA deferred (non-code stage). S5
+      pending, needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -555,9 +564,10 @@ open_risks:
 next_action:
   kind: stage_approval
   summary: >-
-    S3 complete (docs/build-your-own-harness.md written and verified, no contradictions). Next:
-    user approval of stage S4 (write docs/privacy.md applying d-014, insert the README "Using
-    sentinel" section, and make the d-015 one-line fix in docs/quick-start.md section 6), then
-    sddl-executor for S4 only.
+    S4 complete (docs/privacy.md written with d-014 applied, README "Using sentinel" section
+    inserted, d-015 one-line fix applied; greps and link check clean, no contradictions). Next:
+    user approval of stage S5 (full verification against the three written docs, claim-to-CF table
+    and AC-1..AC-18 evidence, npm run check and npm test, git diff --stat blast radius), then
+    sddl-executor for S5 only.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T17:50:00Z"
+updated_at: "2026-10-03T18:30:00Z"

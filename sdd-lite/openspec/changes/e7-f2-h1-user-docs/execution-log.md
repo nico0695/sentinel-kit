@@ -7,7 +7,7 @@
 | S1 | Verification scripts + dry baseline | completed (pending QA/next approval) | cp-008 (user, 2026-10-03T16:10:00Z) | 2 scripts written; baseline green, 79/79 checks; no contradictions |
 | S2 | `docs/quick-start.md` | completed (pending next approval) | cp-009 (user, 2026-10-03T16:40:00Z) | doc written; V1-V15 green 79/79; doc commands replayed literally; no contradictions |
 | S3 | `docs/build-your-own-harness.md` | completed (pending next approval) | cp-010 (user, 2026-10-03T17:20:00Z) | doc written; V4/V11/V12/V13/V15 green 50/50 from the guide's literal files; verdict check ALL PASS; no contradictions |
-| S4 | `docs/privacy.md` + README section | pending | requires its own stage_approval | carries d-014 |
+| S4 | `docs/privacy.md` + README section | completed (pending next approval) | cp-011 (user, 2026-10-03T18:00:00Z) | privacy.md written (d-014 applied), README section inserted, d-015 one-line fix applied; all S4 greps clean; no contradictions |
 | S5 | Full verification + gate | pending | requires its own stage_approval | |
 
 ## S1 - Verification scripts and dry baseline
@@ -260,6 +260,85 @@ None. No CF row contradicted; no protected path touched; engine never resolvable
 ### Next action
 
 Request `stage_approval` for S4 (`docs/privacy.md`, README "Using sentinel" section, and the d-015 one-line fix in `docs/quick-start.md` section 6).
+
+## S4 - `docs/privacy.md`, README section, d-015 fix
+
+- Approval: `stage_approval` cp-011, selected `approve`. Branch `claude/nifty-heisenberg-w3gn8z`, HEAD ab2f590. No git side effects by the executor (no add/commit/stash/push).
+- Planned scope: create `docs/privacy.md` (applying d-014); insert the design's "Using sentinel" block immediately before `## Quick start (development)` in `README.md`; apply d-015 (single-line change in `docs/quick-start.md` section 6).
+
+### Changed files
+
+| File | Change |
+|---|---|
+| `docs/privacy.md` | new (H1, purpose line, sections 1-5, Next steps, one Mermaid in section 1) |
+| `README.md` | one added block, "Using sentinel", before `## Quick start (development)` |
+| `docs/quick-start.md` | one line: "To use OpenCode for one review, name a model first:" became "OpenCode needs a model id. Set it first:" (d-015) |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md` | this entry |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml` | S4 notes, next_action, updated_at |
+
+`git status --short` before these log edits: `M README.md`, `M docs/quick-start.md`, `?? docs/privacy.md`. Nothing under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, `docs/build-your-own-harness.md` or contributor docs was touched. Scripts unchanged. No sandbox run and no engine call were needed (no claim required observation beyond S1-S3 evidence and code reading).
+
+### Wording decisions applied
+
+- d-014: section 2 does not show `claude -p`, `--model` or any invocation flags. Claude Code line: "it runs with your own Claude Code permission settings. sentinel adds no limits of its own." OpenCode line kept: "sentinel blocks file edits, shell commands and web fetches" (verified in `permission-config.ts`: `permission: { edit: "deny", bash: "deny", webfetch: "deny" }`, passed to `opencode run` through `OPENCODE_CONFIG` in `opencode-adapter.ts`).
+- Run folder contents are qualified (S2/S3 evidence): `metadata.json` always; `prompt.md` is "the prompt as sent"; `result.md` "only when the engine gave one"; `validations/` "only when some ran". "Every review that started keeps its folder, whatever its outcome" plus "A review that sentinel refuses to start, for example when `--type` is missing, keeps nothing" (V6/V8: pre-run errors persist no run). The doc does not spell the `runs/<owner>__<repo>/<id>` path (A-8); it says `~/.sentinel/runs/` and the printed `runDir`.
+- "Until you delete it": no code under `src/` removes a finalized run folder (only staging remnants in `run-store-fs.ts`), so there is no retention policy to describe.
+- Validation commands appear as one list item ("the output of the repository's check commands, when you set any up") and are not explained or named as a config field (out of scope per spec; the design allows a clause only).
+- The temporary copy: "sentinel removes that copy when the review ends" rests on `cleanupPolicy ?? "always"` (`run-review.ts:543`) with no override anywhere in `src/` outside tests.
+- Jargon-free wording: "temporary copy of the branch" instead of the internal term; "engine CLI", "model provider", "harness", "skills", `runDir`, `--type` are the printed or typed names.
+- Install, harness, and placeholder explanations are not repeated: privacy links to the Quick start for the sentinel folder and lists both docs under Next steps (AC-5).
+
+### Claim-to-CF / code map (AC-14)
+
+| Privacy claim (section) | CF row / code reference |
+|---|---|
+| Prompt holds harness instructions, skills, answer format (when the harness has one), diff (1) | CF-8, `assemble-prompt.ts` (`<instructions>`, `<skills>`, `<output-contract>` only if `output.md`, `<diff>`) |
+| Output of check commands is in the prompt when set up (1) | CF-8, `assemble-prompt.ts:12,26,86` (`<validation-output>`) |
+| Prompt goes to the chosen engine CLI (Claude Code or OpenCode) (1) | CF-5, CF-14; prompt on stdin: `claude-code-adapter.ts:119`, `opencode-adapter.ts` (`input: request.prompt`) |
+| The CLI sends it to its provider under that tool's own account and settings; sentinel does not talk to the provider (1) | CF-15 (no HTTP client in `src/`; grep for `node:http(s)`, `node:net`, `fetch(`, `XMLHttp`, `WebSocket` outside tests returns nothing) |
+| Engine reads files in a temporary copy of the branch, not only the diff (2) | CF-14: cwd = `request.worktree.path` in both adapters; `git worktree add --detach` in `git-cli.ts:170` |
+| sentinel removes the copy when the review ends (2) | `run-review.ts:543` (`cleanupPolicy ?? "always"`), `git-cli.ts:185` (`worktree remove --force`) |
+| OpenCode: edits, shell commands, web fetches blocked (2) | CF-14: `permission-config.ts` deny config, `opencode-adapter.ts` sets `OPENCODE_CONFIG` for pre-flight and run |
+| Claude Code: your own permission settings, sentinel adds no limits (2) | CF-14: claude adapter passes no permission flags or config |
+| `~/.sentinel/clones/` full copy of each registered repository (3) | CF-1, CF-3 (clone into `clones/<owner>/<repo>`) |
+| `~/.sentinel/runs/` one folder per review, the printed `runDir` (3) | CF-1, CF-13 (`format-review.ts` prints `runDir`) |
+| Folder kept for every review that started, whatever the outcome; contents vary (3) | CF-13 (corrected: `run-store-fs.ts:218-245`); S2 V13 (harness-stage failure holds only `metadata.json`), V7 (engine-error holds `metadata.json` and `prompt.md`) |
+| `prompt.md` includes the diff; `result.md` only if engine answered; `validations/` only if some ran (3) | `run-store-fs.ts:223-245` (each written conditionally), CF-13 |
+| Refused-to-start review keeps nothing (3) | S1/S2 V6, V8 (exit 1, no run persisted) |
+| Kept until you delete it (3) | no pruning code for final run folders (grep of `src/`) |
+| Only git traffic: download at repo add, fetch when interactive mode lists branches (4) | CF-15, CF-12; `git-cli.ts:70` (clone), `git-cli.ts:76-81` (fetch), `list-branches.ts:35` |
+| No other network calls, no usage data (4) | CF-15 (no HTTP client; runtime deps are `commander`, `execa`, `yaml`, `zod`, `@clack/prompts`, `picocolors`) |
+| No stored passwords or tokens; git uses your own git setup; engine uses its own login (5) | CF-15; `git-cli.ts:43-56` (only `GIT_TERMINAL_PROMPT=0`, no credential handling); engine adapters pass no credentials |
+
+Claim limits: none removed or softened in S4; every claim above has a CF or code reference.
+
+### Verification
+
+| Check | Command or method | Result |
+|---|---|---|
+| Mermaid count | `grep -c '```mermaid'` on privacy, quick-start, harness guide | 1, 0, 0 |
+| Mermaid shape | read: nodes A-E (5 distinct, below the 8 limit); `grep -nE 'style |classDef|%%\{init' docs/privacy.md` | 5 nodes; no matches |
+| d-014 | `grep -nE 'claude -p|--model' docs/privacy.md` | empty |
+| OpenCode sentence | read section 2 | present, verified against `permission-config.ts` |
+| AC-4 jargon | `grep -inwE 'ports?|adapters?|hexagonal|use case|composition root|core|terminal state|worktrees?|pipeline' docs/privacy.md` | empty |
+| AC-2 shape | `grep -n '^#' docs/privacy.md` | H1 `What sentinel sends and stores`, `## 1.`-`## 5.`, `## Next steps`; no TOC |
+| Language policy | non-ASCII grep on privacy.md | none |
+| Links | every relative link in README, quick-start, build-your-own-harness, privacy resolved to an existing file | all ok, none broken |
+| README diff | `git diff README.md` | one added block (6 lines) before `## Quick start (development)`; nothing else |
+| d-015 diff | `git diff docs/quick-start.md` | single-line change (1 insertion, 1 deletion) |
+| AC-7 | commands, flags, env vars, paths in privacy.md | `--type` (typed by the user, in the saved `review --help`), `~/.sentinel`, `~/.sentinel/clones/`, `~/.sentinel/runs/` (CF-1), `metadata.json`, `prompt.md`, `result.md`, `validations/` (CF-13); no commands, no env vars; nothing out of scope documented |
+
+### Blockers
+
+None. No CF row contradicted; no protected path touched.
+
+### QA handoff
+
+`sddl-qa-review` deferred: non-code stage, self-contained, low risk; the first QA/4R pass happens after S5 per plan.
+
+### Next action
+
+Request `stage_approval` for S5 (full verification against the written docs and gate). S5 should also re-check that quick-start section 6 still runs through `verify-quickstart.sh` unchanged by the d-015 wording and that `git diff --stat main` shows only the 3 docs, README and sdd-lite/history.
 
 ## Appendix A - Saved `--help` texts (AC-7 reference, from the built CLI at 5b5786e)
 

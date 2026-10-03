@@ -15,7 +15,7 @@ complexity_assessment:
   confidence: medium
   recorded_at: "2026-10-03T13:10:00Z"
 lifecycle_status: planning
-current_stage: sddl-design
+current_stage: sddl-plan
 stages:
   sddl-deep-explorer:
     status: pending
@@ -58,7 +58,14 @@ stages:
       (interactive mode fetches); CF-13 corrected (runs/<owner>__<repo>/<id>, result.md only when
       the engine answered); skills.yaml requires skills when present. No B/C item.
   sddl-plan:
-    status: pending
+    status: completed
+    started_at: "2026-10-03T15:45:00Z"
+    completed_at: "2026-10-03T16:00:00Z"
+    notes: >-
+      plan.md written: five sequential stages S1 scripts + dry baseline, S2 quick-start, S3 harness
+      guide, S4 privacy + README (carries d-014), S5 full verification + gate. Each gated by its
+      own stage_approval. Design Needed-Before-execution rows (F1-F7, V8 exit code) recorded in
+      Approval Notes. F1-F7 filing, 4R, QA, history, PR are downstream orchestrator gates.
   sddl-executor:
     status: pending
   sddl-qa-review:
@@ -438,9 +445,9 @@ open_risks:
       --base-branch). To be filed as GitHub issues, not fixed in this PR.
     severity: low
 next_action:
-  kind: run_stage
+  kind: stage_approval
   summary: >-
-    Design complete (no B/C items). Next: sddl-plan to stage the executor work (docs, README,
-    verification scripts, issue filing).
+    Plan complete. Next: user approval of stage S1 (verification scripts and dry baseline in
+    the scratchpad sandbox), then sddl-executor for S1 only.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T15:20:00Z"
+updated_at: "2026-10-03T16:00:00Z"

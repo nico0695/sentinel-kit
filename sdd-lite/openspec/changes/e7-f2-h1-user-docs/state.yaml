@@ -257,6 +257,17 @@ checkpoints:
     created_at: "2026-10-03T13:10:00Z"
     resolved_at: "2026-10-03T13:30:00Z"
 decisions:
+  - id: d-014
+    checkpoint_id: design
+    free_text: privacy section 2 wording for Claude Code
+    rationale: >-
+      Editorial adjustment to design.md privacy section 2, applied downstream (design.md is not
+      rewritten): the doc must not show the engine invocation flags (`claude -p --model sonnet`),
+      which the user never sees or types (d-001 user-language rule). Wording instead: Claude Code
+      runs with your own Claude Code permission settings; sentinel adds no limits of its own.
+      The OpenCode sentence (sentinel blocks file edits, shell commands and web fetches) stays.
+      Author: claude->user (claude proposed at the design checkpoint, user approved).
+    recorded_at: "2026-10-03T15:40:00Z"
   - id: d-013
     checkpoint_id: design
     free_text: design-stage A decisions

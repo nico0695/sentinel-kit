@@ -14,8 +14,8 @@ complexity_assessment:
     Low blast radius, medium ambiguity concentrated in the install path and verification.
   confidence: medium
   recorded_at: "2026-10-03T13:10:00Z"
-lifecycle_status: planning
-current_stage: sddl-plan
+lifecycle_status: implementing
+current_stage: sddl-executor
 stages:
   sddl-deep-explorer:
     status: pending
@@ -67,7 +67,20 @@ stages:
       own stage_approval. Design Needed-Before-execution rows (F1-F7, V8 exit code) recorded in
       Approval Notes. F1-F7 filing, 4R, QA, history, PR are downstream orchestrator gates.
   sddl-executor:
-    status: pending
+    status: in_progress
+    started_at: "2026-10-03T16:20:00Z"
+    notes: >-
+      S1 completed (stage_approval cp-008). verify-quickstart.sh (V1-V15) and verify-verdict.mts
+      written in the change dir; execution-log.md started. Dry baseline against branch HEAD 5b5786e
+      in the scratchpad sandbox sb-s1: all 79 checks green (V1-V8, V10, V13, V14, V15 required; V9,
+      V11, V12 and the verdict check also pass as informational runs on the design's embedded
+      example). V8 observed exit code without SENTINEL_OPENCODE_MODEL = 1 (message only to be
+      documented). Engine absence asserted 10 of 10 before reviews; no model invoked; real
+      ~/.sentinel, npm prefix and gitconfig unchanged. No CF row contradicted; wording notes for
+      S2-S5 recorded in execution-log.md (generic failureMessage for a missing engine, third repo add
+      column is "-", pre-run errors exit 1 without a run while harness failures exit 2 with a run).
+      Scripts are not covered by biome/tsconfig (confirmed). S2-S5 pending, each needs its own
+      stage_approval. QA review not recommended after S1 (non-code stage).
   sddl-qa-review:
     status: pending
 artifacts:
@@ -465,7 +478,7 @@ open_risks:
 next_action:
   kind: stage_approval
   summary: >-
-    Plan complete. Next: user approval of stage S1 (verification scripts and dry baseline in
-    the scratchpad sandbox), then sddl-executor for S1 only.
+    S1 complete (scripts + dry baseline green, no contradictions). Next: user approval of stage
+    S2 (write docs/quick-start.md per design outline), then sddl-executor for S2 only.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T16:00:00Z"
+updated_at: "2026-10-03T16:50:00Z"

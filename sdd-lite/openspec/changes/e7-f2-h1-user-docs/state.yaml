@@ -81,6 +81,13 @@ stages:
       column is "-", pre-run errors exit 1 without a run while harness failures exit 2 with a run).
       Scripts are not covered by biome/tsconfig (confirmed). S2-S5 pending, each needs its own
       stage_approval. QA review not recommended after S1 (non-code stage).
+      S2 completed (stage_approval cp-009): docs/quick-start.md written (sections 1-7, D6 sentence in
+      section 4, no Mermaid, AC-4 grep clean). Full verify-quickstart.sh in sandbox sb-s2: 79 of 79
+      green, engine absence asserted 10 of 10, no model invoked; doc bash blocks extracted by script
+      and replayed literally against a second origin with the documented outputs. Doc-command to
+      V-step map and AC-7 check recorded in execution-log.md. Run folder wording qualified after
+      observing that harness-stage failures persist only metadata.json. No CF row contradicted;
+      scripts unchanged. S3-S5 pending, each needs its own stage_approval.
   sddl-qa-review:
     status: pending
 artifacts:
@@ -495,7 +502,8 @@ open_risks:
 next_action:
   kind: stage_approval
   summary: >-
-    S1 complete (scripts + dry baseline green, no contradictions). Next: user approval of stage
-    S2 (write docs/quick-start.md per design outline), then sddl-executor for S2 only.
+    S2 complete (docs/quick-start.md written and verified, no contradictions). Next: user
+    approval of stage S3 (write docs/build-your-own-harness.md with the my-review example), then
+    sddl-executor for S3 only.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T16:50:00Z"
+updated_at: "2026-10-03T17:05:00Z"

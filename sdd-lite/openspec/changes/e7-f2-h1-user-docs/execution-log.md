@@ -5,7 +5,7 @@
 | Stage Id | Goal | Status | Approval | Notes |
 |---|---|---|---|---|
 | S1 | Verification scripts + dry baseline | completed (pending QA/next approval) | cp-008 (user, 2026-10-03T16:10:00Z) | 2 scripts written; baseline green, 79/79 checks; no contradictions |
-| S2 | `docs/quick-start.md` | pending | requires its own stage_approval | |
+| S2 | `docs/quick-start.md` | completed (pending next approval) | cp-009 (user, 2026-10-03T16:40:00Z) | doc written; V1-V15 green 79/79; doc commands replayed literally; no contradictions |
 | S3 | `docs/build-your-own-harness.md` | pending | requires its own stage_approval | |
 | S4 | `docs/privacy.md` + README section | pending | requires its own stage_approval | carries d-014 |
 | S5 | Full verification + gate | pending | requires its own stage_approval | |
@@ -107,6 +107,80 @@ None. No stop condition triggered: no CF row false, no protected path touched, n
 ### Next action
 
 Request `stage_approval` for S2 (write `docs/quick-start.md`).
+
+## S2 - `docs/quick-start.md`
+
+- Approval: `stage_approval` cp-009, selected `approve`. Branch `claude/nifty-heisenberg-w3gn8z`, HEAD 252d049 (S1 at 6ec6a49). No git side effects by the executor.
+- Planned scope: create `docs/quick-start.md` per the design outline (H1, one-line purpose, sections 1-7, Next steps; D6 sentence in section 4; no Mermaid); re-run V1-V10 and V14.
+
+### Changed files
+
+| File | Change |
+|---|---|
+| `docs/quick-start.md` | new (H1 `Quick start`, `## 1.`-`## 7.`, `## Next steps` with two links; 16 fenced blocks, 15 `bash` and 1 `yaml`) |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md` | this entry |
+| `sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml` | S2 notes, next_action, updated_at |
+
+Scripts were not changed (the doc, not the script, was the thing under test; no script defect found). Nothing under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, README or contributor docs was touched; `git status --short` shows only `docs/quick-start.md` as untracked before this log and state.yaml edits.
+
+### Wording decisions applied (from S1 notes and handoff)
+
+- Missing engine binary: the doc says `engine-error` at stage `engine` "usually means the engine could not run" and asks the reader to check the CLI is installed and logged in; it does not promise that `failureMessage` names the cause (observed value is the generic `Engine invocation failed`).
+- `repo add` output: described as the repository name and `registered`; the third column (`-`) is not promised. `repo list`: name, address, base branch, default harness (`-` when none), as observed.
+- Pre-run errors (no `--type`, missing opencode model): doc says sentinel prints one line and keeps no run folder; the missing-model error is described by its message (ask to set `SENTINEL_OPENCODE_MODEL`), no exit code is documented. Exit codes are by pointer to `sentinel review --help` only (d-008).
+- Run folder contents are qualified from evidence found in this stage: a harness-stage failure run (V13) holds only `metadata.json`; an engine-error run holds `metadata.json` and `prompt.md`; `result.md` appears only when the engine answered. The doc therefore says `prompt.md` "once sentinel had built it" and `result.md` "when the engine gave one".
+- D6 (d-012): one sentence in section 4: "`sentinel review` works on the copy downloaded at `repo add`; it does not pick up changes pushed later." No refresh command.
+- TUI (d-009): section 7 is interactive-only ("It needs a terminal"; scripts and CI use `sentinel review`, exit codes via `sentinel review --help`). #82 is not named.
+- Only GitHub https examples (`https://github.com/acme/widget.git`, install clone URL). `~/.sentinel` introduced once with the `SENTINEL_HOME` sentence in section 3. `extraSkills`, `--local-path`, `--base-branch`, `--timeout`, `--changes-exit-code`, `validations` and other out-of-scope fields are not mentioned.
+
+### Verification
+
+Full `verify-quickstart.sh <scratchpad>/sb-s2` (fresh clone of HEAD 252d049, same isolation as S1): exit 0, 79 checks, 0 failed; V1-V15 all PASS; engine-absence asserted 10 of 10 before reviews (`[engine-absence] ok`), no ABORT; V15 isolation identical before and after. No model invoked (d-006).
+
+Doc-command to V-step map (commands were also extracted from the doc by script and replayed literally in the sandbox against a fresh `SENTINEL_HOME` and a second throwaway origin `acme/gizmo`, with `<url>` = the local `file://` origin, `<owner/repo>` = `acme/gizmo`, `<branch>` = `feature/greeting`, `<id>` = the id from `runs list`; engine guard asserted first; install and `export` lines not replayed):
+
+| Doc section | Doc command | V-step that executes it | Replay result |
+|---|---|---|---|
+| 1 | `node --version` | V2 (`node --version`, v22.22.0) | not replayed (V2 ran it) |
+| 2 | `git clone https://github.com/nico0695/sentinel-kit.git` | V2 (`git clone` of the local branch instead of GitHub, per plan) | not replayed |
+| 2 | `cd sentinel-kit` | V2 (`cd "$CLONE"`) | n/a |
+| 2 | `npm ci` | V2 (exit 0) | not replayed |
+| 2 | `npm run build` | V2 (exit 0) | not replayed |
+| 2 | `npm install -g .` | V2 (exit 0; `sentinel` and `snt` in the sandbox prefix) | not replayed |
+| 2 | `sentinel --help` | V2, V3 (exit 0) | exit 0 |
+| 3 | `sentinel repo add <url>` | V4 (twice: `registered`, then `already-registered`, `repos.yaml` unchanged) | `acme/gizmo<TAB>registered<TAB>-`, exit 0 |
+| 3 | `sentinel repo list` | V5 (one line, `acme/widget<TAB>url<TAB>main<TAB>-`) | exit 0, same shape |
+| 3 | prose: `--harness <name>` on first add | V12 (`repo add --harness my-review`, then review without `--type` uses it) | n/a |
+| 4 | `sentinel review <owner/repo> <branch> --type quick` | V7 (exit 2, `engine-error`, `failureStage engine`, `runDir`) | same |
+| 4 | prose: no `--type` and no default | V6 (exit 1, message names `--type`, no run persisted) | n/a |
+| 5 | `sentinel runs list <owner/repo>` | V10 | one line per run, id in field 2 |
+| 5 | `sentinel runs show <owner/repo> <id>` | V10 | `key<TAB>value` block, `state engine-error` |
+| 6 | `export SENTINEL_OPENCODE_MODEL=<provider/model>` | V8 (variable set via `env`) | applied via `env` in the replay |
+| 6 | `sentinel review <owner/repo> <branch> --type quick --engine opencode` | V8 (exit 1 message without the variable; with it exit 2, `engine opencode`, `engine-error`, `failureStage engine`) | exit 2, `engine opencode` |
+| 6 | `defaultEngine: opencode` in `config.yaml` | V9 (`engine opencode` without `--engine`) | n/a |
+| 7 | `sentinel` | V14 (`</dev/null`: guidance on stderr, exit 1, stdout empty) | exit 1, same guidance |
+
+Observed in S2 that supports doc claims: V6 stderr `No harness type for "acme/widget": pass --type or set a default harness for the repository`; V8 stderr `The opencode engine needs a model id: set SENTINEL_OPENCODE_MODEL (for example "anthropic/claude-sonnet-4") and run the review again` (exit 1, no run persisted); V13 broken-harness run directory holds only `metadata.json`.
+
+AC-7 check (every command, subcommand, flag, env var and path in the doc exists in the saved `--help` or a CF row):
+
+- Subcommands: `repo add`, `repo list`, `review`, `runs list`, `runs show` (Appendix A). Flags: `--help`, `--version` (root help `-V, --version`), `--type`, `--engine`, `--harness` (`repo add`). All present; no out-of-scope flags used.
+- Env vars: `SENTINEL_HOME` (CF-1, root help), `SENTINEL_OPENCODE_MODEL` (CF-5, root help). Paths: `~/.sentinel` and `SENTINEL_HOME` (CF-1), `~/.sentinel/clones/` (CF-1, CF-3), `~/.sentinel/config.yaml` with `defaultEngine` (CF-1, CF-5), `metadata.json`, `prompt.md`, `result.md` (CF-13). Harness names `quick`, `pr-review`, `security` (CF-2; `harnesses/` directory). `snt` binary (V2). Example model `anthropic/claude-sonnet-4` (printed by the CLI's own error).
+- Claim-to-CF: Node 22+ (CF-2 package engines); default engine claude-code, `--engine` override, `defaultEngine` (CF-5); default harness / `--type` rule (CF-4); `already-registered` (CF-3); D6 sentence (CF-12); run folder contents (CF-13, plus V7 and V13 observations above); TUI needs a terminal (CF-16); exit codes by pointer (CF-17).
+
+AC checks: AC-2 heading shape confirmed (`grep -n '^#'`: H1, `## 1.`-`## 7.`, `## Next steps`, no TOC); AC-3 `grep -c '```mermaid' docs/quick-start.md` = 0; AC-4 `grep -inwE 'ports?|adapters?|hexagonal|use case|composition root|core|terminal state|worktrees?|pipeline' docs/quick-start.md` returns nothing (jargon-free; "harness" is printed by the CLI and typed by the user); AC-6 15 `bash` blocks each hold exactly one command, no leading `$`; placeholders `<url>`, `<owner/repo>`, `<branch>`, `<provider/model>` and `<id>` are each explained right after first use; AC-15 section 7 interactive-only with the `sentinel review` / `--help` pointer; AC-16 one D6 sentence, no command.
+
+### Blockers
+
+None. No CF row contradicted; no protected path touched; engine never resolvable; real `~/.sentinel`, gitconfig and npm prefix unchanged.
+
+### QA handoff
+
+`sddl-qa-review` deferred: non-code stage, self-contained, low risk; the first QA/4R pass happens after S5 per plan.
+
+### Next action
+
+Request `stage_approval` for S3 (`docs/build-your-own-harness.md`).
 
 ## Appendix A - Saved `--help` texts (AC-7 reference, from the built CLI at 5b5786e)
 

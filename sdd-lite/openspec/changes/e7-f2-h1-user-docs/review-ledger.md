@@ -62,4 +62,23 @@ No refuter pass: zero BLOCKER/CRITICAL findings, so no severe inferential candid
 
 ## Fix Rounds
 
-None (protocol budget 0 of 2 used). Any fix of info rows is a user-approved, docs-only plan amendment outside the protocol fix loop (see state.yaml cp-014).
+None (protocol budget 0 of 2 used). Info rows stay `info` per the contract; they were addressed outside the protocol fix loop by a user-approved, docs-only plan amendment (d-017, cp-014; S6 approved at cp-015).
+
+### Info rows addressed in S6 (Amendment 1)
+
+| Id | Resolution in S6 |
+|---|---|
+| R1-001 | privacy §3: Claude Code also saves each review prompt, diff included, in its own session history. Product follow-up F8 (isolation flags). |
+| R1-002 | privacy §2: settings stored in the reviewed branch can apply too. Product follow-up F8. |
+| R1-003 | privacy §2 softened: "sentinel's OpenCode settings deny …"; no precedence claim. Product follow-up F9. |
+| R1-004 | privacy §3: `~/.sentinel/worktrees/` listed for interrupted reviews or a copy sentinel cannot remove. |
+| R1-005 | privacy §5 + quick-start §3: no token or password in the repository address; sentinel saves it as typed. |
+| R2-001 | run-folder list only in privacy §3 (quick-start §5 links); prompt order only in privacy §1 (guide §1 links). |
+| R2-002 | kept and softened: "check commands configured for the repository, if any (these docs do not cover them)" — executor kept it because it is a real prompt input (`assemble-prompt.ts`); dropping would understate what is sent. |
+| R2-003 | "sentinel's copy of the repository" vs "temporary copy of the branch" used consistently; Mermaid node A relabelled. |
+| R3-001 | quick-start §5: failureStage/failureMessage for non-ok, non-ambiguous states; `ambiguous` = no verdict line found, both fields `-`, read `result.md`. |
+| R4-002 | quick-start §3: https or ssh (ssh alias derivation verified in code); git runs without a prompt, private repos need stored credentials or an SSH key. |
+| R4-003 | quick-start §2: keep the `sentinel-kit` folder in place. |
+| R4-004 | guide §1: use `SENTINEL_HOME` instead of `~/.sentinel` if set; §7 check includes location. |
+
+Scoped re-review: not required (info rows only, plan Amendment 1); final QA re-verifies.

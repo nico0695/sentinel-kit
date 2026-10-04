@@ -125,6 +125,19 @@ stages:
       in the repo to create git-ignored node_modules). git diff --stat origin/main...HEAD: 3 docs,
       README, sdd-lite only. No contradiction, no blocker, no git side effects. Next: 4R review
       triage, then final QA.
+      S6 completed (stage_approval cp-015, plan Amendment 1, d-017): the 12 review-ledger info rows
+      resolved in the three docs only (README and review-ledger.md untouched). Net +7 lines
+      (quick-start 166->168, guide 130->130, privacy 61->66), no section added, Mermaid still 1 with 5
+      nodes, no bash block changed (compared with HEAD). R3-001 ambiguous guidance, R4-002 private repo
+      and ssh (verified: deriveAlias and repo add --help accept ssh), R1-005 token-in-URL (privacy sec.
+      5 + link), R4-003 keep the folder, R2-001 run-folder list and prompt order once (links), R1-001
+      Claude Code session history, R1-002 branch settings can apply, R1-003 OpenCode wording per
+      permission-config.ts, R1-004 interrupted review leaves worktrees/, R4-004 SENTINEL_HOME in the
+      guide, R2-003 clone vs temporary copy terminology and Mermaid node, R2-002 kept and softened
+      (the clause is a real prompt input). Claim-to-code table in execution-log.md. Links 0 broken,
+      AC-4 grep clean (loose grep hits only the on-disk folder name worktrees/), d-014 grep empty,
+      npm run check and npm test exit 0 (1039 tests), git status = 3 docs + sdd-lite. No live model
+      call, no CF row contradicted, no git side effects. Next: final sddl-qa-review (final mode).
   sddl-qa-review:
     status: pending
 artifacts:
@@ -714,11 +727,10 @@ review_summary:
     stored), R4-002 (private repos need stored git credentials). Fixing them is a user choice.
   ledger: sdd-lite/openspec/changes/e7-f2-h1-user-docs/review-ledger.md
 next_action:
-  kind: stage_approval
+  kind: qa_review
   summary: >-
-    Plan amendment 1 written (S6, docs-only fix of review-ledger info rows, d-017/cp-014).
-    Awaiting stage_approval for S6. After S6 no scoped re-review is required; the orchestrator
-    runs final sddl-qa-review (disclosing the d-006 not-verified-live gap), then history entry,
-    F1-F9 filing and the PR.
+    S6 completed (docs-only fix of the review-ledger info rows, d-017). No scoped re-review is
+    required (Amendment 1). Run final sddl-qa-review (final mode), disclosing the d-006
+    not-verified-live gap, then history entry, F1-F9 filing and the PR (Closes #43).
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-04T09:00:00Z"
+updated_at: "2026-10-04T10:00:00Z"

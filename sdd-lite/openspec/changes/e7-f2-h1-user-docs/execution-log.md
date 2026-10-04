@@ -9,6 +9,7 @@
 | S3 | `docs/build-your-own-harness.md` | completed (pending next approval) | cp-010 (user, 2026-10-03T17:20:00Z) | doc written; V4/V11/V12/V13/V15 green 50/50 from the guide's literal files; verdict check ALL PASS; no contradictions |
 | S4 | `docs/privacy.md` + README section | completed (pending next approval) | cp-011 (user, 2026-10-03T18:00:00Z) | privacy.md written (d-014 applied), README section inserted, d-015 one-line fix applied; all S4 greps clean; no contradictions |
 | S5 | Full verification + gate | completed (pending 4R review / final QA) | cp-012 (user, stage_approval) | full verify 79/79 + literal replay 38/38 + verdict 15/15; `npm run check` and `npm test` exit 0 (1039 tests); diff = 3 docs + README + sdd-lite only; AC-1..AC-18 PASS (AC-5 with caveat), AC-19 open at PR step; not-verified-live caveat (d-006) |
+| S6 | Docs-only fix of review-ledger info rows (d-017) | completed (pending final QA) | cp-015 (user, stage_approval) | 12 ledger rows resolved in 3 docs (R2-002 kept, softened); no bash block changed; greps clean; `npm run check` and `npm test` exit 0 (1039 tests); diff = 3 docs + sdd-lite only |
 
 ## S1 - Verification scripts and dry baseline
 
@@ -468,6 +469,56 @@ Recommended: 4R review of the frozen diff, then final `sddl-qa-review` (per plan
 ### Next action
 
 Orchestrator: 4R review triage, then final QA, then history entry, F1-F7 filing and PR (`Closes #43`).
+
+## S6 - Review-ledger info rows (docs only)
+
+- Approval: `stage_approval` cp-015 (user), plan Amendment 1 / d-017. Branch `claude/nifty-heisenberg-w3gn8z`, HEAD 239d7a9 at start. Working tree clean at start. No git side effects by the executor.
+- Edited: `docs/quick-start.md`, `docs/build-your-own-harness.md`, `docs/privacy.md`, `execution-log.md`, `state.yaml`. README untouched (no link target changed). `review-ledger.md` untouched (orchestrator-owned). Nothing under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, contributor docs.
+- Line counts before -> after: quick-start 166 -> 168 (+2), build-your-own-harness 130 -> 130 (0), privacy 61 -> 66 (+5). Net +7 lines across three docs. No section added; Mermaid still 1 (privacy, 5 nodes).
+- No live model call (d-006). No `bash` block changed (compared block by block against `HEAD`: 15 / 3 / 0, all identical), so no literal replay in a sandbox was needed. One scratch check in the scratchpad (`s6/alias.ts`, the `deriveAlias` function copied verbatim from `register-repo.ts:29-54` and run with node) for R4-002.
+
+### Per-ledger-id resolution
+
+| Id | What changed | Where | Claim -> code reference |
+|---|---|---|---|
+| R3-001 | Replaced "if `state` is not `ok` ... give a short reason" with: that sentence now excludes `ambiguous`; new sentence "`ambiguous` means the engine answered but sentinel found no verdict line. Both fields show `-`: read `result.md`." | quick-start sec. 5 | `ambiguous` returned with no `failure`: `run-review.ts:471` (`return { state: "ambiguous" }` when the parser returns null), type doc `run-review.ts:211-214` ("failure present on every state other than ok / ambiguous"); unset failure fields print `-`: `format-review.ts:34,105-106` (`ABSENT = "-"`, `record.failure?.stage/message`); `result.md` written when the engine answered: `run-store-fs.ts:223-228`, `run-review.ts:461` (`draft.engineOutput` set before the parse); no-verdict rule: `builtin-verdict-extraction.ts:24-26,VERDICT_LINE` |
+| R4-002 | Address is now "the https or ssh address"; new paragraph: sentinel runs git without a prompt, so a private repo needs stored credentials or an SSH key; if `repo add` fails, check address and access. | quick-start sec. 3 | ssh accepted: `repo add --help` ("git URL of the repository (https or ssh)", Appendix A); `deriveAlias` handles scp-style and `ssh://` (`register-repo.ts:29-54`); scratch run: `git@github.com:acme/widget.git`, `ssh://git@github.com/acme/widget.git` and the https URL all give alias `acme/widget`; the URL goes unchanged to `git clone` (`git-cli.ts:70`, `register-repo.ts:84-86`). No prompt: `GIT_TERMINAL_PROMPT=0` on every git call (`git-cli.ts:43-56`); clone failure message `Failed to clone repository "<url>"` (`register-repo.ts:89`). The doc does not claim ssh passphrase behavior. |
+| R1-005 | One statement, in privacy sec. 5: "sentinel has no credential store" (replaces "stores no passwords or tokens"); do not put a token or password in a repository address; sentinel saves it as typed (configuration and its copy of the repository) and `repo list` prints it. quick-start sec. 3 carries one short sentence + link to "Credentials". | privacy sec. 5, quick-start sec. 3 | URL written verbatim to `repos.yaml`: `register-repo.ts:116-127` (`const entry = { url, ... }`, `writeRepos`); passed to clone and so kept as the clone remote by git: `git-cli.ts:70` (`git clone --quiet <url> <targetPath>`); printed by `repo list` (CF-3, quick-start sec. 3 already states the address is listed). |
+| R4-003 | One line: "Keep the `sentinel-kit` folder where it is: the installed command runs from it." | quick-start sec. 2 | S5 observation (this log, S5 "Observations", item 1): `npm install -g .` links `prefix/lib/node_modules/@nico0695/sentinel -> .../sentinel-kit`; deleting the folder breaks the command. npm behavior, no sentinel code. |
+| R2-001 | Run-folder file list now lives only in privacy sec. 3. quick-start sec. 5 keeps one pointer: "The engine's answer is in `result.md`, when the engine gave one. [What sentinel sends and stores] lists the other files." Prompt order stated once in privacy sec. 1 ("in this order"); guide sec. 1 sentence replaced by a link ("The order of the prompt is listed in ..."). `validations/` stays in privacy sec. 3. | quick-start sec. 5, privacy sec. 1, build-your-own-harness sec. 1 | Order: `assemble-prompt.ts:21-27` (instructions, skills, output-contract, diff, validation output); files: `run-store-fs.ts:218-245` (`metadata.json`, `result.md` only if engine output, `prompt.md`, `validations/` only if validation output). |
+| R1-001 | New sentence: Claude Code also saves each review prompt, diff included, in its own session history on your machine, outside the sentinel folder. "Everything is under your sentinel folder" reworded to "sentinel keeps these under your sentinel folder". | privacy sec. 3 | No session-persistence opt-out in the invocation: `claude-code-adapter.ts:111-117` (args `-p --model <m> --output-format json` only); default behavior documented in `docs/engines/claude-code.md:60-62,96-99` (every review lands in session history). No internal flag is named in the user doc. |
+| R1-002 | Claude Code bullet gains: "Because it runs inside the reviewed branch, settings stored in that branch can apply too." | privacy sec. 2 | cwd = reviewed-branch checkout: `claude-code-adapter.ts:118` (`cwd: request.worktree.path`); no settings-source restriction passed (same lines; `docs/engines/claude-code.md:56-62,96-99`). Worded "can apply", no claim about which settings win. |
+| R1-003 | OpenCode bullet softened to "sentinel's OpenCode settings deny file edits, shell commands and web fetches." No "blocks", no precedence claim. | privacy sec. 2 | `permission-config.ts:13-16` (`permission: { edit: "deny", bash: "deny", webfetch: "deny" }`), supplied via `OPENCODE_CONFIG` (`opencode-adapter.ts:142`). |
+| R1-004 | Disk list gains the worktrees folder: "the temporary copy of a branch, only left behind when you stop a review (for example with Ctrl+C) or sentinel cannot remove it". Sec. 2 sentence "removes that copy when the review ends" kept (true for any normal end). | privacy sec. 3 | Cleanup runs in-process after the pipeline, default policy `always`: `run-review.ts:268-285,520-557` (`request.cleanupPolicy ?? "always"`, faults only annotate `cleanup-failed`), `resolve-review-request.ts:89` (policy omitted); no SIGINT/SIGTERM handler in the review path (grep of `src/`, only `clack-prompter.ts` comments and process-runner kill escalation), so a killed process skips cleanup; folder `worktrees/`: `paths.ts:90`, path layout `workspace/helpers.ts:42`; orphan listing exists because leftovers happen: `list-orphan-worktrees.ts:1-10`. |
+| R4-004 | One sentence in sec. 1: "If you set `SENTINEL_HOME`, use that folder instead of `~/.sentinel` in every path below." Sec. 7 check gains "and that it sits under your sentinel folder". | build-your-own-harness sec. 1 and 7 | `resolveSentinelHome`: `paths.ts:62-69`; harness and skills dirs derive from the root: `paths.ts:84-93`. |
+| R2-003 | Terminology fixed: "sentinel's copy of the repository" = the clone (quick-start sec. 3 existing wording, sec. 4 `review` now says "sentinel's copy of the repository, downloaded at `repo add`", privacy `clones/` bullet "sentinel's copy of each repository you registered, in full"); "temporary copy of the branch" = the per-review checkout (privacy sec. 2, new `worktrees/` bullet, Mermaid node A relabeled "Temporary copy of the branch"). Still 5 nodes, no styles. | quick-start sec. 4, privacy sec. 1-3 | Clone dir `clones/<owner>/<repo>`: `register-repo.ts:84`; temporary checkout: `worktrees/` per above, engine cwd `claude-code-adapter.ts:118`. |
+| R2-002 | Kept and softened (dropping the clause would hide a real input to the prompt, so the shorter-wins rule does not apply): prompt bullet reads "the output of check commands configured for the repository, if any (these docs do not cover them)"; `validations/` bullet reads "the output of those check commands, only when some ran". | privacy sec. 1 and 3 | `assemblePrompt` adds validation output after the diff when present: `assemble-prompt.ts:21-27`; runs only when declarations exist: `run-review.ts:425`; `validations/` only when output exists: `run-store-fs.ts:236-245`. |
+
+### Validation (all after the edits)
+
+| Check | Result |
+|---|---|
+| Relative links across `README.md` + three docs (python, every `](path)` target exists) | 0 broken |
+| `bash` blocks vs `HEAD` | identical (15 / 3 / 0) |
+| AC-4 jargon grep (`port\|adapter\|hexagonal\|use case\|composition root\|core\|terminal state\|worktree\|pipeline`, case-insensitive, word-bounded) | no hits. A loose grep for `worktree` matches only the literal folder name `~/.sentinel/worktrees/` in privacy sec. 3, which is a path the user sees on disk (AC-4 exemption for names printed or typed); QA may judge it. |
+| Mermaid | quick-start 0, guide 0, privacy 1 (5 nodes); no `style`, `classDef` or `%%{init` |
+| d-014: `grep -nE 'claude -p\|--model' docs/privacy.md` | empty; also no `no-session`, `setting-sources`, `strict-mcp` in any of the three docs |
+| `extraSkills` in the three docs | not present |
+| `npm run check` | exit 0 (biome 165 files, tsc, depcruise 107 modules no violations) |
+| `npm test` | exit 0 (50 files, 1039 tests) |
+| `git status --short` | only the three docs (plus these sdd-lite files) |
+
+### Blockers
+
+None. No CF row contradicted. R4-002: SSH is verified in code and mentioned. R2-002 kept (softened) rather than dropped, reason in the table.
+
+### QA handoff
+
+Recommended: final `sddl-qa-review` (final mode), disclosing the d-006 not-verified-live gap. Info rows never enter the protocol fix loop, so no scoped re-review is required (Amendment 1). Orchestrator should mark the ledger rows R1-001..R4-004 (except R2-002 softened) as addressed.
+
+### Next action
+
+Orchestrator: final QA, history entry, F1-F9 filing and PR (`Closes #43`).
 
 ## Appendix A - Saved `--help` texts (AC-7 reference, from the built CLI at 5b5786e)
 

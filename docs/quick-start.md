@@ -56,6 +56,8 @@ sentinel --help
 
 The command is also installed as `snt`. Three review types (called harnesses) come with it: `quick`, `pr-review` and `security`.
 
+Keep the `sentinel-kit` folder where it is: the installed command runs from it.
+
 ## 3. Add a repository
 
 Register the repository you want to review:
@@ -64,7 +66,9 @@ Register the repository you want to review:
 sentinel repo add <url>
 ```
 
-Replace `<url>` with the https address of your repository, for example `https://github.com/acme/widget.git`.
+Replace `<url>` with the https or ssh address of your repository, for example `https://github.com/acme/widget.git`. Do not put a token or password in the address (see [Credentials](privacy.md)).
+
+sentinel runs git without a prompt. For a private repository, git must already be able to clone it with stored credentials or an SSH key. If `repo add` fails, check the address and your access.
 
 sentinel names the repository `<owner/repo>` after the last two parts of the address: `acme/widget` in the example. It prints that name and `registered`.
 
@@ -90,7 +94,7 @@ Replace `<owner/repo>` with a name from `sentinel repo list` and `<branch>` with
 
 `--type` picks the harness. Without it, sentinel uses the repository's default harness, and stops with an error that names `--type` if there is none.
 
-`sentinel review` works on the copy downloaded at `repo add`; it does not pick up changes pushed later.
+`sentinel review` works on sentinel's copy of the repository, downloaded at `repo add`; it does not pick up changes pushed later.
 
 The result is printed as `key` and `value` lines. Read these:
 
@@ -114,13 +118,11 @@ sentinel runs show <owner/repo> <id>
 
 Replace `<id>` with an id from the list.
 
-Every review that started keeps a `runDir` folder. It holds:
+Every review that started keeps a `runDir` folder. The engine's answer is in `result.md`, when the engine gave one. [What sentinel sends and stores](privacy.md) lists the other files.
 
-- `metadata.json`: the details of the run
-- `prompt.md`: exactly what was sent to the engine, once sentinel had built it; see [What sentinel sends and stores](privacy.md)
-- `result.md`: the engine's answer, when the engine gave one
+If `state` is not `ok` or `ambiguous`, `failureStage` and `failureMessage` give a short reason. For example, `engine-error` at stage `engine` usually means the engine could not run: check that its CLI is installed and logged in.
 
-If `state` is not `ok`, `failureStage` and `failureMessage` give a short reason. For example, `engine-error` at stage `engine` usually means the engine could not run: check that its CLI is installed and logged in.
+`ambiguous` means the engine answered but sentinel found no verdict line. Both fields show `-`: read `result.md`.
 
 If sentinel cannot start a review at all, for example when `--type` is missing, it prints one line and keeps no run folder.
 

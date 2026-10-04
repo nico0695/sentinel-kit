@@ -4,7 +4,7 @@ Write your own review instructions and run them with `sentinel review --type`.
 
 ## 1. How a harness works
 
-A harness is a folder of review instructions. The folder name is the value you pass to `--type`. Your harnesses live in `~/.sentinel/harnesses/<name>/`, inside your sentinel folder (`~/.sentinel`, see the [Quick start](quick-start.md)).
+A harness is a folder of review instructions. The folder name is the value you pass to `--type`. Your harnesses live in `~/.sentinel/harnesses/<name>/`, inside your sentinel folder (`~/.sentinel`, see the [Quick start](quick-start.md)). If you set `SENTINEL_HOME`, use that folder instead of `~/.sentinel` in every path below.
 
 | File | Required | What it holds |
 |---|---|---|
@@ -16,7 +16,7 @@ A skill is a short markdown file with extra rules. Yours go in `~/.sentinel/skil
 
 If a harness or a skill has the same name as one that comes with sentinel, yours is used.
 
-sentinel sends `harness.md`, then the skills, then `output.md`, then the diff.
+The order of the prompt is listed in [What sentinel sends and stores](privacy.md).
 
 This guide builds a harness called `my-review`.
 
@@ -118,7 +118,7 @@ After that, `sentinel review <owner/repo> <branch>` uses `my-review` without `--
 
 ## 7. Check it is picked up
 
-Run `sentinel` in a terminal, then pick a repository and a branch. `my-review` is in the list of harnesses. Press Ctrl+C to leave: sentinel prints "Review cancelled — nothing was run." and stops. If `my-review` is not in the list, check the folder name and that it holds `harness.md`.
+Run `sentinel` in a terminal, then pick a repository and a branch. `my-review` is in the list of harnesses. Press Ctrl+C to leave: sentinel prints "Review cancelled — nothing was run." and stops. If `my-review` is not in the list, check the folder name, that it holds `harness.md`, and that it sits under your sentinel folder.
 
 Every review loads every harness, yours and the ones that come with sentinel. One broken folder, for example one without `harness.md`, stops all reviews. They end with `state validation-failed`, `failureStage harness` and a `failureMessage` that names the problem, such as `Missing required harness.md in harness "broken"`. Fix the folder or delete it.
 

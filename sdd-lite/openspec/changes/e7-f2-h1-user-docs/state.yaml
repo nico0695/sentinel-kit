@@ -136,6 +136,24 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-015
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S6 (plan amendment 1): docs-only fixes for the 12 review-ledger info rows per
+      d-017, replacing sentences rather than adding sections; each new claim mapped to
+      file:line; SSH mentioned only if verified in code; re-run link check, AC-4 jargon grep,
+      Mermaid limits, d-014 grep, npm run check and npm test; no live model call.
+    options:
+      - id: approve
+        label: Approve S6
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-04T09:20:00Z"
+    created_at: "2026-10-04T09:15:00Z"
+    resolved_at: "2026-10-04T09:20:00Z"
   - id: cp-014
     type: review_gate
     stage: sddl-code-review

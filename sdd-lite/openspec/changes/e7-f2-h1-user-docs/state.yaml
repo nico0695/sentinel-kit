@@ -14,8 +14,8 @@ complexity_assessment:
     Low blast radius, medium ambiguity concentrated in the install path and verification.
   confidence: medium
   recorded_at: "2026-10-03T13:10:00Z"
-lifecycle_status: implementing
-current_stage: sddl-executor
+lifecycle_status: reviewing
+current_stage: sddl-qa-review
 stages:
   sddl-deep-explorer:
     status: pending
@@ -139,7 +139,17 @@ stages:
       npm run check and npm test exit 0 (1039 tests), git status = 3 docs + sdd-lite. No live model
       call, no CF row contradicted, no git side effects. Next: final sddl-qa-review (final mode).
   sddl-qa-review:
-    status: pending
+    status: completed
+    started_at: "2026-10-04T10:30:00Z"
+    completed_at: "2026-10-04T11:15:00Z"
+    notes: >-
+      Final QA, verdict pass_with_warnings. AC-1..AC-18 pass against the current post-S6 docs; AC-19
+      open by design (F1-F9 filed at PR time). QA re-ran npm run check and npm test (1039 tests),
+      link check, AC-4 jargon grep, Mermaid, d-014 grep, and the full verify-quickstart.sh replay in a
+      fresh sandbox (79/79, engine-absence 10/10, no model call) plus verify-verdict.mts (ALL PASS);
+      re-checked the S6 privacy claims, ssh alias, ambiguous output and SENTINEL_HOME against src/.
+      Warnings: W1 not verified live (d-006), W2 AC-19 and F1-F9 pending, W3 S6 commits exist only on
+      a detached HEAD (branch ref and origin still at 8fb52de). Completion withheld pending cp-017.
 artifacts:
   state: sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml
   proposal: sdd-lite/openspec/changes/e7-f2-h1-user-docs/proposal.md
@@ -149,6 +159,22 @@ artifacts:
   execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
   qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 checkpoints:
+  - id: cp-017
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA verdict pass_with_warnings (no finding above medium). Accept the warnings to close the
+      change: W1 not verified live (d-006), W2 AC-19 / F1-F9 filed at PR time, W3 S6 commits are on a
+      detached HEAD and must be moved onto the branch before the PR.
+    question: Accept the QA warnings and proceed to history entry, issue filing and PR?
+    options:
+      - id: accept_and_deliver
+        label: Accept warnings, then history entry, F1-F9 and PR
+        recommended: true
+      - id: fix_first
+        label: Request changes before closeout
+    free_input_allowed: true
+    created_at: "2026-10-04T11:15:00Z"
   - id: cp-016
     type: stage_approval
     stage: sddl-qa-review
@@ -497,6 +523,23 @@ checkpoints:
     created_at: "2026-10-03T13:10:00Z"
     resolved_at: "2026-10-03T13:30:00Z"
 decisions:
+  - id: d-019
+    checkpoint_id: incident
+    free_text: review-worker checkout incident and recovery
+    rationale: >-
+      Incident: during the forced full-4r fan-out (d-016) one read-only review worker ran
+      `git checkout 8fb52de` (reflog 2026-10-03 19:24:36Z), detaching HEAD. The worker could not
+      be identified (R1, R3 and R4 all read the frozen commit; R2 reported HEAD at 471da66). No
+      file content changed (HEAD was already 8fb52de), but every later commit landed on the
+      detached HEAD and the orchestrator's `git push origin <branch>` pushed the stale ref
+      (silently, -q). Impact on findings: none material. All 12 rows were info, the
+      orchestrator re-verified the privacy rows against code, and final QA independently
+      re-checked them, so the findings are kept with this note rather than discarded.
+      Recovery: ancestor check, `git branch -f` to 8e91c5a, checkout, fast-forward push. Lesson:
+      future review envelopes must forbid checkout explicitly, and the orchestrator verifies
+      `git status -sb` after fan-out and after each push. Author: claude (orchestrator); found by
+      QA (W3).
+    recorded_at: "2026-10-04T11:30:00Z"
   - id: d-018
     checkpoint_id: cp-016
     selected_option_id: accept_and_qa
@@ -671,6 +714,24 @@ decisions:
       Author: user.
     recorded_at: "2026-10-03T13:10:00Z"
 open_risks:
+  - id: risk-e7f2h1-012
+    summary: >-
+      QA W3: commits f75d246 (S6), 239d7a9, 8e91c5a and the 4R/state commits exist only on a detached
+      HEAD; the branch ref claude/nifty-heisenberg-w3gn8z and its origin are at 8fb52de. Move or
+      push the branch to the current HEAD before the PR or the S6 docs fix is lost.
+      RESOLVED 2026-10-04 by the orchestrator: reflog shows `checkout: moving from
+      claude/nifty-heisenberg-w3gn8z to 8fb52de` at 2026-10-03 19:24:36Z, during the 4R lens
+      fan-out (a read-only review worker ran a state-changing checkout of the frozen target;
+      d-019). The branch was fast-forwarded to 8e91c5a (ancestor check passed, no history
+      rewrite), checked out, and pushed (8fb52de..8e91c5a).
+    severity: low
+    status: resolved
+  - id: risk-e7f2h1-013
+    summary: >-
+      QA W2: AC-19 open. F1-F9 (F8 Claude Code isolation flags, F9 OpenCode config precedence) must
+      be filed and listed in the PR body together with the d-006 not-verified-live gap
+      (risk-e7f2h1-002) and the d-016 / d-018 disclosures.
+    severity: medium
   - id: risk-e7f2h1-010
     summary: >-
       S5 observation: npm install -g . from a directory installs a symlink to the cloned folder, so
@@ -734,6 +795,15 @@ open_risks:
       usage is repo add <url>; repo add --local-path without an origin remote needs
       --base-branch). To be filed as GitHub issues, not fixed in this PR.
     severity: low
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    AC-1..AC-18 pass against the post-S6 docs; AC-19 deferred to PR time. Gates re-run green, replay
+    79/79 with engine absence 10/10, no model call. Warnings: not verified live (d-006), F1-F9 not
+    yet filed, S6 commits only on a detached HEAD. Completion deferred to final_review cp-017.
+  reported_at: "2026-10-04T11:15:00Z"
+  report_path: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
 review_summary:
   mode: 4r
   verdict: pass_with_warnings
@@ -753,10 +823,12 @@ review_summary:
     stored), R4-002 (private repos need stored git credentials). Fixing them is a user choice.
   ledger: sdd-lite/openspec/changes/e7-f2-h1-user-docs/review-ledger.md
 next_action:
-  kind: qa_review
+  kind: ask_user
+  target: cp-017
   summary: >-
-    S6 completed (docs-only fix of the review-ledger info rows, d-017). No scoped re-review is
-    required (Amendment 1). Run final sddl-qa-review (final mode), disclosing the d-006
-    not-verified-live gap, then history entry, F1-F9 filing and the PR (Closes #43).
+    Final QA is pass_with_warnings; completion is withheld until the user accepts the warnings
+    (cp-017). Then: history entry, move/push the branch to the current HEAD, file F1-F9, open the PR
+    (Closes #43) disclosing the d-006 not-verified-live gap, the d-016 rubric override and the d-018
+    R2-002 deviation. Recommended next stage after acceptance: sddl-delivery.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-04T10:00:00Z"
+updated_at: "2026-10-04T11:15:00Z"

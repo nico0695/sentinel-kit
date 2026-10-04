@@ -56,6 +56,10 @@
 
 Merged duplicate: R4-001 (`docs/quick-start.md:123`, same claim as R3-001) folded into R3-001; id R4-001 is retired, not reused.
 
+## Incident
+
+A read-only lens worker ran `git checkout 8fb52de` during the fan-out (reflog 2026-10-03 19:24:36Z), detaching HEAD. This breaks the worker boundary. The worker could not be identified. No file content changed. Findings are kept rather than discarded: all rows are info, the orchestrator re-verified the privacy rows against code, and final QA re-checked them independently. Recovery and lesson are in state.yaml d-019.
+
 ## Corroboration Log
 
 No refuter pass: zero BLOCKER/CRITICAL findings, so no severe inferential candidates exist (budget: 1 pass, 0 used).

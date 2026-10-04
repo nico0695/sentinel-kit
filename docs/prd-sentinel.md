@@ -274,14 +274,22 @@ Two ways to deliver the diff and instructions to the engine:
 ## 8. Decisions
 
 **Taken in this version**
+
 1. **Single product**: no separate "VPS tool" — server deployment is stage 3 of the same CLI (daemon as driving adapter). Single repo, single core.
 2. **Git tooling: own wrapper** over the `git` binary (execa + porcelain/machine-readable formats: `worktree list --porcelain`, `for-each-ref --format`, `merge-base`, `diff --numstat`). `simple-git` discarded: no first-class API for worktrees — the central operation of the flow — and small, well-known git surface that doesn't justify the dependency.
 3. **Naming: `sentinel`**. On npm: scoped package `@nico0695/sentinel` (`sentinel` and `sentinel-cli` are taken) with `bin: sentinel` + alias `snt` (mitigates collision with HashiCorp Sentinel binary).
 4. **Language/runtime/stack**: TypeScript on Node ≥22 (target 24 LTS), runtime-agnostic code (Bun reserved as a compilation channel to single binary), npm distribution. Library stack, configs, executable guards, and pipelines defined in `setup-tecnico-sentinel.md` — **validated as recommendations, re-evaluated when implementing each piece**.
 
+<!-- Decision numbers are stable identifiers: 5 is still open. Separate lists keep 6 rendered as 6. -->
+
+6. **License: MIT** (closed in `[E7.F2.H2]`). The repository is already public, the public npm release of `@nico0695/sentinel` is planned in `[E7.F2.H3]`, and the runtime dependencies are permissively licensed (MIT/ISC). `LICENSE` lives at the repo root (copyright holder `nico0695`) and `package.json` declares `"license": "MIT"`.
+
 **Open**
+
 5. **`sentinel open` (interactive session)**: does it enter the MVP as optional or straight to stage 2?
-6. **License**: open source (MIT) vs. private — affects docs, npm scope, and repo visibility.
+
+<!-- Decision 6 moved to Taken; separate list keeps 7 rendered as 7. -->
+
 7. **Engine spike (§6.2)**: canonical communication mechanism per engine — input, output format, non-interactive execution mode, and permissions. Blocks adapter development; do it first.
 8. **Context spike (§6.3)**: validate autonomous diff and materialization of skills as native agent config vs. inline, comparing quality, tokens, and reproducibility over real PRs. Does not block the MVP (inline is the default); defines the roadmap for the assembler.
 

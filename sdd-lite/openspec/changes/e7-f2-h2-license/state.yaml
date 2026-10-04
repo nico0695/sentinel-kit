@@ -1,0 +1,265 @@
+version: "0.1"
+change_name: e7-f2-h2-license
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E7.F2.H2] (issue #44, milestone E7, required): decide MIT vs. private and apply
+    LICENSE, the package.json field and visibility consistently. Docs and metadata only, four
+    files, no src/ change. The user already decided MIT, the holder line and the scope limits in
+    chat. Low blast radius, low ambiguity.
+  confidence: high
+  recorded_at: "2026-10-04T12:00:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: pending
+  sddl-proposal:
+    status: completed
+    started_at: "2026-10-04T12:00:00Z"
+    completed_at: "2026-10-04T12:05:00Z"
+    notes: >-
+      proposal.md written, proposal_status ready. Gates: contradiction resolved (low, D3),
+      insufficient_context clear, ambiguous_framing clear. No exploration beyond manifests and
+      target lines. D1-D5 recorded from chat with authorship user.
+  sddl-spec:
+    status: completed
+    started_at: "2026-10-04T12:10:00Z"
+    completed_at: "2026-10-04T12:20:00Z"
+    notes: >-
+      spec.md written (full shape, compact). AC-1..AC-9 incl. grep consistency check (AC-6),
+      stable PRD decision identifiers when rendered (AC-5), check/test green (AC-7) and npm pack
+      LICENSE + license MIT (AC-8). All proposal open questions resolved (A-level, claude);
+      only the markdown mechanism for AC-5 is left to design. New low risk risk-e7f2h2-003.
+  sddl-design:
+    status: completed
+    started_at: "2026-10-04T12:25:00Z"
+    completed_at: "2026-10-04T12:35:00Z"
+    notes: >-
+      design.md written with verbatim text for LICENSE (canonical MIT), package.json (license
+      after version), PRD section 8 (HTML-comment-separated lists so identifiers render 1-4, 6
+      and 5, 7, 8; A-level, claude) and README lines 19 and 61. No execution questions carried.
+  sddl-plan:
+    status: completed
+    started_at: "2026-10-04T12:40:00Z"
+    completed_at: "2026-10-04T12:45:00Z"
+    notes: >-
+      plan.md written: single stage S1 applying design sections 1-4 verbatim plus validation
+      (npm ci prerequisite, AC-6 greps, check, test, npm pack, git status). No execution
+      questions to surface. All risks low.
+  sddl-executor:
+    status: completed
+    started_at: "2026-10-04T12:50:00Z"
+    completed_at: "2026-10-04T13:05:00Z"
+    notes: >-
+      S1 executed: LICENSE created, package.json license field, PRD section 8 restructured,
+      README lines 19 and 61 replaced; no deviation from design. Quick checks all pass:
+      npm run check green, npm test 50 files / 1039 tests green, npm pack lists LICENSE and
+      packed license is MIT, AC-6 greps clean, git status limited to the touch set.
+      package-lock.json unchanged after npm ci. QA review recommended, not auto-run.
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-10-04T13:10:00Z"
+    completed_at: "2026-10-04T13:30:00Z"
+    notes: >-
+      Final-mode QA over the four-file change: verdict pass, completion allowed. AC-1..AC-9
+      re-verified; npm run check (165 biome files, tsc clean, depcruise 107 modules) and
+      npm test (1039/1039, 50 files) re-run fresh; npm pack lists LICENSE and packed license is
+      MIT; touch set equals the four approved files, package-lock unchanged. AC-5 render proof
+      (commonmark 0.31) and LICENSE-vs-canonical-MIT comparison are orchestrator-provided
+      evidence. 4R skipped as trivial by the orchestrator; no review-ledger. Zero findings.
+qa_summary:
+  mode: final
+  verdict: pass
+  summary: >-
+    Final QA re-verified AC-1..AC-9 with fresh evidence (check and test green, npm pack lists
+    LICENSE with license MIT, touch set equals the four approved files). AC-5 render proof and
+    LICENSE-vs-canonical-MIT comparison are orchestrator-provided. Zero findings; low risks
+    001..003 remain accepted. Completion allowed.
+  reported_at: "2026-10-04T13:30:00Z"
+  report_path: ./sdd-lite/openspec/changes/e7-f2-h2-license/qa-report.md
+artifacts:
+  state: sdd-lite/openspec/changes/e7-f2-h2-license/state.yaml
+  proposal: sdd-lite/openspec/changes/e7-f2-h2-license/proposal.md
+  spec: sdd-lite/openspec/changes/e7-f2-h2-license/spec.md
+  design: sdd-lite/openspec/changes/e7-f2-h2-license/design.md
+  plan: sdd-lite/openspec/changes/e7-f2-h2-license/plan.md
+  execution_log: sdd-lite/openspec/changes/e7-f2-h2-license/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e7-f2-h2-license/qa-report.md
+checkpoints:
+  - id: cp-007
+    type: stage_approval
+    stage: sddl-executor
+    artifact: sdd-lite/openspec/changes/e7-f2-h2-license/plan.md
+    summary: >-
+      Stage S1 (apply design sections 1-4, then validation) approved by the user in chat
+      ("Aprobar S1"). Authorship: user.
+    decision: approved
+    created_at: "2026-10-04T12:50:00Z"
+    resolved_at: "2026-10-04T12:50:00Z"
+  - id: cp-006
+    type: phase_validation
+    stage: sddl-plan
+    artifact: sdd-lite/openspec/changes/e7-f2-h2-license/plan.md
+    summary: >-
+      Skipped: session mode auto, user already indicated advancement, single-stage plan, all
+      risks low. S1 still requires stage_approval.
+    decision: skipped
+    created_at: "2026-10-04T12:45:00Z"
+    resolved_at: "2026-10-04T12:45:00Z"
+  - id: cp-005
+    type: phase_validation
+    stage: sddl-design
+    artifact: sdd-lite/openspec/changes/e7-f2-h2-license/design.md
+    summary: >-
+      Skipped: session mode auto, user already indicated advancement, single design question
+      resolved with evidence, all risks low.
+    decision: skipped
+    created_at: "2026-10-04T12:35:00Z"
+    resolved_at: "2026-10-04T12:35:00Z"
+  - id: cp-004
+    type: phase_validation
+    stage: sddl-spec
+    artifact: sdd-lite/openspec/changes/e7-f2-h2-license/spec.md
+    summary: >-
+      Skipped: session mode auto, user already indicated advancement, no open question or risk
+      above low.
+    decision: skipped
+    created_at: "2026-10-04T12:20:00Z"
+    resolved_at: "2026-10-04T12:20:00Z"
+  - id: cp-001
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D1 and D4 (B): license choice and repository visibility. Claude recommended MIT because the
+      repo is already public, E7.F2.H3 plans a public npm publish with provenance, and the runtime
+      deps are permissive.
+    question: MIT or private?
+    options:
+      - id: mit
+        label: MIT
+        description: Apply MIT; repo stays public. Consistent with the planned public npm release.
+        recommended: true
+      - id: private
+        label: Private
+        description: Would contradict the E7.F2.H3 public publish plan and the already public repo.
+    free_input_allowed: true
+    response:
+      selected_option_id: mit
+      responded_at: "2026-10-04T11:58:00Z"
+    created_at: "2026-10-04T11:55:00Z"
+    resolved_at: "2026-10-04T11:58:00Z"
+  - id: cp-002
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D2 (B): copyright holder line. The user prefers not to use a real name when not required.
+    question: Which holder name goes in the LICENSE?
+    options:
+      - id: github_handle
+        label: GitHub handle
+        description: "Copyright (c) 2026 nico0695. MIT needs a holder but not a legal name."
+        recommended: true
+    free_input_allowed: true
+    response:
+      selected_option_id: github_handle
+      free_text: Avoid the real name if not needed; use the handle.
+      responded_at: "2026-10-04T11:59:00Z"
+    created_at: "2026-10-04T11:56:00Z"
+    resolved_at: "2026-10-04T11:59:00Z"
+  - id: cp-003
+    type: scope_change
+    stage: sddl-proposal
+    summary: >-
+      D3 and D5 (B): sdd-lite/ stays unmentioned in the LICENSE and the CLAUDE.md wording stays;
+      package.json repository/author fields are deferred to E7.F2.H3 (#45).
+    question: Confirm the scope limits for this story?
+    options:
+      - id: confirm_limits
+        label: Confirm limits
+        description: No sdd-lite carve-out, no CLAUDE.md edit, no repository/author fields here.
+        recommended: true
+    free_input_allowed: true
+    response:
+      selected_option_id: confirm_limits
+      responded_at: "2026-10-04T12:00:00Z"
+    created_at: "2026-10-04T11:57:00Z"
+    resolved_at: "2026-10-04T12:00:00Z"
+  - id: cp-008
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA approval granted by the user in chat (chose "QA + PR"). Recorded as a user
+      approval checkpoint; the verdict is a clean pass, so no warnings gate was needed.
+      Authorship: user.
+    question: Run final QA and proceed to PR closeout?
+    free_input_allowed: true
+    response:
+      free_text: QA + PR
+      responded_at: "2026-10-04T13:10:00Z"
+    created_at: "2026-10-04T13:10:00Z"
+    resolved_at: "2026-10-04T13:10:00Z"
+decisions:
+  - id: d-001
+    checkpoint_id: cp-001
+    selected_option_id: mit
+    rationale: >-
+      License is MIT, resolving PRD section 8 open decision 6. Repo already public, public npm
+      publish planned in E7.F2.H3, runtime deps permissive (commander, execa, zod, @clack/prompts
+      MIT; yaml, picocolors ISC). Author: user (recommended by claude).
+    recorded_at: "2026-10-04T11:58:00Z"
+  - id: d-002
+    checkpoint_id: cp-002
+    selected_option_id: github_handle
+    free_text: Copyright (c) 2026 nico0695
+    rationale: >-
+      Holder is the GitHub handle, not a legal name, per the user's wish to avoid the real name
+      when not required. Author: user directive, interpreted by claude and accepted by the user
+      (claude to user).
+    recorded_at: "2026-10-04T11:59:00Z"
+  - id: d-003
+    checkpoint_id: cp-003
+    free_text: sdd-lite is the user's own public work.
+    rationale: >-
+      The LICENSE does not mention sdd-lite (no carve-out, no extra notice). The CLAUDE.md
+      "vendored third-party" wording is not changed in this story. Author: user.
+    recorded_at: "2026-10-04T12:00:00Z"
+  - id: d-004
+    checkpoint_id: cp-001
+    rationale: >-
+      Repository visibility is already public; no change is needed. Author: user.
+    recorded_at: "2026-10-04T11:58:00Z"
+  - id: d-005
+    checkpoint_id: cp-003
+    rationale: >-
+      package.json repository and author fields (needed by npm provenance) are out of scope and
+      deferred to E7.F2.H3 (issue #45). Author: user.
+    recorded_at: "2026-10-04T12:00:00Z"
+open_risks:
+  - id: risk-e7f2h2-001
+    summary: >-
+      CLAUDE.md language policy calls sdd-lite/ vendored third-party content while the MIT LICENSE
+      will cover the whole repo including it. Wording inconsistency left by user choice (d-003);
+      worth a later follow-up.
+    severity: low
+  - id: risk-e7f2h2-002
+    summary: >-
+      biome.json includes package.json but not LICENSE, README or the PRD, so npm run check will
+      not catch drift between them; the spec needs an explicit consistency check (grep).
+    severity: low
+  - id: risk-e7f2h2-003
+    summary: >-
+      sdd-lite/project-context.md line 121 still describes PRD decision 6 as unresolved after
+      this change; it is a bootstrap file refreshed by sddl-init, not an executor target.
+    severity: low
+next_action:
+  kind: complete
+  target: orchestrator
+  summary: >-
+    Change completed (final QA pass, zero findings). Orchestrator-owned closeout: history entry,
+    optional sddl-delivery drafting, PR "[E7.F2.H2] License applied" with Closes #44 (never
+    merge, never push to main). recommended_next_stage: sddl-delivery.
+created_at: "2026-10-04T12:00:00Z"
+updated_at: "2026-10-04T13:30:00Z"

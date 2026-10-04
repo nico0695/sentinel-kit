@@ -66,6 +66,8 @@ stages:
       guide, S4 privacy + README (carries d-014), S5 full verification + gate. Each gated by its
       own stage_approval. Design Needed-Before-execution rows (F1-F7, V8 exit code) recorded in
       Approval Notes. F1-F7 filing, 4R, QA, history, PR are downstream orchestrator gates.
+      Amendment 1 (d-017, cp-014): S6 docs-only fix stage for the review-ledger info rows
+      appended to plan.md, own stage_approval, no scoped re-review required; F8/F9 filed at PR time.
   sddl-executor:
     status: completed
     started_at: "2026-10-03T16:20:00Z"
@@ -694,12 +696,11 @@ review_summary:
     stored), R4-002 (private repos need stored git credentials). Fixing them is a user choice.
   ledger: sdd-lite/openspec/changes/e7-f2-h1-user-docs/review-ledger.md
 next_action:
-  kind: review_output
+  kind: stage_approval
   summary: >-
-    S5 complete (verification and gate green: full verify 79/79, literal replay 38/38, verdict
-    15/15, npm run check and npm test exit 0, diff = 3 docs + README + sdd-lite only; AC-1..AC-18
-    PASS with AC-5 caveat, AC-19 open at PR step). Next: orchestrator runs 4R review of the frozen
-    diff and triages findings (including risk-e7f2h1-010 and -011), then final sddl-qa-review
-    (must disclose the not-verified-live gap, d-006), then history entry, F1-F7 filing and the PR.
+    Plan amendment 1 written (S6, docs-only fix of review-ledger info rows, d-017/cp-014).
+    Awaiting stage_approval for S6. After S6 no scoped re-review is required; the orchestrator
+    runs final sddl-qa-review (disclosing the d-006 not-verified-live gap), then history entry,
+    F1-F9 filing and the PR.
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-03T19:10:00Z"
+updated_at: "2026-10-04T09:00:00Z"

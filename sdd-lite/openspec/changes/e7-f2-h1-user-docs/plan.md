@@ -26,6 +26,7 @@
 | S3 | Write `docs/build-your-own-harness.md` with the exact `my-review` example (harness.md, skills.yaml, house-rules.md, output.md). | S2 (links, placeholders explained once) | Create `docs/build-your-own-harness.md`. | V11, V12, V13 executed from the guide's literal files; `verify-verdict.mts` against the sandbox clone's `builtin-verdict-extraction.ts` and the example output.md (long synthetic answer parses to `request-changes`, verdict-first control gives `null`); `grep -i extraskills` empty; AC-4 grep. | No | yes |
 | S4 | Write `docs/privacy.md` (one Mermaid, 5 nodes) applying d-014; insert README "Using sentinel" section before `## Quick start (development)`. | S2, S3 | Create `docs/privacy.md`; edit `README.md` (one added section). | `grep -c '```mermaid'` = 1, no `style`/`classDef`/`%%{init`; `grep -nE 'claude -p|--model' docs/privacy.md` empty (d-014); OpenCode sentence present; AC-4 grep; `git diff README.md` shows only the added block (AC-17). | No | yes |
 | S5 | Full verification against the written docs and gate. Record claim-to-CF table (AC-14) and AC-1..AC-18 evidence in execution-log.md. | S1-S4 | Edit `execution-log.md` only (plus script fixes if the scripts, not the docs, were wrong). | Commands extracted from the three docs equal what the scripts execute; full `verify-quickstart.sh` and `verify-verdict.mts` green; cross-doc read (AC-5); `npm run check` and `npm test` green; `git diff --stat main` shows only 3 docs + README + sdd-lite/history, nothing under `src/`, `e2e/`, `fixtures/`, `harnesses/`, `skills/`, `package.json`, or contributor docs (AC-1, AC-18). | No | yes |
+| S6 | Docs-only fix of the review-ledger info rows (d-017, cp-014). See Amendment 1. | S5 | Edit `docs/quick-start.md`, `docs/build-your-own-harness.md`, `docs/privacy.md`; `README.md` only if a link changes; append to `execution-log.md`. | Per Amendment 1: claim-to-code table, literal replay of changed commands, link check, AC-4 grep, Mermaid limits, d-014 grep, `npm run check` + `npm test`, diff limited to the docs. | No | yes |
 
 ## Validation Strategy
 
@@ -61,3 +62,42 @@
 ## Budget Notes
 
 - Over the 300-500 word target because the stage table carries per-stage validation and stop rules.
+
+## Amendment 1 (S6, d-017 / cp-014)
+
+S1-S5 rows are unchanged. S6 is a docs-only fix stage from the review-ledger info rows, with its own `stage_approval`. Info rows never enter the protocol fix loop, so a scoped re-review is NOT required; the orchestrator runs final QA after S6.
+
+Binding: d-001 brevity (short sentences, user language, each concept once, at most 1 Mermaid per doc), small net growth, replace sentences rather than add sections. Every new claim is recorded as claim -> file:line in `execution-log.md`.
+
+### S6 work units (one per ledger id)
+
+| Id | Doc | Change |
+|---|---|---|
+| R3-001 | quick-start sec. 5 | Replace the "failureStage/failureMessage give a short reason" sentence: `ambiguous` means the engine answered but sentinel found no verdict line; both fields print `-`; read `result.md`. Short. |
+| R4-002 | quick-start sec. 3 | Private repo: git must already clone it without asking (stored credentials or SSH); if `repo add` fails, check address and access. Executor verifies in code that `repo add` accepts an ssh URL before mentioning SSH; otherwise drop SSH. Consistent with `repo add --help`. |
+| R1-005 | privacy credentials + quick-start sec. 3 | No tokens or passwords in the repository address; sentinel saves it as given. Say once, link from the other doc. |
+| R4-003 | quick-start sec. 2 | One line: keep the cloned folder where it is (the installed command uses it). |
+| R2-001 | quick-start sec. 5, privacy sec. 3, privacy/guide | Run-folder contents listed in ONE doc (privacy sec. 3; includes `validations/`), linked from quick-start sec. 5. Prompt contents/order stated once (privacy sec. 1 or guide sec. 1), linked from the other. |
+| R1-001 | privacy | Claude Code keeps its own session history of each review prompt (which includes the diff) on the user's machine. |
+| R1-002 | privacy | The engine runs inside the reviewed branch, so that branch's own Claude Code project settings can apply too. User terms. |
+| R1-003 | privacy | Soften the OpenCode sentence ("sentinel asks OpenCode to block..." / "sentinel's OpenCode settings deny..."), worded per `permission-config.ts`. No precedence claim. |
+| R1-004 | privacy | Temporary copy removed when the review ends normally; if interrupted it can stay under `~/.sentinel/worktrees/` (add to the disk list). |
+| R4-004 | guide sec. 1/7 | One sentence: with `SENTINEL_HOME` set, use that folder instead of `~/.sentinel` in every path; add location to sec. 7's "not in the list" check. |
+| R2-003 | privacy, quick-start | Use "sentinel's copy of the repository" (clone) vs "a temporary copy of the branch" consistently; relabel the Mermaid node (still 5 nodes or fewer, no styles). |
+| R2-002 | privacy | Validations clause: keep factual but state it applies only if check commands are configured (not covered by these docs), or drop it; choose the shorter. |
+
+### S6 validation
+
+- Claim -> code table in `execution-log.md` (including the ssh-URL check for R4-002 and the `permission-config.ts` wording for R1-003).
+- Re-run the affected verification: literal replay of any changed command (none expected), link check, AC-4 jargon grep, Mermaid limits (`grep -c '```mermaid'` at most 1 per doc, no `style`/`classDef`/`%%{init`), d-014 grep (`grep -nE 'claude -p|--model' docs/privacy.md` empty).
+- No live model call (d-006). `npm run check` and `npm test` stay green.
+- `git diff` limited to the three docs (README untouched unless a link changes) plus sdd-lite files.
+- Stop conditions as in Validation Strategy; a claim code cannot support is removed, not softened further.
+
+### Post-execution gates (orchestrator, not stages)
+
+Final QA after S6, history entry, then at PR time file F1-F7 plus product follow-ups F8 (Claude Code isolation flags) and F9 (OpenCode config precedence). The PR body lists them and the d-006 gap.
+
+### Approval request
+
+S6 only.

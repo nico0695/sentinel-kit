@@ -1,0 +1,850 @@
+version: "0.1"
+change_name: e7-f2-h1-user-docs
+objective: new-feature
+mode: lite
+complexity_assessment:
+  route: continue-lite
+  summary: >-
+    Story [E7.F2.H1] (issue #43, milestone E7, required): user documentation for people who
+    install and use sentinel, not contributors. Docs-only, no production code. The user
+    mandated the format (at most 3 flat docs, one per issue criterion, linked from README,
+    minimal repeated structure, at most one small Mermaid per doc). Bounded span but four
+    B-level decisions: the install path (package unpublished, #45 pending), file names, where
+    config.yaml/repos.yaml are documented under the 3-doc cap, and live-engine verification.
+    Low blast radius, medium ambiguity concentrated in the install path and verification.
+  confidence: medium
+  recorded_at: "2026-10-03T13:10:00Z"
+lifecycle_status: completed
+current_stage: sddl-qa-review
+stages:
+  sddl-deep-explorer:
+    status: pending
+  sddl-proposal:
+    status: completed
+    started_at: "2026-10-03T13:10:00Z"
+    completed_at: "2026-10-03T13:30:00Z"
+    notes: >-
+      proposal.md written; returned partial (needs-input), then D1-D4 resolved by the user
+      (d-003..d-006; proposal.md's decision table still reads "pending" - state.yaml is the
+      authority for the resolution). Four B-level decisions D1-D4 each
+      carry a recommendation and are recorded as unresolved checkpoints cp-001..cp-004.
+      Lightweight exploration plus a sandbox install trial confirmed that npm pack + global
+      install and npm install -g . both produce a working sentinel/snt with factory harnesses.
+  sddl-spec:
+    status: completed
+    started_at: "2026-10-03T13:40:00Z"
+    completed_at: "2026-10-03T14:20:00Z"
+    notes: >-
+      spec.md written with a verified Code Facts table (CF-1..CF-17), AC-1..AC-19 written for
+      structural-only verification (d-006), follow-ups F1-F7. Proposal questions closed: harness
+      without output.md is accepted but asks for no verdict (CF-10); config fields narrowed to
+      defaultEngine/defaultHarness (A-1, extraSkills not wired); exit codes by pointer to
+      review --help (A-2); TUI interactive-only (A-3); README links-only (A-4). New facts raised
+      two B decisions (resolved by the user as d-011/d-012 and the spec validated at cp-007): D5 verdict position in the harness example (parser reads only the tail
+      window, factory output.md asks for the first line) and D6 stale managed clone (review
+      never fetches). Partial until D5/D6 are answered.
+  sddl-design:
+    status: completed
+    started_at: "2026-10-03T14:45:00Z"
+    completed_at: "2026-10-03T15:20:00Z"
+    notes: >-
+      design.md written: per-doc outlines mapped to CF rows (one Mermaid in total, privacy data
+      flow, 5 nodes), exact harness example my-review (harness.md, skills.yaml, output.md with
+      the VERDICT line last, user skill house-rules) checked against the loader, schema and
+      builtin-verdict-extraction.ts, README insert before "Quick start (development)", sandbox
+      verification V1-V15 plus verdict check as scripts kept in the change dir (sandbox state in
+      the scratchpad; PATH shim drops /opt/node22/bin), F1-F7 drafts, AC mapping. A-level
+      resolutions: guide check = interactive harness list; D6 sentence scoped to sentinel review
+      (interactive mode fetches); CF-13 corrected (runs/<owner>__<repo>/<id>, result.md only when
+      the engine answered); skills.yaml requires skills when present. No B/C item.
+  sddl-plan:
+    status: completed
+    started_at: "2026-10-03T15:45:00Z"
+    completed_at: "2026-10-03T16:00:00Z"
+    notes: >-
+      plan.md written: five sequential stages S1 scripts + dry baseline, S2 quick-start, S3 harness
+      guide, S4 privacy + README (carries d-014), S5 full verification + gate. Each gated by its
+      own stage_approval. Design Needed-Before-execution rows (F1-F7, V8 exit code) recorded in
+      Approval Notes. F1-F7 filing, 4R, QA, history, PR are downstream orchestrator gates.
+      Amendment 1 (d-017, cp-014): S6 docs-only fix stage for the review-ledger info rows
+      appended to plan.md, own stage_approval, no scoped re-review required; F8/F9 filed at PR time.
+  sddl-executor:
+    status: completed
+    started_at: "2026-10-03T16:20:00Z"
+    completed_at: "2026-10-03T19:10:00Z"
+    notes: >-
+      S1 completed (stage_approval cp-008). verify-quickstart.sh (V1-V15) and verify-verdict.mts
+      written in the change dir; execution-log.md started. Dry baseline against branch HEAD 5b5786e
+      in the scratchpad sandbox sb-s1: all 79 checks green (V1-V8, V10, V13, V14, V15 required; V9,
+      V11, V12 and the verdict check also pass as informational runs on the design's embedded
+      example). V8 observed exit code without SENTINEL_OPENCODE_MODEL = 1 (message only to be
+      documented). Engine absence asserted 10 of 10 before reviews; no model invoked; real
+      ~/.sentinel, npm prefix and gitconfig unchanged. No CF row contradicted; wording notes for
+      S2-S5 recorded in execution-log.md (generic failureMessage for a missing engine, third repo add
+      column is "-", pre-run errors exit 1 without a run while harness failures exit 2 with a run).
+      Scripts are not covered by biome/tsconfig (confirmed). S2-S5 pending, each needs its own
+      stage_approval. QA review not recommended after S1 (non-code stage).
+      S2 completed (stage_approval cp-009): docs/quick-start.md written (sections 1-7, D6 sentence in
+      section 4, no Mermaid, AC-4 grep clean). Full verify-quickstart.sh in sandbox sb-s2: 79 of 79
+      green, engine absence asserted 10 of 10, no model invoked; doc bash blocks extracted by script
+      and replayed literally against a second origin with the documented outputs. Doc-command to
+      V-step map and AC-7 check recorded in execution-log.md. Run folder wording qualified after
+      observing that harness-stage failures persist only metadata.json. No CF row contradicted;
+      scripts unchanged. S3-S5 pending, each needs its own stage_approval.
+      S3 completed (stage_approval cp-010): docs/build-your-own-harness.md written (sections 1-7,
+      Next steps, no Mermaid, AC-4 grep clean, no extraSkills or contextMode). The four my-review
+      files extracted literally from the guide are byte-identical to design.md's Harness Example.
+      Sandbox sb-s3 (HEAD 0c29671) with VQ_HARNESS_DIR pointing at the extracted files: V4, V11,
+      V12, V13, V15 green, 50 of 50 checks; engine absence asserted 5 of 5, no model invoked.
+      verify-verdict.mts against the extracted output.md: ALL PASS (long answer with the verdict
+      last gives request-changes; verdict-first control gives null). "Review cancelled - nothing
+      was run." confirmed in tui-flow.ts. No CF row contradicted; scripts unchanged. S4 (privacy,
+      README, d-015 one-line quick-start fix) and S5 pending, each needs its own stage_approval.
+      S4 completed (stage_approval cp-011): docs/privacy.md written (sections 1-5, Next steps, one
+      5-node Mermaid without styles, d-014 applied: no engine flags, OpenCode deny sentence kept and
+      verified against permission-config.ts); README "Using sentinel" block inserted before
+      "Quick start (development)" (git diff shows only the added block); d-015 applied (single-line
+      change in docs/quick-start.md section 6). Greps clean (Mermaid 1/0/0, no style/classDef/init,
+      no claude -p or --model, AC-4 empty), all relative links resolve. Claim-to-CF/code map for AC-14
+      recorded in execution-log.md; no claim removed, none unsupported. No CF row contradicted;
+      nothing outside the S4 scope touched; no git side effects. QA deferred (non-code stage). S5
+      pending, needs its own stage_approval.
+      S5 completed (stage_approval cp-012), verification only; docs and scripts unchanged. Doc bash
+      blocks extracted by script (quick-start 15, guide 3, privacy 0, one command each) and mapped
+      to V-steps; every doc command is covered by verify-quickstart.sh or the literal replay (only the
+      install block and the interactive harness list/Ctrl+C step are not run literally: install by V2
+      with the local clone per plan, TUI structural). Full verify-quickstart.sh in sb-s5 (HEAD
+      9998593, VQ_HARNESS_DIR = four files extracted from the written guide): 79/79 PASS, engine
+      absence 10/10; literal replay with SENTINEL_HOME unset (default ~/.sentinel under a sandbox
+      HOME): 38/38 PASS, guard 12/12, includes quick-start section 6 after d-015 (opencode needs a
+      model id also via defaultEngine; defaultEngine honored). verify-verdict.mts ALL PASS (15).
+      Cross-doc: format rules, AC-3, AC-4, links all clean; AC-5 PASS-WITH-CAVEAT (run-folder file
+      list in quick-start 5 and privacy 3, prompt composition in guide 1 and privacy 1). Final
+      AC-1..AC-19 table in execution-log.md: no FAIL; AC-19 open until the PR step; not-verified-live
+      caveat row recorded. npm run check exit 0, npm test exit 0 (50 files, 1039 tests; npm ci run
+      in the repo to create git-ignored node_modules). git diff --stat origin/main...HEAD: 3 docs,
+      README, sdd-lite only. No contradiction, no blocker, no git side effects. Next: 4R review
+      triage, then final QA.
+      S6 completed (stage_approval cp-015, plan Amendment 1, d-017): the 12 review-ledger info rows
+      resolved in the three docs only (README and review-ledger.md untouched). Net +7 lines
+      (quick-start 166->168, guide 130->130, privacy 61->66), no section added, Mermaid still 1 with 5
+      nodes, no bash block changed (compared with HEAD). R3-001 ambiguous guidance, R4-002 private repo
+      and ssh (verified: deriveAlias and repo add --help accept ssh), R1-005 token-in-URL (privacy sec.
+      5 + link), R4-003 keep the folder, R2-001 run-folder list and prompt order once (links), R1-001
+      Claude Code session history, R1-002 branch settings can apply, R1-003 OpenCode wording per
+      permission-config.ts, R1-004 interrupted review leaves worktrees/, R4-004 SENTINEL_HOME in the
+      guide, R2-003 clone vs temporary copy terminology and Mermaid node, R2-002 kept and softened
+      (the clause is a real prompt input). Claim-to-code table in execution-log.md. Links 0 broken,
+      AC-4 grep clean (loose grep hits only the on-disk folder name worktrees/), d-014 grep empty,
+      npm run check and npm test exit 0 (1039 tests), git status = 3 docs + sdd-lite. No live model
+      call, no CF row contradicted, no git side effects. Next: final sddl-qa-review (final mode).
+  sddl-qa-review:
+    status: completed
+    started_at: "2026-10-04T10:30:00Z"
+    completed_at: "2026-10-04T11:15:00Z"
+    notes: >-
+      Final QA, verdict pass_with_warnings. AC-1..AC-18 pass against the current post-S6 docs; AC-19
+      open by design (F1-F9 filed at PR time). QA re-ran npm run check and npm test (1039 tests),
+      link check, AC-4 jargon grep, Mermaid, d-014 grep, and the full verify-quickstart.sh replay in a
+      fresh sandbox (79/79, engine-absence 10/10, no model call) plus verify-verdict.mts (ALL PASS);
+      re-checked the S6 privacy claims, ssh alias, ambiguous output and SENTINEL_HOME against src/.
+      Warnings: W1 not verified live (d-006), W2 AC-19 and F1-F9 pending, W3 S6 commits exist only on
+      a detached HEAD (branch ref and origin still at 8fb52de). Completion withheld pending cp-017.
+artifacts:
+  state: sdd-lite/openspec/changes/e7-f2-h1-user-docs/state.yaml
+  proposal: sdd-lite/openspec/changes/e7-f2-h1-user-docs/proposal.md
+  spec: sdd-lite/openspec/changes/e7-f2-h1-user-docs/spec.md
+  design: sdd-lite/openspec/changes/e7-f2-h1-user-docs/design.md
+  plan: sdd-lite/openspec/changes/e7-f2-h1-user-docs/plan.md
+  execution_log: sdd-lite/openspec/changes/e7-f2-h1-user-docs/execution-log.md
+  qa_report: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
+checkpoints:
+  - id: cp-017
+    type: final_review
+    stage: sddl-qa-review
+    summary: >-
+      Final QA verdict pass_with_warnings (no finding above medium). Accept the warnings to close the
+      change: W1 not verified live (d-006), W2 AC-19 / F1-F9 filed at PR time, W3 S6 commits are on a
+      detached HEAD and must be moved onto the branch before the PR.
+    question: Accept the QA warnings and proceed to history entry, issue filing and PR?
+    options:
+      - id: accept_and_deliver
+        label: Accept warnings, then history entry, F1-F9 and PR
+        recommended: true
+      - id: fix_first
+        label: Request changes before closeout
+    free_input_allowed: true
+    response:
+      selected_option_id: accept_and_deliver
+      responded_at: "2026-10-04T11:40:00Z"
+    created_at: "2026-10-04T11:15:00Z"
+    resolved_at: "2026-10-04T11:40:00Z"
+  - id: cp-016
+    type: stage_approval
+    stage: sddl-qa-review
+    summary: >-
+      Go-ahead for final QA after S6 (f75d246), asked together with accepting the executor's
+      deviation on R2-002 (kept and softened instead of dropped).
+    options:
+      - id: accept_and_qa
+        label: Accept R2-002 as is and run final QA
+      - id: drop_r2_002
+        label: Drop the clause first
+    response:
+      selected_option_id: accept_and_qa
+      responded_at: "2026-10-04T10:20:00Z"
+    created_at: "2026-10-04T10:15:00Z"
+    resolved_at: "2026-10-04T10:20:00Z"
+  - id: cp-015
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S6 (plan amendment 1): docs-only fixes for the 12 review-ledger info rows per
+      d-017, replacing sentences rather than adding sections; each new claim mapped to
+      file:line; SSH mentioned only if verified in code; re-run link check, AC-4 jargon grep,
+      Mermaid limits, d-014 grep, npm run check and npm test; no live model call.
+    options:
+      - id: approve
+        label: Approve S6
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-04T09:20:00Z"
+    created_at: "2026-10-04T09:15:00Z"
+    resolved_at: "2026-10-04T09:20:00Z"
+  - id: cp-014
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      Review verdict pass_with_warnings, 0 severe, 12 info rows. Several info rows are real
+      accuracy or privacy-disclosure defects in user-facing text. Options: a docs-only S6 fix
+      stage plus two product follow-up issues, an accuracy-only S6, or no fix before final QA.
+    options:
+      - id: s6_docs_and_issues
+        label: S6 docs fix plus product follow-up issues
+        recommended: true
+      - id: s6_accuracy_only
+        label: S6 accuracy-only
+      - id: no_fix
+        label: No fix, carry as info
+    response:
+      selected_option_id: s6_docs_and_issues
+      responded_at: "2026-10-04T09:00:00Z"
+    created_at: "2026-10-03T19:50:00Z"
+    resolved_at: "2026-10-04T09:00:00Z"
+  - id: cp-013
+    type: review_gate
+    stage: sddl-code-review
+    summary: >-
+      After S5 the 4R rubric triages the frozen target (commit 8fb52de, docs diff sha256
+      148975f2...) as trivial (docs only, zero code/config), which skips review. The user's
+      session brief explicitly requires a 4R review. Options: full-4r adapted to docs, standard
+      with one reliability lens, or skip per the rubric.
+    options:
+      - id: full_4r_adapted
+        label: Forced full-4r with docs-adapted lenses
+        recommended: true
+      - id: standard_reliability
+        label: Standard, one reliability lens
+      - id: skip
+        label: Skip per rubric
+    response:
+      selected_option_id: full_4r_adapted
+      responded_at: "2026-10-03T19:20:00Z"
+    created_at: "2026-10-03T19:15:00Z"
+    resolved_at: "2026-10-03T19:20:00Z"
+  - id: cp-012
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S5: full verification. Doc-extracted commands vs script commands, a full
+      verify-quickstart.sh run in a fresh sandbox (including section 6 after d-015) and
+      verify-verdict.mts with no engine, cross-doc single-explanation read, npm run check and
+      npm test, and git diff --stat main proving no protected path changed. Writes only
+      execution-log.md and state.yaml.
+    options:
+      - id: approve
+        label: Approve S5
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T18:40:00Z"
+    created_at: "2026-10-03T18:35:00Z"
+    resolved_at: "2026-10-03T18:40:00Z"
+  - id: cp-011
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S4: write docs/privacy.md (5 sections, one 5-node Mermaid without styles, d-014
+      wording), insert the README "Using sentinel" section before "Quick start (development)",
+      and apply d-015 (one-line fix in docs/quick-start.md section 6).
+    options:
+      - id: approve
+        label: Approve S4
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T18:00:00Z"
+    created_at: "2026-10-03T17:55:00Z"
+    resolved_at: "2026-10-03T18:00:00Z"
+  - id: cp-010
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S3: write docs/build-your-own-harness.md with the exact my-review example from
+      design.md, then run V11-V13 and verify-verdict.mts against files extracted from the guide,
+      with no engine on PATH. Asked together with the quick-start section 6 wording fix (d-015).
+    options:
+      - id: approve
+        label: Approve S3
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T17:20:00Z"
+    created_at: "2026-10-03T17:15:00Z"
+    resolved_at: "2026-10-03T17:20:00Z"
+  - id: cp-009
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S2: write docs/quick-start.md per the design outline (7 sections, D6 sentence
+      in section 4, Next steps, no Mermaid), then re-run V1-V10 and V14 with commands extracted
+      from the doc and check every flag against the saved --help. No other file touched.
+    options:
+      - id: approve
+        label: Approve S2
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T16:40:00Z"
+    created_at: "2026-10-03T16:35:00Z"
+    resolved_at: "2026-10-03T16:40:00Z"
+  - id: cp-008
+    type: stage_approval
+    stage: sddl-executor
+    summary: >-
+      Gate before S1: write verify-quickstart.sh and verify-verdict.mts in the change dir, start
+      execution-log.md, and run the dry baseline in a scratchpad sandbox (fresh clone, isolated
+      SENTINEL_HOME and npm prefix, PATH without claude/opencode asserted before every review).
+      No src/, docs/ or README changes; no live model call.
+    options:
+      - id: approve
+        label: Approve S1
+      - id: adjust
+        label: Adjust first
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T16:10:00Z"
+    created_at: "2026-10-03T16:05:00Z"
+    resolved_at: "2026-10-03T16:10:00Z"
+  - id: cp-007
+    type: phase_validation
+    stage: sddl-spec
+    artifact: sdd-lite/openspec/changes/e7-f2-h1-user-docs/spec.md
+    summary: >-
+      Spec presented for validation: medium risks active and two B decisions (D5, D6) open.
+    decision: approved
+    response:
+      selected_option_id: approve
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
+  - id: cp-006
+    type: missing_context
+    stage: sddl-spec
+    summary: >-
+      D6 (B): sentinel review never fetches (only the TUI branch step does) and a bare base
+      name resolves to the local branch, which stays as of clone time. Later reviews of a
+      repository added by URL can miss new pushes or include unrelated base commits.
+    question: How does the quick start handle the stale managed copy?
+    options:
+      - id: refresh_command
+        label: Document one refresh command
+        description: >-
+          Short section "Review new changes later" with
+          git -C ~/.sentinel/clones/<owner>/<repo> pull --ff-only (repos added by URL);
+          verified in the AC-9 sandbox; F3 filed.
+        recommended: true
+      - id: note_only
+        label: One-sentence limitation, no command
+        description: States that sentinel reviews the copy downloaded at repo add; F3 filed.
+      - id: omit
+        label: Say nothing, file F3
+        description: Quick start covers the first review only; later wrong diffs stay silent.
+    free_input_allowed: true
+    response:
+      selected_option_id: note_only
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
+  - id: cp-005
+    type: missing_context
+    stage: sddl-spec
+    summary: >-
+      D5 (B): the built-in parser finds VERDICT only in the tail window (longer of the last 30
+      lines or 2000 chars). Factory output.md files ask for the verdict as the first line, so a
+      long review comes back ambiguous (F5). The guide's example must pick a position.
+    question: Where does the harness example ask for the verdict line?
+    options:
+      - id: last_line
+        label: Last line
+        description: >-
+          Robust with the parser for any length; differs from the factory harnesses' first-line
+          convention (not mentioned in the guide); F5 filed for the factory/parser mismatch.
+        recommended: true
+      - id: first_line
+        label: First line, like the factory harnesses
+        description: Consistent with factory files but inherits F5; AC-12 would fail for long output.
+      - id: first_and_last
+        label: Both first and last line
+        description: Identical repeated markers collapse; robust but more to explain.
+    free_input_allowed: true
+    response:
+      selected_option_id: last_line
+      responded_at: "2026-10-03T14:40:00Z"
+    created_at: "2026-10-03T14:20:00Z"
+    resolved_at: "2026-10-03T14:40:00Z"
+  - id: cp-004
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D4 (B): verification of the quick start against a real engine. The sandbox has `claude`
+      2.1.288 logged in through the host session's OAuth token and no `opencode`. A real review
+      sends the diff to Anthropic and spends that account's quota.
+    question: >-
+      How is the quick start verified against a real engine?
+    options:
+      - id: one_real_review
+        label: One real review of a tiny throwaway repo
+        description: >-
+          At the executor stage, with explicit approval, run one claude-code review of a
+          disposable repo (a few lines of diff). opencode is documented from code and
+          docs/engines and marked unverified live.
+        recommended: true
+      - id: structural_only
+        label: Structural verification only
+        description: >-
+          Verify install, repo add/list, runs list, error paths and the engine pre-flight
+          without invoking a model. The QA report states the gap honestly.
+      - id: user_runs_it
+        label: The user runs the live step
+        description: >-
+          Executor stops at the commands that need the engine; the user runs them on their
+          own machine and reports the result.
+    free_input_allowed: true
+    response:
+      selected_option_id: structural_only
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-003
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D3 (B): where config.yaml and repos.yaml are documented. The backlog lists
+      "configuration docs" separately; the user's cap is 3 docs, one per issue criterion.
+      There is no config command, so users edit the YAML by hand to change the default engine
+      or a repository's default harness.
+    question: Fold configuration into the three docs, or add a 4th?
+    options:
+      - id: fold
+        label: Fold into the three docs
+        description: >-
+          Engine choice (--engine, defaultEngine in config.yaml) in the quick start; repos.yaml
+          defaultHarness and extraSkills in the harness guide. Only fields verified end to end
+          are documented.
+        recommended: true
+      - id: fourth_doc
+        label: Add docs/configuration.md
+        description: >-
+          A fourth flat doc as the config reference. Breaks the one-per-criterion cap, so it
+          needs the user's explicit approval.
+      - id: readme_section
+        label: Put a short settings section in README
+        description: Keeps three docs but widens the README edit beyond links.
+    free_input_allowed: true
+    response:
+      selected_option_id: fold
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-002
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D2 (B): names and location of the three docs. Flat only, since nested folders and index
+      files are ruled out. Contributor docs already occupy docs/.
+    question: Which file names and location?
+    options:
+      - id: docs_flat
+        label: docs/quick-start.md, docs/build-your-own-harness.md, docs/privacy.md
+        description: >-
+          Flat, next to the contributor docs; README groups links under "Using sentinel" and
+          "Contributing".
+        recommended: true
+      - id: root_files
+        label: Root-level files
+        description: QUICKSTART.md and similar next to README; clutters the repository root.
+    free_input_allowed: true
+    response:
+      selected_option_id: docs_flat
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+  - id: cp-001
+    type: missing_context
+    stage: sddl-proposal
+    summary: >-
+      D1 (B): install path for the quick start. The package @nico0695/sentinel@0.0.0 is not
+      published (#45). Sandbox trial: npm ci, npm run build, then npm pack plus global install,
+      and npm install -g ., each yield working sentinel and snt commands with factory harnesses
+      resolved. There is no prepare script and dist/ is gitignored, so installing straight from
+      the git URL very likely fails (inferred, untested). Classified B, not C: no PRD text
+      requires a published install and the backlog dependency is E6.F1.H1.
+    question: What install does the quick start document?
+    options:
+      - id: from_source
+        label: Source install now, isolated in one step
+        description: >-
+          git clone, npm ci, npm run build, npm install -g . (Node 22+). Reproducible today;
+          #45 later swaps this single step for npm i -g.
+        recommended: true
+      - id: future_command
+        label: Document only the future npm i -g command
+        description: Not reproducible today and the command does not work yet; rejected.
+      - id: wait_for_release
+        label: Hold the story until #45 publishes
+        description: Reproducible but blocks a required story on an unrelated one.
+    free_input_allowed: true
+    response:
+      selected_option_id: from_source
+      responded_at: "2026-10-03T13:30:00Z"
+    created_at: "2026-10-03T13:10:00Z"
+    resolved_at: "2026-10-03T13:30:00Z"
+decisions:
+  - id: d-020
+    checkpoint_id: cp-017
+    selected_option_id: accept_and_deliver
+    rationale: >-
+      User accepted final QA pass_with_warnings (W1 not verified live per d-006; W2 F1-F9 filed
+      at PR time; W3 detached HEAD already resolved per d-019). Change marked completed by the
+      orchestrator on that acceptance. Next: history entry, file F1-F9, open the PR with
+      Closes #43. Author: user.
+    recorded_at: "2026-10-04T11:40:00Z"
+  - id: d-019
+    checkpoint_id: incident
+    free_text: review-worker checkout incident and recovery
+    rationale: >-
+      Incident: during the forced full-4r fan-out (d-016) one read-only review worker ran
+      `git checkout 8fb52de` (reflog 2026-10-03 19:24:36Z), detaching HEAD. The worker could not
+      be identified (R1, R3 and R4 all read the frozen commit; R2 reported HEAD at 471da66). No
+      file content changed (HEAD was already 8fb52de), but every later commit landed on the
+      detached HEAD and the orchestrator's `git push origin <branch>` pushed the stale ref
+      (silently, -q). Impact on findings: none material. All 12 rows were info, the
+      orchestrator re-verified the privacy rows against code, and final QA independently
+      re-checked them, so the findings are kept with this note rather than discarded.
+      Recovery: ancestor check, `git branch -f` to 8e91c5a, checkout, fast-forward push. Lesson:
+      future review envelopes must forbid checkout explicitly, and the orchestrator verifies
+      `git status -sb` after fan-out and after each push. Author: claude (orchestrator); found by
+      QA (W3).
+    recorded_at: "2026-10-04T11:30:00Z"
+  - id: d-018
+    checkpoint_id: cp-016
+    selected_option_id: accept_and_qa
+    rationale: >-
+      Accept the S6 executor's deviation from plan Amendment 1 on R2-002: the check-commands
+      clause is kept, softened ("check commands configured for the repository, if any (these
+      docs do not cover them)") instead of dropped, because validation output is a real prompt
+      input (assemble-prompt.ts) and dropping it would understate what is sent. Run final QA.
+      Author: claude (executor) -> user.
+    recorded_at: "2026-10-04T10:20:00Z"
+  - id: d-017
+    checkpoint_id: cp-014
+    selected_option_id: s6_docs_and_issues
+    rationale: >-
+      Fix info rows before final QA through a plan amendment (S6, docs-only, own
+      stage_approval), outside the protocol fix-round budget (info rows never enter the
+      protocol loop). S6 fixes R3-001, R1-001, R1-002, R1-004, R1-005, R4-002, R2-001, R4-004,
+      R4-003 (one line: keep the cloned folder in place) and R2-003, keeping d-001 brevity;
+      R1-003 and R2-002 are softened in wording. Two product follow-up issues are filed at PR
+      time with F1-F7: (F8) isolate Claude Code runs (--no-session-persistence,
+      --setting-sources / --strict-mcp-config) and (F9) verify and harden OpenCode config
+      precedence against a project opencode.json in the reviewed branch. Author: claude->user.
+    recorded_at: "2026-10-04T09:00:00Z"
+  - id: d-016
+    checkpoint_id: cp-013
+    selected_option_id: full_4r_adapted
+    rationale: >-
+      Rubric override: the target is trivial by the 4R rubric (docs only), but the user's session
+      brief mandates a 4R review. Run all four lenses with rules adapted to documentation (R1 risk
+      = privacy/security claims, R2 readability = d-001 format and user clarity, R3 reliability =
+      every claim vs code, R4 resilience = failure guidance and silent breakage) plus the single
+      refuter pass for severe inferential findings. Frozen target: commit 8fb52de, diff of
+      README.md and the three docs vs origin/main (sha256 148975f2...). Author: claude->user.
+    recorded_at: "2026-10-03T19:20:00Z"
+  - id: d-015
+    checkpoint_id: cp-010
+    free_text: quick-start section 6 wording fix folded into S4
+    rationale: >-
+      Orchestrator review of S2 found docs/quick-start.md section 6 says "To use OpenCode for one
+      review, name a model first", implying the model id is only needed for a one-off review.
+      SENTINEL_OPENCODE_MODEL is required whenever the opencode engine is resolved, including via
+      defaultEngine (src/main/container.ts). Fix: "OpenCode needs a model id. Set it first:".
+      Folded into S4's scope (one-line edit in docs/quick-start.md). Author: claude->user.
+    recorded_at: "2026-10-03T17:20:00Z"
+  - id: d-014
+    checkpoint_id: design
+    free_text: privacy section 2 wording for Claude Code
+    rationale: >-
+      Editorial adjustment to design.md privacy section 2, applied downstream (design.md is not
+      rewritten): the doc must not show the engine invocation flags (`claude -p --model sonnet`),
+      which the user never sees or types (d-001 user-language rule). Wording instead: Claude Code
+      runs with your own Claude Code permission settings; sentinel adds no limits of its own.
+      The OpenCode sentence (sentinel blocks file edits, shell commands and web fetches) stays.
+      Author: claude->user (claude proposed at the design checkpoint, user approved).
+    recorded_at: "2026-10-03T15:40:00Z"
+  - id: d-013
+    checkpoint_id: design
+    free_text: design-stage A decisions
+    rationale: >-
+      A-5 the guide confirms pickup via the interactive harness list (no model call; same loader
+      as review), with prompt.md as a one-line hint. A-6 verification scripts live in the change
+      dir (not linted, not in tsconfig, not product tests); sandbox state stays in the scratchpad;
+      reads the spec's "scratchpad only / not committed" hints as no product test code. A-7 D6
+      sentence scoped to sentinel review because interactive mode fetches (CF-12). A-8 docs refer
+      to the printed runDir, never spell runs/<owner>__<repo>/<id> (CF-13 corrected). A-9 the
+      only Mermaid is in privacy. Author: claude.
+    recorded_at: "2026-10-03T15:20:00Z"
+  - id: d-012
+    checkpoint_id: cp-006
+    selected_option_id: note_only
+    rationale: >-
+      D6 resolved by the user against the recommendation (refresh_command): the quick start
+      states the limitation in one sentence (sentinel reviews the copy downloaded at repo add
+      and does not pick up later pushes) with no refresh command. F3 is still filed.
+      Author: user (claude recommended refresh_command).
+    recorded_at: "2026-10-03T14:40:00Z"
+  - id: d-011
+    checkpoint_id: cp-005
+    selected_option_id: last_line
+    rationale: >-
+      D5 resolved by the user as recommended: the harness example's output.md asks for the
+      VERDICT line as the last line of the response, robust with the parser's tail window at
+      any length; the factory first-line mismatch is not mentioned in the guide and is filed as
+      F5. Author: claude->user.
+    recorded_at: "2026-10-03T14:40:00Z"
+  - id: d-010
+    checkpoint_id: spec
+    free_text: README links-only
+    rationale: >-
+      A-4: README gets only a "Using sentinel" list with the three links before
+      "Quick start (development)"; the heading already says "development", so no rename.
+      Matches the approved docs_flat option text. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-009
+    checkpoint_id: spec
+    free_text: TUI interactive-only framing
+    rationale: >-
+      A-3: bare sentinel needs stdin and stdout TTYs, else guidance and exit 1 (tui-flow.ts:73-87);
+      #82 makes the post-run prompt unsafe without a terminal. Docs present it as interactive-only
+      and send scripts to sentinel review. No issue number in user docs. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-008
+    checkpoint_id: spec
+    free_text: exit codes by pointer
+    rationale: >-
+      A-2: the mapping already lives in sentinel review --help (exit-code.ts, review-command.ts
+      EXIT_CODE_HELP); d-001 says link instead of repeat, so the quick start points there and
+      does not restate a table. #79 is a test gap, not user-relevant. The help text's omission
+      that pre-run errors also exit 1 is filed as F6. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-007
+    checkpoint_id: spec
+    free_text: documented config fields
+    rationale: >-
+      A-1: applying d-005's own "verified end to end" rule. Documented: config.yaml defaultEngine,
+      repos.yaml defaultHarness (and repo add --harness), SENTINEL_HOME, SENTINEL_OPENCODE_MODEL.
+      Dropped: extraSkills (parsed, never passed to loadHarnesses; F4). Wired but outside the
+      d-005 fold and not documented: validations, validationTimeoutMs, diffLimits,
+      reviewTimeoutMs, defaultBaseBranch, per-repo defaultEngine. Author: claude.
+    recorded_at: "2026-10-03T14:20:00Z"
+  - id: d-006
+    checkpoint_id: cp-004
+    selected_option_id: structural_only
+    rationale: >-
+      D4 resolved by the user against the recommendation (one_real_review): no live model call.
+      Verify install, repo add/list, runs list, error paths and the engine pre-flight without
+      invoking a model; the review/result steps of the quick start are documented from code and
+      QA must state the unverified-live gap explicitly. Author: user (claude recommended
+      one_real_review).
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-005
+    checkpoint_id: cp-003
+    selected_option_id: fold
+    rationale: >-
+      D3 resolved by the user as recommended: configuration folds into the three docs (engine
+      choice in the quick start, repos.yaml defaultHarness/extraSkills in the harness guide),
+      documenting only fields verified end to end. No 4th doc. Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-004
+    checkpoint_id: cp-002
+    selected_option_id: docs_flat
+    rationale: >-
+      D2 resolved by the user as recommended: docs/quick-start.md,
+      docs/build-your-own-harness.md, docs/privacy.md, flat, linked from README.
+      Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-003
+    checkpoint_id: cp-001
+    selected_option_id: from_source
+    rationale: >-
+      D1 resolved by the user as recommended: the quick start documents the source install
+      (git clone, npm ci, npm run build, npm install -g ., Node 22+) isolated in one step so the
+      release (#45) swaps a single step. Author: claude->user.
+    recorded_at: "2026-10-03T13:30:00Z"
+  - id: d-002
+    checkpoint_id: handoff
+    free_text: continue-lite
+    rationale: >-
+      Route confirmed by the proposal stage: docs-only, bounded, no PRD conflict, no new
+      architecture. Level A. Author: claude (orchestrator proposed continue-lite, evidence
+      agrees).
+    recorded_at: "2026-10-03T13:10:00Z"
+  - id: d-001
+    checkpoint_id: handoff
+    free_text: user-mandated documentation format
+    rationale: >-
+      Binding format from the user's handoff: users not contributors; at most 3 flat docs, one
+      per issue criterion, linked from README; fixed minimal structure (title, one-line
+      purpose, numbered steps, Next steps); short and scannable; at most one simple Mermaid per
+      doc (fewer than 8 nodes, no custom styles); user language; contributor docs untouched;
+      every command verified against real code; no production code; license out of scope.
+      Author: user.
+    recorded_at: "2026-10-03T13:10:00Z"
+open_risks:
+  - id: risk-e7f2h1-012
+    summary: >-
+      QA W3: commits f75d246 (S6), 239d7a9, 8e91c5a and the 4R/state commits exist only on a detached
+      HEAD; the branch ref claude/nifty-heisenberg-w3gn8z and its origin are at 8fb52de. Move or
+      push the branch to the current HEAD before the PR or the S6 docs fix is lost.
+      RESOLVED 2026-10-04 by the orchestrator: reflog shows `checkout: moving from
+      claude/nifty-heisenberg-w3gn8z to 8fb52de` at 2026-10-03 19:24:36Z, during the 4R lens
+      fan-out (a read-only review worker ran a state-changing checkout of the frozen target;
+      d-019). The branch was fast-forwarded to 8e91c5a (ancestor check passed, no history
+      rewrite), checked out, and pushed (8fb52de..8e91c5a).
+    severity: low
+    status: resolved
+  - id: risk-e7f2h1-013
+    summary: >-
+      QA W2: AC-19 open. F1-F9 (F8 Claude Code isolation flags, F9 OpenCode config precedence) must
+      be filed and listed in the PR body together with the d-006 not-verified-live gap
+      (risk-e7f2h1-002) and the d-016 / d-018 disclosures.
+    severity: medium
+    status: resolved
+    resolution: >-
+      AC-19 satisfied 2026-10-04: F1-F9 filed as #83 (F1 TUI hint), #84 (F2 --local-path),
+      #85 (F3 review never fetches), #86 (F4 extraSkills), #87 (F5 verdict position), #88 (F6
+      exit 1 help), #89 (F7 broken harness), #90 (F8 Claude Code isolation), #91 (F9 OpenCode
+      config precedence), all labelled optional; #16 linked in the PR for repo defaults.
+  - id: risk-e7f2h1-010
+    summary: >-
+      S5 observation: npm install -g . from a directory installs a symlink to the cloned folder, so
+      deleting sentinel-kit breaks the sentinel command; quick start section 2 does not say to keep
+      it. No doc claim is false. Optional one-line note for triage; moot once the release (#45)
+      replaces the source install.
+    severity: low
+  - id: risk-e7f2h1-011
+    summary: >-
+      S5 observation (AC-5): two small overlaps between docs (run-folder file list in quick-start 5
+      and privacy 3; prompt composition in guide 1 and privacy 1), both from the approved outlines.
+      Triage in 4R whether to link instead of repeat.
+    severity: low
+  - id: risk-e7f2h1-006
+    summary: >-
+      F5: factory output.md asks for the verdict on the first line but the parser reads only the
+      tail window, so long factory-harness reviews may end ambiguous. Guide example avoids it
+      under D5 last_line; product fix out of scope (candidate for #42).
+    severity: medium
+  - id: risk-e7f2h1-007
+    summary: >-
+      F3: sentinel review never fetches and the base resolves to the stale local branch, so later
+      reviews of a URL-added repo can show wrong diffs. Docs state it in one sentence (d-012);
+      users get no refresh command; F3 filed.
+    severity: medium
+  - id: risk-e7f2h1-009
+    summary: >-
+      The interactive harness list (guide check step) cannot be driven without a terminal in the
+      sandbox; verified structurally (listHarnessTypes uses the same loader as review, V11).
+    severity: low
+  - id: risk-e7f2h1-008
+    summary: >-
+      In the sandbox claude sits in /opt/node22/bin next to node; structural verification needs a
+      PATH shim so no model can be invoked (AC-10).
+    severity: low
+  - id: risk-e7f2h1-001
+    summary: >-
+      The source-install step goes stale when the release pipeline (#45) publishes the
+      package. Mitigation: isolate install in one step of the quick start.
+    severity: medium
+  - id: risk-e7f2h1-002
+    summary: >-
+      Per d-006 (structural_only) no live model call is made: the quick start's review and
+      result steps are verified against code and the engine pre-flight only, never against a
+      real engine run; opencode is absent from the sandbox. QA must disclose the gap and the PR
+      must say so.
+    severity: medium
+  - id: risk-e7f2h1-003
+    summary: >-
+      The TUI post-run prompt with stdin at EOF exits 13 (#82). The docs must present the TUI as
+      interactive-only and point scripts at sentinel review.
+    severity: low
+  - id: risk-e7f2h1-004
+    summary: >-
+      Exit code 2 is not covered end to end (#79). Document the real mapping with a caveat
+      only if the spec decides to document exit codes.
+    severity: low
+  - id: risk-e7f2h1-005
+    summary: >-
+      Friction found while verifying (TUI empty-state hint says repo add <alias> <url> but real
+      usage is repo add <url>; repo add --local-path without an origin remote needs
+      --base-branch). To be filed as GitHub issues, not fixed in this PR.
+    severity: low
+qa_summary:
+  mode: final
+  verdict: pass_with_warnings
+  summary: >-
+    AC-1..AC-18 pass against the post-S6 docs; AC-19 deferred to PR time. Gates re-run green, replay
+    79/79 with engine absence 10/10, no model call. Warnings: not verified live (d-006), F1-F9 not
+    yet filed, S6 commits only on a detached HEAD. Completion deferred to final_review cp-017.
+  reported_at: "2026-10-04T11:15:00Z"
+  report_path: sdd-lite/openspec/changes/e7-f2-h1-user-docs/qa-report.md
+review_summary:
+  mode: 4r
+  verdict: pass_with_warnings
+  round: 0
+  counts:
+    confirmed: 0
+    suspect: 0
+    escalated: 0
+    info: 12
+  summary: >-
+    Forced full-4r (d-016) over frozen target 8fb52de (docs diff sha256 148975f2...), four
+    docs-adapted lenses, one sweep each, no refuter needed. Zero severe findings; twelve info
+    rows in review-ledger.md. Notable info rows: R3-001 (quick start says failureStage/
+    failureMessage explain any non-ok state; false for ambiguous), R1-001 (reviews persist in
+    Claude Code session history), R1-002/R1-003 (engine restrictions overstated), R1-004
+    (interrupted reviews leave the branch copy under worktrees/), R1-005 (token in URL is
+    stored), R4-002 (private repos need stored git credentials). Fixing them is a user choice.
+  ledger: sdd-lite/openspec/changes/e7-f2-h1-user-docs/review-ledger.md
+next_action:
+  kind: complete
+  summary: >-
+    Change completed (d-020). Closeout outside the lifecycle: history entry, file follow-up
+    issues F1-F9, open PR [E7.F2.H1] User documentation (Closes #43).
+created_at: "2026-10-03T13:10:00Z"
+updated_at: "2026-10-04T11:55:00Z"

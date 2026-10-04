@@ -19,6 +19,12 @@ core owns.
 > dogfooding, user documentation, licence and release. Scope and progress:
 > [docs/backlog-mvp-sentinel.md](./docs/backlog-mvp-sentinel.md).
 
+## Using sentinel
+
+- [Quick start](./docs/quick-start.md) — install sentinel and review your first branch.
+- [Build your own harness](./docs/build-your-own-harness.md) — write your own review instructions.
+- [What sentinel sends and stores](./docs/privacy.md) — what leaves your machine and what stays on disk.
+
 ## Quick start (development)
 
 Requires **Node ≥ 22**.

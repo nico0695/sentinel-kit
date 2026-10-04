@@ -16,7 +16,7 @@ core owns.
 > engine adapters (E4 — the spikes are resolved and the engines are no longer
 > stubbed), declared validations and run history, and both product surfaces —
 > the `sentinel` CLI and the interactive TUI. **E7 remains open**: E2E smoke,
-> dogfooding, user documentation, licence and release. Scope and progress:
+> dogfooding, user documentation and release. Scope and progress:
 > [docs/backlog-mvp-sentinel.md](./docs/backlog-mvp-sentinel.md).
 
 ## Using sentinel
@@ -58,4 +58,4 @@ the change workflow is [`CLAUDE.md`](./CLAUDE.md) + `sdd-lite/`.
 
 Everything persisted in this repository is **English**. Changes follow
 Conventional Commits and the one-PR-per-story workflow; a human reviews and
-merges everything. License is not yet decided (tracked for the wrap-up epic).
+merges everything. Licensed under the [MIT License](./LICENSE).

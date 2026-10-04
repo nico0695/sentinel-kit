@@ -745,6 +745,12 @@ open_risks:
       be filed and listed in the PR body together with the d-006 not-verified-live gap
       (risk-e7f2h1-002) and the d-016 / d-018 disclosures.
     severity: medium
+    status: resolved
+    resolution: >-
+      AC-19 satisfied 2026-10-04: F1-F9 filed as #83 (F1 TUI hint), #84 (F2 --local-path),
+      #85 (F3 review never fetches), #86 (F4 extraSkills), #87 (F5 verdict position), #88 (F6
+      exit 1 help), #89 (F7 broken harness), #90 (F8 Claude Code isolation), #91 (F9 OpenCode
+      config precedence), all labelled optional; #16 linked in the PR for repo defaults.
   - id: risk-e7f2h1-010
     summary: >-
       S5 observation: npm install -g . from a directory installs a symlink to the cloned folder, so
@@ -841,4 +847,4 @@ next_action:
     Change completed (d-020). Closeout outside the lifecycle: history entry, file follow-up
     issues F1-F9, open PR [E7.F2.H1] User documentation (Closes #43).
 created_at: "2026-10-03T13:10:00Z"
-updated_at: "2026-10-04T11:40:00Z"
+updated_at: "2026-10-04T11:55:00Z"
